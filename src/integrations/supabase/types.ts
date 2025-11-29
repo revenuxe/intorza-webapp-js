@@ -14,6 +14,365 @@ export type Database = {
   }
   public: {
     Tables: {
+      clients: {
+        Row: {
+          address: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          client_id: string | null
+          client_name: string
+          created_at: string | null
+          due_date: string | null
+          id: string
+          invoice_date: string | null
+          invoice_number: string
+          notes: string | null
+          paid_amount: number | null
+          project_name: string
+          quotation_id: string | null
+          remaining_amount: number | null
+          status: string | null
+          total_amount: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          client_name: string
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_number: string
+          notes?: string | null
+          paid_amount?: number | null
+          project_name: string
+          quotation_id?: string | null
+          remaining_amount?: number | null
+          status?: string | null
+          total_amount: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string | null
+          client_name?: string
+          created_at?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_number?: string
+          notes?: string | null
+          paid_amount?: number | null
+          project_name?: string
+          quotation_id?: string | null
+          remaining_amount?: number | null
+          status?: string | null
+          total_amount?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          invoice_id: string
+          notes: string | null
+          payment_date: string | null
+          payment_method: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          invoice_id: string
+          notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          invoice_id?: string
+          notes?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          company_name: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          gstin: string | null
+          id: string
+          logo_url: string | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          gstin?: string | null
+          id: string
+          logo_url?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          gstin?: string | null
+          id?: string
+          logo_url?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      quotation_items: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          depth: string | null
+          height_ft: number | null
+          id: string
+          notes: string | null
+          product_details: string | null
+          product_name: string
+          rate_per_sft: number | null
+          section_id: string
+          sft_area: number | null
+          side: string | null
+          sort_order: number
+          width_ft: number | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string | null
+          depth?: string | null
+          height_ft?: number | null
+          id?: string
+          notes?: string | null
+          product_details?: string | null
+          product_name: string
+          rate_per_sft?: number | null
+          section_id: string
+          sft_area?: number | null
+          side?: string | null
+          sort_order?: number
+          width_ft?: number | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string | null
+          depth?: string | null
+          height_ft?: number | null
+          id?: string
+          notes?: string | null
+          product_details?: string | null
+          product_name?: string
+          rate_per_sft?: number | null
+          section_id?: string
+          sft_area?: number | null
+          side?: string | null
+          sort_order?: number
+          width_ft?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_items_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotation_sections: {
+        Row: {
+          created_at: string | null
+          id: string
+          quotation_id: string
+          section_name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          quotation_id: string
+          section_name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          quotation_id?: string
+          section_name?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_sections_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotations: {
+        Row: {
+          client_address: string | null
+          client_id: string | null
+          client_name: string
+          created_at: string | null
+          date_of_proposal: string | null
+          discount_amount: number | null
+          grand_total: number | null
+          gst_amount: number | null
+          gst_enabled: boolean | null
+          gst_percentage: number | null
+          id: string
+          notes: string | null
+          place_of_project: string | null
+          project_name: string
+          project_type: string | null
+          quotation_number: string
+          quotation_title: string | null
+          status: string | null
+          subtotal: number | null
+          updated_at: string | null
+          user_id: string
+          valid_till: string | null
+          warranty: string | null
+        }
+        Insert: {
+          client_address?: string | null
+          client_id?: string | null
+          client_name: string
+          created_at?: string | null
+          date_of_proposal?: string | null
+          discount_amount?: number | null
+          grand_total?: number | null
+          gst_amount?: number | null
+          gst_enabled?: boolean | null
+          gst_percentage?: number | null
+          id?: string
+          notes?: string | null
+          place_of_project?: string | null
+          project_name: string
+          project_type?: string | null
+          quotation_number: string
+          quotation_title?: string | null
+          status?: string | null
+          subtotal?: number | null
+          updated_at?: string | null
+          user_id: string
+          valid_till?: string | null
+          warranty?: string | null
+        }
+        Update: {
+          client_address?: string | null
+          client_id?: string | null
+          client_name?: string
+          created_at?: string | null
+          date_of_proposal?: string | null
+          discount_amount?: number | null
+          grand_total?: number | null
+          gst_amount?: number | null
+          gst_enabled?: boolean | null
+          gst_percentage?: number | null
+          id?: string
+          notes?: string | null
+          place_of_project?: string | null
+          project_name?: string
+          project_type?: string | null
+          quotation_number?: string
+          quotation_title?: string | null
+          status?: string | null
+          subtotal?: number | null
+          updated_at?: string | null
+          user_id?: string
+          valid_till?: string | null
+          warranty?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
