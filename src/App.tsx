@@ -10,6 +10,8 @@ import Invoices from "./pages/Invoices";
 import Clients from "./pages/Clients";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -19,17 +21,21 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/quotations" element={<Quotations />} />
-            <Route path="/invoices" element={<Invoices />} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/settings" element={<Settings />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Layout>
+        <Routes>
+          {/* Admin routes without Layout */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          
+          {/* Regular routes with Layout */}
+          <Route path="/" element={<Layout><Index /></Layout>} />
+          <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
+          <Route path="/invoices" element={<Layout><Invoices /></Layout>} />
+          <Route path="/clients" element={<Layout><Clients /></Layout>} />
+          <Route path="/settings" element={<Layout><Settings /></Layout>} />
+          
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
