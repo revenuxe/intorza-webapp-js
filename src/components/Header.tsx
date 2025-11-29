@@ -1,4 +1,4 @@
-import { Menu } from "lucide-react";
+import { Menu, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -6,9 +6,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Navigation } from "./Navigation";
+import { useAuth } from "@/hooks/useAuth";
 import logo from "@/assets/intorza-logo.webp";
 
 export const Header = () => {
+  const { signOut } = useAuth();
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="container flex h-16 items-center justify-between px-4">
@@ -33,6 +36,12 @@ export const Header = () => {
             className="h-7 md:h-8 w-auto object-contain"
           />
         </div>
+
+        {/* Mobile logout button */}
+        <Button variant="ghost" size="icon" onClick={signOut} className="lg:hidden h-9 w-9">
+          <LogOut className="h-5 w-5" />
+          <span className="sr-only">Logout</span>
+        </Button>
       </div>
     </header>
   );
