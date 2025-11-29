@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { generateQuotationPDF } from "@/lib/pdfGenerator";
 
 interface LineItem {
   id: string;
@@ -29,6 +32,7 @@ interface Section {
 
 
 const CreateQuotation = () => {
+  const { toast } = useToast();
   const [sections, setSections] = useState<Section[]>([
     {
       id: "1",
@@ -39,12 +43,57 @@ const CreateQuotation = () => {
     },
   ]);
   const [projectTitle, setProjectTitle] = useState("BEST BUDGET");
+  const [clientName, setClientName] = useState("");
+  const [clientAddress, setClientAddress] = useState("");
+  const [dateOfProposal, setDateOfProposal] = useState("");
   const [quotationValidTill, setQuotationValidTill] = useState("");
+  const [placeOfProject, setPlaceOfProject] = useState("");
   const [warranty, setWarranty] = useState("10");
   const [projectType, setProjectType] = useState("");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState("18");
   const [discount, setDiscount] = useState(0);
+  const [profile, setProfile] = useState({
+    company_name: "",
+    logo_url: "",
+    address: "",
+    phone: "",
+    email: "",
+    gstin: "",
+    professional_advantages: ""
+  });
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setProfile({
+          company_name: data.company_name || "",
+          logo_url: data.logo_url || "",
+          address: data.address || "",
+          phone: data.phone || "",
+          email: data.email || "",
+          gstin: data.gstin || "",
+          professional_advantages: data.professional_advantages || ""
+        });
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    }
+  };
 
   const addSection = () => {
     setSections([
@@ -124,6 +173,59 @@ const CreateQuotation = () => {
   const gstAmount = gstEnabled ? (subtotal * parseFloat(gstRate)) / 100 : 0;
   const grandTotal = subtotal + gstAmount - discount;
 
+  const handleDownloadPDF = async () => {
+    try {
+      if (!clientName || !clientAddress) {
+        toast({
+          title: "Missing information",
+          description: "Please fill in client name and address before downloading PDF",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await generateQuotationPDF({
+        quotationTitle: projectTitle,
+        clientName,
+        clientAddress,
+        dateOfProposal: dateOfProposal || new Date().toLocaleDateString('en-IN'),
+        quotationValidTill: quotationValidTill || '',
+        placeOfProject: placeOfProject || '',
+        warranty,
+        projectType,
+        sections: sections.map(section => ({
+          title: section.title,
+          items: section.items
+        })),
+        subtotal,
+        gstEnabled,
+        gstRate: parseFloat(gstRate),
+        gstAmount,
+        discount,
+        grandTotal,
+        companyLogo: profile.logo_url,
+        companyName: profile.company_name,
+        companyAddress: profile.address,
+        companyPhone: profile.phone,
+        companyEmail: profile.email,
+        gstin: profile.gstin,
+        professionalAdvantages: profile.professional_advantages
+      });
+
+      toast({
+        title: "PDF Downloaded",
+        description: "Your quotation PDF has been generated successfully",
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "PDF Generation Failed",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
       <div className="flex flex-col gap-6">
@@ -161,15 +263,30 @@ const CreateQuotation = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="clientName">Client Name</Label>
-                <Input id="clientName" placeholder="Enter client name" />
+                <Input 
+                  id="clientName" 
+                  placeholder="Enter client name"
+                  value={clientName}
+                  onChange={(e) => setClientName(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="clientAddress">Client Address</Label>
-                <Input id="clientAddress" placeholder="Enter address" />
+                <Input 
+                  id="clientAddress" 
+                  placeholder="Enter address"
+                  value={clientAddress}
+                  onChange={(e) => setClientAddress(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dateOfProposal">Date of Proposal</Label>
-                <Input id="dateOfProposal" type="date" />
+                <Input 
+                  id="dateOfProposal" 
+                  type="date"
+                  value={dateOfProposal}
+                  onChange={(e) => setDateOfProposal(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="quotationValidTill">Quotation Valid Till</Label>
@@ -182,7 +299,12 @@ const CreateQuotation = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="placeOfProject">Place of Project</Label>
-                <Input id="placeOfProject" placeholder="Enter location" />
+                <Input 
+                  id="placeOfProject" 
+                  placeholder="Enter location"
+                  value={placeOfProject}
+                  onChange={(e) => setPlaceOfProject(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="warranty">Warranty (Years)</Label>
@@ -518,8 +640,8 @@ const CreateQuotation = () => {
               <Button variant="outline" className="w-full">
                 Save as Draft
               </Button>
-              <Button variant="outline" className="w-full">
-                Preview PDF
+              <Button variant="outline" className="w-full" onClick={handleDownloadPDF}>
+                Download PDF
               </Button>
               <Button className="w-full">
                 Save & Send
