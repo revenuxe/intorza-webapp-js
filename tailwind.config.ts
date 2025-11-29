@@ -13,7 +13,16 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ['Manrope', 'system-ui', 'sans-serif'],
+      },
       colors: {
+        charcoal: "hsl(var(--charcoal))",
+        "warm-beige": "hsl(var(--warm-beige))",
+        "soft-grey": "hsl(var(--soft-grey))",
+        terracotta: "hsl(var(--terracotta))",
+        navy: "hsl(var(--navy))",
+        gold: "hsl(var(--gold))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
