@@ -173,6 +173,120 @@ const CreateQuotation = () => {
   const gstAmount = gstEnabled ? (subtotal * parseFloat(gstRate)) / 100 : 0;
   const grandTotal = subtotal + gstAmount - discount;
 
+  const handleSaveQuotation = async (status: string) => {
+    try {
+      if (!clientName || !projectTitle) {
+        toast({
+          title: "Missing information",
+          description: "Please fill in client name and project title",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      // Generate quotation number
+      const quotationNumber = `QT-${Date.now()}`;
+
+      // Insert quotation
+      const { data: quotationData, error: quotationError } = await supabase
+        .from('quotations')
+        .insert({
+          user_id: user.id,
+          quotation_number: quotationNumber,
+          quotation_title: projectTitle,
+          client_name: clientName,
+          client_address: clientAddress,
+          project_name: projectTitle,
+          date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
+          valid_till: quotationValidTill,
+          place_of_project: placeOfProject,
+          warranty: warranty,
+          project_type: projectType,
+          status: status,
+          gst_enabled: gstEnabled,
+          gst_percentage: parseFloat(gstRate),
+          gst_amount: gstAmount,
+          discount_amount: discount,
+          subtotal: subtotal,
+          grand_total: grandTotal,
+        })
+        .select()
+        .single();
+
+      if (quotationError) throw quotationError;
+
+      // Insert sections and items
+      for (const section of sections) {
+        const { data: sectionData, error: sectionError } = await supabase
+          .from('quotation_sections')
+          .insert({
+            quotation_id: quotationData.id,
+            section_name: section.title,
+            sort_order: sections.indexOf(section),
+          })
+          .select()
+          .single();
+
+        if (sectionError) throw sectionError;
+
+        // Insert items for this section
+        const itemsToInsert = section.items.map((item, index) => ({
+          section_id: sectionData.id,
+          side: item.side,
+          product_name: item.productName,
+          product_details: item.productDetails,
+          width_ft: item.widthFt,
+          height_ft: item.heightFt,
+          depth: item.depth.toString(),
+          sft_area: item.sftArea,
+          rate_per_sft: item.ratePerSft,
+          amount: item.amount,
+          sort_order: index,
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('quotation_items')
+          .insert(itemsToInsert);
+
+        if (itemsError) throw itemsError;
+      }
+
+      toast({
+        title: "Quotation saved",
+        description: `Quotation ${quotationNumber} has been saved successfully`,
+      });
+
+      // Reset form if saved as pending
+      if (status === 'pending') {
+        setClientName("");
+        setClientAddress("");
+        setDateOfProposal("");
+        setQuotationValidTill("");
+        setPlaceOfProject("");
+        setProjectType("");
+        setSections([
+          {
+            id: "1",
+            title: "KITCHEN WITHOUT CIVIL AND ACCESSORIES",
+            items: [
+              { id: "1", side: "A", productName: "BASE UNIT-1", productDetails: "", widthFt: 0, heightFt: 0, depth: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
+            ],
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error('Error saving quotation:', error);
+      toast({
+        title: "Save failed",
+        description: "Failed to save quotation. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDownloadPDF = async () => {
     try {
       if (!clientName || !clientAddress) {
@@ -325,16 +439,13 @@ const CreateQuotation = () => {
                   placeholder="e.g., Residential - 2BHK RENOVATION" 
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="logo">Company Logo</Label>
-                <div className="flex items-center gap-4">
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Upload className="h-4 w-4" />
-                    Upload Logo
-                  </Button>
-                  <span className="text-sm text-muted-foreground">No file chosen</span>
+              {!profile.logo_url && (
+                <div className="space-y-2 md:col-span-2 p-3 bg-muted/30 rounded-lg">
+                  <p className="text-sm text-muted-foreground">
+                    Company logo not uploaded. <a href="/settings" className="text-primary underline">Go to Settings</a> to upload your logo.
+                  </p>
                 </div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -637,13 +748,13 @@ const CreateQuotation = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-4">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full" onClick={() => handleSaveQuotation('draft')}>
                 Save as Draft
               </Button>
               <Button variant="outline" className="w-full" onClick={handleDownloadPDF}>
                 Download PDF
               </Button>
-              <Button className="w-full">
+              <Button className="w-full" onClick={() => handleSaveQuotation('pending')}>
                 Save & Send
               </Button>
             </div>
