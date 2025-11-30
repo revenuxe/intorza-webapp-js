@@ -64,10 +64,27 @@ const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: numb
     img.src = imageUrl;
   });
 
-// ---- currency formatter used everywhere ----
+// ---- smart number formatters ----
+// formatINR: if value is whole number => show no decimal places (₹ 1,200)
+// otherwise show two decimals (₹ 1,234.50)
 const formatINR = (v?: number | null) => {
   const n = Number(v || 0);
-  return '₹ ' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const opts = Number.isInteger(n)
+    ? { minimumFractionDigits: 0, maximumFractionDigits: 0 }
+    : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+  return '₹ ' + n.toLocaleString('en-IN', opts);
+};
+
+// formatNumberSmart: for width/height/SQFT — hide .00 when integer,
+// keep one decimal if there's a single decimal like 12.5, keep two decimals for fractional precision if needed.
+const formatNumberSmart = (v?: number | null, maxDecimals = 2) => {
+  const n = Number(v || 0);
+  if (Number.isInteger(n)) return String(n);
+  // remove trailing zeros but keep up to maxDecimals significant decimals
+  return n.toLocaleString('en-IN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDecimals
+  });
 };
 
 // ---- main generator ----
@@ -80,6 +97,8 @@ export const generateQuotationPDF = async (dataIn: QuotationData) => {
     sections: [],
     ...dataIn
   };
+
+  const companyName = data.companyName || 'COMPANY';
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4', compress: true });
   const pageW = doc.internal.pageSize.getWidth();
@@ -100,7 +119,7 @@ export const generateQuotationPDF = async (dataIn: QuotationData) => {
 
   // ---------- Header: small fixed-size logo at top-left + compact company info ----------
   const logoW = 40;
-  const logoH = 28; // non-square helps avoid vertical stretch while keeping small
+  const logoH = 28;
   const logoX = margin;
   const logoY = y;
 
@@ -108,19 +127,18 @@ export const generateQuotationPDF = async (dataIn: QuotationData) => {
     try { doc.addImage(compressedLogo, 'JPEG', logoX, logoY, logoW, logoH, undefined, 'FAST'); }
     catch (e) { console.warn('logo add failed', e); }
   } else {
-    // fallback initials (no stretching)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
-    doc.text((data.companyName || 'COMPANY').slice(0, 12), logoX + 1, logoY + 10);
+    doc.text(companyName.slice(0, 12), logoX + 1, logoY + 10);
   }
 
-  // compact company details to the right of logo (no big card)
+  // compact company details to the right of logo
   const infoX = logoX + logoW + 8;
   const infoMaxW = contentW - logoW - 8;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor(20, 20, 20);
-  doc.text(data.companyName || 'COMPANY NAME', infoX, logoY + 8, { maxWidth: infoMaxW });
+  doc.text(companyName, infoX, logoY + 8, { maxWidth: infoMaxW });
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
@@ -191,18 +209,16 @@ export const generateQuotationPDF = async (dataIn: QuotationData) => {
     doc.text(section.title.toUpperCase(), margin + 2, y);
     y += 8;
 
-    // prepare table rows
     const rows = (section.items || []).map(it => [
       it.side || '-',
       it.productName || '-',
       it.productDetails || '-',
-      (it.widthFt || 0).toFixed(1),
-      (it.heightFt || 0).toFixed(1),
-      (it.sftArea || 0).toFixed(2),
+      formatNumberSmart(it.widthFt, 1),
+      formatNumberSmart(it.heightFt, 1),
+      formatNumberSmart(it.sftArea, 2),
       formatINR(it.amount || 0)
     ]);
 
-    // Use smaller font for units and amounts to prevent overflow:
     autoTable(doc, {
       startY: y,
       head: [['Side', 'Product Name', 'Product Details', 'Width (Ft)', 'Height (Ft)', 'SQFT', 'Amount']],
@@ -214,11 +230,9 @@ export const generateQuotationPDF = async (dataIn: QuotationData) => {
         0: { cellWidth: 16, halign: 'center' },
         1: { cellWidth: 46, halign: 'left' },
         2: { cellWidth: 62, halign: 'left' },
-        // reduce units font size and cell width slightly so they fit neatly
         3: { cellWidth: 18, halign: 'center', fontSize: 7 },
         4: { cellWidth: 18, halign: 'center', fontSize: 7 },
         5: { cellWidth: 18, halign: 'center', fontSize: 7 },
-        // widen amount column substantially and make amount font smaller (prevents overflow)
         6: { cellWidth: 56, halign: 'right', fontSize: 7.2 }
       },
       margin: { left: margin, right: margin },
@@ -227,7 +241,6 @@ export const generateQuotationPDF = async (dataIn: QuotationData) => {
 
     y = ((doc as any).lastAutoTable && (doc as any).lastAutoTable.finalY) ? (doc as any).lastAutoTable.finalY + 6 : y + 34;
 
-    // section total
     const sectionTotal = (section.items || []).reduce((s, it) => s + (it.amount || 0), 0);
     doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
     const totalX = pageW - margin - 84;
@@ -278,7 +291,7 @@ export const generateQuotationPDF = async (dataIn: QuotationData) => {
   // TOTAL SFT (if provided)
   if (data.totalSft != null) {
     doc.text('TOTAL SFT:', leftLabelX, sy);
-    doc.text(String(data.totalSft), rightValueX, sy, { align: 'right' });
+    doc.text(formatNumberSmart(data.totalSft, 2), rightValueX, sy, { align: 'right' });
     sy += 7;
   }
 
@@ -291,72 +304,69 @@ export const generateQuotationPDF = async (dataIn: QuotationData) => {
   // Total / Net payable
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
   doc.text('NET PAYABLE (Rounded):', leftLabelX, sy);
-  // prefer explicit grandTotal if provided, otherwise compute
   const computedGrand = data.grandTotal != null ? data.grandTotal : Number((data.subtotal || 0) - (data.discount || 0) - ((data.subtotal || 0) * ((smPct) / 100)) + (data.gstAmount || 0));
   doc.text(formatINR(computedGrand), rightValueX, sy, { align: 'right' });
 
   y += summaryH + 12;
 
-  // ---------- Insert the long Terms & Conditions / Site readiness / revision-drawings text verbatim ----------
+  // ---------- Insert the long Terms & Conditions / Site readiness / revision-drawings text (company-name aware) ----------
   ensureSpace(120);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 0, 0);
   doc.text('TERMS & CONDITIONS & SITE READINESS', margin, y);
   y += 8;
 
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-  // large block copied from user (verbatim). We'll break into paragraphs and let splitTextToSize handle wrapping.
+
   const bigText = `
-and then produce revision drawings that can be executed in one of four ways:  
+and then produce revision drawings that can be executed in one of four ways:
 1.) Provide the builder with amended civil, electrical, and plumbing details for completion.
-2.) Hire DEXOHOMES to revise the civil, electrical, and plumbing systems according to the plans.
-3.) Hire DEXOHOMES-recommended vendor to complete civil, electrical, and plumbing adjustments according to plans.
+2.) Hire ${companyName} to revise the civil, electrical, and plumbing systems according to the plans.
+3.) Hire a ${companyName}-recommended vendor to complete civil, electrical, and plumbing adjustments according to plans.
 4.) Hire a client-owned vendor to complete civil, electrical, and plumbing adjustments according to plans.
 
 The following is the procedure in such a case:
-1.) DEXOHOMES site survey and measurement team does not take site measurements.
+1.) The ${companyName} site survey and measurement team does not take site measurements.
 2.) Based on the builder's layout plan, the furniture arrangement (first cut plan and elevations) is established.
 
-If the customer insists on having measurements taken on a place that does not meet the three conditions listed above, the client is responsible.
+If the customer insists on having measurements taken on a place that does not meet the conditions listed above, the client is responsible.
 3.) Design services are suspended after the furniture design is finalised to a layout and elevation level.
 At this time, there will be no more design discussions about finishes and detailing.
 4.) An invoice is issued for the remaining 15% payment.
 5.) As per the payment, revised civil, electrical, and/or plumbing drawings are created, authorised, and given.
-above-mentioned terms and conditions
-6.) Design services are then put on hold until the project is ready for ownership and/or the builder's handover date, by accordance with the suspending design services terms and conditions listed below.
-7.) Because the client has paid up to 20% of the projected project value, the estimated prices are valid. Guaranteed for an additional two months, bringing the total validity to six months.
+6.) Design services are then put on hold until the project is ready for ownership and/or the builder's handover date, in accordance with the suspending design services terms and conditions listed below.
+7.) Because the client has paid up to 20% of the projected project value, the estimated prices are guaranteed for an additional two months, bringing the total validity to six months.
 
-(II) Site CONDITION is assessed again during the Kickoff meeting, resulting in the start of the Execution phase following the Client's approval.
-The following four parts of the site should be completed for order for the Kickoff meeting to proceed according to DEXOHOMES guidelines:
+(II) Site condition is assessed again during the Kickoff meeting, resulting in the start of the Execution phase following the Client's approval.
+The following four parts of the site should be completed for the Kickoff meeting to proceed according to guidelines:
 1.) The flooring should be finished.
 2.) Plastering should be done on the walls.
 3.) Work on the electrical and plumbing systems should be completed.
 4.) All work on the site must be reviewed and signed off.
 
-If these tasks aren't accomplished, the site's preparedness isn't complete, and the Execution phase can't get started. If site readiness is not available, we will not be able to complete the project's execution and installation phases.
+If these tasks aren't accomplished, the site's preparedness isn't complete, and the Execution phase cannot get started. If site readiness is not available, the Execution and installation phases cannot be completed.
 The Client is responsible for ensuring that the site is ready for installation and that there are no delays or pending work from the builder or the client's vendors.
 
-DELAYS AND QUALITY PROBLEMS DURING THE DESIGN PHASE PENALTY
-When we say we'll finish your project in 45 days, 60 days, or 90 days, we're referring to the time it takes to execute the project after Design Sign-off. In terms of execution, the agreement specifies the beginning and finishing dates.
-The Design deadlines are in addition to the execution timelines already mentioned. Commencement Date (of Project): The starting date is the date on which the Accounts team realises the 5% advance as per the estimate.
-Date of completion (of the project's design phase): The completion date is when we receive 55 per cent of the cash and the Client gives a final sign-off on all drawings and the scope of work.
+DELAYS AND QUALITY PROBLEMS DURING THE DESIGN PHASE - PENALTY
+When we state project durations (e.g., 45, 60, or 90 days), these refer to the execution time after Design Sign-off. The agreement specifies commencement and completion dates for execution.
+Design deadlines are in addition to the execution timelines already mentioned. Commencement Date (of Project): The starting date is the date on which the Accounts team realises the 5% advance as per the estimate.
+Date of completion (of the project's design phase): The completion date is when we receive 55% of the cash and the Client gives a final sign-off on all drawings and the scope of work.
 
-The following activities will take place in the first two weeks after the 5 per cent advance is realised:
-1.) The Client Happiness team will call you to say hello.
-2.) Scheduling of site visits by the Site Measurement, Survey, and Record teams (this is subject to Site Readiness, which the customer must confirm).
+The following activities will take place in the first two weeks after the 5% advance is realised:
+1.) The Client Happiness team will call to introduce themselves.
+2.) Scheduling of site visits by the Site Measurement, Survey, and Record teams (subject to Site Readiness, which the customer must confirm).
 3.) Designer assignment.
 4.) Designers' initial contact with the client.
-5.) The first meeting at the site will be organised and finished within the first 7-10 days, if possible, based on mutual convenience (DEXOHHOMES designer & Client) (and Site preparedness).
+5.) The first meeting at the site will be organised and finished within the first 7-10 days, if possible, based on mutual convenience (Designer & Client) and Site preparedness.
 
-* Any delays caused by Client vendors, Site readiness, Payment delays, Client Selections not completed, Builder delays, Client delays in accepting quotations, and other delays due to Client dependencies in the design service days and/or due to force majeure conditions will not be included in the delayed days.
-* After a two-week grace period, DEXOHOMES will charge Rs. 5,000 per week on a pro-rata basis for all days of delay beyond the handover date due to DEXOHOMES faults.
+* Any delays caused by client vendors, site readiness, payment delays, client selections not completed, builder delays, client delays in accepting quotations, and other client dependencies or force majeure conditions will not be included in the delay days.
+* After a two-week grace period, ${companyName} will charge Rs. 5,000 per week on a pro-rata basis for all days of delay beyond the handover date due to ${companyName} faults.
 * The penalty will not exceed 5% of the project's total value.
-* Aside from the above-mentioned delay compensation, no other compensation would be offered.
+* Aside from the above-mentioned delay compensation, no other compensation will be offered.
 
 CHANGES IN DESIGN DUE TO TECHNICAL IMPOSSIBILITY
 Due to site conditions, material modifications, and/or other factors, there may be design adjustments at the time of implementation. When the Client is informed of the changes, they should approve them.
 `;
 
-  // split into paragraphs and render with paging
   const paragraphs = bigText.trim().split(/\n\s*\n/);
   for (const p of paragraphs) {
     ensureSpace(80);
@@ -365,10 +375,10 @@ Due to site conditions, material modifications, and/or other factors, there may 
     y += lines.length * 4 + 6;
   }
 
-  // ---------- Acceptance & signature lines (as requested) ----------
+  // ---------- Acceptance & signature lines ----------
   ensureSpace(120);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(0, 0, 0);
-  doc.text('Accepteance from Customer For DEXOHOMES.', margin, y);
+  doc.text(`Acceptance from Customer for ${companyName}`, margin, y);
   y += 8;
   doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
   doc.text('Signatory Authorized Signatory', margin, y);
@@ -377,7 +387,8 @@ Due to site conditions, material modifications, and/or other factors, there may 
   // signature boxes
   ensureSpace(90);
   const sigW = 86, sigH = 36;
-  doc.roundedRect(margin, y, sigW, sigH, 2, 2); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(110, 110, 110);
+  doc.roundedRect(margin, y, sigW, sigH, 2, 2);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(110, 110, 110);
   doc.text('Customer Signature', margin + 4, y + sigH + 6);
 
   const compX = pageW - margin - sigW;
@@ -385,7 +396,7 @@ Due to site conditions, material modifications, and/or other factors, there may 
   if (compressedSignature) {
     try { doc.addImage(compressedSignature, 'JPEG', compX + 6, y + 6, sigW - 12, sigH - 10, undefined, 'FAST'); } catch (e) { /* ignore */ }
   }
-  doc.text(`For ${data.companyName || 'DEXOHOMES'}`, compX + 4, y + sigH + 6);
+  doc.text(`For ${companyName}`, compX + 4, y + sigH + 6);
   y += sigH + 12;
 
   // ---------- final footer ----------
@@ -396,6 +407,7 @@ Due to site conditions, material modifications, and/or other factors, there may 
   const safeName = (data.clientName || 'client').replace(/\s+/g, '_');
   doc.save(`Quotation_${safeName}.pdf`);
 };
+
 
 
 
