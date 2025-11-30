@@ -52,6 +52,7 @@ const CreateQuotation = () => {
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState("18");
   const [discount, setDiscount] = useState(0);
+  const [enableSocialMediaDiscount, setEnableSocialMediaDiscount] = useState(false);
   const [profile, setProfile] = useState({
     company_name: "",
     logo_url: "",
@@ -171,8 +172,13 @@ const CreateQuotation = () => {
     (sum, section) => sum + section.items.reduce((itemSum, item) => itemSum + item.amount, 0),
     0
   );
-  const gstAmount = gstEnabled ? (subtotal * parseFloat(gstRate)) / 100 : 0;
-  const grandTotal = subtotal + gstAmount - discount;
+  
+  // Calculate social media discount (6% of subtotal)
+  const socialMediaDiscountAmount = enableSocialMediaDiscount ? subtotal * 0.06 : 0;
+  const discountAmount = enableSocialMediaDiscount ? socialMediaDiscountAmount : discount;
+  
+  const gstAmount = gstEnabled ? ((subtotal - discountAmount) * parseFloat(gstRate)) / 100 : 0;
+  const grandTotal = subtotal - discountAmount + gstAmount;
 
   const handleSaveQuotation = async (status: string) => {
     try {
@@ -315,7 +321,7 @@ const CreateQuotation = () => {
         gstEnabled,
         gstRate: parseFloat(gstRate),
         gstAmount,
-        discount,
+        discount: enableSocialMediaDiscount ? socialMediaDiscountAmount : discount,
         grandTotal,
         companyLogo: profile.logo_url,
         companyName: profile.company_name,
@@ -324,7 +330,8 @@ const CreateQuotation = () => {
         companyEmail: profile.email,
         gstin: profile.gstin,
         professionalAdvantages: profile.professional_advantages,
-        signatureUrl: profile.signature_url
+        signatureUrl: profile.signature_url,
+        enableSocialMediaDiscount
       });
 
       toast({
@@ -477,8 +484,8 @@ const CreateQuotation = () => {
             <CardContent className="space-y-4">
               {/* Table Header - Hidden on mobile, shown on tablet+ */}
               <div className="hidden md:block overflow-x-auto">
-                <div className="min-w-[900px]">
-                  <div className="grid grid-cols-[60px_120px_1fr_80px_80px_80px_100px_100px] gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
+                <div className="min-w-[1000px]">
+                  <div className="grid grid-cols-[60px_120px_1fr_80px_80px_80px_100px_100px_100px] gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
                     <div>Side</div>
                     <div>Product Name</div>
                     <div>Product Details</div>
@@ -486,6 +493,7 @@ const CreateQuotation = () => {
                     <div>Height (Ft)</div>
                     <div>Sft Area</div>
                     <div>Rate/Sft</div>
+                    <div>Price/Sq.ft</div>
                     <div>Amount</div>
                   </div>
                 </div>
@@ -510,8 +518,8 @@ const CreateQuotation = () => {
 
                   {/* Desktop Table Row */}
                   <div className="hidden md:block overflow-x-auto">
-                    <div className="min-w-[900px]">
-                      <div className="grid grid-cols-[60px_120px_1fr_80px_80px_80px_100px_100px] gap-2">
+                    <div className="min-w-[1000px]">
+                      <div className="grid grid-cols-[60px_120px_1fr_80px_80px_80px_100px_100px_100px] gap-2">
                         <Input
                           value={item.side}
                           onChange={(e) => updateItem(section.id, item.id, "side", e.target.value)}
@@ -561,7 +569,10 @@ const CreateQuotation = () => {
                           step="0.01"
                           className="h-9"
                         />
-                        <div className="h-9 flex items-center font-medium">
+                        <div className="h-9 flex items-center font-medium tabular-nums">
+                          ₹{item.ratePerSft.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </div>
+                        <div className="h-9 flex items-center font-semibold tabular-nums">
                           ₹{item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </div>
                       </div>
@@ -644,10 +655,15 @@ const CreateQuotation = () => {
                       </div>
                     </div>
 
-                    <div className="text-right pt-2 border-t">
-                      <span className="text-sm font-medium">
-                        Amount: ₹{item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </span>
+                    <div className="space-y-1 pt-2 border-t">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Price/Sq.ft:</span>
+                        <span className="font-medium tabular-nums">₹{item.ratePerSft.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-sm font-medium">Amount:</span>
+                        <span className="font-semibold tabular-nums">₹{item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -712,18 +728,37 @@ const CreateQuotation = () => {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="discount">Discount (Optional)</Label>
-                <Input
-                  id="discount"
-                  type="number"
-                  value={discount}
-                  onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                />
+              <div className="flex items-center justify-between py-2 border-t border-border">
+                <div className="flex items-center gap-2">
+                  <Switch 
+                    checked={enableSocialMediaDiscount} 
+                    onCheckedChange={setEnableSocialMediaDiscount}
+                  />
+                  <Label className="cursor-pointer">Social Media Special Discount (6%)</Label>
+                </div>
               </div>
+
+              {enableSocialMediaDiscount && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Social Media Discount (6%)</span>
+                  <span className="font-medium text-green-600">-₹{socialMediaDiscountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
+
+              {!enableSocialMediaDiscount && (
+                <div className="space-y-2">
+                  <Label htmlFor="discount">Discount (Optional)</Label>
+                  <Input
+                    id="discount"
+                    type="number"
+                    value={discount}
+                    onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
 
               <div className="flex justify-between text-lg font-bold pt-3 border-t border-border">
                 <span>Grand Total</span>
