@@ -245,7 +245,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     // Section Header "Card"
     // Clean underline style with bold text
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
+    doc.setFontSize(10);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text(section.title.toUpperCase(), margin, yPosition + 4);
     
@@ -283,29 +283,30 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       theme: 'grid', // Cleaner looking than plain
       styles: {
         font: 'helvetica',
-        fontSize: 8,
+        fontSize: 7,
         textColor: COLORS.TEXT_SECONDARY,
         lineColor: COLORS.BORDER,
         lineWidth: 0.1,
-        cellPadding: 4,
+        cellPadding: 3,
       },
       headStyles: {
         fillColor: [255, 255, 255], // White background
         textColor: COLORS.TEXT_PRIMARY, // Black text
         fontStyle: 'bold',
+        fontSize: 7,
         lineWidth: 0.1,
         lineColor: COLORS.BORDER, // Border for header
         halign: 'left'
       },
       columnStyles: {
-        0: { cellWidth: 10, halign: 'center' },
-        1: { cellWidth: 30, fontStyle: 'bold' },
-        2: { cellWidth: 'auto' },
-        3: { cellWidth: 13, halign: 'center' },
-        4: { cellWidth: 13, halign: 'center' },
-        5: { cellWidth: 13, halign: 'center' },
-        6: { cellWidth: 25, halign: 'right', fontStyle: 'bold' },
-        7: { cellWidth: 28, halign: 'right', fontStyle: 'bold' }
+        0: { cellWidth: 12, halign: 'center', fontSize: 6 },
+        1: { cellWidth: 28, fontStyle: 'bold', fontSize: 7 },
+        2: { cellWidth: 'auto', fontSize: 6 },
+        3: { cellWidth: 12, halign: 'center', fontSize: 6 },
+        4: { cellWidth: 12, halign: 'center', fontSize: 6 },
+        5: { cellWidth: 14, halign: 'center', fontSize: 7 },
+        6: { cellWidth: 24, halign: 'right', fontStyle: 'bold', fontSize: 7 },
+        7: { cellWidth: 26, halign: 'right', fontStyle: 'bold', fontSize: 7 }
       },
       margin: { left: margin, right: margin },
       didDrawPage: (d) => {
@@ -319,7 +320,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const sectionTotal = section.items.reduce((sum, item) => sum + item.amount, 0);
     
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text(`Total ${section.title}:  ${formatCurrency(sectionTotal)}`, pageWidth - margin, yPosition + 6, { align: 'right' });
     
@@ -351,7 +352,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // Render Summary as a Table but with custom styling
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(10);
   doc.text("PAYMENT SUMMARY", margin, yPosition);
   yPosition += 6;
 
@@ -380,12 +381,12 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     styles: {
       lineColor: COLORS.BORDER,
       lineWidth: 0.1,
-      cellPadding: 6,
-      fontSize: 9
+      cellPadding: 5,
+      fontSize: 8
     },
     columnStyles: {
-      0: { cellWidth: 120, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY },
-      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY }
+      0: { cellWidth: 120, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
+      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8 }
     },
     willDrawCell: (data) => {
       // Highlight the Grand Total Row
@@ -401,7 +402,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- 5. Stagewise Payment Option ---
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(10);
   doc.text("STAGEWISE PAYMENT OPTION", margin, yPosition);
   yPosition += 6;
 
@@ -421,19 +422,22 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     styles: {
         lineColor: COLORS.BORDER,
         lineWidth: 0.1,
-        textColor: COLORS.TEXT_SECONDARY
+        textColor: COLORS.TEXT_SECONDARY,
+        fontSize: 7,
+        cellPadding: 3
     },
     headStyles: {
       fillColor: COLORS.BG_CARD,
       textColor: COLORS.TEXT_PRIMARY,
       fontStyle: 'bold',
       lineColor: COLORS.BORDER,
-      lineWidth: 0.1
+      lineWidth: 0.1,
+      fontSize: 7
     },
     columnStyles: {
-      0: { cellWidth: 15, halign: 'center' },
-      1: { cellWidth: 'auto' },
-      2: { cellWidth: 30, halign: 'center', fontStyle: 'bold' }
+      0: { cellWidth: 15, halign: 'center', fontSize: 7 },
+      1: { cellWidth: 'auto', fontSize: 7 },
+      2: { cellWidth: 30, halign: 'center', fontStyle: 'bold', fontSize: 7 }
     },
     margin: { left: margin, right: margin }
   });
@@ -448,13 +452,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(10);
   doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
   doc.text("TERMS & CONDITIONS", margin, yPosition);
   yPosition += 8;
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8); 
+  doc.setFontSize(7);
   
   // Helper to add titled blocks
   const addBlock = (title: string, lines: string[]) => {
