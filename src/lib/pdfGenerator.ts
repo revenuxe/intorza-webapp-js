@@ -48,7 +48,8 @@ interface QuotationData {
 // --- Helpers ---
 
 const formatCurrency = (amount: number): string => {
-  return 'INR ' + Math.round(amount).toLocaleString('en-IN');
+  // Use Indian rupee system for better localization and clarity
+  return '₹ ' + Math.round(amount).toLocaleString('en-IN');
 };
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
@@ -100,38 +101,38 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   const contentWidth = pageWidth - (margin * 2);
   let yPosition = 15;
 
-  // --- Design System Colors ---
+  // --- Design System Colors (Brand Introduction) ---
   const COLORS = {
-    TEXT_PRIMARY: [20, 20, 20],      // Almost black
+    BRAND: [40, 100, 150],           // Deep Teal/Blue for accents
+    TEXT_PRIMARY: [30, 30, 30],      // Very Dark Grey
     TEXT_SECONDARY: [80, 80, 80],    // Dark Grey
-    TEXT_LIGHT: [120, 120, 120],     // Light Grey
-    BG_CARD: [250, 250, 250],        // Very light grey for cards
-    BORDER: [230, 230, 230],         // Subtle borders
-    ACCENT: [0, 0, 0],               // Black accent
-    HIGHLIGHT: [255, 240, 0],        // Yellow highlight
+    TEXT_LIGHT: [150, 150, 150],     // Light Grey for minor text
+    BG_CARD: [245, 245, 245],        // Soft grey for cards/fill
+    BORDER: [220, 220, 220],         // Subtle borders
+    GRAND_TOTAL_BG: [40, 100, 150],  // BRAND color for final total
+    GRAND_TOTAL_TEXT: [255, 255, 255], // White text on total
   };
 
-  // --- 1. Header Section (Clean & Minimal) ---
+  // --- 1. Header Section (Clean, Branded & Minimal) ---
   
-  // Logo - Top Left, No Background
+  // Logo - Top Left, Smart Placement
   let compressedLogo: string | null = null;
   if (data.companyLogo) {
     try {
       compressedLogo = await compressImage(data.companyLogo, 200, 150);
-      const logoSize = 30; // Slightly smaller, sharper
-      // Place effectively at top-left
+      const logoSize = 30;
       doc.addImage(compressedLogo, 'JPEG', margin, yPosition, logoSize, logoSize, undefined, 'FAST');
     } catch (e) { console.error(e); }
   }
 
-  // Company Details - Top Right
+  // Company Details - Top Right, Branded Name
   const companyInfoX = pageWidth - margin;
   let headerTextY = yPosition + 5;
   
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-  doc.text((data.companyName || 'COMPANY NAME').toUpperCase(), companyInfoX, headerTextY, { align: 'right' });
+  doc.setFontSize(22);
+  doc.setTextColor(COLORS.BRAND[0], COLORS.BRAND[1], COLORS.BRAND[2]); // Branded Company Name
+  doc.text((data.companyName || 'PREMIUM INTERIORS').toUpperCase(), companyInfoX, headerTextY, { align: 'right' });
   
   headerTextY += 7;
   doc.setFont('helvetica', 'normal');
@@ -147,8 +148,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
   
   const contactDetails = [];
-  if (data.companyPhone) contactDetails.push(data.companyPhone);
-  if (data.companyEmail) contactDetails.push(data.companyEmail);
+  if (data.companyPhone) contactDetails.push(`P: ${data.companyPhone}`);
+  if (data.companyEmail) contactDetails.push(`E: ${data.companyEmail}`);
   
   if (contactDetails.length > 0) {
     doc.text(contactDetails.join(' | '), companyInfoX, headerTextY, { align: 'right' });
@@ -157,10 +158,17 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   
   if (data.gstin) {
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text(`GSTIN: ${data.gstin}`, companyInfoX, headerTextY, { align: 'right' });
   }
 
-  yPosition += 35; // Move past header
+  // Full-width accent line below header
+  yPosition = Math.max(yPosition + 35, headerTextY + 5);
+  doc.setDrawColor(COLORS.BRAND[0], COLORS.BRAND[1], COLORS.BRAND[2]);
+  doc.setLineWidth(1);
+  doc.line(margin, yPosition, pageWidth - margin, yPosition);
+
+  yPosition += 8; // Move past header line
 
   // --- 2. Info Cards (Client & Project) ---
   
@@ -171,7 +179,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // Left Card: Client Info
   doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
   doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-  doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, 'FD'); // Fill & Draw
+  doc.setLineWidth(0.5);
+  doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, 'FD'); 
   
   let cardY = yPosition + 8;
   const cardPadding = 6;
@@ -180,12 +189,12 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-  doc.text('QUOTATION FOR', cardContentX, cardY);
+  doc.text('QUOTATION FOR CLIENT', cardContentX, cardY);
   
   cardY += 6;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+  doc.setFontSize(12); // Slightly larger client name
+  doc.setTextColor(COLORS.BRAND[0], COLORS.BRAND[1], COLORS.BRAND[2]);
   doc.text(data.clientName, cardContentX, cardY);
   
   cardY += 5;
@@ -203,12 +212,12 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   let metaY = yPosition + 8;
   const metaContentX = rightCardX + cardPadding;
   const metaLabelX = metaContentX;
-  const metaValueX = metaContentX + 30; // Align values
+  const metaValueX = rightCardX + cardWidth - cardPadding; // Align values right
   
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-  doc.text('PROJECT DETAILS', metaContentX, metaY);
+  doc.text('PROJECT METADATA', metaContentX, metaY);
   metaY += 6;
 
   const addMeta = (label: string, value: string) => {
@@ -219,18 +228,18 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-    doc.text(value, metaValueX, metaY);
+    doc.text(value, metaValueX, metaY, { align: 'right' }); // Right align value
     metaY += 5.5;
   };
 
-  addMeta('Date:', data.dateOfProposal);
-  addMeta('Valid Till:', data.quotationValidTill);
-  addMeta('Project:', data.quotationTitle.substring(0, 20)); // Truncate if too long
+  addMeta('Quotation Title:', data.quotationTitle.substring(0, 25) + (data.quotationTitle.length > 25 ? '...' : ''));
+  addMeta('Date of Proposal:', data.dateOfProposal);
+  addMeta('Quotation Valid Till:', data.quotationValidTill);
   addMeta('Warranty:', `${data.warranty} Years`);
 
   yPosition += cardHeight + 10;
 
-  // --- 3. Product Sections (Enhanced Cards) ---
+  // --- 3. Product Sections (High-Impact Tables) ---
   
   let totalSFT = 0;
 
@@ -241,19 +250,18 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       yPosition = 15;
     }
 
-    // Section Header "Card"
-    // Clean underline style with bold text
+    // Section Header (Enhanced Card Style)
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
+    doc.setFontSize(14);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text(section.title.toUpperCase(), margin, yPosition + 4);
     
-    // Draw a thick accent line below title
-    doc.setDrawColor(COLORS.ACCENT[0], COLORS.ACCENT[1], COLORS.ACCENT[2]);
-    doc.setLineWidth(0.7);
-    doc.line(margin, yPosition + 7, margin + 20, yPosition + 7); // Short accent line
+    // Draw a prominent BRAND accent line below title
+    doc.setDrawColor(COLORS.BRAND[0], COLORS.BRAND[1], COLORS.BRAND[2]);
+    doc.setLineWidth(1.5);
+    doc.line(margin, yPosition + 7, margin + 40, yPosition + 7); // Short, thick accent line
     
-    // Draw a thin full-width line
+    // Draw a thin grey full-width line
     doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
     doc.setLineWidth(0.2);
     doc.line(margin, yPosition + 7, pageWidth - margin, yPosition + 7);
@@ -276,33 +284,33 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
     autoTable(doc, {
       startY: yPosition,
-      head: [['Side', 'Product', 'Details', 'W (ft)', 'H (ft)', 'Sq.Ft', 'Amount']],
+      head: [['SIDE', 'PRODUCT NAME', 'DETAILS', 'W (ft)', 'H (ft)', 'SQ.FT', 'AMOUNT']],
       body: tableBody,
-      theme: 'grid', // Cleaner looking than plain
+      theme: 'grid', 
       styles: {
         font: 'helvetica',
-        fontSize: 8,
+        fontSize: 8.5,
         textColor: COLORS.TEXT_SECONDARY,
         lineColor: COLORS.BORDER,
         lineWidth: 0.1,
-        cellPadding: 4,
+        cellPadding: 3,
       },
       headStyles: {
-        fillColor: [255, 255, 255], // White background
-        textColor: COLORS.TEXT_PRIMARY, // Black text
+        fillColor: COLORS.BRAND, // Brand Color Header
+        textColor: [255, 255, 255], // White Text
         fontStyle: 'bold',
         lineWidth: 0.1,
-        lineColor: COLORS.BORDER, // Border for header
+        lineColor: COLORS.BRAND, 
         halign: 'left'
       },
       columnStyles: {
         0: { cellWidth: 10, halign: 'center' },
-        1: { cellWidth: 35, fontStyle: 'bold' },
+        1: { cellWidth: 35, fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY },
         2: { cellWidth: 'auto' },
-        3: { cellWidth: 15, halign: 'center' },
-        4: { cellWidth: 15, halign: 'center' },
-        5: { cellWidth: 15, halign: 'center' },
-        6: { cellWidth: 30, halign: 'right', fontStyle: 'bold' }
+        3: { cellWidth: 15, halign: 'right' }, // Right align numbers
+        4: { cellWidth: 15, halign: 'right' },
+        5: { cellWidth: 15, halign: 'right' },
+        6: { cellWidth: 30, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY } // Currency Right Align
       },
       margin: { left: margin, right: margin },
       didDrawPage: (d) => {
@@ -316,14 +324,14 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const sectionTotal = section.items.reduce((sum, item) => sum + item.amount, 0);
     
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-    doc.text(`Total ${section.title}:  ${formatCurrency(sectionTotal)}`, pageWidth - margin, yPosition + 6, { align: 'right' });
+    doc.setFontSize(10);
+    doc.setTextColor(COLORS.BRAND[0], COLORS.BRAND[1], COLORS.BRAND[2]); // Brand color for section total
+    doc.text(`Total for ${section.title}:  ${formatCurrency(sectionTotal)}`, pageWidth - margin, yPosition + 6, { align: 'right' });
     
     yPosition += 15;
   }
 
-  // --- 4. Payment Summary ---
+  // --- 4. Payment Summary (High-Contrast Totals) ---
   if (yPosition > pageHeight - 120) {
     doc.addPage();
     yPosition = 15;
@@ -346,49 +354,62 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   const gstAmount = data.gstEnabled ? (taxableAmount * (gstRate / 100)) : 0;
   const finalTotal = taxableAmount + gstAmount;
 
-  // Render Summary as a Table but with custom styling
+  // Render Summary
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(14);
+  doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
   doc.text("PAYMENT SUMMARY", margin, yPosition);
   yPosition += 6;
 
   const summaryData: any[] = [
-    ['Total Project Area', `${totalSFT.toFixed(2)} Sq.Ft`],
-    ['Subtotal Amount', formatCurrency(subtotal)],
+    ['Total Project Area', `${totalSFT.toFixed(2)} Sq.Ft`, COLORS.TEXT_SECONDARY],
+    ['Subtotal Amount', formatCurrency(subtotal), COLORS.TEXT_PRIMARY],
   ];
 
   if (data.enableSocialMediaDiscount) {
-    summaryData.push(['Social Media Special Discount @ 6%', '-' + formatCurrency(socialMediaDiscountAmount)]);
+    summaryData.push(['Social Media Discount @ 6%', '-' + formatCurrency(socialMediaDiscountAmount), COLORS.TEXT_PRIMARY]);
   } else if (data.discount && data.discount > 0) {
-    summaryData.push(['Discount', '-' + formatCurrency(data.discount)]);
+    summaryData.push(['Discount', '-' + formatCurrency(data.discount), COLORS.TEXT_PRIMARY]);
   }
 
   if (data.gstEnabled) {
-    summaryData.push(['Net Taxable Amount', formatCurrency(taxableAmount)]);
-    summaryData.push([`GST @ ${gstRate}%`, formatCurrency(gstAmount)]);
+    summaryData.push(['Net Taxable Amount', formatCurrency(taxableAmount), COLORS.TEXT_PRIMARY]);
+    summaryData.push([`GST @ ${gstRate}%`, formatCurrency(gstAmount), COLORS.TEXT_PRIMARY]);
   }
 
-  summaryData.push(['GRAND TOTAL', formatCurrency(finalTotal)]);
+  summaryData.push(['GRAND TOTAL', formatCurrency(finalTotal), COLORS.GRAND_TOTAL_TEXT]);
 
   autoTable(doc, {
     startY: yPosition,
-    body: summaryData,
-    theme: 'grid',
+    body: summaryData.map(row => [row[0], row[1]]),
+    theme: 'plain', // Use plain theme and manage borders/fill manually
     styles: {
-      lineColor: COLORS.BORDER,
-      lineWidth: 0.1,
       cellPadding: 6,
-      fontSize: 9
+      fontSize: 10
     },
     columnStyles: {
-      0: { cellWidth: 120, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY },
-      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY }
+      0: { cellWidth: 120, halign: 'right', fontStyle: 'normal', textColor: COLORS.TEXT_SECONDARY },
+      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold' } 
     },
-    willDrawCell: (data) => {
-      // Highlight the Grand Total Row
-      if (data.row.index === summaryData.length - 1 && data.section === 'body') {
-        doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
-        doc.setTextColor(0, 0, 0);
+    willDrawCell: (cellData) => {
+      const rowData = summaryData[cellData.row.index];
+      const textColor = rowData[2];
+
+      // Use a subtle background for all summary rows
+      if (cellData.section === 'body') {
+        doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+        doc.setLineWidth(0.2);
+        doc.rect(cellData.cell.x, cellData.cell.y, cellData.table.width, cellData.cell.height, 'D');
+      }
+
+      // Highlight the Grand Total Row dramatically
+      if (cellData.row.index === summaryData.length - 1 && cellData.section === 'body') {
+        doc.setFillColor(COLORS.GRAND_TOTAL_BG[0], COLORS.GRAND_TOTAL_BG[1], COLORS.GRAND_TOTAL_BG[2]);
+        doc.rect(cellData.cell.x, cellData.cell.y, cellData.table.width, cellData.cell.height, 'F');
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        doc.setFontSize(12);
+      } else {
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
       }
     },
     margin: { left: margin, right: margin }
@@ -396,9 +417,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   yPosition = (doc as any).lastAutoTable.finalY + 15;
 
-  // --- 5. Stagewise Payment ---
+  // --- 5. Stagewise Payment (Clean, Clear) ---
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(14);
   doc.text("PAYMENT SCHEDULE", margin, yPosition);
   yPosition += 6;
 
@@ -412,7 +433,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   autoTable(doc, {
     startY: yPosition,
-    head: [['#', 'Stage / Milestone', 'Payment %']],
+    head: [['#', 'STAGE / MILESTONE', 'PAYMENT %']],
     body: paymentStages,
     theme: 'grid',
     styles: {
@@ -421,16 +442,16 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         textColor: COLORS.TEXT_SECONDARY
     },
     headStyles: {
-      fillColor: COLORS.BG_CARD,
-      textColor: COLORS.TEXT_PRIMARY,
+      fillColor: COLORS.BRAND, // Brand color header
+      textColor: [255, 255, 255],
       fontStyle: 'bold',
-      lineColor: COLORS.BORDER,
+      lineColor: COLORS.BRAND,
       lineWidth: 0.1
     },
     columnStyles: {
       0: { cellWidth: 15, halign: 'center' },
       1: { cellWidth: 'auto' },
-      2: { cellWidth: 30, halign: 'center', fontStyle: 'bold' }
+      2: { cellWidth: 35, halign: 'center', fontStyle: 'bold', textColor: COLORS.BRAND } // Highlight percentage
     },
     margin: { left: margin, right: margin }
   });
@@ -445,7 +466,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
+  doc.setFontSize(14);
   doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
   doc.text("TERMS & CONDITIONS", margin, yPosition);
   yPosition += 8;
@@ -461,10 +482,12 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     }
     if (title) {
         doc.setFont('helvetica', 'bold');
+        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
         doc.text(title, margin, yPosition);
         yPosition += 4;
     }
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
     lines.forEach(line => {
         if (yPosition > pageHeight - 20) {
             doc.addPage();
@@ -554,7 +577,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.setFontSize(10);
   doc.text("Acceptance from Customer", margin, yPosition);
   
-  // Signature Image
+  // Signature Image (If provided)
   if (data.signatureUrl) {
     try {
       let compressedSig = await compressImage(data.signatureUrl, 150, 60);
@@ -571,16 +594,20 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.line(margin, yPosition, margin + signBoxWidth, yPosition);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.text("Signatory", margin, yPosition + 5);
+  doc.text("Client Signatory", margin, yPosition + 5);
 
   // Company Line
   doc.line(companySignX, yPosition, companySignX + signBoxWidth, yPosition);
-  doc.text("Authorized Signatory", companySignX, yPosition + 5);
+  doc.text("Authorized Signatory (for Company)", companySignX, yPosition + 5);
 
-  // Footer
+  // Footer (Thin line and watermark)
+  doc.setDrawColor(COLORS.BRAND[0], COLORS.BRAND[1], COLORS.BRAND[2]);
+  doc.setLineWidth(0.5);
+  doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+
   doc.setFontSize(7);
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-  doc.text("This quotation is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
+  doc.text("This is a premium quotation generated for your project. All amounts are in Indian Rupees (₹).", pageWidth / 2, pageHeight - 10, { align: 'center' });
 
   // Save
   doc.save(`Quotation_${data.clientName.replace(/\s+/g, '_')}.pdf`);
