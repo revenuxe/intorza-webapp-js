@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface LineItem {
   id: string;
@@ -29,6 +30,13 @@ interface Section {
   items: LineItem[];
 }
 
+interface PaymentStage {
+  id: string;
+  stage: string;
+  milestone: string;
+  percentage: number;
+}
+
 
 const CreateQuotation = () => {
   const { toast } = useToast();
@@ -46,6 +54,7 @@ const CreateQuotation = () => {
   const [clientAddress, setClientAddress] = useState("");
   const [dateOfProposal, setDateOfProposal] = useState("");
   const [quotationValidTill, setQuotationValidTill] = useState("");
+  const [projectDeadline, setProjectDeadline] = useState("");
   const [placeOfProject, setPlaceOfProject] = useState("");
   const [warranty, setWarranty] = useState("10");
   const [projectType, setProjectType] = useState("");
@@ -54,6 +63,14 @@ const CreateQuotation = () => {
   const [discount, setDiscount] = useState(0);
   const [enableSocialMediaDiscount, setEnableSocialMediaDiscount] = useState(false);
   const [socialMediaDiscountRate, setSocialMediaDiscountRate] = useState(6);
+  const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
+  const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([
+    { id: "1", stage: "1", milestone: "Design Phase", percentage: 10 },
+    { id: "2", stage: "2", milestone: "Material Procurement", percentage: 30 },
+    { id: "3", stage: "3", milestone: "Execution Start", percentage: 30 },
+    { id: "4", stage: "4", milestone: "Mid-Execution", percentage: 20 },
+    { id: "5", stage: "5", milestone: "Final Handover", percentage: 10 },
+  ]);
   const [profile, setProfile] = useState({
     company_name: "",
     logo_url: "",
@@ -333,7 +350,12 @@ const CreateQuotation = () => {
         professionalAdvantages: profile.professional_advantages,
         signatureUrl: profile.signature_url,
         enableSocialMediaDiscount,
-        socialMediaDiscountRate
+        socialMediaDiscountRate,
+        paymentStages: paymentStages.map(s => ({
+          stage: s.stage,
+          milestone: s.milestone,
+          percentage: s.percentage
+        }))
       });
 
       toast({
@@ -363,9 +385,72 @@ const CreateQuotation = () => {
             <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
               Templates
             </Button>
-            <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
-              Customize View
-            </Button>
+            <Dialog open={customizeDialogOpen} onOpenChange={setCustomizeDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
+                  Customize View
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Customize Payment Stages</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Edit the payment stages and percentages that will appear in your quotation PDF.
+                  </p>
+                  <div className="space-y-3">
+                    {paymentStages.map((stage, index) => (
+                      <div key={stage.id} className="grid grid-cols-[60px_1fr_100px] gap-3 items-center">
+                        <Input
+                          value={stage.stage}
+                          onChange={(e) => {
+                            const updated = [...paymentStages];
+                            updated[index].stage = e.target.value;
+                            setPaymentStages(updated);
+                          }}
+                          placeholder="Stage"
+                        />
+                        <Input
+                          value={stage.milestone}
+                          onChange={(e) => {
+                            const updated = [...paymentStages];
+                            updated[index].milestone = e.target.value;
+                            setPaymentStages(updated);
+                          }}
+                          placeholder="Milestone"
+                        />
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            value={stage.percentage}
+                            onChange={(e) => {
+                              const updated = [...paymentStages];
+                              updated[index].percentage = parseFloat(e.target.value) || 0;
+                              setPaymentStages(updated);
+                            }}
+                            placeholder="0"
+                            min="0"
+                            max="100"
+                            step="1"
+                          />
+                          <span className="text-sm text-muted-foreground">%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex justify-between items-center pt-3 border-t">
+                    <span className="text-sm font-medium">Total Percentage:</span>
+                    <span className={`text-sm font-bold ${paymentStages.reduce((sum, s) => sum + s.percentage, 0) === 100 ? 'text-green-600' : 'text-destructive'}`}>
+                      {paymentStages.reduce((sum, s) => sum + s.percentage, 0)}%
+                    </span>
+                  </div>
+                  <Button onClick={() => setCustomizeDialogOpen(false)} className="w-full">
+                    Done
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -419,6 +504,15 @@ const CreateQuotation = () => {
                   type="date"
                   value={quotationValidTill}
                   onChange={(e) => setQuotationValidTill(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="projectDeadline">Project Deadline</Label>
+                <Input 
+                  id="projectDeadline" 
+                  type="date"
+                  value={projectDeadline}
+                  onChange={(e) => setProjectDeadline(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
