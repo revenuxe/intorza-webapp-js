@@ -212,7 +212,7 @@ const QuotationDetail = () => {
           total_amount: invoiceAmount,
           paid_amount: paidAmount,
           remaining_amount: remaining,
-          status: remaining === 0 ? 'paid' : (paidAmount > 0 ? 'partially paid' : 'unpaid'),
+          status: remaining === 0 ? 'paid' : (paidAmount > 0 ? 'partially_paid' : 'unpaid'),
           invoice_date: new Date().toISOString().split('T')[0],
           due_date: dueDate || null,
           notes: invoiceNotes
