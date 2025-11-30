@@ -29,11 +29,11 @@ export const Header = () => {
             </SheetContent>
           </Sheet>
           
-          {/* Logo */}
+          {/* Logo - only show on mobile */}
           <img 
             src={logo} 
             alt="INTORZA" 
-            className="h-7 md:h-8 w-auto object-contain"
+            className="h-7 w-auto object-contain lg:hidden"
           />
         </div>
 
