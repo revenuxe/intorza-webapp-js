@@ -7,7 +7,6 @@ interface LineItem {
   productDetails: string;
   widthFt: number;
   heightFt: number;
-  depth: number;
   sftArea: number;
   ratePerSft: number;
   amount: number;
@@ -41,6 +40,7 @@ interface QuotationData {
   companyEmail?: string;
   gstin?: string;
   professionalAdvantages?: string;
+  signatureUrl?: string;
 }
 
 export const generateQuotationPDF = async (data: QuotationData) => {
@@ -58,29 +58,27 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         img.onload = resolve;
         img.onerror = reject;
       });
-      const imgWidth = 40;
-      const imgHeight = 30;
+      const imgWidth = 50;
+      const imgHeight = 40;
       doc.addImage(data.companyLogo, 'PNG', (pageWidth - imgWidth) / 2, yPosition, imgWidth, imgHeight);
-      yPosition += imgHeight + 10;
+      yPosition += imgHeight + 5;
     } catch (error) {
       console.error('Error loading logo:', error);
     }
   }
 
-  // Company name
-  if (data.companyName) {
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text(data.companyName, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 8;
-  }
-
-  // Quotation title
-  doc.setFontSize(20);
+  // Project Duration header
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(200, 150, 50); // Gold color
-  doc.text(data.quotationTitle, pageWidth / 2, yPosition, { align: 'center' });
-  yPosition += 15;
+  doc.setTextColor(0, 0, 0);
+  doc.text('PROJECT DURATION FOR 30 DAYS (CHALANGE AFTER DESIGN PHASE)', pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 8;
+
+  // Take Professional Advantages header
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Take Professional Advantages from ${data.companyName || 'Us'}`, pageWidth / 2, yPosition, { align: 'center' });
+  yPosition += 10;
 
   // Client and project details
   doc.setFontSize(10);
@@ -121,35 +119,34 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     doc.text(section.title.toUpperCase(), leftColumn, yPosition);
     yPosition += 10;
 
-    // Create table for section items
+    // Create table for section items (without Depth column)
     const tableData = section.items.map(item => [
       item.side,
       item.productName,
       item.productDetails,
       item.widthFt.toString(),
       item.heightFt.toString(),
-      item.depth.toString(),
       item.sftArea.toFixed(2),
       `₹${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
     ]);
 
     autoTable(doc, {
       startY: yPosition,
-      head: [['Side', 'Product Name', 'Product Details', 'Width (Ft)', 'Height (Ft)', 'Depth', 'Sft Area', 'Amount']],
+      head: [['Side', 'Product Name', 'Product Details', 'Width (Ft)', 'Height (Ft)', 'Sft Area', 'Amount']],
       body: tableData,
       theme: 'grid',
       headStyles: {
         fillColor: [240, 240, 240],
         textColor: [0, 0, 0],
         fontStyle: 'bold',
-        fontSize: 8
+        fontSize: 9
       },
       bodyStyles: {
         fontSize: 8
       },
       columnStyles: {
-        2: { cellWidth: 50 }, // Product Details wider
-        7: { halign: 'right' } // Amount right-aligned
+        2: { cellWidth: 60 }, // Product Details wider
+        6: { halign: 'right' } // Amount right-aligned
       },
       margin: { left: leftColumn, right: leftColumn }
     });
@@ -205,11 +202,6 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       yPosition = 20;
     }
 
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Take Professional Advantages from ${data.companyName || 'Us'}`, leftColumn, yPosition);
-    yPosition += 8;
-
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     const advantagesLines = doc.splitTextToSize(data.professionalAdvantages, pageWidth - 40);
@@ -221,9 +213,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       { title: 'Costs for designers', desc: "You will be assigned a personal designer who will assist you in designing your ideal home." },
       { title: 'Experience in 2D and 3D design', desc: 'We will assist you in virtually experiencing your new house before you make a decision.' },
       { title: 'Management of projects', desc: 'Our Execution Team will take care of everything and ensure that your new house is built on time.' },
-      { title: 'Warranty on service', desc: 'Product warranties range from one to five years, depending on the product type and the manufacturer guarantee.' },
+      { title: 'warranty on service', desc: 'Product warranties range from one to five years, depending on the product type and the manufacturer guarantee.' },
       { title: 'QUALITY OF MATERIAL', desc: 'The greatest Indian and international brands would be chosen by the client.' },
-      { title: 'ENTIRE TRANSPARENCY', desc: 'We are known for our dedication; everything is included in the final quote, and there are no additional or hidden fees.' }
+      { title: 'ENTIRE TRANSPARENCY', desc: `${data.companyName || 'We'} is known for its dedication; everything is included in the final quote, and there are no additional or hidden fees.` }
     ];
 
     for (const adv of advantages) {
@@ -241,6 +233,45 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       yPosition += descLines.length * 5 + 5;
     }
   }
+
+  // Add signature section
+  if (yPosition > pageHeight - 50) {
+    doc.addPage();
+    yPosition = 20;
+  }
+
+  yPosition += 15;
+
+  // Signature boxes
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  
+  // Customer signature box
+  const boxY = yPosition;
+  doc.rect(leftColumn, boxY, 70, 30);
+  doc.text('Acceptance from Customer', leftColumn + 2, boxY - 2);
+  doc.text('Signatory', leftColumn + 2, boxY + 35);
+
+  // Company signature box with image if available
+  const rightBoxX = pageWidth - leftColumn - 70;
+  doc.rect(rightBoxX, boxY, 70, 30);
+  doc.text(`For ${data.companyName || 'Company'}`, rightBoxX + 2, boxY - 2);
+  
+  if (data.signatureUrl) {
+    try {
+      const sigImg = new Image();
+      sigImg.src = data.signatureUrl;
+      await new Promise((resolve, reject) => {
+        sigImg.onload = resolve;
+        sigImg.onerror = reject;
+      });
+      doc.addImage(data.signatureUrl, 'PNG', rightBoxX + 5, boxY + 5, 60, 20);
+    } catch (error) {
+      console.error('Error loading signature:', error);
+    }
+  }
+  
+  doc.text('Authorized Signatory', rightBoxX + 2, boxY + 35);
 
   // Save PDF
   doc.save(`Quotation_${data.clientName.replace(/\s+/g, '_')}.pdf`);

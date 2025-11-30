@@ -12,6 +12,7 @@ const Settings = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingSignature, setUploadingSignature] = useState(false);
   const [profile, setProfile] = useState({
     company_name: "",
     full_name: "",
@@ -20,6 +21,7 @@ const Settings = () => {
     address: "",
     gstin: "",
     logo_url: "",
+    signature_url: "",
     professional_advantages: `You've imagined your ideal home and are determined to make it a reality. You can get numerous different quotations from different Interior Designers. But since you've chosen us, let's have a look at how we can make your idea a reality.`
   });
 
@@ -48,6 +50,7 @@ const Settings = () => {
           address: data.address || "",
           gstin: data.gstin || "",
           logo_url: data.logo_url || "",
+          signature_url: data.signature_url || "",
           professional_advantages: data.professional_advantages || profile.professional_advantages
         });
       }
@@ -118,6 +121,71 @@ const Settings = () => {
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleSignatureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploadingSignature(true);
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload an image file",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user found');
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/signature.${fileExt}`;
+
+      // Delete old signature if exists
+      if (profile.signature_url) {
+        const oldPath = profile.signature_url.split('/').slice(-2).join('/');
+        await supabase.storage.from('company-logos').remove([oldPath]);
+      }
+
+      // Upload new signature
+      const { error: uploadError } = await supabase.storage
+        .from('company-logos')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('company-logos')
+        .getPublicUrl(fileName);
+
+      // Update profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ signature_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      setProfile({ ...profile, signature_url: publicUrl });
+      toast({
+        title: "Signature uploaded",
+        description: "Your signature has been updated successfully",
+      });
+    } catch (error) {
+      console.error('Error uploading signature:', error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload signature. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingSignature(false);
     }
   };
 
@@ -200,6 +268,43 @@ const Settings = () => {
             </div>
             <p className="text-xs text-muted-foreground">
               Upload your company logo. This will appear on all quotations and invoices.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <SettingsIcon className="h-5 w-5" />
+              Signature Image
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {profile.signature_url && (
+              <div className="flex justify-center p-4 bg-muted/30 rounded-lg">
+                <img 
+                  src={profile.signature_url} 
+                  alt="Signature" 
+                  className="max-h-24 object-contain"
+                />
+              </div>
+            )}
+            <div className="flex items-center gap-4">
+              <Input
+                id="signature"
+                type="file"
+                accept="image/*"
+                onChange={handleSignatureUpload}
+                disabled={uploadingSignature}
+                className="flex-1"
+              />
+              <Button disabled={uploadingSignature}>
+                {uploadingSignature ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {uploadingSignature ? "Uploading..." : "Upload"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Upload your signature image. This will appear at the bottom of all quotations.
             </p>
           </CardContent>
         </Card>
