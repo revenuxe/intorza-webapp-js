@@ -19,6 +19,7 @@ interface Quotation {
   project_name: string;
   client_name: string;
   client_address: string;
+  client_id: string | null;
   grand_total: number;
   subtotal: number;
   gst_amount: number;
@@ -204,6 +205,7 @@ const QuotationDetail = () => {
         .insert({
           user_id: user.id,
           quotation_id: quotation?.id,
+          client_id: quotation?.client_id || null,
           invoice_number: invoiceNumber,
           client_name: quotation?.client_name || '',
           project_name: quotation?.project_name || '',
