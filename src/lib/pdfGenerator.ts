@@ -1,7 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// --- Interfaces ---
 interface LineItem {
   side: string;
   productName: string;
@@ -40,18 +39,11 @@ interface QuotationData {
   companyPhone?: string;
   companyEmail?: string;
   gstin?: string;
-  professionalAdvantages?: string; // For the text block in the summary image
+  professionalAdvantages?: string;
   signatureUrl?: string;
 }
 
-// --- Helpers ---
-
-// Format currency: "INR 1,50,000" (No decimals)
-const formatCurrency = (amount: number): string => {
-  return 'INR ' + Math.round(amount).toLocaleString('en-IN');
-};
-
-// Compress images
+// Compress images to reduce PDF size
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -75,7 +67,7 @@ const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: numb
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
       } else {
         reject(new Error('Canvas context not available'));
       }
@@ -84,8 +76,6 @@ const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: numb
     img.src = imageUrl;
   });
 };
-
-// --- Main Generator Function ---
 
 export const generateQuotationPDF = async (data: QuotationData) => {
   const doc = new jsPDF({
@@ -97,394 +87,490 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
-  const contentWidth = pageWidth - (margin * 2);
   let yPosition = 15;
 
-  // Colors
-  const COLOR_PRIMARY = [41, 41, 41]; // Dark Grey/Black
-  const COLOR_ACCENT = [220, 220, 220]; // Light Grey
-  const COLOR_HEADER_BG = [245, 245, 245]; // Very Light Grey for headers
-  const COLOR_TEXT_MAIN = [0, 0, 0];
-  const COLOR_TEXT_SUB = [80, 80, 80];
+  const margin = 15;
+  const contentWidth = pageWidth - (margin * 2);
 
-  // --- 1. Header Section ---
-  
-  // Prepare Logo
+  // Compress images
   let compressedLogo: string | null = null;
   if (data.companyLogo) {
     try {
-      compressedLogo = await compressImage(data.companyLogo, 200, 150);
-    } catch (e) { console.error(e); }
+      compressedLogo = await compressImage(data.companyLogo, 180, 140);
+    } catch (error) {
+      console.error('Logo compression error:', error);
+    }
   }
 
-  // Draw Header Container
+  let compressedSignature: string | null = null;
+  if (data.signatureUrl) {
+    try {
+      compressedSignature = await compressImage(data.signatureUrl, 220, 70);
+    } catch (error) {
+      console.error('Signature compression error:', error);
+    }
+  }
+
+  // ============= PREMIUM HEADER =============
   const headerHeight = 45;
+  const logoBoxWidth = 60;
   
-  // Logo (Left)
+  // Black logo box - left side with rounded right corners
+  doc.setFillColor(0, 0, 0);
+  doc.rect(margin, yPosition, logoBoxWidth, headerHeight, 'F');
+  
+  // Rounded corners on right side only
+  doc.setFillColor(0, 0, 0);
+  const cornerRadius = 10;
+  doc.roundedRect(margin + logoBoxWidth - cornerRadius, yPosition, cornerRadius, headerHeight, cornerRadius, cornerRadius, 'F');
+
+  // Add logo centered in black box
   if (compressedLogo) {
-    const logoSize = 35;
-    doc.addImage(compressedLogo, 'JPEG', margin, yPosition, logoSize, logoSize, undefined, 'FAST');
+    try {
+      const logoSize = 38;
+      const logoX = margin + (logoBoxWidth - logoSize) / 2;
+      const logoY = yPosition + (headerHeight - logoSize) / 2;
+      doc.addImage(compressedLogo, 'JPEG', logoX, logoY, logoSize, logoSize, undefined, 'FAST');
+    } catch (error) {
+      console.error('Logo add error:', error);
+    }
   }
 
-  // Company Details (Right Aligned)
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
-  doc.text((data.companyName || 'COMPANY NAME').toUpperCase(), pageWidth - margin, yPosition + 8, { align: 'right' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(COLOR_TEXT_SUB[0], COLOR_TEXT_SUB[1], COLOR_TEXT_SUB[2]);
+  // White company details box - right side
+  const companyBoxX = margin + logoBoxWidth;
+  const companyBoxWidth = contentWidth - logoBoxWidth;
   
-  let headerTextY = yPosition + 15;
-  const lineHeight = 4.5;
+  doc.setFillColor(255, 255, 255);
+  doc.rect(companyBoxX, yPosition, companyBoxWidth, headerHeight, 'F');
+  
+  // Subtle border around company box
+  doc.setDrawColor(240, 240, 240);
+  doc.setLineWidth(0.5);
+  doc.rect(companyBoxX, yPosition, companyBoxWidth, headerHeight);
+
+  // Company details
+  const companyTextX = companyBoxX + 8;
+  let companyTextY = yPosition + 10;
+
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(data.companyName || 'COMPANY NAME', companyTextX, companyTextY);
+
+  companyTextY += 7;
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(70, 70, 70);
 
   if (data.companyAddress) {
-    const addressLines = doc.splitTextToSize(data.companyAddress, 80);
-    addressLines.forEach((line: string) => {
-      doc.text(line, pageWidth - margin, headerTextY, { align: 'right' });
-      headerTextY += lineHeight;
-    });
+    const addressLines = doc.splitTextToSize(data.companyAddress, companyBoxWidth - 16);
+    doc.text(addressLines.slice(0, 1), companyTextX, companyTextY);
+    companyTextY += 4.5;
   }
-  
   if (data.companyPhone) {
-    doc.text(`Phone: ${data.companyPhone}`, pageWidth - margin, headerTextY, { align: 'right' });
-    headerTextY += lineHeight;
+    doc.text(`Phone: ${data.companyPhone}`, companyTextX, companyTextY);
+    companyTextY += 4.5;
   }
   if (data.companyEmail) {
-    doc.text(`Email: ${data.companyEmail}`, pageWidth - margin, headerTextY, { align: 'right' });
-    headerTextY += lineHeight;
+    doc.text(`Email: ${data.companyEmail}`, companyTextX, companyTextY);
+    companyTextY += 4.5;
   }
   if (data.gstin) {
-    doc.text(`GSTIN: ${data.gstin}`, pageWidth - margin, headerTextY, { align: 'right' });
+    doc.text(`GSTIN: ${data.gstin}`, companyTextX, companyTextY);
   }
 
-  yPosition += headerHeight;
+  yPosition += headerHeight + 8;
 
-  // Divider Line
-  doc.setDrawColor(COLOR_ACCENT[0], COLOR_ACCENT[1], COLOR_ACCENT[2]);
-  doc.setLineWidth(0.5);
+  // Thin divider line
+  doc.setDrawColor(220, 220, 220);
+  doc.setLineWidth(0.3);
   doc.line(margin, yPosition, pageWidth - margin, yPosition);
-  yPosition += 8;
+  yPosition += 10;
 
-  // --- 2. Client & Project Info (Grid Layout) ---
-  const boxHeight = 40;
+  // ============= QUOTATION DETAILS PANEL =============
+  const detailsPanelHeight = 48;
   
-  // Left Side: Client Info
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(COLOR_TEXT_MAIN[0], COLOR_TEXT_MAIN[1], COLOR_TEXT_MAIN[2]);
-  doc.text('QUOTATION FOR:', margin, yPosition);
-  
-  doc.setFont('helvetica', 'bold');
+  doc.setFillColor(244, 244, 244);
+  doc.roundedRect(margin, yPosition, contentWidth, detailsPanelHeight, 3, 3, 'F');
+
   doc.setFontSize(11);
-  doc.text(data.clientName, margin, yPosition + 7);
-  
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text('QUOTATION DETAILS', margin + 5, yPosition + 8);
+
+  const detailsStartY = yPosition + 16;
+  const col1X = margin + 5;
+  const col2X = margin + contentWidth / 2 + 3;
+  const labelWidth = 32;
+  const valueWidth = (contentWidth / 2) - labelWidth - 10;
+
+  doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(COLOR_TEXT_SUB[0], COLOR_TEXT_SUB[1], COLOR_TEXT_SUB[2]);
-  const clientAddr = doc.splitTextToSize(data.clientAddress, contentWidth / 2 - 10);
-  doc.text(clientAddr, margin, yPosition + 13);
+  doc.setTextColor(50, 50, 50);
 
-  // Right Side: Quotation Meta
-  const rightColX = pageWidth / 2 + 10;
-  let metaY = yPosition;
-  
-  const addMetaRow = (label: string, value: string) => {
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(COLOR_TEXT_MAIN[0], COLOR_TEXT_MAIN[1], COLOR_TEXT_MAIN[2]);
-    doc.text(label, rightColX, metaY);
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(COLOR_TEXT_SUB[0], COLOR_TEXT_SUB[1], COLOR_TEXT_SUB[2]);
-    doc.text(value, rightColX + 35, metaY);
-    metaY += 6;
-  };
+  let rowY = detailsStartY;
 
-  addMetaRow('Date:', data.dateOfProposal);
-  addMetaRow('Valid Till:', data.quotationValidTill);
-  addMetaRow('Project:', data.quotationTitle);
-  addMetaRow('Warranty:', data.warranty + ' Years');
-  
-  yPosition += boxHeight;
+  // Left column
+  doc.setFont('helvetica', 'bold');
+  doc.text('Project Name:', col1X, rowY);
+  doc.setFont('helvetica', 'normal');
+  const projectText = doc.splitTextToSize(data.quotationTitle || 'N/A', valueWidth);
+  doc.text(projectText[0], col1X + labelWidth, rowY);
 
-  // --- 3. Product Table ---
+  rowY += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Client Name:', col1X, rowY);
+  doc.setFont('helvetica', 'normal');
+  const clientText = doc.splitTextToSize(data.clientName, valueWidth);
+  doc.text(clientText[0], col1X + labelWidth, rowY);
+
+  rowY += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Client Address:', col1X, rowY);
+  doc.setFont('helvetica', 'normal');
+  const addressText = doc.splitTextToSize(data.clientAddress, valueWidth);
+  doc.text(addressText.slice(0, 2), col1X + labelWidth, rowY);
+
+  // Right column
+  rowY = detailsStartY;
   
+  doc.setFont('helvetica', 'bold');
+  doc.text('Date of Proposal:', col2X, rowY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.dateOfProposal, col2X + labelWidth, rowY);
+
+  rowY += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Valid Till:', col2X, rowY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(data.quotationValidTill, col2X + labelWidth, rowY);
+
+  rowY += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Place of Project:', col2X, rowY);
+  doc.setFont('helvetica', 'normal');
+  const placeText = doc.splitTextToSize(data.placeOfProject, valueWidth);
+  doc.text(placeText[0], col2X + labelWidth, rowY);
+
+  rowY += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Project Type:', col2X, rowY);
+  doc.setFont('helvetica', 'normal');
+  const typeText = doc.splitTextToSize(data.projectType, valueWidth);
+  doc.text(typeText[0], col2X + labelWidth, rowY);
+
+  rowY += 6;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Warranty:', col2X, rowY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${data.warranty} Years`, col2X + labelWidth, rowY);
+
+  yPosition += detailsPanelHeight + 12;
+
+  // ============= PROJECT SECTIONS & ITEMS =============
   for (const section of data.sections) {
-    // Check space
-    if (yPosition > pageHeight - 40) {
+    if (yPosition > pageHeight - 60) {
       doc.addPage();
       yPosition = 15;
     }
 
-    // Section Title
-    doc.setFillColor(COLOR_HEADER_BG[0], COLOR_HEADER_BG[1], COLOR_HEADER_BG[2]);
-    doc.rect(margin, yPosition, contentWidth, 8, 'F');
-    doc.setFont('helvetica', 'bold');
+    // Section header
+    doc.setFillColor(237, 237, 237);
+    doc.roundedRect(margin, yPosition, contentWidth, 9, 2, 2, 'F');
+    
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text(section.title.toUpperCase(), margin + 3, yPosition + 5.5);
-    yPosition += 8;
+    doc.text(section.title.toUpperCase(), margin + 5, yPosition + 6);
+    
+    yPosition += 12;
 
-    // Prepare Table Data
-    const tableBody = section.items.map(item => [
+    // Table data
+    const tableData = section.items.map(item => [
       item.side || '-',
       item.productName,
       item.productDetails,
       item.widthFt.toFixed(1),
       item.heightFt.toFixed(1),
       item.sftArea.toFixed(2),
-      formatCurrency(item.amount) // Uses new format helper
+      '₹ ' + item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     ]);
 
     autoTable(doc, {
       startY: yPosition,
-      head: [['Side', 'Product', 'Details', 'W(ft)', 'H(ft)', 'Sq.Ft', 'Amount']],
-      body: tableBody,
-      theme: 'plain',
+      head: [['Side', 'Product Name', 'Product Details', 'Width\n(Ft)', 'Height\n(Ft)', 'SQFT', 'Amount (₹)']],
+      body: tableData,
+      theme: 'grid',
       headStyles: {
-        fillColor: [255, 255, 255],
+        fillColor: [237, 237, 237],
         textColor: [0, 0, 0],
         fontStyle: 'bold',
         fontSize: 8,
-        lineWidth: 0,
-        valign: 'bottom',
-        halign: 'left'
+        cellPadding: 4,
+        halign: 'center',
+        valign: 'middle',
+        lineWidth: 0.1,
+        lineColor: [220, 220, 220]
       },
       bodyStyles: {
-        fontSize: 8,
+        fontSize: 7.5,
+        cellPadding: 4,
         textColor: [50, 50, 50],
-        valign: 'top',
-        cellPadding: 3
+        lineWidth: 0.1,
+        lineColor: [230, 230, 230],
+        overflow: 'linebreak',
+        cellWidth: 'wrap'
+      },
+      alternateRowStyles: {
+        fillColor: [252, 252, 252]
       },
       columnStyles: {
-        0: { cellWidth: 10 }, // Side
-        1: { cellWidth: 35, fontStyle: 'bold' }, // Product
-        2: { cellWidth: 'auto' }, // Details
-        3: { cellWidth: 12, halign: 'center' },
-        4: { cellWidth: 12, halign: 'center' },
-        5: { cellWidth: 12, halign: 'center' },
-        6: { cellWidth: 30, halign: 'right', fontStyle: 'bold' }
+        0: { cellWidth: 12, halign: 'center', overflow: 'linebreak' },
+        1: { cellWidth: 30, halign: 'left', overflow: 'linebreak' },
+        2: { cellWidth: 62, halign: 'left', overflow: 'linebreak' },
+        3: { cellWidth: 15, halign: 'center' },
+        4: { cellWidth: 15, halign: 'center' },
+        5: { cellWidth: 15, halign: 'center' },
+        6: { cellWidth: 30, halign: 'right', fontStyle: 'bold', textColor: [0, 0, 0], font: 'helvetica', fontSize: 8 }
       },
       margin: { left: margin, right: margin },
-      didDrawPage: (d) => {
-        // Adjust yPosition if table breaks page
-        if (d.cursor) {
-           yPosition = d.cursor.y;
-        }
+      tableWidth: 'auto',
+      didDrawPage: function(data) {
+        // Ensure proper pagination
       }
     });
-    
-    yPosition = (doc as any).lastAutoTable.finalY;
 
-    // Section Total Line
-    doc.setDrawColor(200, 200, 200);
-    doc.line(margin, yPosition, pageWidth - margin, yPosition);
-    yPosition += 2;
+    yPosition = (doc as any).lastAutoTable.finalY + 3;
+
+    // Section total with beige background
+    const totalBoxWidth = 70;
+    const totalBoxX = pageWidth - margin - totalBoxWidth;
     
-    const sectionTotal = section.items.reduce((sum, item) => sum + item.amount, 0);
-    doc.setFont('helvetica', 'bold');
+    doc.setFillColor(243, 237, 229);
+    doc.roundedRect(totalBoxX, yPosition, totalBoxWidth, 8, 2, 2, 'F');
+    
     doc.setFontSize(9);
-    doc.text(`Total for ${section.title}:`, pageWidth - 60, yPosition + 4, { align: 'right' });
-    doc.text(formatCurrency(sectionTotal), pageWidth - margin, yPosition + 4, { align: 'right' });
-    yPosition += 10;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    const sectionTotal = section.items.reduce((sum, item) => sum + item.amount, 0);
+    doc.text('SECTION TOTAL:', totalBoxX + 3, yPosition + 5.5);
+    doc.text(`₹${sectionTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalBoxX + totalBoxWidth - 3, yPosition + 5.5, { align: 'right' });
+    
+    yPosition += 14;
   }
 
-  // --- 4. The "Shared Section" (Payment Summary & Timeline) ---
-  if (yPosition > pageHeight - 100) {
+  // ============= PAYMENT SUMMARY BOX =============
+  if (yPosition > pageHeight - 65) {
     doc.addPage();
     yPosition = 15;
   }
 
-  yPosition += 5;
+  const summaryBoxWidth = 80;
+  const summaryBoxX = pageWidth - margin - summaryBoxWidth;
+  const summaryBoxHeight = data.discount > 0 ? 50 : 45;
 
-  // Box Container for Summary
-  const summaryBoxY = yPosition;
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.2);
-  
-  // We will create two side-by-side columns conceptually, 
-  // but looking at the user request, they want a "Shared Section" input.
-  // We will build the Payment Summary Table first.
+  doc.setFillColor(243, 237, 229);
+  doc.roundedRect(summaryBoxX, yPosition, summaryBoxWidth, summaryBoxHeight, 3, 3, 'F');
 
-  doc.setFont('helvetica', 'bold');
+  // Subtle border
+  doc.setDrawColor(230, 220, 210);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(summaryBoxX, yPosition, summaryBoxWidth, summaryBoxHeight, 3, 3);
+
   doc.setFontSize(11);
-  doc.text("PAYMENT SUMMARY", margin, yPosition);
-  yPosition += 5;
-
-  // 4a. Cost Breakdown Table (Replicating image style)
-  const costData = [
-    ['Net Amount', formatCurrency(data.subtotal)],
-  ];
-  
-  if (data.gstEnabled) {
-    costData.push([`GST @ ${data.gstRate}%`, formatCurrency(data.gstAmount)]);
-  }
-  
-  if (data.discount > 0) {
-    costData.push(['Special Discount', '-' + formatCurrency(data.discount)]);
-  }
-
-  costData.push(['TOTAL PAYABLE', formatCurrency(data.grandTotal)]);
-
-  autoTable(doc, {
-    startY: yPosition,
-    body: costData,
-    theme: 'grid',
-    bodyStyles: {
-      fontSize: 9,
-      fontStyle: 'bold',
-      textColor: [0, 0, 0],
-      cellPadding: 4,
-      lineWidth: 0.1,
-      lineColor: [0, 0, 0]
-    },
-    columnStyles: {
-      0: { cellWidth: 100, fillColor: [255, 255, 255], halign: 'right' },
-      1: { cellWidth: 'auto', fillColor: [255, 255, 0], halign: 'right', fontStyle: 'bold' } // Yellow Highlight like image
-    },
-    margin: { left: margin, right: margin }
-  });
-
-  yPosition = (doc as any).lastAutoTable.finalY + 10;
-
-  // 4b. Stagewise Payment Option (Based on USER TEXT request)
-  // Text requested:
-  // 1-PROJECT DURATION (Actually this is separate)
-  // 2-PAYMENT TIMELINE=10% For design, 40% For production, 30% After material dispatch...
-  
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text("STAGEWISE PAYMENT OPTION", margin, yPosition);
-  yPosition += 5;
+  doc.setTextColor(0, 0, 0);
+  doc.text('PAYMENT SUMMARY', summaryBoxX + 5, yPosition + 7);
 
-  const paymentStages = [
-    ['1', 'Design Phase', '10%'],
-    ['2', 'Production Phase', '40%'],
-    ['3', 'After Material Dispatch', '30%'],
-    ['4', 'Hardware & Accessories', '25%'], // Note: User requested 25%. Math (10+40+30+25+5 = 110%). Keeping user text.
-    ['5', 'Handles & Handover', '5%']
-  ];
+  let summaryY = yPosition + 14;
+  const summaryLineHeight = 6;
 
-  autoTable(doc, {
-    startY: yPosition,
-    head: [['Stage', 'Milestone', '% Payment']],
-    body: paymentStages,
-    theme: 'grid',
-    headStyles: {
-      fillColor: [220, 220, 220],
-      textColor: [0, 0, 0],
-      fontStyle: 'bold',
-      lineColor: [0, 0, 0],
-      lineWidth: 0.1
-    },
-    bodyStyles: {
-      textColor: [0, 0, 0],
-      lineColor: [0, 0, 0],
-      lineWidth: 0.1
-    },
-    columnStyles: {
-      0: { cellWidth: 20, halign: 'center' },
-      1: { cellWidth: 'auto' },
-      2: { cellWidth: 30, halign: 'center' }
-    },
-    margin: { left: margin, right: margin }
-  });
-
-  yPosition = (doc as any).lastAutoTable.finalY + 15;
-
-  // --- 5. Terms & Conditions (Specific User Requests) ---
-  
-  if (yPosition > pageHeight - 60) {
-    doc.addPage();
-    yPosition = 15;
-  }
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text("TERMS & CONDITIONS", margin, yPosition);
-  yPosition += 7;
-
+  doc.setFontSize(8.5);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  
-  // Helper to add bullet points
-  const addBullet = (text: string) => {
-    const splitText = doc.splitTextToSize(text, contentWidth - 10);
-    doc.text('•', margin, yPosition);
-    doc.text(splitText, margin + 6, yPosition);
-    yPosition += (splitText.length * 4.5) + 2;
+  doc.setTextColor(50, 50, 50);
+
+  doc.text('Subtotal:', summaryBoxX + 5, summaryY);
+  doc.text(`₹${data.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, summaryBoxX + summaryBoxWidth - 5, summaryY, { align: 'right' });
+  summaryY += summaryLineHeight;
+
+  if (data.discount > 0) {
+    doc.text('Discount:', summaryBoxX + 5, summaryY);
+    doc.text(`-₹${data.discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, summaryBoxX + summaryBoxWidth - 5, summaryY, { align: 'right' });
+    summaryY += summaryLineHeight;
+  }
+
+  if (data.gstEnabled) {
+    doc.text(`GST (${data.gstRate}%):`, summaryBoxX + 5, summaryY);
+    doc.text(`₹${data.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, summaryBoxX + summaryBoxWidth - 5, summaryY, { align: 'right' });
+    summaryY += summaryLineHeight;
+  }
+
+  // Divider
+  doc.setDrawColor(230, 220, 210);
+  doc.setLineWidth(0.3);
+  doc.line(summaryBoxX + 5, summaryY + 1, summaryBoxX + summaryBoxWidth - 5, summaryY + 1);
+  summaryY += 5;
+
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text('GRAND TOTAL:', summaryBoxX + 5, summaryY);
+  doc.text(`₹${data.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, summaryBoxX + summaryBoxWidth - 5, summaryY, { align: 'right' });
+
+  yPosition += summaryBoxHeight + 14;
+
+  // ============= TERMS & CONDITIONS =============
+  const addTermsSection = (title: string, bullets: string[]) => {
+    if (yPosition > pageHeight - 35) {
+      doc.addPage();
+      yPosition = 15;
+    }
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text(title, margin, yPosition);
+    yPosition += 5;
+
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(70, 70, 70);
+
+    bullets.forEach(bullet => {
+      if (yPosition > pageHeight - 12) {
+        doc.addPage();
+        yPosition = 15;
+      }
+      
+      const bulletLines = doc.splitTextToSize(`• ${bullet}`, contentWidth - 4);
+      doc.text(bulletLines, margin + 3, yPosition);
+      yPosition += bulletLines.length * 3.5 + 1.5;
+    });
+
+    yPosition += 3;
   };
 
-  // 1. PROJECT DURATION
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text("1. PROJECT DURATION", margin, yPosition);
-  yPosition += 5;
-  doc.setFont('helvetica', 'normal');
-  addBullet("Project Duration for 30 Days (Challenge after Design Phase).");
-  yPosition += 3;
+  doc.setTextColor(0, 0, 0);
+  doc.text('PROJECT DURATION FOR 30 DAYS (AFTER DESIGN PHASE)', margin, yPosition);
+  yPosition += 6;
 
-  // 2. PAYMENT TIMELINE (Already in table, but adding note if needed, or skipping to next point)
-  // User asked for "2-PAYMENT TIMELINE" in the text list, but we visualized it above. 
-  // Let's add the hardware note here.
-  
-  doc.setFont('helvetica', 'bold');
-  doc.text("2. HARDWARE SPECIFICATIONS", margin, yPosition);
-  yPosition += 5;
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  
-  // Point 3 from user request
-  addBullet("All the hardware will be Ebco fittings. Hafele and Hettich will charge extra.");
-  
-  // Point 4 from user request
-  addBullet("All Base unit kitchen: Ebco Soft Close Hinges are used.");
-  addBullet("For Lofts: Ebco Normal Hinges will be used.");
-  addBullet("Note: In case Soft Close is required for Lofts, it will cost extra.");
-  
-  // General Terms
-  yPosition += 3;
-  doc.setFont('helvetica', 'bold');
-  doc.text("3. GENERAL TERMS", margin, yPosition);
-  yPosition += 5;
-  doc.setFont('helvetica', 'normal');
-  addBullet("Validity: This quotation is valid for 15 days.");
-  addBullet("Delivery: Material dispatch within 2 weeks after phase payment.");
-  addBullet("Warranty: As per manufacturer standards (1-5 years depending on material).");
+  doc.setTextColor(70, 70, 70);
+  const introText = 'You have visualized your ideal home and decided to make it real. Once you finalize your design, the 30-day execution countdown begins. Below is the complete process and conditions.';
+  const introLines = doc.splitTextToSize(introText, contentWidth);
+  doc.text(introLines, margin, yPosition);
+  yPosition += introLines.length * 3.5 + 6;
 
-  // --- 6. Signature Section ---
-  if (yPosition > pageHeight - 40) {
+  addTermsSection('MATERIAL DISPATCH & EXECUTION PROCESS', [
+    'After receiving the second stage payment, the material will be dispatched within 2 working weeks.',
+    'The delivery schedule may vary with prior notice.',
+    'Service charges apply after two years.',
+    'Any design changes requested after finalization will incur extra cost.',
+    'All applicable taxes are additional.',
+    'Civil, plumbing, granite, and tiling work are not included.',
+    'False ceiling light styles will follow standard specifications.',
+    'Chimney and hob are not included.',
+    'All 2D and 3D drawings must be approved before production begins.'
+  ]);
+
+  addTermsSection('SITE READINESS – IMPORTANT REQUIREMENT', [
+    'Before measurements can be taken, flooring, wall plastering, electrical and plumbing work MUST be fully completed.',
+    'If any of the above are incomplete: Measurements cannot be taken, drawings and production accuracy cannot be guaranteed, designer will not begin detailing.',
+    'Special Case (Pre-Possession Planning): If the client wants design finalization before possession, no on-site measurements will be taken.',
+    'Layout and elevations will be made only using builder floor plans.',
+    'Design discussions pause after layout and elevation approval. Invoice for the next payment stage will be issued.',
+    'Revised civil/electrical/plumbing drawings will be provided after payment.',
+    'Design services remain paused until site is fully ready.',
+    'Prices remain valid for 6 months after 20% payment.',
+    'Before installation begins, flooring, wall plastering, electrical and plumbing work, and site inspection sign-off MUST be completed.',
+    'If the site is not ready: Execution and installation cannot begin. Any delay caused due to incomplete site work is the client\'s responsibility.'
+  ]);
+
+  addTermsSection('IMPLICATIONS OF PAYMENT DELAY', [
+    'Delay during Dispatch Stage: If payment is delayed, dispatch will be moved to the next available dispatch cycle (may be longer than the days delayed).',
+    'Delay exceeding 2 weeks: Storage charges of ₹5,000 per week apply.',
+    'Delay exceeding 1 month: Product warranty will be reduced by one full month.'
+  ]);
+
+  addTermsSection('DESIGN PHASE TIMELINES & DELAY POLICY', [
+    'Execution timelines (30/45/60/90 days) begin after design sign-off, not after the first payment.',
+    'Design Phase Start: Begins on the date the 5% advance payment is received.',
+    'Design Phase Completion: Achieved when the client approves all drawings and the 55% payment is received.',
+    'First Two Weeks Include: Welcome call, scheduling site visits (if site ready), designer assignment, first designer–client communication, first design meeting (within 7–10 days if possible).',
+    'Delays NOT Counted Under Penalty: Client-side vendors, site not ready, client payment delays, client not providing timely selections, builder delays, client delays in approving quotation, force majeure situations.',
+    'Company-Side Delay Penalty: Two-week grace period. After grace: ₹5,000 per month (pro-rata). Penalty cannot exceed 5% of total project value.',
+    'No additional compensation is provided beyond this.'
+  ]);
+
+  addTermsSection('CHANGES DURING EXECUTION DUE TO TECHNICAL LIMITATION', [
+    'Actual site conditions may require modifications to the approved design due to material limitations, installation feasibility, or structural constraints.',
+    'The client will be informed, and changes will proceed only with approval.'
+  ]);
+
+  addTermsSection('SERVICE, WARRANTY & TRANSPARENCY', [
+    'Product warranties range from 1 to 5 years, depending on material and manufacturer.',
+    'The entire price is transparent with no hidden charges.',
+    'All execution work will follow agreed drawings and specifications.',
+    `A dedicated team from ${data.companyName || 'our company'} ensures timely handover.`
+  ]);
+
+  // ============= SIGNATURE SECTION =============
+  if (yPosition > pageHeight - 45) {
     doc.addPage();
-    yPosition = pageHeight - 50;
-  } else {
-    yPosition += 10;
+    yPosition = 15;
   }
+
+  yPosition += 8;
+
+  // Thin divider
+  doc.setDrawColor(220, 220, 220);
+  doc.setLineWidth(0.3);
+  doc.line(margin, yPosition, pageWidth - margin, yPosition);
+  yPosition += 10;
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text('CUSTOMER ACCEPTANCE', margin, yPosition);
+  yPosition += 6;
 
   const signBoxWidth = 70;
-  const companySignX = pageWidth - margin - signBoxWidth;
+  const signBoxHeight = 32;
 
-  // Company Signature
-  if (data.signatureUrl) {
-    try {
-      let compressedSig = await compressImage(data.signatureUrl, 150, 60);
-      doc.addImage(compressedSig, 'JPEG', companySignX, yPosition - 15, 50, 20);
-    } catch (e) {}
-  }
-  
-  doc.setFont('helvetica', 'bold');
-  doc.text(`For ${data.companyName || 'Company'}`, companySignX, yPosition + 10);
-  
-  // Customer Acceptance
+  // Customer signature box
+  doc.setDrawColor(220, 220, 220);
   doc.setLineWidth(0.5);
-  doc.line(margin, yPosition + 5, margin + 70, yPosition + 5);
+  doc.roundedRect(margin, yPosition, signBoxWidth, signBoxHeight, 2, 2);
+  
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.text("Customer Signature", margin, yPosition + 10);
+  doc.setTextColor(120, 120, 120);
+  doc.text('Customer Signature', margin + 3, yPosition + signBoxHeight + 5);
+
+  // Company signature box
+  const companySignX = pageWidth - margin - signBoxWidth;
+  doc.roundedRect(companySignX, yPosition, signBoxWidth, signBoxHeight, 2, 2);
+
+  // Add compressed signature
+  if (compressedSignature) {
+    try {
+      doc.addImage(compressedSignature, 'JPEG', companySignX + 3, yPosition + 3, signBoxWidth - 6, signBoxHeight - 6, undefined, 'FAST');
+    } catch (error) {
+      console.error('Signature add error:', error);
+    }
+  }
+
+  doc.text(`For ${data.companyName || 'Company'}`, companySignX + 3, yPosition + signBoxHeight + 5);
 
   // Footer
-  doc.setFontSize(8);
-  doc.setTextColor(150, 150, 150);
-  doc.text("This is a computer-generated invoice.", pageWidth / 2, pageHeight - 10, { align: 'center' });
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(160, 160, 160);
+  doc.text('This is a computer-generated quotation.', pageWidth / 2, pageHeight - 8, { align: 'center' });
 
-  // Save
+  // Save with maximum compression
   doc.save(`Quotation_${data.clientName.replace(/\s+/g, '_')}.pdf`);
 };
