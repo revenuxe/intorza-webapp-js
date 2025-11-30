@@ -419,6 +419,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold' } 
     },
     willDrawCell: (cellData) => {
+      // FIX: Ensure we are only accessing the external array (summaryData) when processing the table body
+      if (cellData.section !== 'body') return; 
+
       const rowData = summaryData[cellData.row.index];
       const textColor = rowData[2];
       const isGrandTotal = cellData.row.index === summaryData.length - 1;
@@ -436,12 +439,12 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       }
       
       // Draw subtle separator line for non-total rows (only when drawing the first column)
-      if (cellData.section === 'body' && !isGrandTotal && isFirstColumn) {
+      if (!isGrandTotal && isFirstColumn) {
         const table = cellData.table;
         const y = cellData.cell.y + cellData.cell.height;
         doc.setLineWidth(0.1);
         doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-        // FIXED: Draw full line using table bounds
+        // Draw full line using table bounds
         doc.line(table.x, y, table.x + table.width, y); 
       }
     },
@@ -494,7 +497,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           const y = cellData.cell.y + cellData.cell.height;
           doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
           doc.setLineWidth(0.1);
-          // FIXED: Draw full line using table bounds
+          // Draw full line using table bounds
           doc.line(table.x, y, table.x + table.width, y); 
         }
       },
