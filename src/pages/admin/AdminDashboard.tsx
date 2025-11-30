@@ -11,13 +11,21 @@ import { LogOut, Users, FileText, Receipt, Settings as SettingsIcon } from "luci
 interface User {
   id: string;
   email: string;
+  full_name: string;
   created_at: string;
-  last_sign_in_at: string;
+}
+
+interface Stats {
+  totalUsers: number;
+  totalQuotations: number;
+  totalInvoices: number;
+  totalRevenue: number;
 }
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
+  const [stats, setStats] = useState<Stats>({ totalUsers: 0, totalQuotations: 0, totalInvoices: 0, totalRevenue: 0 });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -43,6 +51,7 @@ const AdminDashboard = () => {
       }
 
       loadUsers();
+      loadStats();
     } catch (error) {
       console.error('Admin check error:', error);
       navigate("/admin/login");
@@ -53,13 +62,43 @@ const AdminDashboard = () => {
 
   const loadUsers = async () => {
     try {
-      // Note: In production, you'd need a server-side endpoint or edge function
-      // to fetch users from auth.users table as it's not directly accessible
-      // For now, we'll show a message about setting up an edge function
-      setUsers([]);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, created_at')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUsers(data || []);
     } catch (error) {
       console.error('Error loading users:', error);
       toast.error("Failed to load users");
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const { count: quotationsCount } = await supabase
+        .from('quotations')
+        .select('*', { count: 'exact', head: true });
+
+      const { count: invoicesCount } = await supabase
+        .from('invoices')
+        .select('*', { count: 'exact', head: true });
+
+      const { data: invoiceData } = await supabase
+        .from('invoices')
+        .select('paid_amount');
+
+      const totalRevenue = invoiceData?.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0) || 0;
+
+      setStats({
+        totalUsers: users.length,
+        totalQuotations: quotationsCount || 0,
+        totalInvoices: invoicesCount || 0,
+        totalRevenue
+      });
+    } catch (error) {
+      console.error('Error loading stats:', error);
     }
   };
 
@@ -108,7 +147,7 @@ const AdminDashboard = () => {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{users.length}</div>
+              <div className="text-2xl font-bold">{stats.totalUsers}</div>
               <p className="text-xs text-muted-foreground">Registered accounts</p>
             </CardContent>
           </Card>
@@ -119,7 +158,7 @@ const AdminDashboard = () => {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{stats.totalQuotations}</div>
               <p className="text-xs text-muted-foreground">Total quotations</p>
             </CardContent>
           </Card>
@@ -130,7 +169,7 @@ const AdminDashboard = () => {
               <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">{stats.totalInvoices}</div>
               <p className="text-xs text-muted-foreground">Total invoices</p>
             </CardContent>
           </Card>
@@ -141,8 +180,8 @@ const AdminDashboard = () => {
               <Receipt className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₹0</div>
-              <p className="text-xs text-muted-foreground">Total revenue</p>
+              <div className="text-2xl font-bold tabular-nums">₹{stats.totalRevenue.toLocaleString('en-IN')}</div>
+              <p className="text-xs text-muted-foreground">Total paid amount</p>
             </CardContent>
           </Card>
         </div>
@@ -160,7 +199,7 @@ const AdminDashboard = () => {
               <CardHeader>
                 <CardTitle>User Management</CardTitle>
                 <CardDescription>
-                  View and manage all registered users. To access user data, you'll need to set up an Edge Function.
+                  View and manage all registered users
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -168,8 +207,8 @@ const AdminDashboard = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Email</TableHead>
+                      <TableHead>Name</TableHead>
                       <TableHead>Created At</TableHead>
-                      <TableHead>Last Sign In</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -177,15 +216,15 @@ const AdminDashboard = () => {
                     {users.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                          No users found. Set up an Edge Function to fetch user data.
+                          No users found
                         </TableCell>
                       </TableRow>
                     ) : (
                       users.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell>{user.email}</TableCell>
+                          <TableCell>{user.full_name || 'N/A'}</TableCell>
                           <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                          <TableCell>{user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : 'Never'}</TableCell>
                           <TableCell>
                             <Button variant="ghost" size="sm">View</Button>
                           </TableCell>
