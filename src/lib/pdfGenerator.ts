@@ -25,6 +25,7 @@ interface QuotationData {
   clientAddress: string;
   dateOfProposal: string;
   quotationValidTill: string;
+  projectDeadline?: string;
   placeOfProject: string;
   warranty: string;
   projectType: string;
@@ -234,6 +235,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   addMeta('Valid Till:', data.quotationValidTill);
   addMeta('Project:', data.quotationTitle.substring(0, 20)); // Truncate if too long
   addMeta('Warranty:', `${data.warranty} Years`);
+  if (data.projectDeadline) {
+    addMeta('Deadline:', data.projectDeadline);
+  }
 
   yPosition += cardHeight + 10;
 

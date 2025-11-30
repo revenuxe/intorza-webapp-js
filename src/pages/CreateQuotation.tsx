@@ -328,6 +328,7 @@ const CreateQuotation = () => {
         clientAddress,
         dateOfProposal: dateOfProposal || new Date().toLocaleDateString('en-IN'),
         quotationValidTill: quotationValidTill || '',
+        projectDeadline: projectDeadline || '',
         placeOfProject: placeOfProject || '',
         warranty,
         projectType,
