@@ -45,6 +45,11 @@ interface QuotationData {
   signatureUrl?: string;
   enableSocialMediaDiscount?: boolean;
   socialMediaDiscountRate?: number;
+  paymentStages?: {
+    stage: string;
+    milestone: string;
+    percentage: number;
+  }[];
 }
 
 // --- Helpers ---
@@ -409,13 +414,21 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.text("STAGEWISE PAYMENT OPTION", margin, yPosition);
   yPosition += 6;
 
-  const paymentStages = [
-    ['1', 'Design Phase', '10%', formatCurrency(finalTotal * 0.10)],
-    ['2', 'Production Phase', '40%', formatCurrency(finalTotal * 0.40)],
-    ['3', 'Material Dispatch', '30%', formatCurrency(finalTotal * 0.30)],
-    ['4', 'Hardware & Accessories', '25%', formatCurrency(finalTotal * 0.25)],
-    ['5', 'Handover', '5%', formatCurrency(finalTotal * 0.05)]
+  const defaultPaymentStages = [
+    { stage: '1', milestone: 'Design Phase', percentage: 10 },
+    { stage: '2', milestone: 'Material Procurement', percentage: 30 },
+    { stage: '3', milestone: 'Execution Start', percentage: 30 },
+    { stage: '4', milestone: 'Mid-Execution', percentage: 20 },
+    { stage: '5', milestone: 'Final Handover', percentage: 10 }
   ];
+
+  const stagesData = data.paymentStages || defaultPaymentStages;
+  const paymentStages = stagesData.map(stage => [
+    stage.stage,
+    stage.milestone,
+    `${stage.percentage}%`,
+    formatCurrency(finalTotal * (stage.percentage / 100))
+  ]);
 
   autoTable(doc, {
     startY: yPosition,
