@@ -44,6 +44,7 @@ interface QuotationData {
   professionalAdvantages?: string;
   signatureUrl?: string;
   enableSocialMediaDiscount?: boolean;
+  socialMediaDiscountRate?: number;
 }
 
 // --- Helpers ---
@@ -339,7 +340,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   let taxableAmount = subtotal;
   
   if (data.enableSocialMediaDiscount) {
-    discountAmount = subtotal * 0.06;
+    const discountRate = data.socialMediaDiscountRate || 6;
+    discountAmount = subtotal * (discountRate / 100);
     taxableAmount = subtotal - discountAmount;
   } else if (data.discount) {
      discountAmount = data.discount;
@@ -362,7 +364,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   ];
 
   if (data.enableSocialMediaDiscount) {
-    summaryData.push(['Social Media Special Discount @ 6%', '-' + formatCurrency(discountAmount)]);
+    const discountRate = data.socialMediaDiscountRate || 6;
+    summaryData.push([`Social Media Special Discount @ ${discountRate}%`, '-' + formatCurrency(discountAmount)]);
   } else if (data.discount && data.discount > 0) {
     summaryData.push(['Discount', '-' + formatCurrency(discountAmount)]);
   }
