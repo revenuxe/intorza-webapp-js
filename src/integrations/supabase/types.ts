@@ -169,6 +169,7 @@ export type Database = {
           logo_url: string | null
           phone: string | null
           professional_advantages: string | null
+          signature_url: string | null
           updated_at: string | null
         }
         Insert: {
@@ -182,6 +183,7 @@ export type Database = {
           logo_url?: string | null
           phone?: string | null
           professional_advantages?: string | null
+          signature_url?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -195,6 +197,7 @@ export type Database = {
           logo_url?: string | null
           phone?: string | null
           professional_advantages?: string | null
+          signature_url?: string | null
           updated_at?: string | null
         }
         Relationships: []

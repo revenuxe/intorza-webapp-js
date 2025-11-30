@@ -18,7 +18,6 @@ interface LineItem {
   productDetails: string;
   widthFt: number;
   heightFt: number;
-  depth: number;
   sftArea: number;
   ratePerSft: number;
   amount: number;
@@ -38,7 +37,7 @@ const CreateQuotation = () => {
       id: "1",
       title: "KITCHEN WITHOUT CIVIL AND ACCESSORIES",
       items: [
-        { id: "1", side: "A", productName: "BASE UNIT-1", productDetails: "", widthFt: 0, heightFt: 0, depth: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
+        { id: "1", side: "A", productName: "BASE UNIT-1", productDetails: "", widthFt: 0, heightFt: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
       ],
     },
   ]);
@@ -60,7 +59,8 @@ const CreateQuotation = () => {
     phone: "",
     email: "",
     gstin: "",
-    professional_advantages: ""
+    professional_advantages: "",
+    signature_url: ""
   });
 
   useEffect(() => {
@@ -87,7 +87,8 @@ const CreateQuotation = () => {
           phone: data.phone || "",
           email: data.email || "",
           gstin: data.gstin || "",
-          professional_advantages: data.professional_advantages || ""
+          professional_advantages: data.professional_advantages || "",
+          signature_url: data.signature_url || ""
         });
       }
     } catch (error) {
@@ -102,7 +103,7 @@ const CreateQuotation = () => {
         id: Date.now().toString(),
         title: "NEW SECTION",
         items: [
-          { id: Date.now().toString(), side: "A", productName: "", productDetails: "", widthFt: 0, heightFt: 0, depth: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
+          { id: Date.now().toString(), side: "A", productName: "", productDetails: "", widthFt: 0, heightFt: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
         ],
       },
     ]);
@@ -115,7 +116,7 @@ const CreateQuotation = () => {
             ...section,
             items: [
               ...section.items,
-              { id: Date.now().toString(), side: "A", productName: "", productDetails: "", widthFt: 0, heightFt: 0, depth: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
+              { id: Date.now().toString(), side: "A", productName: "", productDetails: "", widthFt: 0, heightFt: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
             ],
           }
         : section
@@ -240,7 +241,6 @@ const CreateQuotation = () => {
           product_details: item.productDetails,
           width_ft: item.widthFt,
           height_ft: item.heightFt,
-          depth: item.depth.toString(),
           sft_area: item.sftArea,
           rate_per_sft: item.ratePerSft,
           amount: item.amount,
@@ -272,7 +272,7 @@ const CreateQuotation = () => {
             id: "1",
             title: "KITCHEN WITHOUT CIVIL AND ACCESSORIES",
             items: [
-              { id: "1", side: "A", productName: "BASE UNIT-1", productDetails: "", widthFt: 0, heightFt: 0, depth: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
+              { id: "1", side: "A", productName: "BASE UNIT-1", productDetails: "", widthFt: 0, heightFt: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
             ],
           },
         ]);
@@ -323,7 +323,8 @@ const CreateQuotation = () => {
         companyPhone: profile.phone,
         companyEmail: profile.email,
         gstin: profile.gstin,
-        professionalAdvantages: profile.professional_advantages
+        professionalAdvantages: profile.professional_advantages,
+        signatureUrl: profile.signature_url
       });
 
       toast({
@@ -477,13 +478,12 @@ const CreateQuotation = () => {
               {/* Table Header - Hidden on mobile, shown on tablet+ */}
               <div className="hidden md:block overflow-x-auto">
                 <div className="min-w-[900px]">
-                  <div className="grid grid-cols-[60px_120px_1fr_80px_80px_80px_80px_100px_100px] gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
+                  <div className="grid grid-cols-[60px_120px_1fr_80px_80px_80px_100px_100px] gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
                     <div>Side</div>
                     <div>Product Name</div>
                     <div>Product Details</div>
                     <div>Width (Ft)</div>
                     <div>Height (Ft)</div>
-                    <div>Depth</div>
                     <div>Sft Area</div>
                     <div>Rate/Sft</div>
                     <div>Amount</div>
@@ -511,7 +511,7 @@ const CreateQuotation = () => {
                   {/* Desktop Table Row */}
                   <div className="hidden md:block overflow-x-auto">
                     <div className="min-w-[900px]">
-                      <div className="grid grid-cols-[60px_120px_1fr_80px_80px_80px_80px_100px_100px] gap-2">
+                      <div className="grid grid-cols-[60px_120px_1fr_80px_80px_80px_100px_100px] gap-2">
                         <Input
                           value={item.side}
                           onChange={(e) => updateItem(section.id, item.id, "side", e.target.value)}
@@ -545,13 +545,6 @@ const CreateQuotation = () => {
                           onChange={(e) => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)}
                           placeholder="0"
                           step="0.1"
-                          className="h-9"
-                        />
-                        <Input
-                          type="number"
-                          value={item.depth || ""}
-                          onChange={(e) => updateItem(section.id, item.id, "depth", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
                           className="h-9"
                         />
                         <Input
@@ -606,7 +599,7 @@ const CreateQuotation = () => {
                       />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-2">
                         <Label>Width (Ft)</Label>
                         <Input
@@ -625,15 +618,6 @@ const CreateQuotation = () => {
                           onChange={(e) => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)}
                           placeholder="0"
                           step="0.1"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Depth</Label>
-                        <Input
-                          type="number"
-                          value={item.depth || ""}
-                          onChange={(e) => updateItem(section.id, item.id, "depth", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
                         />
                       </div>
                     </div>
