@@ -103,13 +103,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- Design System Colors ---
   const COLORS = {
-    TEXT_PRIMARY: [20, 20, 20],      // Almost black
-    TEXT_SECONDARY: [80, 80, 80],    // Dark Grey
-    TEXT_LIGHT: [120, 120, 120],     // Light Grey
-    BG_CARD: [250, 250, 250],        // Very light grey for cards
-    BORDER: [230, 230, 230],         // Subtle borders
-    ACCENT: [0, 0, 0],               // Black accent
-    HIGHLIGHT: [255, 240, 0],        // Yellow highlight
+    TEXT_PRIMARY: [20, 20, 20] as [number, number, number],      // Almost black
+    TEXT_SECONDARY: [80, 80, 80] as [number, number, number],    // Dark Grey
+    TEXT_LIGHT: [120, 120, 120] as [number, number, number],     // Light Grey
+    BG_CARD: [250, 250, 250] as [number, number, number],        // Very light grey for cards
+    BORDER: [230, 230, 230] as [number, number, number],         // Subtle borders
+    ACCENT: [0, 0, 0] as [number, number, number],               // Black accent
+    HIGHLIGHT: [255, 240, 0] as [number, number, number],        // Yellow highlight
   };
 
   // --- 1. Header Section (Clean & Minimal) ---
@@ -272,12 +272,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       item.widthFt.toFixed(1),
       item.heightFt.toFixed(1),
       item.sftArea.toFixed(2),
+      formatCurrency(item.ratePerSft),
       formatCurrency(item.amount) 
     ]);
 
     autoTable(doc, {
       startY: yPosition,
-      head: [['Side', 'Product', 'Details', 'W (ft)', 'H (ft)', 'Sq.Ft', 'Amount']],
+      head: [['Side', 'Product', 'Details', 'W (ft)', 'H (ft)', 'Sq.Ft', 'Price/Sq.ft', 'Amount']],
       body: tableBody,
       theme: 'grid', // Cleaner looking than plain
       styles: {
@@ -298,12 +299,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       },
       columnStyles: {
         0: { cellWidth: 10, halign: 'center' },
-        1: { cellWidth: 35, fontStyle: 'bold' },
+        1: { cellWidth: 30, fontStyle: 'bold' },
         2: { cellWidth: 'auto' },
-        3: { cellWidth: 15, halign: 'center' },
-        4: { cellWidth: 15, halign: 'center' },
-        5: { cellWidth: 15, halign: 'center' },
-        6: { cellWidth: 30, halign: 'right', fontStyle: 'bold' }
+        3: { cellWidth: 13, halign: 'center' },
+        4: { cellWidth: 13, halign: 'center' },
+        5: { cellWidth: 13, halign: 'center' },
+        6: { cellWidth: 25, halign: 'right', fontStyle: 'bold' },
+        7: { cellWidth: 28, halign: 'right', fontStyle: 'bold' }
       },
       margin: { left: margin, right: margin },
       didDrawPage: (d) => {
@@ -332,18 +334,18 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // Calculations
   const subtotal = data.subtotal;
-  let socialMediaDiscountAmount = 0;
+  let discountAmount = 0;
   let taxableAmount = subtotal;
   
   if (data.enableSocialMediaDiscount) {
-    socialMediaDiscountAmount = subtotal * 0.06;
-    taxableAmount = subtotal - socialMediaDiscountAmount;
+    discountAmount = subtotal * 0.06;
+    taxableAmount = subtotal - discountAmount;
   } else if (data.discount) {
-     socialMediaDiscountAmount = data.discount;
-     taxableAmount = subtotal - socialMediaDiscountAmount;
+     discountAmount = data.discount;
+     taxableAmount = subtotal - discountAmount;
   }
 
-  const gstRate = 18;
+  const gstRate = data.gstRate || 18;
   const gstAmount = data.gstEnabled ? (taxableAmount * (gstRate / 100)) : 0;
   const finalTotal = taxableAmount + gstAmount;
 
@@ -359,9 +361,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   ];
 
   if (data.enableSocialMediaDiscount) {
-    summaryData.push(['Social Media Special Discount @ 6%', '-' + formatCurrency(socialMediaDiscountAmount)]);
+    summaryData.push(['Social Media Special Discount @ 6%', '-' + formatCurrency(discountAmount)]);
   } else if (data.discount && data.discount > 0) {
-    summaryData.push(['Discount', '-' + formatCurrency(data.discount)]);
+    summaryData.push(['Discount', '-' + formatCurrency(discountAmount)]);
   }
 
   if (data.gstEnabled) {
@@ -397,10 +399,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   yPosition = (doc as any).lastAutoTable.finalY + 15;
 
-  // --- 5. Stagewise Payment ---
+  // --- 5. Stagewise Payment Option ---
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
-  doc.text("PAYMENT SCHEDULE", margin, yPosition);
+  doc.text("STAGEWISE PAYMENT OPTION", margin, yPosition);
   yPosition += 6;
 
   const paymentStages = [
