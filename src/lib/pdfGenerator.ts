@@ -407,16 +407,16 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   yPosition += 6;
 
   const paymentStages = [
-    ['1', 'Design Phase', '10%'],
-    ['2', 'Production Phase', '40%'],
-    ['3', 'Material Dispatch', '30%'],
-    ['4', 'Hardware & Accessories', '25%'],
-    ['5', 'Handover', '5%']
+    ['1', 'Design Phase', '10%', formatCurrency(finalTotal * 0.10)],
+    ['2', 'Production Phase', '40%', formatCurrency(finalTotal * 0.40)],
+    ['3', 'Material Dispatch', '30%', formatCurrency(finalTotal * 0.30)],
+    ['4', 'Hardware & Accessories', '25%', formatCurrency(finalTotal * 0.25)],
+    ['5', 'Handover', '5%', formatCurrency(finalTotal * 0.05)]
   ];
 
   autoTable(doc, {
     startY: yPosition,
-    head: [['#', 'Stage / Milestone', 'Payment %']],
+    head: [['#', 'Stage / Milestone', 'Payment %', 'Amount']],
     body: paymentStages,
     theme: 'grid',
     styles: {
@@ -435,9 +435,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       fontSize: 7
     },
     columnStyles: {
-      0: { cellWidth: 15, halign: 'center', fontSize: 7 },
+      0: { cellWidth: 12, halign: 'center', fontSize: 7 },
       1: { cellWidth: 'auto', fontSize: 7 },
-      2: { cellWidth: 30, halign: 'center', fontStyle: 'bold', fontSize: 7 }
+      2: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fontSize: 7 },
+      3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: 7 }
     },
     margin: { left: margin, right: margin }
   });
