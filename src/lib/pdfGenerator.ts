@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 interface LineItem {
   side: string;
@@ -133,7 +133,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       `₹${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPosition,
       head: [['Side', 'Product Name', 'Product Details', 'Width (Ft)', 'Height (Ft)', 'Depth', 'Sft Area', 'Amount']],
       body: tableData,
