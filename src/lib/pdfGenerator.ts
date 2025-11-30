@@ -293,7 +293,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       item.widthFt.toFixed(1),
       item.heightFt.toFixed(1),
       item.sftArea.toFixed(2),
-      item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      '₹ ' + item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     ]);
 
     autoTable(doc, {
@@ -331,7 +331,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         3: { cellWidth: 15, halign: 'center' },
         4: { cellWidth: 15, halign: 'center' },
         5: { cellWidth: 15, halign: 'center' },
-        6: { cellWidth: 30, halign: 'right', fontStyle: 'bold', textColor: [0, 0, 0] }
+        6: { cellWidth: 30, halign: 'right', fontStyle: 'bold', textColor: [0, 0, 0], font: 'helvetica', fontSize: 8 }
       },
       margin: { left: margin, right: margin },
       tableWidth: 'auto',

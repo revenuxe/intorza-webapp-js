@@ -127,8 +127,8 @@ const Quotations = () => {
                     <div className="flex justify-between items-center pt-2 border-t border-border">
                       <div>
                         <p className="text-xs text-muted-foreground">Amount</p>
-                        <p className="text-lg font-bold text-primary">
-                          ₹{quotation.grand_total?.toLocaleString("en-IN") || '0'}
+                        <p className="text-lg font-bold text-primary tabular-nums">
+                          ₹{quotation.grand_total?.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
                         </p>
                       </div>
                       <div className="text-right">
@@ -138,7 +138,11 @@ const Quotations = () => {
                         </p>
                       </div>
                     </div>
-                    <Button variant="outline" className="w-full mt-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full mt-2"
+                      onClick={() => navigate(`/quotations/${quotation.id}`)}
+                    >
                       View Details
                     </Button>
                   </div>

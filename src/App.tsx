@@ -7,7 +7,9 @@ import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Quotations from "./pages/Quotations";
+import QuotationDetail from "./pages/QuotationDetail";
 import Invoices from "./pages/Invoices";
+import InvoiceDetail from "./pages/InvoiceDetail";
 import Clients from "./pages/Clients";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
@@ -34,7 +36,9 @@ const App = () => (
           {/* Protected routes with Layout */}
           <Route path="/" element={<ProtectedRoute><Layout><Index /></Layout></ProtectedRoute>} />
           <Route path="/quotations" element={<ProtectedRoute><Layout><Quotations /></Layout></ProtectedRoute>} />
+          <Route path="/quotations/:id" element={<ProtectedRoute><Layout><QuotationDetail /></Layout></ProtectedRoute>} />
           <Route path="/invoices" element={<ProtectedRoute><Layout><Invoices /></Layout></ProtectedRoute>} />
+          <Route path="/invoices/:id" element={<ProtectedRoute><Layout><InvoiceDetail /></Layout></ProtectedRoute>} />
           <Route path="/clients" element={<ProtectedRoute><Layout><Clients /></Layout></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
           
