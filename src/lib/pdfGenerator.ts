@@ -326,13 +326,24 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     
     yPosition = (doc as any).lastAutoTable.finalY + 2;
 
-    // Section Total - Right Aligned with styling
+    // Section Total - Right Aligned with yellow highlight
     const sectionTotal = section.items.reduce((sum, item) => sum + item.amount, 0);
     
+    // Draw yellow highlight background
+    const totalText = `Total ${section.title}:  ${formatCurrency(sectionTotal)}`;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
+    const textWidth = doc.getTextWidth(totalText);
+    const highlightPadding = 2;
+    const highlightX = pageWidth - margin - textWidth - highlightPadding;
+    const highlightY = yPosition + 1;
+    const highlightHeight = 6;
+    
+    doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
+    doc.rect(highlightX, highlightY, textWidth + (highlightPadding * 2), highlightHeight, 'F');
+    
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-    doc.text(`Total ${section.title}:  ${formatCurrency(sectionTotal)}`, pageWidth - margin, yPosition + 6, { align: 'right' });
+    doc.text(totalText, pageWidth - margin, yPosition + 6, { align: 'right' });
     
     yPosition += 15;
   }
@@ -401,8 +412,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8 }
     },
     willDrawCell: (data) => {
-      // Highlight the Grand Total Row
-      if (data.row.index === summaryData.length - 1 && data.section === 'body') {
+      // Highlight all amount cells (column 1) with yellow
+      if (data.column.index === 1 && data.section === 'body') {
         doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
         doc.setTextColor(0, 0, 0);
       }
