@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
+import { useSearchParams } from "react-router-dom";
 
 
 interface LineItem {
@@ -40,6 +41,8 @@ interface PaymentStage {
 
 const CreateQuotation = () => {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const quotationId = searchParams.get('id');
   const [sections, setSections] = useState<Section[]>([
     {
       id: "1",
@@ -84,7 +87,10 @@ const CreateQuotation = () => {
 
   useEffect(() => {
     loadProfile();
-  }, []);
+    if (quotationId) {
+      loadQuotation(quotationId);
+    }
+  }, [quotationId]);
 
   const loadProfile = async () => {
     try {
@@ -118,6 +124,90 @@ const CreateQuotation = () => {
       }
     } catch (error) {
       console.error('Error loading profile:', error);
+    }
+  };
+
+  const loadQuotation = async (id: string) => {
+    try {
+      // Load quotation data
+      const { data: quotation, error: quotationError } = await supabase
+        .from('quotations')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (quotationError) throw quotationError;
+
+      // Pre-fill form fields
+      setProjectTitle(quotation.quotation_title || "");
+      setClientName(quotation.client_name || "");
+      setClientAddress(quotation.client_address || "");
+      setDateOfProposal(quotation.date_of_proposal || "");
+      setQuotationValidTill(quotation.valid_till || "");
+      setPlaceOfProject(quotation.place_of_project || "");
+      setWarranty(quotation.warranty || "10");
+      setProjectType(quotation.project_type || "");
+      setGstEnabled(quotation.gst_enabled || false);
+      setGstRate(quotation.gst_percentage?.toString() || "18");
+      
+      // Calculate discount percentage from discount amount
+      if (quotation.discount_amount && quotation.subtotal) {
+        const discountPercent = (quotation.discount_amount / quotation.subtotal) * 100;
+        setDiscountPercentage(discountPercent);
+      }
+
+      // Load sections
+      const { data: sectionsData, error: sectionsError } = await supabase
+        .from('quotation_sections')
+        .select('*')
+        .eq('quotation_id', id)
+        .order('sort_order');
+
+      if (sectionsError) throw sectionsError;
+
+      // Load items for each section
+      const loadedSections: Section[] = [];
+      for (const section of sectionsData || []) {
+        const { data: itemsData, error: itemsError } = await supabase
+          .from('quotation_items')
+          .select('*')
+          .eq('section_id', section.id)
+          .order('sort_order');
+
+        if (itemsError) throw itemsError;
+
+        loadedSections.push({
+          id: section.id,
+          title: section.section_name,
+          items: (itemsData || []).map(item => ({
+            id: item.id,
+            side: item.side || "A",
+            productName: item.product_name || "",
+            productDetails: item.product_details || "",
+            widthFt: item.width_ft || 0,
+            heightFt: item.height_ft || 0,
+            sftArea: item.sft_area || 0,
+            ratePerSft: item.rate_per_sft || 0,
+            amount: item.amount || 0,
+          }))
+        });
+      }
+
+      if (loadedSections.length > 0) {
+        setSections(loadedSections);
+      }
+
+      toast({
+        title: "Quotation loaded",
+        description: "Existing quotation data has been loaded for editing",
+      });
+    } catch (error) {
+      console.error('Error loading quotation:', error);
+      toast({
+        title: "Load failed",
+        description: "Failed to load quotation data",
+        variant: "destructive",
+      });
     }
   };
 
@@ -218,76 +308,147 @@ const CreateQuotation = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      // Generate quotation number
-      const quotationNumber = `QT-${Date.now()}`;
+      if (quotationId) {
+        // Update existing quotation
+        const { error: quotationError } = await supabase
+          .from('quotations')
+          .update({
+            quotation_title: projectTitle,
+            client_name: clientName,
+            client_address: clientAddress,
+            project_name: projectTitle,
+            date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
+            valid_till: quotationValidTill,
+            place_of_project: placeOfProject,
+            warranty: warranty,
+            project_type: projectType,
+            status: status,
+            gst_enabled: gstEnabled,
+            gst_percentage: parseFloat(gstRate),
+            gst_amount: gstAmount,
+            discount_amount: discountAmount,
+            subtotal: subtotal,
+            grand_total: grandTotal,
+          })
+          .eq('id', quotationId);
 
-      // Insert quotation
-      const { data: quotationData, error: quotationError } = await supabase
-        .from('quotations')
-        .insert({
-          user_id: user.id,
-          quotation_number: quotationNumber,
-          quotation_title: projectTitle,
-          client_name: clientName,
-          client_address: clientAddress,
-          project_name: projectTitle,
-          date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
-          valid_till: quotationValidTill,
-          place_of_project: placeOfProject,
-          warranty: warranty,
-          project_type: projectType,
-          status: status,
-          gst_enabled: gstEnabled,
-          gst_percentage: parseFloat(gstRate),
-          gst_amount: gstAmount,
-          discount_amount: discountAmount,
-          subtotal: subtotal,
-          grand_total: grandTotal,
-        })
-        .select()
-        .single();
+        if (quotationError) throw quotationError;
 
-      if (quotationError) throw quotationError;
-
-      // Insert sections and items
-      for (const section of sections) {
-        const { data: sectionData, error: sectionError } = await supabase
+        // Delete existing sections and items
+        const { error: deleteSectionsError } = await supabase
           .from('quotation_sections')
+          .delete()
+          .eq('quotation_id', quotationId);
+
+        if (deleteSectionsError) throw deleteSectionsError;
+
+        // Insert updated sections and items
+        for (const section of sections) {
+          const { data: sectionData, error: sectionError } = await supabase
+            .from('quotation_sections')
+            .insert({
+              quotation_id: quotationId,
+              section_name: section.title,
+              sort_order: sections.indexOf(section),
+            })
+            .select()
+            .single();
+
+          if (sectionError) throw sectionError;
+
+          const itemsToInsert = section.items.map((item, index) => ({
+            section_id: sectionData.id,
+            side: item.side,
+            product_name: item.productName,
+            product_details: item.productDetails,
+            width_ft: item.widthFt,
+            height_ft: item.heightFt,
+            sft_area: item.sftArea,
+            rate_per_sft: item.ratePerSft,
+            amount: item.amount,
+            sort_order: index,
+          }));
+
+          const { error: itemsError } = await supabase
+            .from('quotation_items')
+            .insert(itemsToInsert);
+
+          if (itemsError) throw itemsError;
+        }
+
+        toast({
+          title: "Quotation updated",
+          description: "Quotation has been updated successfully",
+        });
+      } else {
+        // Create new quotation
+        const quotationNumber = `QT-${Date.now()}`;
+
+        const { data: quotationData, error: quotationError } = await supabase
+          .from('quotations')
           .insert({
-            quotation_id: quotationData.id,
-            section_name: section.title,
-            sort_order: sections.indexOf(section),
+            user_id: user.id,
+            quotation_number: quotationNumber,
+            quotation_title: projectTitle,
+            client_name: clientName,
+            client_address: clientAddress,
+            project_name: projectTitle,
+            date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
+            valid_till: quotationValidTill,
+            place_of_project: placeOfProject,
+            warranty: warranty,
+            project_type: projectType,
+            status: status,
+            gst_enabled: gstEnabled,
+            gst_percentage: parseFloat(gstRate),
+            gst_amount: gstAmount,
+            discount_amount: discountAmount,
+            subtotal: subtotal,
+            grand_total: grandTotal,
           })
           .select()
           .single();
 
-        if (sectionError) throw sectionError;
+        if (quotationError) throw quotationError;
 
-        // Insert items for this section
-        const itemsToInsert = section.items.map((item, index) => ({
-          section_id: sectionData.id,
-          side: item.side,
-          product_name: item.productName,
-          product_details: item.productDetails,
-          width_ft: item.widthFt,
-          height_ft: item.heightFt,
-          sft_area: item.sftArea,
-          rate_per_sft: item.ratePerSft,
-          amount: item.amount,
-          sort_order: index,
-        }));
+        for (const section of sections) {
+          const { data: sectionData, error: sectionError } = await supabase
+            .from('quotation_sections')
+            .insert({
+              quotation_id: quotationData.id,
+              section_name: section.title,
+              sort_order: sections.indexOf(section),
+            })
+            .select()
+            .single();
 
-        const { error: itemsError } = await supabase
-          .from('quotation_items')
-          .insert(itemsToInsert);
+          if (sectionError) throw sectionError;
 
-        if (itemsError) throw itemsError;
+          const itemsToInsert = section.items.map((item, index) => ({
+            section_id: sectionData.id,
+            side: item.side,
+            product_name: item.productName,
+            product_details: item.productDetails,
+            width_ft: item.widthFt,
+            height_ft: item.heightFt,
+            sft_area: item.sftArea,
+            rate_per_sft: item.ratePerSft,
+            amount: item.amount,
+            sort_order: index,
+          }));
+
+          const { error: itemsError } = await supabase
+            .from('quotation_items')
+            .insert(itemsToInsert);
+
+          if (itemsError) throw itemsError;
+        }
+
+        toast({
+          title: "Quotation saved",
+          description: `Quotation ${quotationNumber} has been saved successfully`,
+        });
       }
-
-      toast({
-        title: "Quotation saved",
-        description: `Quotation ${quotationNumber} has been saved successfully`,
-      });
 
       // Reset form if saved as pending
       if (status === 'pending') {

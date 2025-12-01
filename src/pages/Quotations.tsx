@@ -142,7 +142,7 @@ const Quotations = () => {
                       <Button 
                         variant="outline" 
                         className="w-full mt-2"
-                        onClick={() => navigate('/')}
+                        onClick={() => navigate(`/?id=${quotation.id}`)}
                       >
                         <Edit className="h-4 w-4 mr-2" />
                         Edit Draft
