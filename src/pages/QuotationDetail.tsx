@@ -141,13 +141,16 @@ const QuotationDetail = () => {
         discount: quotation.discount_amount,
         gstEnabled: quotation.gst_enabled,
         gstRate: quotation.gst_percentage || 18,
+        companyLogo: profile?.logo_url,
         companyName: profile?.company_name,
         companyAddress: profile?.address,
         companyPhone: profile?.phone,
         companyEmail: profile?.email,
         gstin: profile?.gstin,
         professionalAdvantages: profile?.professional_advantages,
-        signatureUrl: profile?.signature_url
+        signatureUrl: profile?.signature_url,
+        paymentStages: (profile?.payment_stages as any) || undefined,
+        termsConditions: (profile?.terms_conditions as any) || undefined,
       });
 
       toast({
@@ -282,7 +285,10 @@ const QuotationDetail = () => {
             Back
           </Button>
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => navigate('/', { state: { editQuotation: quotation } })}>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate(`/?id=${quotation.id}`)}
+            >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
