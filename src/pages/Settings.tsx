@@ -107,7 +107,23 @@ const Settings = () => {
         }
         
         if (data.terms_conditions) {
-          setTermsConditions(data.terms_conditions as any);
+          // Handle both old format (with 'content') and new format (with 'points')
+          const terms = (data.terms_conditions as any[]).map((term: any) => {
+            if (term.content && !term.points) {
+              // Convert old format to new format
+              return {
+                id: term.id,
+                title: term.title,
+                points: [term.content]
+              };
+            }
+            // Ensure points is always an array
+            return {
+              ...term,
+              points: Array.isArray(term.points) ? term.points : [term.points || ""]
+            };
+          });
+          setTermsConditions(terms);
         }
       }
     } catch (error) {
