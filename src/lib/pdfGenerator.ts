@@ -131,7 +131,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   if (data.companyLogo) {
     try {
       compressedLogo = await compressImage(data.companyLogo, 400, 400);
-      const logoSize = 35; // Smaller size for corner placement
+      const logoSize = 25; // Smaller size for corner placement
       const cornerRadius = logoSize * 0.1; // 10% corner radius
       
       // Draw rounded rectangle for logo background (black)

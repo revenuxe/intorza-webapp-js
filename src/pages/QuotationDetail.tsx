@@ -32,6 +32,7 @@ interface Quotation {
   place_of_project: string;
   warranty: string;
   project_type: string;
+  project_deadline: string | null;
   created_at: string;
 }
 
@@ -119,6 +120,7 @@ const QuotationDetail = () => {
         quotationTitle: quotation.quotation_title || quotation.project_name,
         dateOfProposal: quotation.date_of_proposal,
         quotationValidTill: quotation.valid_till,
+        projectDeadline: quotation.project_deadline || '',
         clientName: quotation.client_name,
         clientAddress: quotation.client_address,
         placeOfProject: quotation.place_of_project,
