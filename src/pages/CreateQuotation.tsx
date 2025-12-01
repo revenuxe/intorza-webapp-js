@@ -144,6 +144,7 @@ const CreateQuotation = () => {
       setClientAddress(quotation.client_address || "");
       setDateOfProposal(quotation.date_of_proposal || "");
       setQuotationValidTill(quotation.valid_till || "");
+      setProjectDeadline(quotation.project_deadline || "");
       setPlaceOfProject(quotation.place_of_project || "");
       setWarranty(quotation.warranty || "10");
       setProjectType(quotation.project_type || "");
@@ -319,6 +320,7 @@ const CreateQuotation = () => {
             project_name: projectTitle,
             date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
             valid_till: quotationValidTill,
+            project_deadline: projectDeadline || null,
             place_of_project: placeOfProject,
             warranty: warranty,
             project_type: projectType,
@@ -395,6 +397,7 @@ const CreateQuotation = () => {
             project_name: projectTitle,
             date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
             valid_till: quotationValidTill,
+            project_deadline: projectDeadline || null,
             place_of_project: placeOfProject,
             warranty: warranty,
             project_type: projectType,

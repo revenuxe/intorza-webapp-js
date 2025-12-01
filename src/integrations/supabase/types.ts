@@ -314,6 +314,7 @@ export type Database = {
           id: string
           notes: string | null
           place_of_project: string | null
+          project_deadline: string | null
           project_name: string
           project_type: string | null
           quotation_number: string
@@ -339,6 +340,7 @@ export type Database = {
           id?: string
           notes?: string | null
           place_of_project?: string | null
+          project_deadline?: string | null
           project_name: string
           project_type?: string | null
           quotation_number: string
@@ -364,6 +366,7 @@ export type Database = {
           id?: string
           notes?: string | null
           place_of_project?: string | null
+          project_deadline?: string | null
           project_name?: string
           project_type?: string | null
           quotation_number?: string
