@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
 
 interface LineItem {
   id: string;
@@ -63,7 +63,6 @@ const CreateQuotation = () => {
   const [discount, setDiscount] = useState(0);
   const [enableSocialMediaDiscount, setEnableSocialMediaDiscount] = useState(false);
   const [socialMediaDiscountRate, setSocialMediaDiscountRate] = useState(6);
-  const [customizeDialogOpen, setCustomizeDialogOpen] = useState(false);
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([
     { id: "1", stage: "1", milestone: "Design Phase", percentage: 10 },
     { id: "2", stage: "2", milestone: "Material Procurement", percentage: 30 },
@@ -79,7 +78,8 @@ const CreateQuotation = () => {
     email: "",
     gstin: "",
     professional_advantages: "",
-    signature_url: ""
+    signature_url: "",
+    terms_conditions: [] as any[]
   });
 
   useEffect(() => {
@@ -107,8 +107,14 @@ const CreateQuotation = () => {
           email: data.email || "",
           gstin: data.gstin || "",
           professional_advantages: data.professional_advantages || "",
-          signature_url: data.signature_url || ""
+          signature_url: data.signature_url || "",
+          terms_conditions: (data.terms_conditions as any) || []
         });
+        
+        // Load payment stages from profile
+        if (data.payment_stages) {
+          setPaymentStages(data.payment_stages as any);
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -386,72 +392,6 @@ const CreateQuotation = () => {
             <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
               Templates
             </Button>
-            <Dialog open={customizeDialogOpen} onOpenChange={setCustomizeDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
-                  Customize View
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Customize Payment Stages</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Edit the payment stages and percentages that will appear in your quotation PDF.
-                  </p>
-                  <div className="space-y-3">
-                    {paymentStages.map((stage, index) => (
-                      <div key={stage.id} className="grid grid-cols-[60px_1fr_100px] gap-3 items-center">
-                        <Input
-                          value={stage.stage}
-                          onChange={(e) => {
-                            const updated = [...paymentStages];
-                            updated[index].stage = e.target.value;
-                            setPaymentStages(updated);
-                          }}
-                          placeholder="Stage"
-                        />
-                        <Input
-                          value={stage.milestone}
-                          onChange={(e) => {
-                            const updated = [...paymentStages];
-                            updated[index].milestone = e.target.value;
-                            setPaymentStages(updated);
-                          }}
-                          placeholder="Milestone"
-                        />
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            value={stage.percentage}
-                            onChange={(e) => {
-                              const updated = [...paymentStages];
-                              updated[index].percentage = parseFloat(e.target.value) || 0;
-                              setPaymentStages(updated);
-                            }}
-                            placeholder="0"
-                            min="0"
-                            max="100"
-                            step="1"
-                          />
-                          <span className="text-sm text-muted-foreground">%</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between items-center pt-3 border-t">
-                    <span className="text-sm font-medium">Total Percentage:</span>
-                    <span className={`text-sm font-bold ${paymentStages.reduce((sum, s) => sum + s.percentage, 0) === 100 ? 'text-green-600' : 'text-destructive'}`}>
-                      {paymentStages.reduce((sum, s) => sum + s.percentage, 0)}%
-                    </span>
-                  </div>
-                  <Button onClick={() => setCustomizeDialogOpen(false)} className="w-full">
-                    Done
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
 

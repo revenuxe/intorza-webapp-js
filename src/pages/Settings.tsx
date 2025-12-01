@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Settings as SettingsIcon, Upload, Loader2 } from "lucide-react";
+import { Settings as SettingsIcon, Upload, Loader2, Plus, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,52 @@ const Settings = () => {
     signature_url: "",
     professional_advantages: `You've imagined your ideal home and are determined to make it a reality. You can get numerous different quotations from different Interior Designers. But since you've chosen us, let's have a look at how we can make your idea a reality.`
   });
+
+  const [paymentStages, setPaymentStages] = useState([
+    { id: "1", stage: "1", milestone: "Design Phase", percentage: 10 },
+    { id: "2", stage: "2", milestone: "Material Procurement", percentage: 30 },
+    { id: "3", stage: "3", milestone: "Execution Start", percentage: 30 },
+    { id: "4", stage: "4", milestone: "Mid-Execution", percentage: 20 },
+    { id: "5", stage: "5", milestone: "Final Handover", percentage: 10 },
+  ]);
+
+  const [termsConditions, setTermsConditions] = useState([
+    {
+      id: "1",
+      title: "PROJECT DURATION FOR 30 DAYS (AFTER DESIGN PHASE)",
+      content: "The execution phase will commence post-design approval and is estimated to be completed within 30 working days, subject to site readiness and material availability."
+    },
+    {
+      id: "2",
+      title: "MATERIAL DISPATCH & EXECUTION PROCESS",
+      content: "Materials will be dispatched as per the approved design and timeline. Installation will be carried out by trained professionals ensuring quality standards."
+    },
+    {
+      id: "3",
+      title: "SITE READINESS",
+      content: "The client must ensure that the site is ready with completed civil work, electrical points, plumbing, and false ceiling before execution begins. Any delays due to site unreadiness will extend the project timeline."
+    },
+    {
+      id: "4",
+      title: "IMPLICATIONS OF PAYMENT DELAY",
+      content: "Delayed payments may result in project timeline extensions and additional charges. Timely payments ensure smooth project execution and delivery."
+    },
+    {
+      id: "5",
+      title: "DESIGN PHASE TIMELINES & DELAY POLICY",
+      content: "Design approval is expected within 7-10 working days. Delays in design approval will proportionally delay the overall project timeline."
+    },
+    {
+      id: "6",
+      title: "CHANGES DURING EXECUTION DUE TO TECHNICAL LIMITATION",
+      content: "Any on-site technical constraints may require minor design modifications. Such changes will be communicated and executed with client consent."
+    },
+    {
+      id: "7",
+      title: "SERVICE WARRANTY & TRANSPARENCY",
+      content: "We provide a warranty on manufacturing defects and workmanship. All materials used will be as per approved specifications with complete transparency."
+    }
+  ]);
 
   useEffect(() => {
     loadProfile();
@@ -53,6 +99,14 @@ const Settings = () => {
           signature_url: data.signature_url || "",
           professional_advantages: data.professional_advantages || profile.professional_advantages
         });
+        
+        if (data.payment_stages) {
+          setPaymentStages(data.payment_stages as any);
+        }
+        
+        if (data.terms_conditions) {
+          setTermsConditions(data.terms_conditions as any);
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -206,6 +260,8 @@ const Settings = () => {
           address: profile.address,
           gstin: profile.gstin,
           professional_advantages: profile.professional_advantages,
+          payment_stages: paymentStages,
+          terms_conditions: termsConditions,
           updated_at: new Date().toISOString(),
         });
 
@@ -393,6 +449,181 @@ const Settings = () => {
                 This text will appear in the "Professional Advantages" section of your quotations.
               </p>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Stages</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Customize the default payment stages that will appear in all quotations.
+            </p>
+            <div className="space-y-3">
+              {paymentStages.map((stage, index) => (
+                <div key={stage.id} className="grid grid-cols-[80px_1fr_120px_40px] gap-3 items-start">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Stage</Label>
+                    <Input
+                      value={stage.stage}
+                      onChange={(e) => {
+                        const updated = [...paymentStages];
+                        updated[index].stage = e.target.value;
+                        setPaymentStages(updated);
+                      }}
+                      placeholder="1"
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Milestone</Label>
+                    <Input
+                      value={stage.milestone}
+                      onChange={(e) => {
+                        const updated = [...paymentStages];
+                        updated[index].milestone = e.target.value;
+                        setPaymentStages(updated);
+                      }}
+                      placeholder="Design Phase"
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Percentage</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        value={stage.percentage}
+                        onChange={(e) => {
+                          const updated = [...paymentStages];
+                          updated[index].percentage = parseFloat(e.target.value) || 0;
+                          setPaymentStages(updated);
+                        }}
+                        placeholder="10"
+                        min="0"
+                        max="100"
+                        step="1"
+                        className="h-9"
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs invisible">Del</Label>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() => {
+                        if (paymentStages.length > 1) {
+                          setPaymentStages(paymentStages.filter((_, i) => i !== index));
+                        }
+                      }}
+                      disabled={paymentStages.length <= 1}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const newId = String(Math.max(...paymentStages.map(s => parseInt(s.id) || 0)) + 1);
+                setPaymentStages([...paymentStages, {
+                  id: newId,
+                  stage: String(paymentStages.length + 1),
+                  milestone: "",
+                  percentage: 0
+                }]);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Stage
+            </Button>
+            <div className="flex justify-between items-center pt-3 border-t">
+              <span className="text-sm font-medium">Total Percentage:</span>
+              <span className={`text-sm font-bold ${paymentStages.reduce((sum, s) => sum + s.percentage, 0) === 100 ? 'text-green-600' : 'text-destructive'}`}>
+                {paymentStages.reduce((sum, s) => sum + s.percentage, 0)}%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Terms & Conditions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Customize the terms and conditions that will appear in all quotation PDFs.
+            </p>
+            <div className="space-y-4">
+              {termsConditions.map((term, index) => (
+                <div key={term.id} className="space-y-3 p-4 border rounded-lg">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-1 space-y-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold">Title</Label>
+                        <Input
+                          value={term.title}
+                          onChange={(e) => {
+                            const updated = [...termsConditions];
+                            updated[index].title = e.target.value;
+                            setTermsConditions(updated);
+                          }}
+                          placeholder="Enter term title"
+                          className="font-medium"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold">Content</Label>
+                        <Textarea
+                          value={term.content}
+                          onChange={(e) => {
+                            const updated = [...termsConditions];
+                            updated[index].content = e.target.value;
+                            setTermsConditions(updated);
+                          }}
+                          placeholder="Enter term content"
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (termsConditions.length > 1) {
+                          setTermsConditions(termsConditions.filter((_, i) => i !== index));
+                        }
+                      }}
+                      disabled={termsConditions.length <= 1}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const newId = String(Math.max(...termsConditions.map(t => parseInt(t.id) || 0)) + 1);
+                setTermsConditions([...termsConditions, {
+                  id: newId,
+                  title: "",
+                  content: ""
+                }]);
+              }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Term
+            </Button>
           </CardContent>
         </Card>
 
