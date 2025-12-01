@@ -60,7 +60,7 @@ const CreateQuotation = () => {
   const [projectType, setProjectType] = useState("");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState("18");
-  const [discountPercentage, setDiscountPercentage] = useState(0);
+  const [discount, setDiscount] = useState(0);
   const [enableSocialMediaDiscount, setEnableSocialMediaDiscount] = useState(false);
   const [socialMediaDiscountRate, setSocialMediaDiscountRate] = useState(6);
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([
@@ -199,7 +199,7 @@ const CreateQuotation = () => {
   
   // Calculate social media discount based on custom rate
   const socialMediaDiscountAmount = enableSocialMediaDiscount ? subtotal * (socialMediaDiscountRate / 100) : 0;
-  const discountAmount = enableSocialMediaDiscount ? socialMediaDiscountAmount : (subtotal * discountPercentage / 100);
+  const discountAmount = enableSocialMediaDiscount ? socialMediaDiscountAmount : discount;
   
   const gstAmount = gstEnabled ? ((subtotal - discountAmount) * parseFloat(gstRate)) / 100 : 0;
   const grandTotal = subtotal - discountAmount + gstAmount;
@@ -240,7 +240,7 @@ const CreateQuotation = () => {
           gst_enabled: gstEnabled,
           gst_percentage: parseFloat(gstRate),
           gst_amount: gstAmount,
-          discount_amount: discountAmount,
+          discount_amount: discount,
           subtotal: subtotal,
           grand_total: grandTotal,
         })
@@ -346,7 +346,7 @@ const CreateQuotation = () => {
         gstEnabled,
         gstRate: parseFloat(gstRate),
         gstAmount,
-        discount: discountAmount,
+        discount: enableSocialMediaDiscount ? socialMediaDiscountAmount : discount,
         grandTotal,
         companyLogo: profile.logo_url,
         companyName: profile.company_name,
@@ -797,30 +797,18 @@ const CreateQuotation = () => {
                 </div>
               )}
 
-              {!enableSocialMediaDiscount && discountPercentage > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Discount ({discountPercentage}%)</span>
-                  <span className="font-medium text-green-600">-₹{discountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                </div>
-              )}
-
               {!enableSocialMediaDiscount && (
                 <div className="space-y-2">
-                  <Label htmlFor="discount">Discount % (Optional)</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="discount"
-                      type="number"
-                      value={discountPercentage}
-                      onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      placeholder="0"
-                      className="h-8"
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
-                  </div>
+                  <Label htmlFor="discount">Discount (Optional)</Label>
+                  <Input
+                    id="discount"
+                    type="number"
+                    value={discount}
+                    onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                  />
                 </div>
               )}
 

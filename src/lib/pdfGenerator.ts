@@ -126,19 +126,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- 1. Header Section (Clean & Minimal) ---
   
-  // Logo - Top Left with rounded corners (10% corner radius)
+  // Logo - Top Left, No Background
   let compressedLogo: string | null = null;
   if (data.companyLogo) {
     try {
-      compressedLogo = await compressImage(data.companyLogo, 400, 400);
-      const logoSize = 50; // Increased from 30
-      const cornerRadius = logoSize * 0.1; // 10% corner radius
-      
-      // Draw rounded rectangle for logo background (black)
-      doc.setFillColor(0, 0, 0);
-      doc.roundedRect(margin, yPosition, logoSize, logoSize, cornerRadius, cornerRadius, 'F');
-      
-      // Add logo on top of background
+      compressedLogo = await compressImage(data.companyLogo, 200, 150);
+      const logoSize = 30; // Slightly smaller, sharper
+      // Place effectively at top-left
       doc.addImage(compressedLogo, 'JPEG', margin, yPosition, logoSize, logoSize, undefined, 'FAST');
     } catch (e) { console.error(e); }
   }
