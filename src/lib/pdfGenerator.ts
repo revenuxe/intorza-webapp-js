@@ -126,12 +126,12 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- 1. Header Section (Clean & Minimal) ---
   
-  // Logo - Top Left with rounded corners (10% corner radius)
+  // Logo - Top Left corner with rounded corners (10% corner radius)
   let compressedLogo: string | null = null;
   if (data.companyLogo) {
     try {
       compressedLogo = await compressImage(data.companyLogo, 400, 400);
-      const logoSize = 50; // Increased from 30
+      const logoSize = 35; // Smaller size for corner placement
       const cornerRadius = logoSize * 0.1; // 10% corner radius
       
       // Draw rounded rectangle for logo background (black)
