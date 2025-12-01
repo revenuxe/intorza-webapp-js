@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Plus, Edit } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -138,13 +138,24 @@ const Quotations = () => {
                         </p>
                       </div>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      className="w-full mt-2"
-                      onClick={() => navigate(`/quotations/${quotation.id}`)}
-                    >
-                      View Details
-                    </Button>
+                     {quotation.status === 'draft' ? (
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-2"
+                        onClick={() => navigate('/')}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Draft
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-2"
+                        onClick={() => navigate(`/quotations/${quotation.id}`)}
+                      >
+                        View Details
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
