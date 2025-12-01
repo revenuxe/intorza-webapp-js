@@ -51,6 +51,11 @@ interface QuotationData {
     milestone: string;
     percentage: number;
   }[];
+  termsConditions?: {
+    id: string;
+    title: string;
+    content: string;
+  }[];
 }
 
 // --- Helpers ---
@@ -493,7 +498,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.setFontSize(7);
   
   // Helper to add titled blocks
-  const addBlock = (title: string, lines: string[]) => {
+  const addBlock = (title: string, content: string) => {
     if (yPosition > pageHeight - 40) {
       doc.addPage();
       yPosition = 15;
@@ -504,78 +509,66 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         yPosition += 4;
     }
     doc.setFont('helvetica', 'normal');
-    lines.forEach(line => {
+    
+    // Split content into lines that fit the width
+    const splitText = doc.splitTextToSize(content, contentWidth);
+    splitText.forEach((line: string) => {
         if (yPosition > pageHeight - 20) {
             doc.addPage();
             yPosition = 15;
         }
-        const splitText = doc.splitTextToSize(line, contentWidth);
-        doc.text(splitText, margin, yPosition);
-        yPosition += (splitText.length * 3.5) + 2;
+        doc.text(line, margin, yPosition);
+        yPosition += 3.5;
     });
     yPosition += 3;
   };
 
-  // Add all terms text here (reused from previous step)
-  addBlock("", [
-    "Revision drawings can be executed in one of four ways:",
-    "1.) Provide the builder with amended civil, electrical, and plumbing details for completion.",
-    "2.) Hire the Company to revise the civil, electrical, and plumbing systems according to the plans.",
-    "3.) Hire a Company-recommended vendor to complete civil, electrical, and plumbing adjustments according to the plans.",
-    "4.) Hire a client-appointed vendor to complete civil, electrical, and plumbing adjustments according to the plans."
-  ]);
+  // Use custom terms if provided, otherwise use default terms
+  const defaultTerms = [
+    {
+      id: "1",
+      title: "PROJECT DURATION FOR 30 DAYS (AFTER DESIGN PHASE)",
+      content: "The execution phase will commence post-design approval and is estimated to be completed within 30 working days, subject to site readiness and material availability."
+    },
+    {
+      id: "2",
+      title: "MATERIAL DISPATCH & EXECUTION PROCESS",
+      content: "Materials will be dispatched as per the approved design and timeline. Installation will be carried out by trained professionals ensuring quality standards."
+    },
+    {
+      id: "3",
+      title: "SITE READINESS",
+      content: "The client must ensure that the site is ready with completed civil work, electrical points, plumbing, and false ceiling before execution begins. Any delays due to site unreadiness will extend the project timeline."
+    },
+    {
+      id: "4",
+      title: "IMPLICATIONS OF PAYMENT DELAY",
+      content: "Delayed payments may result in project timeline extensions and additional charges. Timely payments ensure smooth project execution and delivery."
+    },
+    {
+      id: "5",
+      title: "DESIGN PHASE TIMELINES & DELAY POLICY",
+      content: "Design approval is expected within 7-10 working days. Delays in design approval will proportionally delay the overall project timeline."
+    },
+    {
+      id: "6",
+      title: "CHANGES DURING EXECUTION DUE TO TECHNICAL LIMITATION",
+      content: "Any on-site technical constraints may require minor design modifications. Such changes will be communicated and executed with client consent."
+    },
+    {
+      id: "7",
+      title: "SERVICE WARRANTY & TRANSPARENCY",
+      content: "We provide a warranty on manufacturing defects and workmanship. All materials used will be as per approved specifications with complete transparency."
+    }
+  ];
 
-  addBlock("Procedure for Client-Appointed Vendor / Incomplete Site:", [
-    "1.) The Company's site survey and measurement team does not take site measurements if site-readiness conditions are not met.",
-    "2.) Based on the builder's layout plan, the furniture arrangement (first-cut plan and elevations) will be created. If the customer insists on taking measurements at a site that does not meet these conditions, the client is solely responsible.",
-    "3.) Design services will be suspended once the furniture design is finalized at a layout and elevation level. No further design discussions on finishes or detailing will take place at this stage.",
-    "4.) An invoice will be issued for the remaining 15% payment.",
-    "5.) Upon payment, revised civil, electrical, and/or plumbing drawings will be created, authorized, and provided as required.",
-    "6.) Design services will remain on hold until the project is ready for execution or until possession/hand-over from the builder is complete.",
-    "7.) Once the client has paid up to 20% of the project value, the quoted prices remain valid. Pricing is guaranteed for an additional two months (total validity: six months)."
-  ]);
+  const termsToUse = data.termsConditions && data.termsConditions.length > 0 
+    ? data.termsConditions 
+    : defaultTerms;
 
-  addBlock("Site Condition Requirements:", [
-    "Site condition is reassessed during the Kickoff Meeting, marking the start of the Execution Phase (post client approval). The following must be fully completed for execution to proceed:",
-    "1.) Flooring must be fully completed.",
-    "2.) Wall plastering should be finished.",
-    "3.) Electrical and plumbing works must be completed.",
-    "4.) All site work must be reviewed and signed off.",
-    "Disclaimer: If these tasks are not completed, the site is not considered ready and the Execution Phase cannot begin. The Company will not be responsible for delays caused due to incomplete site readiness. The client is fully responsible for ensuring the site is ready and free from delays caused by the builder or any client-appointed vendors."
-  ]);
-
-  addBlock("Design Phase Delays & Penalties:", [
-    "The promised execution timeline (30/45/60/90 days) begins after Design Sign-off, not earlier.",
-    "Commencement Date: The date on which the Accounts Team receives the initial 5% advance payment.",
-    "Design Phase Completion Date: The date on which the Company receives 55% payment and the client provides final approval of all drawings and scope.",
-    "Within the first two weeks after the 5% advance is received, the following activities will occur:",
-    "1.) The Client Happiness team will contact the client for onboarding.",
-    "2.) Site visits will be scheduled by the Measurement/Survey/Record teams (subject to site readiness, confirmed by the client).",
-    "3.) Designer assignment.",
-    "4.) First contact between designer and client.",
-    "5.) First design meeting (ideally completed within 7-10 days based on mutual availability and site readiness)."
-  ]);
-
-  addBlock("Delays NOT counted towards penalty:", [
-    "• Client-appointed vendor delays",
-    "• Incomplete site readiness",
-    "• Payment delays",
-    "• Delay in client selections",
-    "• Builder delays",
-    "• Client delays in approving quotations",
-    "• Force-majeure situations"
-  ]);
-
-  addBlock("Penalty for Company-side delays:", [
-    "After a two-week grace period, the Company will compensate at Rs. 5,000 per month on a pro-rata basis for delays beyond the committed handover date.",
-    "Total penalty will not exceed 5% of the total project value.",
-    "No additional compensation will be provided beyond this."
-  ]);
-
-  addBlock("Changes in Design due to Technical Impossibility:", [
-    "During execution, site conditions, material limitations or other technical constraints may require changes to the approved design.",
-    "When such changes occur, the client will be informed and execution will proceed only upon client approval."
-  ]);
+  termsToUse.forEach(term => {
+    addBlock(term.title, term.content);
+  });
 
   // --- 7. Signature & Footer ---
   if (yPosition > pageHeight - 50) {

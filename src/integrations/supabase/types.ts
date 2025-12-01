@@ -167,9 +167,11 @@ export type Database = {
           gstin: string | null
           id: string
           logo_url: string | null
+          payment_stages: Json | null
           phone: string | null
           professional_advantages: string | null
           signature_url: string | null
+          terms_conditions: Json | null
           updated_at: string | null
         }
         Insert: {
@@ -181,9 +183,11 @@ export type Database = {
           gstin?: string | null
           id: string
           logo_url?: string | null
+          payment_stages?: Json | null
           phone?: string | null
           professional_advantages?: string | null
           signature_url?: string | null
+          terms_conditions?: Json | null
           updated_at?: string | null
         }
         Update: {
@@ -195,9 +199,11 @@ export type Database = {
           gstin?: string | null
           id?: string
           logo_url?: string | null
+          payment_stages?: Json | null
           phone?: string | null
           professional_advantages?: string | null
           signature_url?: string | null
+          terms_conditions?: Json | null
           updated_at?: string | null
         }
         Relationships: []
