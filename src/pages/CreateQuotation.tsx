@@ -362,7 +362,8 @@ const CreateQuotation = () => {
           stage: s.stage,
           milestone: s.milestone,
           percentage: s.percentage
-        }))
+        })),
+        termsConditions: profile.terms_conditions
       });
 
       toast({
