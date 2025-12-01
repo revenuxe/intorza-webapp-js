@@ -54,7 +54,7 @@ interface QuotationData {
   termsConditions?: {
     id: string;
     title: string;
-    content: string;
+    points: string[];
   }[];
 }
 
@@ -497,8 +497,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
   
-  // Helper to add titled blocks
-  const addBlock = (title: string, content: string) => {
+  // Helper to add titled blocks with points
+  const addBlock = (title: string, points: string[]) => {
     if (yPosition > pageHeight - 40) {
       doc.addPage();
       yPosition = 15;
@@ -510,17 +510,30 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     }
     doc.setFont('helvetica', 'normal');
     
-    // Split content into lines that fit the width
-    const splitText = doc.splitTextToSize(content, contentWidth);
-    splitText.forEach((line: string) => {
+    // Render each point as a bullet
+    points.forEach((point) => {
+      if (!point.trim()) return; // Skip empty points
+      
+      // Split point into lines that fit the width
+      const splitText = doc.splitTextToSize(point, contentWidth - 5);
+      
+      splitText.forEach((line: string, lineIndex: number) => {
         if (yPosition > pageHeight - 20) {
-            doc.addPage();
-            yPosition = 15;
+          doc.addPage();
+          yPosition = 15;
         }
-        doc.text(line, margin, yPosition);
+        
+        // Add bullet only on first line of each point
+        if (lineIndex === 0) {
+          doc.text("•", margin, yPosition);
+          doc.text(line, margin + 5, yPosition);
+        } else {
+          doc.text(line, margin + 5, yPosition);
+        }
         yPosition += 3.5;
+      });
     });
-    yPosition += 3;
+    yPosition += 2;
   };
 
   // Use custom terms if provided, otherwise use default terms
@@ -528,37 +541,37 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     {
       id: "1",
       title: "PROJECT DURATION FOR 30 DAYS (AFTER DESIGN PHASE)",
-      content: "The execution phase will commence post-design approval and is estimated to be completed within 30 working days, subject to site readiness and material availability."
+      points: ["The execution phase will commence post-design approval and is estimated to be completed within 30 working days, subject to site readiness and material availability."]
     },
     {
       id: "2",
       title: "MATERIAL DISPATCH & EXECUTION PROCESS",
-      content: "Materials will be dispatched as per the approved design and timeline. Installation will be carried out by trained professionals ensuring quality standards."
+      points: ["Materials will be dispatched as per the approved design and timeline.", "Installation will be carried out by trained professionals ensuring quality standards."]
     },
     {
       id: "3",
       title: "SITE READINESS",
-      content: "The client must ensure that the site is ready with completed civil work, electrical points, plumbing, and false ceiling before execution begins. Any delays due to site unreadiness will extend the project timeline."
+      points: ["The client must ensure that the site is ready with completed civil work, electrical points, plumbing, and false ceiling before execution begins.", "Any delays due to site unreadiness will extend the project timeline."]
     },
     {
       id: "4",
       title: "IMPLICATIONS OF PAYMENT DELAY",
-      content: "Delayed payments may result in project timeline extensions and additional charges. Timely payments ensure smooth project execution and delivery."
+      points: ["Delayed payments may result in project timeline extensions and additional charges.", "Timely payments ensure smooth project execution and delivery."]
     },
     {
       id: "5",
       title: "DESIGN PHASE TIMELINES & DELAY POLICY",
-      content: "Design approval is expected within 7-10 working days. Delays in design approval will proportionally delay the overall project timeline."
+      points: ["Design approval is expected within 7-10 working days.", "Delays in design approval will proportionally delay the overall project timeline."]
     },
     {
       id: "6",
       title: "CHANGES DURING EXECUTION DUE TO TECHNICAL LIMITATION",
-      content: "Any on-site technical constraints may require minor design modifications. Such changes will be communicated and executed with client consent."
+      points: ["Any on-site technical constraints may require minor design modifications.", "Such changes will be communicated and executed with client consent."]
     },
     {
       id: "7",
       title: "SERVICE WARRANTY & TRANSPARENCY",
-      content: "We provide a warranty on manufacturing defects and workmanship. All materials used will be as per approved specifications with complete transparency."
+      points: ["We provide a warranty on manufacturing defects and workmanship.", "All materials used will be as per approved specifications with complete transparency."]
     }
   ];
 
@@ -567,7 +580,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     : defaultTerms;
 
   termsToUse.forEach(term => {
-    addBlock(term.title, term.content);
+    addBlock(term.title, term.points);
   });
 
   // --- 7. Signature & Footer ---
