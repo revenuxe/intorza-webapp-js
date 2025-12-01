@@ -516,6 +516,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     }
     doc.setFont('helvetica', 'normal');
     
+    // Ensure points is an array before iterating
+    if (!points || !Array.isArray(points)) return;
+    
     // Render each point as a bullet
     points.forEach((point) => {
       if (!point.trim()) return; // Skip empty points
@@ -586,7 +589,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     : defaultTerms;
 
   termsToUse.forEach(term => {
-    addBlock(term.title, term.points);
+    if (term && term.title && term.points) {
+      addBlock(term.title, term.points);
+    }
   });
 
   // --- 7. Signature & Footer ---
