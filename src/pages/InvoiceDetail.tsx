@@ -25,6 +25,7 @@ interface Invoice {
   due_date: string;
   notes: string;
   created_at: string;
+  quotation_id: string | null;
 }
 
 interface Payment {
@@ -56,6 +57,7 @@ const InvoiceDetail = () => {
   const { toast } = useToast();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [relatedInvoices, setRelatedInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -67,6 +69,7 @@ const InvoiceDetail = () => {
     if (id) {
       loadInvoice();
       loadPayments();
+      loadRelatedInvoices();
     }
   }, [id]);
 
@@ -105,6 +108,24 @@ const InvoiceDetail = () => {
       setPayments(data || []);
     } catch (error) {
       console.error('Error loading payments:', error);
+    }
+  };
+
+  const loadRelatedInvoices = async () => {
+    try {
+      if (!invoice?.quotation_id) return;
+      
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .eq('quotation_id', invoice.quotation_id)
+        .neq('id', id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setRelatedInvoices(data || []);
+    } catch (error) {
+      console.error('Error loading related invoices:', error);
     }
   };
 
@@ -153,52 +174,12 @@ const InvoiceDetail = () => {
       setPaymentNotes("");
       loadInvoice();
       loadPayments();
+      loadRelatedInvoices();
     } catch (error) {
       console.error('Error adding payment:', error);
       toast({
         title: "Error",
         description: "Failed to add payment",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDuplicateInvoice = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !invoice) return;
-
-      const newInvoiceNumber = `INV-${Date.now()}`;
-      
-      const { data: newInvoice, error } = await supabase
-        .from('invoices')
-        .insert({
-          user_id: user.id,
-          invoice_number: newInvoiceNumber,
-          client_name: invoice.client_name,
-          project_name: invoice.project_name,
-          total_amount: invoice.total_amount,
-          paid_amount: 0,
-          remaining_amount: invoice.total_amount,
-          status: 'unpaid',
-          notes: invoice.notes
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      toast({
-        title: "Invoice Duplicated",
-        description: "A new invoice has been created",
-      });
-
-      navigate(`/invoices/${newInvoice.id}`);
-    } catch (error) {
-      console.error('Error duplicating invoice:', error);
-      toast({
-        title: "Error",
-        description: "Failed to duplicate invoice",
         variant: "destructive",
       });
     }
@@ -215,6 +196,7 @@ const InvoiceDetail = () => {
         .from('invoices')
         .insert({
           user_id: user.id,
+          quotation_id: invoice.quotation_id,
           invoice_number: newInvoiceNumber,
           client_name: invoice.client_name,
           project_name: `${invoice.project_name} - Next Phase`,
@@ -280,19 +262,15 @@ const InvoiceDetail = () => {
             Back
           </Button>
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => setPaymentDialogOpen(true)}>
+            <Button onClick={() => setPaymentDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Payment
-            </Button>
-            <Button variant="outline" onClick={handleDuplicateInvoice}>
-              <Copy className="h-4 w-4 mr-2" />
-              Duplicate
             </Button>
             <Button variant="outline" onClick={handleCreateNextInvoice}>
               <FileText className="h-4 w-4 mr-2" />
               Next Invoice
             </Button>
-            <Button onClick={() => toast({ title: "Coming Soon", description: "PDF download will be available soon" })}>
+            <Button variant="outline" onClick={() => toast({ title: "Coming Soon", description: "PDF download will be available soon" })}>
               <Download className="h-4 w-4 mr-2" />
               PDF
             </Button>
@@ -378,6 +356,33 @@ const InvoiceDetail = () => {
                         {payment.notes && (
                           <p className="text-xs text-muted-foreground mt-1">{payment.notes}</p>
                         )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Related Invoices from Same Quotation */}
+            {relatedInvoices.length > 0 && (
+              <div>
+                <h3 className="font-semibold mb-3">Related Invoices</h3>
+                <div className="space-y-2">
+                  {relatedInvoices.map((relInvoice) => (
+                    <div 
+                      key={relInvoice.id} 
+                      className="flex items-center justify-between p-3 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50"
+                      onClick={() => navigate(`/invoices/${relInvoice.id}`)}
+                    >
+                      <div>
+                        <p className="font-medium">{relInvoice.invoice_number}</p>
+                        <p className="text-xs text-muted-foreground">{relInvoice.project_name}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium tabular-nums">₹{relInvoice.total_amount?.toLocaleString('en-IN')}</p>
+                        <Badge className={getStatusColor(relInvoice.status)}>
+                          {relInvoice.status}
+                        </Badge>
                       </div>
                     </div>
                   ))}
