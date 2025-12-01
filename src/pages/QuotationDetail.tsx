@@ -390,6 +390,10 @@ const QuotationDetail = () => {
                   <p className="font-medium">{formatDate(quotation.valid_till)}</p>
                 </div>
                 <div>
+                  <p className="text-muted-foreground">Project Deadline</p>
+                  <p className="font-medium">{quotation.project_deadline ? formatDate(quotation.project_deadline) : 'N/A'}</p>
+                </div>
+                <div>
                   <p className="text-muted-foreground">Warranty</p>
                   <p className="font-medium">{quotation.warranty} Years</p>
                 </div>
