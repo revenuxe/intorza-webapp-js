@@ -42,9 +42,11 @@ interface PaymentStage {
 
 const CreateQuotation = () => {
   const { toast } = useToast();
-  const { requireAuth } = useAuthAction();
-  const [searchParams] = useSearchParams();
+  const { requireAuth, clearPendingAction, getPendingAction } = useAuthAction();
+  const [searchParams, setSearchParams] = useSearchParams();
   const quotationId = searchParams.get('id');
+  const continueAction = searchParams.get('continueAction');
+  const [actionExecuted, setActionExecuted] = useState(false);
   const [sections, setSections] = useState<Section[]>([
     {
       id: "1",
@@ -86,6 +88,32 @@ const CreateQuotation = () => {
     signature_url: "",
     terms_conditions: [] as any[]
   });
+  const [formRestored, setFormRestored] = useState(false);
+
+  // Restore form data from sessionStorage after login
+  useEffect(() => {
+    if (continueAction && !formRestored) {
+      const { formData } = getPendingAction();
+      if (formData) {
+        if (formData.sections) setSections(formData.sections);
+        if (formData.projectTitle) setProjectTitle(formData.projectTitle);
+        if (formData.clientName) setClientName(formData.clientName);
+        if (formData.clientAddress) setClientAddress(formData.clientAddress);
+        if (formData.dateOfProposal) setDateOfProposal(formData.dateOfProposal);
+        if (formData.quotationValidTill) setQuotationValidTill(formData.quotationValidTill);
+        if (formData.projectDeadline) setProjectDeadline(formData.projectDeadline);
+        if (formData.placeOfProject) setPlaceOfProject(formData.placeOfProject);
+        if (formData.warranty) setWarranty(formData.warranty);
+        if (formData.projectType) setProjectType(formData.projectType);
+        if (formData.gstEnabled !== undefined) setGstEnabled(formData.gstEnabled);
+        if (formData.gstRate) setGstRate(formData.gstRate);
+        if (formData.discountPercentage !== undefined) setDiscountPercentage(formData.discountPercentage);
+        if (formData.enableSocialMediaDiscount !== undefined) setEnableSocialMediaDiscount(formData.enableSocialMediaDiscount);
+        if (formData.socialMediaDiscountRate !== undefined) setSocialMediaDiscountRate(formData.socialMediaDiscountRate);
+      }
+      setFormRestored(true);
+    }
+  }, [continueAction, formRestored]);
 
   useEffect(() => {
     loadProfile();
@@ -93,6 +121,34 @@ const CreateQuotation = () => {
       loadQuotation(quotationId);
     }
   }, [quotationId]);
+
+  // Handle continuing actions after login (wait for form to be restored)
+  useEffect(() => {
+    const executePendingAction = async () => {
+      if (continueAction && formRestored && !actionExecuted) {
+        setActionExecuted(true);
+        clearPendingAction();
+        
+        // Remove continueAction from URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('continueAction');
+        setSearchParams(newParams, { replace: true });
+        
+        // Small delay to ensure state is fully updated
+        setTimeout(async () => {
+          if (continueAction === 'saveDraft') {
+            await handleSaveQuotation('draft');
+          } else if (continueAction === 'downloadPdf') {
+            await handleDownloadPDF();
+          } else if (continueAction === 'saveAndSend') {
+            await handleSaveQuotation('pending');
+          }
+        }, 800);
+      }
+    };
+    
+    executePendingAction();
+  }, [continueAction, formRestored, actionExecuted]);
 
   const loadProfile = async () => {
     try {
@@ -296,6 +352,24 @@ const CreateQuotation = () => {
   
   const gstAmount = gstEnabled ? ((subtotal - discountAmount) * parseFloat(gstRate)) / 100 : 0;
   const grandTotal = subtotal - discountAmount + gstAmount;
+
+  const getFormData = () => ({
+    sections,
+    projectTitle,
+    clientName,
+    clientAddress,
+    dateOfProposal,
+    quotationValidTill,
+    projectDeadline,
+    placeOfProject,
+    warranty,
+    projectType,
+    gstEnabled,
+    gstRate,
+    discountPercentage,
+    enableSocialMediaDiscount,
+    socialMediaDiscountRate,
+  });
 
   const handleSaveQuotation = async (status: string) => {
     try {
@@ -997,13 +1071,13 @@ const CreateQuotation = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-4">
-              <Button variant="outline" className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('draft'))}>
+              <Button variant="outline" className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('draft'), 'saveDraft', getFormData())}>
                 Save as Draft
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => requireAuth(handleDownloadPDF)}>
+              <Button variant="outline" className="w-full" onClick={() => requireAuth(handleDownloadPDF, 'downloadPdf', getFormData())}>
                 Download PDF
               </Button>
-              <Button className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('pending'))}>
+              <Button className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('pending'), 'saveAndSend', getFormData())}>
                 Save & Send
               </Button>
             </div>

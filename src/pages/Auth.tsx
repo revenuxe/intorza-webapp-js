@@ -19,6 +19,15 @@ const Auth = () => {
   const [signupCompany, setSignupCompany] = useState("");
   const navigate = useNavigate();
 
+  const getReturnPath = () => {
+    const returnPath = sessionStorage.getItem('returnPath');
+    const pendingAction = sessionStorage.getItem('pendingAction');
+    if (returnPath && pendingAction) {
+      return `${returnPath}${returnPath.includes('?') ? '&' : '?'}continueAction=${pendingAction}`;
+    }
+    return "/";
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -32,7 +41,9 @@ const Auth = () => {
       if (error) throw error;
 
       toast.success("Welcome back!");
-      navigate("/");
+      const returnPath = getReturnPath();
+      sessionStorage.removeItem('returnPath');
+      navigate(returnPath);
     } catch (error: any) {
       toast.error(error.message || "Login failed");
     } finally {
@@ -63,7 +74,9 @@ const Auth = () => {
       
       // If email confirmation is disabled, redirect immediately
       if (data.session) {
-        navigate("/");
+        const returnPath = getReturnPath();
+        sessionStorage.removeItem('returnPath');
+        navigate(returnPath);
       }
     } catch (error: any) {
       toast.error(error.message || "Signup failed");
