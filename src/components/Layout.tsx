@@ -9,16 +9,16 @@ interface LayoutProps {
 export const Layout = ({ children }: LayoutProps) => {
   return (
     <div className="min-h-screen flex w-full bg-background">
-      {/* Desktop Sidebar */}
+      {/* Desktop Sidebar - Fixed */}
       <Sidebar />
       
       {/* Main Content */}
-      <div className="flex-1 flex flex-col w-full">
+      <div className="flex-1 flex flex-col w-full min-w-0">
         {/* Mobile Header */}
         <Header />
         
-        {/* Page Content */}
-        <main className="flex-1 overflow-auto">
+        {/* Page Content - Scrollable */}
+        <main className="flex-1 overflow-y-auto h-[calc(100vh-4rem)] lg:h-screen">
           {children}
         </main>
       </div>
