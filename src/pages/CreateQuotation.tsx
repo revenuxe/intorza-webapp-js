@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useSearchParams } from "react-router-dom";
+import { useAuthAction } from "@/hooks/useAuthAction";
 
 
 interface LineItem {
@@ -41,6 +42,7 @@ interface PaymentStage {
 
 const CreateQuotation = () => {
   const { toast } = useToast();
+  const { requireAuth } = useAuthAction();
   const [searchParams] = useSearchParams();
   const quotationId = searchParams.get('id');
   const [sections, setSections] = useState<Section[]>([
@@ -995,13 +997,13 @@ const CreateQuotation = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-4">
-              <Button variant="outline" className="w-full" onClick={() => handleSaveQuotation('draft')}>
+              <Button variant="outline" className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('draft'))}>
                 Save as Draft
               </Button>
-              <Button variant="outline" className="w-full" onClick={handleDownloadPDF}>
+              <Button variant="outline" className="w-full" onClick={() => requireAuth(handleDownloadPDF)}>
                 Download PDF
               </Button>
-              <Button className="w-full" onClick={() => handleSaveQuotation('pending')}>
+              <Button className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('pending'))}>
                 Save & Send
               </Button>
             </div>

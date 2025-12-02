@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
-import { ProtectedRoute } from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Quotations from "./pages/Quotations";
 import QuotationDetail from "./pages/QuotationDetail";
@@ -33,14 +32,14 @@ const App = () => (
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           
-          {/* Protected routes with Layout */}
-          <Route path="/" element={<ProtectedRoute><Layout><Index /></Layout></ProtectedRoute>} />
-          <Route path="/quotations" element={<ProtectedRoute><Layout><Quotations /></Layout></ProtectedRoute>} />
-          <Route path="/quotations/:id" element={<ProtectedRoute><Layout><QuotationDetail /></Layout></ProtectedRoute>} />
-          <Route path="/invoices" element={<ProtectedRoute><Layout><Invoices /></Layout></ProtectedRoute>} />
-          <Route path="/invoices/:id" element={<ProtectedRoute><Layout><InvoiceDetail /></Layout></ProtectedRoute>} />
-          <Route path="/clients" element={<ProtectedRoute><Layout><Clients /></Layout></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><Layout><Settings /></Layout></ProtectedRoute>} />
+          {/* Public routes with Layout - auth triggered on actions */}
+          <Route path="/" element={<Layout><Index /></Layout>} />
+          <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
+          <Route path="/quotations/:id" element={<Layout><QuotationDetail /></Layout>} />
+          <Route path="/invoices" element={<Layout><Invoices /></Layout>} />
+          <Route path="/invoices/:id" element={<Layout><InvoiceDetail /></Layout>} />
+          <Route path="/clients" element={<Layout><Clients /></Layout>} />
+          <Route path="/settings" element={<Layout><Settings /></Layout>} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
