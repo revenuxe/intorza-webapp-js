@@ -1,4 +1,4 @@
-import { LogOut } from "lucide-react";
+import { LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Navigation } from "./Navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,14 +19,19 @@ export const Sidebar = () => {
       <div className="flex-1 overflow-y-auto">
         <Navigation />
       </div>
-      {isAuthenticated && (
-        <div className="p-4 border-t border-border shrink-0">
+      <div className="p-4 border-t border-border shrink-0">
+        {isAuthenticated ? (
           <Button variant="outline" className="w-full" onClick={signOut}>
             <LogOut className="mr-2 h-4 w-4" />
             Logout
           </Button>
-        </div>
-      )}
+        ) : (
+          <Button variant="default" className="w-full" onClick={() => window.location.href = '/auth'}>
+            <LogIn className="mr-2 h-4 w-4" />
+            Login
+          </Button>
+        )}
+      </div>
     </aside>
   );
 };
