@@ -1,4 +1,4 @@
-import { Menu, LogOut } from "lucide-react";
+import { Menu, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import logo from "@/assets/intorza-logo.webp";
 
 export const Header = () => {
-  const { signOut } = useAuth();
+  const { signOut, isAuthenticated } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
@@ -37,11 +37,18 @@ export const Header = () => {
           />
         </div>
 
-        {/* Mobile logout button */}
-        <Button variant="ghost" size="icon" onClick={signOut} className="lg:hidden h-9 w-9">
-          <LogOut className="h-5 w-5" />
-          <span className="sr-only">Logout</span>
-        </Button>
+        {/* Mobile auth button */}
+        {isAuthenticated ? (
+          <Button variant="ghost" size="icon" onClick={signOut} className="lg:hidden h-9 w-9">
+            <LogOut className="h-5 w-5" />
+            <span className="sr-only">Logout</span>
+          </Button>
+        ) : (
+          <Button variant="ghost" size="icon" onClick={() => window.location.href = '/auth'} className="lg:hidden h-9 w-9">
+            <LogIn className="h-5 w-5" />
+            <span className="sr-only">Login</span>
+          </Button>
+        )}
       </div>
     </header>
   );
