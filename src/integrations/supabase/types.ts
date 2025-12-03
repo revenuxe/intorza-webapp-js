@@ -166,6 +166,7 @@ export type Database = {
           full_name: string | null
           gstin: string | null
           id: string
+          invoice_terms_conditions: Json | null
           logo_url: string | null
           payment_stages: Json | null
           phone: string | null
@@ -182,6 +183,7 @@ export type Database = {
           full_name?: string | null
           gstin?: string | null
           id: string
+          invoice_terms_conditions?: Json | null
           logo_url?: string | null
           payment_stages?: Json | null
           phone?: string | null
@@ -198,6 +200,7 @@ export type Database = {
           full_name?: string | null
           gstin?: string | null
           id?: string
+          invoice_terms_conditions?: Json | null
           logo_url?: string | null
           payment_stages?: Json | null
           phone?: string | null

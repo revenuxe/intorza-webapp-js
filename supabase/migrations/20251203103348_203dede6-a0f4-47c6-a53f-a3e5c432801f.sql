@@ -1,0 +1,3 @@
+-- Add invoice_terms_conditions column to profiles table
+ALTER TABLE public.profiles 
+ADD COLUMN IF NOT EXISTS invoice_terms_conditions jsonb DEFAULT '[{"id": "1", "title": "PAYMENT TERMS", "points": ["Payment is due within 30 days of invoice date.", "Late payments may incur additional charges."]}, {"id": "2", "title": "SERVICE WARRANTY", "points": ["All services are covered under our standard warranty terms.", "Warranty does not cover damage due to misuse or neglect."]}, {"id": "3", "title": "CANCELLATION POLICY", "points": ["Cancellations must be made in writing.", "Refunds will be processed within 14 business days."]}]'::jsonb;

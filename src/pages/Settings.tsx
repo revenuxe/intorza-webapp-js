@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Settings as SettingsIcon, Upload, Loader2, Plus, Trash2, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ const Settings = () => {
     { id: "4", stage: "4", milestone: "Mid-Execution", percentage: 20 },
     { id: "5", stage: "5", milestone: "Final Handover", percentage: 10 },
   ]);
+  const [paymentStagesDialogOpen, setPaymentStagesDialogOpen] = useState(false);
 
   const [termsConditions, setTermsConditions] = useState([
     {
@@ -73,6 +74,25 @@ const Settings = () => {
   ]);
   const [termsDialogOpen, setTermsDialogOpen] = useState(false);
 
+  const [invoiceTerms, setInvoiceTerms] = useState([
+    {
+      id: "1",
+      title: "PAYMENT TERMS",
+      points: ["Payment is due within 30 days of invoice date.", "Late payments may incur additional charges."]
+    },
+    {
+      id: "2",
+      title: "SERVICE WARRANTY",
+      points: ["All services are covered under our standard warranty terms.", "Warranty does not cover damage due to misuse or neglect."]
+    },
+    {
+      id: "3",
+      title: "CANCELLATION POLICY",
+      points: ["Cancellations must be made in writing.", "Refunds will be processed within 14 business days."]
+    }
+  ]);
+  const [invoiceTermsDialogOpen, setInvoiceTermsDialogOpen] = useState(false);
+
   useEffect(() => {
     loadProfile();
   }, []);
@@ -107,23 +127,28 @@ const Settings = () => {
         }
         
         if (data.terms_conditions) {
-          // Handle both old format (with 'content') and new format (with 'points')
           const terms = (data.terms_conditions as any[]).map((term: any) => {
             if (term.content && !term.points) {
-              // Convert old format to new format
               return {
                 id: term.id,
                 title: term.title,
                 points: [term.content]
               };
             }
-            // Ensure points is always an array
             return {
               ...term,
               points: Array.isArray(term.points) ? term.points : [term.points || ""]
             };
           });
           setTermsConditions(terms);
+        }
+
+        if ((data as any).invoice_terms_conditions) {
+          const invTerms = ((data as any).invoice_terms_conditions as any[]).map((term: any) => ({
+            ...term,
+            points: Array.isArray(term.points) ? term.points : [term.points || ""]
+          }));
+          setInvoiceTerms(invTerms);
         }
       }
     } catch (error) {
@@ -137,7 +162,6 @@ const Settings = () => {
       const file = event.target.files?.[0];
       if (!file) return;
 
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         toast({
           title: "Invalid file type",
@@ -153,25 +177,21 @@ const Settings = () => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/logo.${fileExt}`;
 
-      // Delete old logo if exists
       if (profile.logo_url) {
         const oldPath = profile.logo_url.split('/').slice(-2).join('/');
         await supabase.storage.from('company-logos').remove([oldPath]);
       }
 
-      // Upload new logo
       const { error: uploadError } = await supabase.storage
         .from('company-logos')
         .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('company-logos')
         .getPublicUrl(fileName);
 
-      // Update profile
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ logo_url: publicUrl })
@@ -202,7 +222,6 @@ const Settings = () => {
       const file = event.target.files?.[0];
       if (!file) return;
 
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         toast({
           title: "Invalid file type",
@@ -218,25 +237,21 @@ const Settings = () => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/signature.${fileExt}`;
 
-      // Delete old signature if exists
       if (profile.signature_url) {
         const oldPath = profile.signature_url.split('/').slice(-2).join('/');
         await supabase.storage.from('company-logos').remove([oldPath]);
       }
 
-      // Upload new signature
       const { error: uploadError } = await supabase.storage
         .from('company-logos')
         .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('company-logos')
         .getPublicUrl(fileName);
 
-      // Update profile
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ signature_url: publicUrl })
@@ -280,6 +295,7 @@ const Settings = () => {
           professional_advantages: profile.professional_advantages,
           payment_stages: paymentStages,
           terms_conditions: termsConditions,
+          invoice_terms_conditions: invoiceTerms,
           updated_at: new Date().toISOString(),
         });
 
@@ -378,7 +394,7 @@ const Settings = () => {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Upload your signature image. This will appear at the bottom of all quotations.
+              Upload your signature image. This will appear at the bottom of all quotations and invoices.
             </p>
           </CardContent>
         </Card>
@@ -474,11 +490,62 @@ const Settings = () => {
           <CardHeader>
             <CardTitle>Payment Stages</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Customize the default payment stages that will appear in all quotations.
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Customize the default payment stages that will appear in all quotations and invoices.
             </p>
-            <div className="space-y-3">
+            <Button onClick={() => setPaymentStagesDialogOpen(true)} className="w-full md:w-auto">
+              <FileText className="h-4 w-4 mr-2" />
+              Edit Payment Stages
+            </Button>
+            <div className="mt-4 flex justify-between items-center pt-3 border-t">
+              <span className="text-sm font-medium">Total Percentage:</span>
+              <span className={`text-sm font-bold ${paymentStages.reduce((sum, s) => sum + s.percentage, 0) === 100 ? 'text-green-600' : 'text-destructive'}`}>
+                {paymentStages.reduce((sum, s) => sum + s.percentage, 0)}%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quotation Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quotation Settings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Customize the terms and conditions that will appear in all quotation PDFs.
+            </p>
+            <Button onClick={() => setTermsDialogOpen(true)} className="w-full md:w-auto">
+              <FileText className="h-4 w-4 mr-2" />
+              Edit Quotation Terms & Conditions
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Invoice Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Invoice Settings</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Customize the terms and conditions that will appear in all invoice PDFs.
+            </p>
+            <Button onClick={() => setInvoiceTermsDialogOpen(true)} className="w-full md:w-auto">
+              <FileText className="h-4 w-4 mr-2" />
+              Edit Invoice Terms & Conditions
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Payment Stages Dialog */}
+        <Dialog open={paymentStagesDialogOpen} onOpenChange={setPaymentStagesDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Payment Stages</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
               {paymentStages.map((stage, index) => (
                 <div key={stage.id} className="grid grid-cols-[80px_1fr_120px_40px] gap-3 items-start">
                   <div className="space-y-2">
@@ -545,52 +612,37 @@ const Settings = () => {
                   </div>
                 </div>
               ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newId = String(Math.max(...paymentStages.map(s => parseInt(s.id) || 0)) + 1);
+                  setPaymentStages([...paymentStages, {
+                    id: newId,
+                    stage: String(paymentStages.length + 1),
+                    milestone: "",
+                    percentage: 0
+                  }]);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Stage
+              </Button>
+              <div className="flex justify-between items-center pt-3 border-t">
+                <span className="text-sm font-medium">Total Percentage:</span>
+                <span className={`text-sm font-bold ${paymentStages.reduce((sum, s) => sum + s.percentage, 0) === 100 ? 'text-green-600' : 'text-destructive'}`}>
+                  {paymentStages.reduce((sum, s) => sum + s.percentage, 0)}%
+                </span>
+              </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const newId = String(Math.max(...paymentStages.map(s => parseInt(s.id) || 0)) + 1);
-                setPaymentStages([...paymentStages, {
-                  id: newId,
-                  stage: String(paymentStages.length + 1),
-                  milestone: "",
-                  percentage: 0
-                }]);
-              }}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Stage
-            </Button>
-            <div className="flex justify-between items-center pt-3 border-t">
-              <span className="text-sm font-medium">Total Percentage:</span>
-              <span className={`text-sm font-bold ${paymentStages.reduce((sum, s) => sum + s.percentage, 0) === 100 ? 'text-green-600' : 'text-destructive'}`}>
-                {paymentStages.reduce((sum, s) => sum + s.percentage, 0)}%
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+          </DialogContent>
+        </Dialog>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Terms & Conditions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Customize the terms and conditions that will appear in all quotation PDFs.
-            </p>
-            <Button onClick={() => setTermsDialogOpen(true)} className="w-full md:w-auto">
-              <FileText className="h-4 w-4 mr-2" />
-              Edit Terms and Conditions
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Terms and Conditions Dialog */}
+        {/* Quotation Terms and Conditions Dialog */}
         <Dialog open={termsDialogOpen} onOpenChange={setTermsDialogOpen}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Edit Terms and Conditions</DialogTitle>
+              <DialogTitle>Edit Quotation Terms & Conditions</DialogTitle>
             </DialogHeader>
             <div className="space-y-6 py-4">
               {termsConditions.map((term, termIndex) => (
@@ -676,6 +728,109 @@ const Settings = () => {
                 onClick={() => {
                   const newId = String(Math.max(...termsConditions.map(t => parseInt(t.id) || 0)) + 1);
                   setTermsConditions([...termsConditions, {
+                    id: newId,
+                    title: "",
+                    points: [""]
+                  }]);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Section
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Invoice Terms and Conditions Dialog */}
+        <Dialog open={invoiceTermsDialogOpen} onOpenChange={setInvoiceTermsDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Invoice Terms & Conditions</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              {invoiceTerms.map((term, termIndex) => (
+                <div key={term.id} className="space-y-4 p-4 border rounded-lg">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-1 space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm font-semibold">Section Title</Label>
+                        <Input
+                          value={term.title}
+                          onChange={(e) => {
+                            const updated = [...invoiceTerms];
+                            updated[termIndex].title = e.target.value;
+                            setInvoiceTerms(updated);
+                          }}
+                          placeholder="Enter section title"
+                          className="font-medium"
+                        />
+                      </div>
+                      <div className="space-y-3">
+                        <Label className="text-sm font-semibold">Points</Label>
+                        {term.points.map((point, pointIndex) => (
+                          <div key={pointIndex} className="flex gap-2">
+                            <Textarea
+                              value={point}
+                              onChange={(e) => {
+                                const updated = [...invoiceTerms];
+                                updated[termIndex].points[pointIndex] = e.target.value;
+                                setInvoiceTerms(updated);
+                              }}
+                              placeholder="Enter point"
+                              rows={2}
+                              className="flex-1"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                if (term.points.length > 1) {
+                                  const updated = [...invoiceTerms];
+                                  updated[termIndex].points = updated[termIndex].points.filter((_, i) => i !== pointIndex);
+                                  setInvoiceTerms(updated);
+                                }
+                              }}
+                              disabled={term.points.length <= 1}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const updated = [...invoiceTerms];
+                            updated[termIndex].points.push("");
+                            setInvoiceTerms(updated);
+                          }}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Point
+                        </Button>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (invoiceTerms.length > 1) {
+                          setInvoiceTerms(invoiceTerms.filter((_, i) => i !== termIndex));
+                        }
+                      }}
+                      disabled={invoiceTerms.length <= 1}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newId = String(Math.max(...invoiceTerms.map(t => parseInt(t.id) || 0)) + 1);
+                  setInvoiceTerms([...invoiceTerms, {
                     id: newId,
                     title: "",
                     points: [""]

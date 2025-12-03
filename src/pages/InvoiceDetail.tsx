@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Plus, Copy, FileText } from "lucide-react";
+import { ArrowLeft, Download, Plus, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
 
 interface Invoice {
   id: string;
@@ -59,6 +60,7 @@ const InvoiceDetail = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [relatedInvoices, setRelatedInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -69,9 +71,14 @@ const InvoiceDetail = () => {
     if (id) {
       loadInvoice();
       loadPayments();
-      loadRelatedInvoices();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (invoice?.quotation_id) {
+      loadRelatedInvoices();
+    }
+  }, [invoice?.quotation_id]);
 
   const loadInvoice = async () => {
     try {
@@ -151,13 +158,13 @@ const InvoiceDetail = () => {
 
       const newPaidAmount = (invoice?.paid_amount || 0) + paymentAmount;
       const newRemainingAmount = (invoice?.total_amount || 0) - newPaidAmount;
-      const newStatus = newRemainingAmount === 0 ? 'paid' : (newPaidAmount > 0 ? 'partially paid' : 'unpaid');
+      const newStatus = newRemainingAmount <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partially paid' : 'unpaid');
 
       const { error: invoiceError } = await supabase
         .from('invoices')
         .update({
           paid_amount: newPaidAmount,
-          remaining_amount: newRemainingAmount,
+          remaining_amount: Math.max(0, newRemainingAmount),
           status: newStatus
         })
         .eq('id', id);
@@ -174,7 +181,6 @@ const InvoiceDetail = () => {
       setPaymentNotes("");
       loadInvoice();
       loadPayments();
-      loadRelatedInvoices();
     } catch (error) {
       console.error('Error adding payment:', error);
       toast({
@@ -185,46 +191,65 @@ const InvoiceDetail = () => {
     }
   };
 
-  const handleCreateNextInvoice = async () => {
+  const handleDownloadPDF = async () => {
+    if (!invoice) return;
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !invoice) return;
-
-      const newInvoiceNumber = `INV-${Date.now()}`;
+      setPdfLoading(true);
       
-      const { data: newInvoice, error } = await supabase
-        .from('invoices')
-        .insert({
-          user_id: user.id,
-          quotation_id: invoice.quotation_id,
-          invoice_number: newInvoiceNumber,
-          client_name: invoice.client_name,
-          project_name: `${invoice.project_name} - Next Phase`,
-          total_amount: 0,
-          paid_amount: 0,
-          remaining_amount: 0,
-          status: 'unpaid'
-        })
-        .select()
-        .single();
+      // Load profile data
+      const { data: { user } } = await supabase.auth.getUser();
+      let profile = {};
+      
+      if (user) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profileData) {
+          profile = profileData;
+        }
+      }
 
-      if (error) throw error;
-
-      toast({
-        title: "Next Invoice Created",
-        description: "A new invoice for the next phase has been created",
+      await generateInvoicePDF({
+        invoiceNumber: invoice.invoice_number,
+        invoiceDate: formatDate(invoice.invoice_date),
+        dueDate: invoice.due_date ? formatDate(invoice.due_date) : undefined,
+        clientName: invoice.client_name,
+        projectName: invoice.project_name,
+        totalAmount: invoice.total_amount,
+        paidAmount: invoice.paid_amount || 0,
+        remainingAmount: invoice.remaining_amount || 0,
+        status: invoice.status || 'unpaid',
+        notes: invoice.notes,
+        payments: payments.map(p => ({
+          amount: p.amount,
+          payment_date: formatDate(p.payment_date),
+          payment_method: p.payment_method,
+          notes: p.notes
+        })),
+        profile: profile as any
       });
 
-      navigate(`/invoices/${newInvoice.id}`);
+      toast({
+        title: "PDF Generated",
+        description: "Invoice PDF has been downloaded",
+      });
     } catch (error) {
-      console.error('Error creating next invoice:', error);
+      console.error('Error generating PDF:', error);
       toast({
         title: "Error",
-        description: "Failed to create next invoice",
+        description: "Failed to generate PDF",
         variant: "destructive",
       });
+    } finally {
+      setPdfLoading(false);
     }
   };
+
+  const isFullyPaid = invoice && (invoice.remaining_amount || 0) <= 0;
 
   if (loading) {
     return (
@@ -262,17 +287,23 @@ const InvoiceDetail = () => {
             Back
           </Button>
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={() => setPaymentDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Payment
-            </Button>
-            <Button variant="outline" onClick={handleCreateNextInvoice}>
-              <FileText className="h-4 w-4 mr-2" />
-              Next Invoice
-            </Button>
-            <Button variant="outline" onClick={() => toast({ title: "Coming Soon", description: "PDF download will be available soon" })}>
+            {isFullyPaid ? (
+              <Button variant="outline" className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100" disabled>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Project Completed
+              </Button>
+            ) : (
+              <Button onClick={() => setPaymentDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Payment
+                <span className="ml-2 text-xs opacity-75">
+                  (₹{(invoice.remaining_amount || 0).toLocaleString('en-IN')} remaining)
+                </span>
+              </Button>
+            )}
+            <Button variant="outline" onClick={handleDownloadPDF} disabled={pdfLoading}>
               <Download className="h-4 w-4 mr-2" />
-              PDF
+              {pdfLoading ? 'Generating...' : 'PDF'}
             </Button>
           </div>
         </div>
@@ -405,7 +436,7 @@ const InvoiceDetail = () => {
             <DialogHeader>
               <DialogTitle>Add Payment</DialogTitle>
               <DialogDescription>
-                Record a new payment for this invoice
+                Record a new payment for this invoice. Balance: ₹{(invoice.remaining_amount || 0).toLocaleString('en-IN')}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -417,7 +448,11 @@ const InvoiceDetail = () => {
                   placeholder="₹0.00"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                  max={invoice.remaining_amount || 0}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Maximum: ₹{(invoice.remaining_amount || 0).toLocaleString('en-IN')}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="payment-method">Payment Method</Label>
@@ -456,7 +491,7 @@ const InvoiceDetail = () => {
               <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleAddPayment}>
+              <Button onClick={handleAddPayment} disabled={paymentAmount <= 0}>
                 Save Payment
               </Button>
             </DialogFooter>
