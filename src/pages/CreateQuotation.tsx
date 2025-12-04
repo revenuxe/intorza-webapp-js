@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useSearchParams } from "react-router-dom";
 import { useAuthAction } from "@/hooks/useAuthAction";
+import { CustomizeFieldsDrawer, QuotationSettings, getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
 
 
 interface LineItem {
@@ -89,6 +90,7 @@ const CreateQuotation = () => {
     terms_conditions: [] as any[]
   });
   const [formRestored, setFormRestored] = useState(false);
+  const [customizeSettings, setCustomizeSettings] = useState<QuotationSettings>(getQuotationSettings());
 
   // Restore form data from sessionStorage after login
   useEffect(() => {
@@ -603,7 +605,8 @@ const CreateQuotation = () => {
           milestone: s.milestone,
           percentage: s.percentage
         })),
-        termsConditions: profile.terms_conditions
+        termsConditions: profile.terms_conditions,
+        settings: customizeSettings
       });
 
       toast({
@@ -633,6 +636,11 @@ const CreateQuotation = () => {
             <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
               Templates
             </Button>
+            <CustomizeFieldsDrawer 
+              type="quotation"
+              settings={customizeSettings}
+              onSettingsChange={(s) => setCustomizeSettings(s as QuotationSettings)}
+            />
           </div>
         </div>
 
