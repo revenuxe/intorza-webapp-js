@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Upload } from "lucide-react";
+import { Plus, Trash2, Upload, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,8 @@ import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useSearchParams } from "react-router-dom";
 import { useAuthAction } from "@/hooks/useAuthAction";
 import { CustomizeFieldsDrawer, QuotationSettings, getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
+import { PDFPreviewEditor } from "@/components/PDFPreviewEditor";
+import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
 
 
 interface LineItem {
@@ -91,6 +93,7 @@ const CreateQuotation = () => {
   });
   const [formRestored, setFormRestored] = useState(false);
   const [customizeSettings, setCustomizeSettings] = useState<QuotationSettings>(getQuotationSettings());
+  const [showPreview, setShowPreview] = useState(false);
 
   // Restore form data from sessionStorage after login
   useEffect(() => {
@@ -559,7 +562,7 @@ const CreateQuotation = () => {
     }
   };
 
-  const handleDownloadPDF = async () => {
+  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings) => {
     try {
       if (!clientName || !clientAddress) {
         toast({
@@ -606,7 +609,8 @@ const CreateQuotation = () => {
           percentage: s.percentage
         })),
         termsConditions: profile.terms_conditions,
-        settings: customizeSettings
+        settings: customizeSettings,
+        editorSettings: editorSettings || getEditorSettings()
       });
 
       toast({
@@ -622,6 +626,18 @@ const CreateQuotation = () => {
       });
     }
   };
+
+  const getQuotationPreviewData = () => ({
+    quotationTitle: projectTitle,
+    clientName,
+    clientAddress,
+    dateOfProposal,
+    sections,
+    subtotal,
+    grandTotal,
+    companyName: profile.company_name,
+    companyLogo: profile.logo_url,
+  });
 
   return (
     <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
@@ -1119,11 +1135,15 @@ const CreateQuotation = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-4">
               <Button variant="outline" className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('draft'), 'saveDraft', getFormData())}>
                 Save as Draft
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => requireAuth(handleDownloadPDF, 'downloadPdf', getFormData())}>
+              <Button variant="outline" className="w-full" onClick={() => setShowPreview(true)}>
+                <Eye className="h-4 w-4 mr-2" />
+                Preview
+              </Button>
+              <Button variant="outline" className="w-full" onClick={() => requireAuth(() => handleDownloadPDF(), 'downloadPdf', getFormData())}>
                 Download PDF
               </Button>
               <Button className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('pending'), 'saveAndSend', getFormData())}>
@@ -1132,6 +1152,15 @@ const CreateQuotation = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* PDF Preview Editor */}
+        <PDFPreviewEditor
+          open={showPreview}
+          onClose={() => setShowPreview(false)}
+          onDownload={(settings) => handleDownloadPDF(settings)}
+          quotationData={getQuotationPreviewData()}
+          customizeSettings={customizeSettings}
+        />
       </div>
     </div>
   );
