@@ -32,8 +32,19 @@ interface InvoiceData {
   };
 }
 
+// --- Design System Colors (same as quotation PDF) ---
+const COLORS = {
+  TEXT_PRIMARY: [20, 20, 20] as [number, number, number],
+  TEXT_SECONDARY: [80, 80, 80] as [number, number, number],
+  TEXT_LIGHT: [120, 120, 120] as [number, number, number],
+  BG_CARD: [250, 250, 250] as [number, number, number],
+  BORDER: [230, 230, 230] as [number, number, number],
+  ACCENT: [0, 0, 0] as [number, number, number],
+  HIGHLIGHT: [255, 240, 0] as [number, number, number],
+};
+
 const formatCurrency = (amount: number): string => {
-  return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return 'INR ' + Math.round(amount).toLocaleString('en-IN');
 };
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
@@ -42,26 +53,27 @@ const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: numb
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      let { width, height } = img;
-      
-      if (width > maxWidth) {
-        height = (height * maxWidth) / width;
-        width = maxWidth;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        width = width * ratio;
+        height = height * ratio;
       }
-      if (height > maxHeight) {
-        width = (width * maxHeight) / height;
-        height = maxHeight;
-      }
-      
+
       canvas.width = width;
       canvas.height = height;
+
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      } else {
+        reject(new Error('Canvas context not available'));
       }
-      resolve(canvas.toDataURL('image/jpeg', 0.8));
     };
     img.onerror = reject;
     img.src = imageUrl;
@@ -70,135 +82,146 @@ const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: numb
 
 export const generateInvoicePDF = async (data: InvoiceData) => {
   const doc = new jsPDF({
-    orientation: 'portrait',
+    orientation: 'p',
     unit: 'mm',
     format: 'a4',
+    compress: true
   });
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
-  let currentY = margin;
+  const contentWidth = pageWidth - (margin * 2);
+  let yPosition = 15;
 
-  // Colors
-  const primaryColor: [number, number, number] = [0, 0, 0];
-  const accentColor: [number, number, number] = [180, 142, 73];
-  const highlightYellow: [number, number, number] = [255, 255, 150];
-  const lightGray: [number, number, number] = [244, 244, 244];
-  const softBeige: [number, number, number] = [243, 237, 229];
-
-  // ===== HEADER SECTION =====
-  const headerHeight = 45;
-  const logoBoxWidth = 70;
-
-  // Black background for logo
-  doc.setFillColor(0, 0, 0);
-  doc.roundedRect(margin, currentY, logoBoxWidth, headerHeight, 0, 8, 'F');
-
-  // Company details on white background
-  doc.setFillColor(255, 255, 255);
-  doc.rect(margin + logoBoxWidth, currentY, pageWidth - margin * 2 - logoBoxWidth, headerHeight, 'F');
-
-  // Add logo if available
+  // --- 1. Header Section (Same as Quotation) ---
+  
+  // Logo - Top Left corner with rounded corners
   if (data.profile.logo_url) {
     try {
-      const compressedLogo = await compressImage(data.profile.logo_url, 200, 150);
-      const logoMaxWidth = logoBoxWidth - 16;
-      const logoMaxHeight = headerHeight - 16;
-      doc.addImage(compressedLogo, 'JPEG', margin + 8, currentY + 8, logoMaxWidth, logoMaxHeight);
-    } catch (error) {
-      console.error('Error loading logo:', error);
-    }
+      const compressedLogo = await compressImage(data.profile.logo_url, 400, 400);
+      const logoSize = 25;
+      const cornerRadius = logoSize * 0.1;
+      
+      doc.setFillColor(0, 0, 0);
+      doc.roundedRect(margin, yPosition, logoSize, logoSize, cornerRadius, cornerRadius, 'F');
+      doc.addImage(compressedLogo, 'JPEG', margin, yPosition, logoSize, logoSize, undefined, 'FAST');
+    } catch (e) { console.error(e); }
   }
 
-  // Company details text
-  const detailsX = margin + logoBoxWidth + 10;
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...primaryColor);
-  doc.text(data.profile.company_name || 'Your Company', detailsX, currentY + 12);
-
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
+  // Company Details - Top Right
+  const companyInfoX = pageWidth - margin;
+  let headerTextY = yPosition + 5;
   
-  let detailY = currentY + 18;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+  doc.text((data.profile.company_name || 'COMPANY NAME').toUpperCase(), companyInfoX, headerTextY, { align: 'right' });
+  
+  headerTextY += 7;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+  
   if (data.profile.address) {
-    const addressLines = doc.splitTextToSize(data.profile.address, pageWidth - margin * 2 - logoBoxWidth - 20);
+    const addressLines = doc.splitTextToSize(data.profile.address, 90);
     addressLines.forEach((line: string) => {
-      doc.text(line, detailsX, detailY);
-      detailY += 4;
+      doc.text(line, companyInfoX, headerTextY, { align: 'right' });
+      headerTextY += 4.5;
     });
   }
-  if (data.profile.phone) {
-    doc.text(`Phone: ${data.profile.phone}`, detailsX, detailY);
-    detailY += 4;
+  
+  const contactDetails = [];
+  if (data.profile.phone) contactDetails.push(data.profile.phone);
+  if (data.profile.email) contactDetails.push(data.profile.email);
+  
+  if (contactDetails.length > 0) {
+    doc.text(contactDetails.join(' | '), companyInfoX, headerTextY, { align: 'right' });
+    headerTextY += 4.5;
   }
-  if (data.profile.email) {
-    doc.text(`Email: ${data.profile.email}`, detailsX, detailY);
-    detailY += 4;
-  }
+  
   if (data.profile.gstin) {
-    doc.text(`GSTIN: ${data.profile.gstin}`, detailsX, detailY);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`GSTIN: ${data.profile.gstin}`, companyInfoX, headerTextY, { align: 'right' });
   }
 
-  currentY += headerHeight + 10;
+  yPosition += 35;
 
-  // ===== INVOICE TITLE =====
-  doc.setFillColor(...accentColor);
-  doc.rect(margin, currentY, pageWidth - margin * 2, 10, 'F');
-  doc.setFontSize(14);
+  // --- 2. Info Cards (Client & Invoice Details) ---
+  
+  const cardHeight = 42;
+  const gap = 5;
+  const cardWidth = (contentWidth - gap) / 2;
+  
+  // Left Card: Client Info
+  doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+  doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+  doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+  
+  let cardY = yPosition + 8;
+  const cardPadding = 6;
+  const cardContentX = margin + cardPadding;
+  
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text('INVOICE', pageWidth / 2, currentY + 7, { align: 'center' });
-  currentY += 15;
-
-  // ===== INFO CARDS =====
-  const cardWidth = (pageWidth - margin * 2 - 8) / 2;
-  const cardHeight = 40;
-
-  // Client Info Card
-  doc.setFillColor(...softBeige);
-  doc.roundedRect(margin, currentY, cardWidth, cardHeight, 3, 3, 'F');
-
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...primaryColor);
-  doc.text('BILL TO', margin + 6, currentY + 8);
-
   doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(80, 80, 80);
-  doc.text(data.clientName, margin + 6, currentY + 16);
-  doc.text(data.projectName, margin + 6, currentY + 22);
-
-  // Invoice Details Card
-  doc.setFillColor(...lightGray);
-  doc.roundedRect(margin + cardWidth + 8, currentY, cardWidth, cardHeight, 3, 3, 'F');
-
-  doc.setFontSize(9);
+  doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+  doc.text('BILL TO', cardContentX, cardY);
+  
+  cardY += 6;
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...primaryColor);
-  doc.text('INVOICE DETAILS', margin + cardWidth + 14, currentY + 8);
-
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(80, 80, 80);
-  doc.text(`Invoice #: ${data.invoiceNumber}`, margin + cardWidth + 14, currentY + 16);
-  doc.text(`Date: ${data.invoiceDate}`, margin + cardWidth + 14, currentY + 22);
-  if (data.dueDate) {
-    doc.text(`Due Date: ${data.dueDate}`, margin + cardWidth + 14, currentY + 28);
-  }
-  doc.text(`Status: ${data.status.toUpperCase()}`, margin + cardWidth + 14, currentY + 34);
-
-  currentY += cardHeight + 12;
-
-  // ===== PAYMENT SUMMARY =====
   doc.setFontSize(11);
+  doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+  doc.text(data.clientName, cardContentX, cardY);
+  
+  cardY += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+  doc.text(data.projectName, cardContentX, cardY);
+
+  // Right Card: Invoice Meta
+  const rightCardX = margin + cardWidth + gap;
+  doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+  doc.roundedRect(rightCardX, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+  
+  let metaY = yPosition + 8;
+  const metaContentX = rightCardX + cardPadding;
+  const metaLabelX = metaContentX;
+  const metaValueX = metaContentX + 30;
+  
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...primaryColor);
-  doc.text('PAYMENT SUMMARY', margin, currentY);
-  currentY += 8;
+  doc.setFontSize(8);
+  doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+  doc.text('INVOICE DETAILS', metaContentX, metaY);
+  metaY += 6;
+
+  const addMeta = (label: string, value: string) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+    doc.text(label, metaLabelX, metaY);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+    doc.text(value, metaValueX, metaY);
+    metaY += 5.5;
+  };
+
+  addMeta('Invoice #:', data.invoiceNumber);
+  addMeta('Date:', data.invoiceDate);
+  if (data.dueDate) {
+    addMeta('Due Date:', data.dueDate);
+  }
+  addMeta('Status:', data.status.toUpperCase());
+
+  yPosition += cardHeight + 10;
+
+  // --- 3. Payment Summary ---
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+  doc.text("PAYMENT SUMMARY", margin, yPosition);
+  yPosition += 6;
 
   const summaryData = [
     ['Total Amount', formatCurrency(data.totalAmount)],
@@ -207,261 +230,247 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   ];
 
   autoTable(doc, {
-    startY: currentY,
-    head: [['Description', 'Amount']],
+    startY: yPosition,
     body: summaryData,
-    margin: { left: margin, right: margin },
+    theme: 'grid',
     styles: {
-      fontSize: 9,
-      cellPadding: 4,
-    },
-    headStyles: {
-      fillColor: [237, 237, 237],
-      textColor: [0, 0, 0],
-      fontStyle: 'bold',
-    },
-    bodyStyles: {
-      fillColor: [255, 255, 255],
+      lineColor: COLORS.BORDER,
+      lineWidth: 0.1,
+      cellPadding: 5,
+      fontSize: 8
     },
     columnStyles: {
-      0: { cellWidth: 100 },
-      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold' },
+      0: { cellWidth: 120, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
+      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8 }
     },
-    didDrawCell: (cellData) => {
-      // Highlight amounts in yellow
-      if (cellData.section === 'body' && cellData.column.index === 1) {
-        doc.setFillColor(...highlightYellow);
-        doc.rect(cellData.cell.x, cellData.cell.y, cellData.cell.width, cellData.cell.height, 'F');
+    willDrawCell: (cellData) => {
+      if (cellData.column.index === 1 && cellData.section === 'body') {
+        doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
         doc.setTextColor(0, 0, 0);
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.text(
-          String(cellData.cell.text),
-          cellData.cell.x + cellData.cell.width - 4,
-          cellData.cell.y + cellData.cell.height / 2 + 1,
-          { align: 'right' }
-        );
       }
     },
+    margin: { left: margin, right: margin }
   });
 
-  currentY = (doc as any).lastAutoTable.finalY + 12;
+  yPosition = (doc as any).lastAutoTable.finalY + 15;
 
-  // ===== PAYMENT HISTORY =====
+  // --- 4. Payment History ---
   if (data.payments && data.payments.length > 0) {
-    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...primaryColor);
-    doc.text('PAYMENT HISTORY', margin, currentY);
-    currentY += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+    doc.text("PAYMENT HISTORY", margin, yPosition);
+    yPosition += 6;
 
     const paymentRows = data.payments.map((payment, index) => [
       String(index + 1),
       payment.payment_date,
-      payment.payment_method.toUpperCase(),
+      (payment.payment_method || '-').toUpperCase(),
       formatCurrency(payment.amount),
       payment.notes || '-',
     ]);
 
     autoTable(doc, {
-      startY: currentY,
+      startY: yPosition,
       head: [['#', 'Date', 'Method', 'Amount', 'Notes']],
       body: paymentRows,
-      margin: { left: margin, right: margin },
+      theme: 'grid',
       styles: {
-        fontSize: 8,
-        cellPadding: 3,
+        lineColor: COLORS.BORDER,
+        lineWidth: 0.1,
+        textColor: COLORS.TEXT_SECONDARY,
+        fontSize: 7,
+        cellPadding: 3
       },
       headStyles: {
-        fillColor: [237, 237, 237],
-        textColor: [0, 0, 0],
+        fillColor: COLORS.BG_CARD,
+        textColor: COLORS.TEXT_PRIMARY,
         fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [250, 250, 250],
+        lineColor: COLORS.BORDER,
+        lineWidth: 0.1,
+        fontSize: 7
       },
       columnStyles: {
-        0: { cellWidth: 15 },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 35, halign: 'right' },
-        4: { cellWidth: 'auto' },
+        0: { cellWidth: 12, halign: 'center', fontSize: 7 },
+        1: { cellWidth: 30, fontSize: 7 },
+        2: { cellWidth: 25, halign: 'center', fontSize: 7 },
+        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: 7 },
+        4: { cellWidth: 'auto', fontSize: 6 }
       },
-      didDrawCell: (cellData) => {
-        // Highlight amounts in yellow
-        if (cellData.section === 'body' && cellData.column.index === 3) {
-          doc.setFillColor(...highlightYellow);
-          doc.rect(cellData.cell.x, cellData.cell.y, cellData.cell.width, cellData.cell.height, 'F');
+      willDrawCell: (cellData) => {
+        if (cellData.column.index === 3 && cellData.section === 'body') {
+          doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
           doc.setTextColor(0, 0, 0);
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'normal');
-          doc.text(
-            String(cellData.cell.text),
-            cellData.cell.x + cellData.cell.width - 3,
-            cellData.cell.y + cellData.cell.height / 2 + 1,
-            { align: 'right' }
-          );
         }
       },
+      margin: { left: margin, right: margin }
     });
 
-    currentY = (doc as any).lastAutoTable.finalY + 12;
+    yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  // ===== STAGEWISE PAYMENT (if available) =====
+  // --- 5. Stagewise Payment Option ---
   if (data.profile.payment_stages && data.profile.payment_stages.length > 0) {
-    // Check if we need a new page
-    if (currentY > pageHeight - 80) {
+    if (yPosition > pageHeight - 80) {
       doc.addPage();
-      currentY = margin;
+      yPosition = 15;
     }
 
-    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...primaryColor);
-    doc.text('STAGEWISE PAYMENT OPTION', margin, currentY);
-    currentY += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+    doc.text("STAGEWISE PAYMENT OPTION", margin, yPosition);
+    yPosition += 6;
 
-    const stageRows = data.profile.payment_stages.map((stage: any) => {
-      const amount = (data.totalAmount * stage.percentage) / 100;
-      return [stage.stage, stage.milestone, `${stage.percentage}%`, formatCurrency(amount)];
-    });
+    const paymentStages = data.profile.payment_stages.map((stage: any) => [
+      stage.stage,
+      stage.milestone,
+      `${stage.percentage}%`,
+      formatCurrency(data.totalAmount * (stage.percentage / 100))
+    ]);
 
     autoTable(doc, {
-      startY: currentY,
-      head: [['Stage', 'Milestone', 'Percentage', 'Amount']],
-      body: stageRows,
-      margin: { left: margin, right: margin },
+      startY: yPosition,
+      head: [['#', 'Stage / Milestone', 'Payment %', 'Amount']],
+      body: paymentStages,
+      theme: 'grid',
       styles: {
-        fontSize: 8,
-        cellPadding: 3,
+        lineColor: COLORS.BORDER,
+        lineWidth: 0.1,
+        textColor: COLORS.TEXT_SECONDARY,
+        fontSize: 7,
+        cellPadding: 3
       },
       headStyles: {
-        fillColor: [237, 237, 237],
-        textColor: [0, 0, 0],
+        fillColor: COLORS.BG_CARD,
+        textColor: COLORS.TEXT_PRIMARY,
         fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [250, 250, 250],
+        lineColor: COLORS.BORDER,
+        lineWidth: 0.1,
+        fontSize: 7
       },
       columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 'auto' },
-        2: { cellWidth: 30, halign: 'center' },
-        3: { cellWidth: 40, halign: 'right' },
+        0: { cellWidth: 12, halign: 'center', fontSize: 7 },
+        1: { cellWidth: 'auto', fontSize: 7 },
+        2: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fontSize: 7 },
+        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: 7 }
       },
-      didDrawCell: (cellData) => {
-        if (cellData.section === 'body' && cellData.column.index === 3) {
-          doc.setFillColor(...highlightYellow);
-          doc.rect(cellData.cell.x, cellData.cell.y, cellData.cell.width, cellData.cell.height, 'F');
+      willDrawCell: (cellData) => {
+        if (cellData.column.index === 3 && cellData.section === 'body') {
+          doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
           doc.setTextColor(0, 0, 0);
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'normal');
-          doc.text(
-            String(cellData.cell.text),
-            cellData.cell.x + cellData.cell.width - 3,
-            cellData.cell.y + cellData.cell.height / 2 + 1,
-            { align: 'right' }
-          );
         }
       },
+      margin: { left: margin, right: margin }
     });
 
-    currentY = (doc as any).lastAutoTable.finalY + 12;
+    yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  // ===== TERMS & CONDITIONS =====
+  // --- 6. Terms & Conditions ---
   if (data.profile.invoice_terms_conditions && data.profile.invoice_terms_conditions.length > 0) {
-    // Check if we need a new page
-    if (currentY > pageHeight - 60) {
+    if (yPosition > pageHeight - 60) {
       doc.addPage();
-      currentY = margin;
+      yPosition = 15;
     }
 
-    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...primaryColor);
-    doc.text('TERMS & CONDITIONS', margin, currentY);
-    currentY += 8;
+    doc.setFontSize(10);
+    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+    doc.text("TERMS & CONDITIONS", margin, yPosition);
+    yPosition += 8;
 
-    data.profile.invoice_terms_conditions.forEach((term, termIndex) => {
-      // Check for page break
-      if (currentY > pageHeight - 30) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+
+    const addBlock = (title: string, points: string[]) => {
+      if (yPosition > pageHeight - 40) {
         doc.addPage();
-        currentY = margin;
+        yPosition = 15;
       }
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(...primaryColor);
-      doc.text(`${termIndex + 1}. ${term.title}`, margin, currentY);
-      currentY += 5;
-
-      doc.setFontSize(8);
+      if (title) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+        doc.text(title, margin, yPosition);
+        yPosition += 4;
+      }
       doc.setFont('helvetica', 'normal');
-      doc.setTextColor(80, 80, 80);
-
-      term.points.forEach((point) => {
-        const bulletText = `• ${point}`;
-        const lines = doc.splitTextToSize(bulletText, pageWidth - margin * 2 - 5);
-        lines.forEach((line: string) => {
-          if (currentY > pageHeight - 20) {
+      doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+      
+      if (!points || !Array.isArray(points)) return;
+      
+      points.forEach((point) => {
+        if (!point || !point.trim()) return;
+        
+        const splitText = doc.splitTextToSize(point, contentWidth - 5);
+        
+        splitText.forEach((line: string, lineIndex: number) => {
+          if (yPosition > pageHeight - 20) {
             doc.addPage();
-            currentY = margin;
+            yPosition = 15;
           }
-          doc.text(line, margin + 5, currentY);
-          currentY += 4;
+          
+          if (lineIndex === 0) {
+            doc.text("•", margin, yPosition);
+            doc.text(line, margin + 5, yPosition);
+          } else {
+            doc.text(line, margin + 5, yPosition);
+          }
+          yPosition += 3.5;
         });
       });
+      yPosition += 2;
+    };
 
-      currentY += 3;
+    data.profile.invoice_terms_conditions.forEach(term => {
+      if (term && term.title && term.points) {
+        addBlock(term.title, term.points);
+      }
     });
   }
 
-  // ===== SIGNATURE SECTION =====
-  if (currentY > pageHeight - 50) {
+  // --- 7. Signature & Footer ---
+  if (yPosition > pageHeight - 50) {
     doc.addPage();
-    currentY = margin;
+    yPosition = pageHeight - 60;
+  } else {
+    yPosition += 10;
   }
 
-  currentY += 10;
-  doc.setDrawColor(200, 200, 200);
-  doc.line(margin, currentY, pageWidth - margin, currentY);
-  currentY += 10;
-
-  // Signature boxes
-  const sigBoxWidth = (pageWidth - margin * 2 - 20) / 2;
-
-  // Customer signature
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
-  doc.text('Customer Signature', margin, currentY);
-  doc.line(margin, currentY + 15, margin + sigBoxWidth, currentY + 15);
-  doc.text('Name: ________________________', margin, currentY + 22);
-  doc.text('Date: ________________________', margin, currentY + 28);
-
-  // Authorized signature
-  doc.text('Authorized Signature', pageWidth - margin - sigBoxWidth, currentY);
+  const signBoxWidth = 70;
+  const companySignX = pageWidth - margin - signBoxWidth;
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+  doc.text("Acceptance from Customer", margin, yPosition);
   
   if (data.profile.signature_url) {
     try {
-      const compressedSig = await compressImage(data.profile.signature_url, 150, 80);
-      doc.addImage(compressedSig, 'JPEG', pageWidth - margin - sigBoxWidth, currentY + 3, 40, 12);
-    } catch (error) {
-      console.error('Error loading signature:', error);
-    }
+      const compressedSig = await compressImage(data.profile.signature_url, 150, 60);
+      doc.addImage(compressedSig, 'JPEG', companySignX, yPosition - 5, 50, 15);
+    } catch (e) {}
   }
+
+  yPosition += 20;
+
+  doc.setDrawColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+  doc.setLineWidth(0.5);
   
-  doc.line(pageWidth - margin - sigBoxWidth, currentY + 15, pageWidth - margin, currentY + 15);
-  doc.text(`For ${data.profile.company_name || 'Company'}`, pageWidth - margin - sigBoxWidth, currentY + 22);
+  doc.line(margin, yPosition, margin + signBoxWidth, yPosition);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+  doc.text("Signatory", margin, yPosition + 5);
 
-  // ===== FOOTER =====
-  const footerY = pageHeight - 10;
+  doc.line(companySignX, yPosition, companySignX + signBoxWidth, yPosition);
+  doc.text("Authorized Signatory", companySignX, yPosition + 5);
+
+  // Footer
   doc.setFontSize(7);
-  doc.setTextColor(150, 150, 150);
-  doc.text('This is a computer-generated document. No signature is required.', pageWidth / 2, footerY, { align: 'center' });
+  doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+  doc.text("This invoice is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
 
-  // Save the PDF
+  // Save
   doc.save(`Invoice_${data.invoiceNumber}.pdf`);
 };
