@@ -660,79 +660,95 @@ const CreateQuotation = () => {
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="clientName">Client Name</Label>
-                <Input 
-                  id="clientName" 
-                  placeholder="Enter client name"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="clientAddress">Client Address</Label>
-                <Input 
-                  id="clientAddress" 
-                  placeholder="Enter address"
-                  value={clientAddress}
-                  onChange={(e) => setClientAddress(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="dateOfProposal">Date of Proposal</Label>
-                <Input 
-                  id="dateOfProposal" 
-                  type="date"
-                  value={dateOfProposal}
-                  onChange={(e) => setDateOfProposal(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quotationValidTill">Quotation Valid Till</Label>
-                <Input 
-                  id="quotationValidTill" 
-                  type="date"
-                  value={quotationValidTill}
-                  onChange={(e) => setQuotationValidTill(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="projectDeadline">Project Deadline</Label>
-                <Input 
-                  id="projectDeadline" 
-                  type="date"
-                  value={projectDeadline}
-                  onChange={(e) => setProjectDeadline(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="placeOfProject">Place of Project</Label>
-                <Input 
-                  id="placeOfProject" 
-                  placeholder="Enter location"
-                  value={placeOfProject}
-                  onChange={(e) => setPlaceOfProject(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="warranty">Warranty (Years)</Label>
-                <Input 
-                  id="warranty" 
-                  type="number"
-                  value={warranty}
-                  onChange={(e) => setWarranty(e.target.value)}
-                  placeholder="10" 
-                />
-              </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="projectType">Project Type</Label>
-                <Input 
-                  id="projectType" 
-                  value={projectType}
-                  onChange={(e) => setProjectType(e.target.value)}
-                  placeholder="e.g., Residential - 2BHK RENOVATION" 
-                />
-              </div>
+              {customizeSettings.showClientName && (
+                <div className="space-y-2">
+                  <Label htmlFor="clientName">Client Name</Label>
+                  <Input 
+                    id="clientName" 
+                    placeholder="Enter client name"
+                    value={clientName}
+                    onChange={(e) => setClientName(e.target.value)}
+                  />
+                </div>
+              )}
+              {customizeSettings.showClientAddress && (
+                <div className="space-y-2">
+                  <Label htmlFor="clientAddress">Client Address</Label>
+                  <Input 
+                    id="clientAddress" 
+                    placeholder="Enter address"
+                    value={clientAddress}
+                    onChange={(e) => setClientAddress(e.target.value)}
+                  />
+                </div>
+              )}
+              {customizeSettings.showDateOfProposal && (
+                <div className="space-y-2">
+                  <Label htmlFor="dateOfProposal">Date of Proposal</Label>
+                  <Input 
+                    id="dateOfProposal" 
+                    type="date"
+                    value={dateOfProposal}
+                    onChange={(e) => setDateOfProposal(e.target.value)}
+                  />
+                </div>
+              )}
+              {customizeSettings.showQuotationValidTill && (
+                <div className="space-y-2">
+                  <Label htmlFor="quotationValidTill">Quotation Valid Till</Label>
+                  <Input 
+                    id="quotationValidTill" 
+                    type="date"
+                    value={quotationValidTill}
+                    onChange={(e) => setQuotationValidTill(e.target.value)}
+                  />
+                </div>
+              )}
+              {customizeSettings.showProjectDeadline && (
+                <div className="space-y-2">
+                  <Label htmlFor="projectDeadline">Project Deadline</Label>
+                  <Input 
+                    id="projectDeadline" 
+                    type="date"
+                    value={projectDeadline}
+                    onChange={(e) => setProjectDeadline(e.target.value)}
+                  />
+                </div>
+              )}
+              {customizeSettings.showPlaceOfProject && (
+                <div className="space-y-2">
+                  <Label htmlFor="placeOfProject">Place of Project</Label>
+                  <Input 
+                    id="placeOfProject" 
+                    placeholder="Enter location"
+                    value={placeOfProject}
+                    onChange={(e) => setPlaceOfProject(e.target.value)}
+                  />
+                </div>
+              )}
+              {customizeSettings.showWarranty && (
+                <div className="space-y-2">
+                  <Label htmlFor="warranty">Warranty (Years)</Label>
+                  <Input 
+                    id="warranty" 
+                    type="number"
+                    value={warranty}
+                    onChange={(e) => setWarranty(e.target.value)}
+                    placeholder="10" 
+                  />
+                </div>
+              )}
+              {customizeSettings.showProjectType && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="projectType">Project Type</Label>
+                  <Input 
+                    id="projectType" 
+                    value={projectType}
+                    onChange={(e) => setProjectType(e.target.value)}
+                    placeholder="e.g., Residential - 2BHK RENOVATION" 
+                  />
+                </div>
+              )}
               {!profile.logo_url && (
                 <div className="space-y-2 md:col-span-2 p-3 bg-muted/30 rounded-lg">
                   <p className="text-sm text-muted-foreground">
@@ -770,16 +786,21 @@ const CreateQuotation = () => {
             <CardContent className="space-y-4">
               {/* Table Header - Hidden on mobile, shown on tablet+ */}
               <div className="hidden md:block overflow-x-auto">
-                <div className="min-w-[1000px]">
-                  <div className="grid grid-cols-[60px_120px_1fr_80px_80px_80px_100px_100px_100px] gap-2 text-sm font-medium text-muted-foreground border-b pb-2">
-                    <div>Side</div>
+                <div className="min-w-[800px]">
+                  <div className="grid gap-2 text-sm font-medium text-muted-foreground border-b pb-2" style={{
+                    gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
+                  }}>
+                    {customizeSettings.showSideColumn && <div>Side</div>}
                     <div>Product Name</div>
-                    <div>Product Details</div>
-                    <div>Width (Ft)</div>
-                    <div>Height (Ft)</div>
-                    <div>Sft Area</div>
+                    {customizeSettings.showProductDetails && <div>Product Details</div>}
+                    {customizeSettings.showDetailedSizeColumns && (
+                      <>
+                        <div>Width (Ft)</div>
+                        <div>Height (Ft)</div>
+                        <div>Sft Area</div>
+                      </>
+                    )}
                     <div>Rate/Sft</div>
-                    <div>Price/Sq.ft</div>
                     <div>Amount</div>
                   </div>
                 </div>
@@ -804,49 +825,59 @@ const CreateQuotation = () => {
 
                   {/* Desktop Table Row */}
                   <div className="hidden md:block overflow-x-auto">
-                    <div className="min-w-[1000px]">
-                      <div className="grid grid-cols-[60px_120px_1fr_80px_80px_80px_100px_100px_100px] gap-2">
-                        <Input
-                          value={item.side}
-                          onChange={(e) => updateItem(section.id, item.id, "side", e.target.value)}
-                          placeholder="A"
-                          className="h-9"
-                        />
+                    <div className="min-w-[800px]">
+                      <div className="grid gap-2" style={{
+                        gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
+                      }}>
+                        {customizeSettings.showSideColumn && (
+                          <Input
+                            value={item.side}
+                            onChange={(e) => updateItem(section.id, item.id, "side", e.target.value)}
+                            placeholder="A"
+                            className="h-9"
+                          />
+                        )}
                         <Input
                           value={item.productName}
                           onChange={(e) => updateItem(section.id, item.id, "productName", e.target.value)}
                           placeholder="Product"
                           className="h-9"
                         />
-                        <Textarea
-                          value={item.productDetails}
-                          onChange={(e) => updateItem(section.id, item.id, "productDetails", e.target.value)}
-                          placeholder="Detailed description..."
-                          className="resize-none h-9 min-h-[36px]"
-                          rows={1}
-                        />
-                        <Input
-                          type="number"
-                          value={item.widthFt || ""}
-                          onChange={(e) => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          step="0.1"
-                          className="h-9"
-                        />
-                        <Input
-                          type="number"
-                          value={item.heightFt || ""}
-                          onChange={(e) => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          step="0.1"
-                          className="h-9"
-                        />
-                        <Input
-                          type="number"
-                          value={item.sftArea.toFixed(2)}
-                          readOnly
-                          className="h-9 bg-muted"
-                        />
+                        {customizeSettings.showProductDetails && (
+                          <Textarea
+                            value={item.productDetails}
+                            onChange={(e) => updateItem(section.id, item.id, "productDetails", e.target.value)}
+                            placeholder="Detailed description..."
+                            className="resize-none h-9 min-h-[36px]"
+                            rows={1}
+                          />
+                        )}
+                        {customizeSettings.showDetailedSizeColumns && (
+                          <>
+                            <Input
+                              type="number"
+                              value={item.widthFt || ""}
+                              onChange={(e) => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              step="0.1"
+                              className="h-9"
+                            />
+                            <Input
+                              type="number"
+                              value={item.heightFt || ""}
+                              onChange={(e) => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              step="0.1"
+                              className="h-9"
+                            />
+                            <Input
+                              type="number"
+                              value={item.sftArea.toFixed(2)}
+                              readOnly
+                              className="h-9 bg-muted"
+                            />
+                          </>
+                        )}
                         <Input
                           type="number"
                           value={item.ratePerSft || ""}
@@ -855,9 +886,6 @@ const CreateQuotation = () => {
                           step="0.01"
                           className="h-9"
                         />
-                        <div className="h-9 flex items-center font-medium tabular-nums">
-                          ₹{item.ratePerSft.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </div>
                         <div className="h-9 flex items-center font-semibold tabular-nums">
                           ₹{item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </div>
@@ -868,15 +896,17 @@ const CreateQuotation = () => {
                   {/* Mobile Stacked Layout */}
                   <div className="md:hidden space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label>Side</Label>
-                        <Input
-                          value={item.side}
-                          onChange={(e) => updateItem(section.id, item.id, "side", e.target.value)}
-                          placeholder="A"
-                        />
-                      </div>
-                      <div className="space-y-2">
+                      {customizeSettings.showSideColumn && (
+                        <div className="space-y-2">
+                          <Label>Side</Label>
+                          <Input
+                            value={item.side}
+                            onChange={(e) => updateItem(section.id, item.id, "side", e.target.value)}
+                            placeholder="A"
+                          />
+                        </div>
+                      )}
+                      <div className={`space-y-2 ${!customizeSettings.showSideColumn ? 'col-span-2' : ''}`}>
                         <Label>Product Name</Label>
                         <Input
                           value={item.productName}
@@ -886,66 +916,66 @@ const CreateQuotation = () => {
                       </div>
                     </div>
 
+                    {customizeSettings.showProductDetails && (
+                      <div className="space-y-2">
+                        <Label>Product Details</Label>
+                        <Textarea
+                          value={item.productDetails}
+                          onChange={(e) => updateItem(section.id, item.id, "productDetails", e.target.value)}
+                          placeholder="Detailed description..."
+                          rows={2}
+                        />
+                      </div>
+                    )}
+
+                    {customizeSettings.showDetailedSizeColumns && (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-2">
+                            <Label>Width (Ft)</Label>
+                            <Input
+                              type="number"
+                              value={item.widthFt || ""}
+                              onChange={(e) => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              step="0.1"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Height (Ft)</Label>
+                            <Input
+                              type="number"
+                              value={item.heightFt || ""}
+                              onChange={(e) => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)}
+                              placeholder="0"
+                              step="0.1"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Sft Area</Label>
+                          <Input
+                            type="number"
+                            value={item.sftArea.toFixed(2)}
+                            readOnly
+                            className="bg-muted"
+                          />
+                        </div>
+                      </>
+                    )}
+
                     <div className="space-y-2">
-                      <Label>Product Details</Label>
-                      <Textarea
-                        value={item.productDetails}
-                        onChange={(e) => updateItem(section.id, item.id, "productDetails", e.target.value)}
-                        placeholder="Detailed description..."
-                        rows={2}
+                      <Label>Rate/Sft (₹)</Label>
+                      <Input
+                        type="number"
+                        value={item.ratePerSft || ""}
+                        onChange={(e) => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)}
+                        placeholder="0"
+                        step="0.01"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-2">
-                        <Label>Width (Ft)</Label>
-                        <Input
-                          type="number"
-                          value={item.widthFt || ""}
-                          onChange={(e) => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          step="0.1"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Height (Ft)</Label>
-                        <Input
-                          type="number"
-                          value={item.heightFt || ""}
-                          onChange={(e) => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          step="0.1"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-2">
-                        <Label>Sft Area</Label>
-                        <Input
-                          type="number"
-                          value={item.sftArea.toFixed(2)}
-                          readOnly
-                          className="bg-muted"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Rate/Sft (₹)</Label>
-                        <Input
-                          type="number"
-                          value={item.ratePerSft || ""}
-                          onChange={(e) => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          step="0.01"
-                        />
-                      </div>
-                    </div>
-
                     <div className="space-y-1 pt-2 border-t">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Price/Sq.ft:</span>
-                        <span className="font-medium tabular-nums">₹{item.ratePerSft.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                      </div>
                       <div className="flex justify-between">
                         <span className="text-sm font-medium">Amount:</span>
                         <span className="font-semibold tabular-nums">₹{item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
@@ -983,99 +1013,110 @@ const CreateQuotation = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-              </div>
-
-              <div className="flex items-center justify-between py-2 border-t border-border">
-                <div className="flex items-center gap-2">
-                  <Switch checked={gstEnabled} onCheckedChange={setGstEnabled} />
-                  <Label className="cursor-pointer">GST</Label>
-                </div>
-                {gstEnabled && (
-                  <Select value={gstRate} onValueChange={setGstRate}>
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5%</SelectItem>
-                      <SelectItem value="12">12%</SelectItem>
-                      <SelectItem value="18">18%</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              {gstEnabled && (
+              {customizeSettings.showSubtotal && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">GST ({gstRate}%)</span>
-                  <span className="font-medium">₹{gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-medium">₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
                 </div>
               )}
 
-              <div className="flex items-center justify-between py-2 border-t border-border">
-                <div className="flex items-center gap-2">
-                  <Switch 
-                    checked={enableSocialMediaDiscount} 
-                    onCheckedChange={setEnableSocialMediaDiscount}
-                  />
-                  <Label className="cursor-pointer">Social Media Special Discount</Label>
-                </div>
-                {enableSocialMediaDiscount && (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      value={socialMediaDiscountRate}
-                      onChange={(e) => setSocialMediaDiscountRate(parseFloat(e.target.value) || 0)}
-                      className="w-20 h-8"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
+              {customizeSettings.showTaxGst && (
+                <>
+                  <div className="flex items-center justify-between py-2 border-t border-border">
+                    <div className="flex items-center gap-2">
+                      <Switch checked={gstEnabled} onCheckedChange={setGstEnabled} />
+                      <Label className="cursor-pointer">GST</Label>
+                    </div>
+                    {gstEnabled && (
+                      <Select value={gstRate} onValueChange={setGstRate}>
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5">5%</SelectItem>
+                          <SelectItem value="12">12%</SelectItem>
+                          <SelectItem value="18">18%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
-                )}
-              </div>
-
-              {enableSocialMediaDiscount && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Social Media Discount ({socialMediaDiscountRate}%)</span>
-                  <span className="font-medium text-green-600">-₹{socialMediaDiscountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                </div>
+                  {gstEnabled && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">GST ({gstRate}%)</span>
+                      <span className="font-medium">₹{gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                </>
               )}
 
-              {!enableSocialMediaDiscount && discountPercentage > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Discount ({discountPercentage}%)</span>
-                  <span className="font-medium text-green-600">-₹{discountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                </div>
-              )}
-
-              {!enableSocialMediaDiscount && (
-                <div className="space-y-2">
-                  <Label htmlFor="discount">Discount % (Optional)</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="discount"
-                      type="number"
-                      value={discountPercentage}
-                      onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      placeholder="0"
-                      className="h-8"
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
+              {customizeSettings.showSocialMediaDiscount && (
+                <>
+                  <div className="flex items-center justify-between py-2 border-t border-border">
+                    <div className="flex items-center gap-2">
+                      <Switch 
+                        checked={enableSocialMediaDiscount} 
+                        onCheckedChange={setEnableSocialMediaDiscount}
+                      />
+                      <Label className="cursor-pointer">Social Media Special Discount</Label>
+                    </div>
+                    {enableSocialMediaDiscount && (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          value={socialMediaDiscountRate}
+                          onChange={(e) => setSocialMediaDiscountRate(parseFloat(e.target.value) || 0)}
+                          className="w-20 h-8"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
+                        <span className="text-sm text-muted-foreground">%</span>
+                      </div>
+                    )}
                   </div>
-                </div>
+                  {enableSocialMediaDiscount && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Social Media Discount ({socialMediaDiscountRate}%)</span>
+                      <span className="font-medium text-green-600">-₹{socialMediaDiscountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                </>
               )}
 
-              <div className="flex justify-between text-lg font-bold pt-3 border-t border-border">
-                <span>Grand Total</span>
-                <span className="text-primary">₹{grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-              </div>
+              {customizeSettings.showDiscount && !enableSocialMediaDiscount && (
+                <>
+                  {discountPercentage > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Discount ({discountPercentage}%)</span>
+                      <span className="font-medium text-green-600">-₹{discountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="discount">Discount % (Optional)</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="discount"
+                        type="number"
+                        value={discountPercentage}
+                        onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        placeholder="0"
+                        className="h-8"
+                      />
+                      <span className="text-sm text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {customizeSettings.showGrandTotal && (
+                <div className="flex justify-between text-lg font-bold pt-3 border-t border-border">
+                  <span>Grand Total</span>
+                  <span className="text-primary">₹{grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-4">

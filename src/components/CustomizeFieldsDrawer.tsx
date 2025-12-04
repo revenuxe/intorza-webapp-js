@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -26,14 +26,31 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface QuotationSettings {
+  // Header & Project Info
   showCompanyLogo: boolean;
   showCompanyAddress: boolean;
   showProjectDetails: boolean;
+  // Form Fields
+  showClientName: boolean;
+  showClientAddress: boolean;
+  showDateOfProposal: boolean;
+  showQuotationValidTill: boolean;
+  showProjectDeadline: boolean;
+  showPlaceOfProject: boolean;
+  showWarranty: boolean;
+  showProjectType: boolean;
+  // Item Table Layout
   showDetailedSizeColumns: boolean;
   useSimpleItemLayout: boolean;
+  showSideColumn: boolean;
+  showProductDetails: boolean;
+  // Totals & Summary
   showSubtotal: boolean;
   showTaxGst: boolean;
   showGrandTotal: boolean;
+  showDiscount: boolean;
+  showSocialMediaDiscount: boolean;
+  // Extra Sections
   showPaymentStages: boolean;
   showTermsConditions: boolean;
   showSignatureArea: boolean;
@@ -54,11 +71,23 @@ const defaultQuotationSettings: QuotationSettings = {
   showCompanyLogo: true,
   showCompanyAddress: true,
   showProjectDetails: true,
+  showClientName: true,
+  showClientAddress: true,
+  showDateOfProposal: true,
+  showQuotationValidTill: true,
+  showProjectDeadline: true,
+  showPlaceOfProject: true,
+  showWarranty: true,
+  showProjectType: true,
   showDetailedSizeColumns: true,
   useSimpleItemLayout: false,
+  showSideColumn: true,
+  showProductDetails: true,
   showSubtotal: true,
   showTaxGst: true,
   showGrandTotal: true,
+  showDiscount: true,
+  showSocialMediaDiscount: true,
   showPaymentStages: true,
   showTermsConditions: true,
   showSignatureArea: true,
@@ -158,9 +187,9 @@ const QuotationCustomizeContent = ({
 
   return (
     <div className="space-y-6 py-4">
-      {/* Group 1 */}
+      {/* Group 1 - Header & Company */}
       <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Header & Project Info</h4>
+        <h4 className="text-sm font-semibold text-foreground mb-3">Header & Company Info</h4>
         <div className="space-y-1">
           <ToggleItem 
             label="Show company logo" 
@@ -173,7 +202,7 @@ const QuotationCustomizeContent = ({
             onCheckedChange={(v) => updateSetting('showCompanyAddress', v)}
           />
           <ToggleItem 
-            label="Show project details block" 
+            label="Show project details block (in PDF)" 
             checked={settings.showProjectDetails}
             onCheckedChange={(v) => updateSetting('showProjectDetails', v)}
           />
@@ -182,7 +211,56 @@ const QuotationCustomizeContent = ({
 
       <Separator />
 
-      {/* Group 2 */}
+      {/* Group 2 - Project & Client Fields */}
+      <div>
+        <h4 className="text-sm font-semibold text-foreground mb-3">Project & Client Fields</h4>
+        <div className="space-y-1">
+          <ToggleItem 
+            label="Client name" 
+            checked={settings.showClientName}
+            onCheckedChange={(v) => updateSetting('showClientName', v)}
+          />
+          <ToggleItem 
+            label="Client address" 
+            checked={settings.showClientAddress}
+            onCheckedChange={(v) => updateSetting('showClientAddress', v)}
+          />
+          <ToggleItem 
+            label="Date of proposal" 
+            checked={settings.showDateOfProposal}
+            onCheckedChange={(v) => updateSetting('showDateOfProposal', v)}
+          />
+          <ToggleItem 
+            label="Quotation valid till" 
+            checked={settings.showQuotationValidTill}
+            onCheckedChange={(v) => updateSetting('showQuotationValidTill', v)}
+          />
+          <ToggleItem 
+            label="Project deadline" 
+            checked={settings.showProjectDeadline}
+            onCheckedChange={(v) => updateSetting('showProjectDeadline', v)}
+          />
+          <ToggleItem 
+            label="Place of project" 
+            checked={settings.showPlaceOfProject}
+            onCheckedChange={(v) => updateSetting('showPlaceOfProject', v)}
+          />
+          <ToggleItem 
+            label="Warranty" 
+            checked={settings.showWarranty}
+            onCheckedChange={(v) => updateSetting('showWarranty', v)}
+          />
+          <ToggleItem 
+            label="Project type" 
+            checked={settings.showProjectType}
+            onCheckedChange={(v) => updateSetting('showProjectType', v)}
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Group 3 - Item Table */}
       <div>
         <h4 className="text-sm font-semibold text-foreground mb-3">Item Table Layout</h4>
         <div className="space-y-1">
@@ -196,6 +274,16 @@ const QuotationCustomizeContent = ({
             checked={settings.useSimpleItemLayout}
             onCheckedChange={(v) => updateSetting('useSimpleItemLayout', v)}
           />
+          <ToggleItem 
+            label="Show Side column" 
+            checked={settings.showSideColumn}
+            onCheckedChange={(v) => updateSetting('showSideColumn', v)}
+          />
+          <ToggleItem 
+            label="Show Product Details column" 
+            checked={settings.showProductDetails}
+            onCheckedChange={(v) => updateSetting('showProductDetails', v)}
+          />
         </div>
         <p className="text-xs text-muted-foreground mt-2">
           Only one layout mode can be active at a time.
@@ -204,7 +292,7 @@ const QuotationCustomizeContent = ({
 
       <Separator />
 
-      {/* Group 3 */}
+      {/* Group 4 - Totals & Summary */}
       <div>
         <h4 className="text-sm font-semibold text-foreground mb-3">Totals & Summary</h4>
         <div className="space-y-1">
@@ -214,9 +302,19 @@ const QuotationCustomizeContent = ({
             onCheckedChange={(v) => updateSetting('showSubtotal', v)}
           />
           <ToggleItem 
-            label="Show tax/GST (if enabled)" 
+            label="Show tax/GST toggle" 
             checked={settings.showTaxGst}
             onCheckedChange={(v) => updateSetting('showTaxGst', v)}
+          />
+          <ToggleItem 
+            label="Show discount option" 
+            checked={settings.showDiscount}
+            onCheckedChange={(v) => updateSetting('showDiscount', v)}
+          />
+          <ToggleItem 
+            label="Show social media discount" 
+            checked={settings.showSocialMediaDiscount}
+            onCheckedChange={(v) => updateSetting('showSocialMediaDiscount', v)}
           />
           <ToggleItem 
             label="Show grand total" 
@@ -228,22 +326,22 @@ const QuotationCustomizeContent = ({
 
       <Separator />
 
-      {/* Group 4 */}
+      {/* Group 5 - Extra Sections */}
       <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Extra Sections</h4>
+        <h4 className="text-sm font-semibold text-foreground mb-3">Extra Sections (PDF)</h4>
         <div className="space-y-1">
           <ToggleItem 
-            label="Show stage-wise payment plan section" 
+            label="Show stage-wise payment plan" 
             checked={settings.showPaymentStages}
             onCheckedChange={(v) => updateSetting('showPaymentStages', v)}
           />
           <ToggleItem 
-            label="Show Terms & Conditions page" 
+            label="Show Terms & Conditions" 
             checked={settings.showTermsConditions}
             onCheckedChange={(v) => updateSetting('showTermsConditions', v)}
           />
           <ToggleItem 
-            label="Show signature area (Client & Company)" 
+            label="Show signature area" 
             checked={settings.showSignatureArea}
             onCheckedChange={(v) => updateSetting('showSignatureArea', v)}
           />
