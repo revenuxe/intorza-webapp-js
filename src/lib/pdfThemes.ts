@@ -45,7 +45,7 @@ export const PDF_THEMES: PDFTheme[] = [
   {
     id: 'luxury-gold',
     name: 'Luxury Gold',
-    description: 'Elegant gold accents on dark theme',
+    description: 'Elegant gold accents on dark',
     colors: {
       primary: [212, 175, 55],
       secondary: [180, 142, 73],
@@ -64,7 +64,7 @@ export const PDF_THEMES: PDFTheme[] = [
   {
     id: 'soft-beige',
     name: 'Soft Beige',
-    description: 'Warm beige tones for interior design',
+    description: 'Warm beige tones for interiors',
     colors: {
       primary: [139, 119, 101],
       secondary: [169, 149, 131],
@@ -83,7 +83,7 @@ export const PDF_THEMES: PDFTheme[] = [
   {
     id: 'corporate-blue',
     name: 'Corporate Blue',
-    description: 'Professional blue corporate theme',
+    description: 'Professional blue corporate',
     colors: {
       primary: [30, 64, 124],
       secondary: [70, 104, 164],
@@ -102,7 +102,7 @@ export const PDF_THEMES: PDFTheme[] = [
   {
     id: 'dark-matte',
     name: 'Dark Matte',
-    description: 'Modern dark theme with subtle contrasts',
+    description: 'Modern dark with subtle contrasts',
     colors: {
       primary: [255, 255, 255],
       secondary: [180, 180, 180],
@@ -121,7 +121,7 @@ export const PDF_THEMES: PDFTheme[] = [
   {
     id: 'forest-green',
     name: 'Forest Green',
-    description: 'Natural green tones for eco-friendly feel',
+    description: 'Natural green eco-friendly',
     colors: {
       primary: [46, 87, 67],
       secondary: [76, 117, 97],
@@ -140,7 +140,7 @@ export const PDF_THEMES: PDFTheme[] = [
   {
     id: 'burgundy-elegant',
     name: 'Burgundy Elegant',
-    description: 'Rich burgundy for luxury projects',
+    description: 'Rich burgundy for luxury',
     colors: {
       primary: [128, 0, 32],
       secondary: [158, 30, 62],
@@ -159,7 +159,7 @@ export const PDF_THEMES: PDFTheme[] = [
   {
     id: 'ocean-breeze',
     name: 'Ocean Breeze',
-    description: 'Calming teal and aqua tones',
+    description: 'Calming teal and aqua',
     colors: {
       primary: [0, 128, 128],
       secondary: [32, 158, 158],
@@ -178,7 +178,7 @@ export const PDF_THEMES: PDFTheme[] = [
   {
     id: 'charcoal-modern',
     name: 'Charcoal Modern',
-    description: 'Sophisticated charcoal with orange accents',
+    description: 'Charcoal with orange accents',
     colors: {
       primary: [54, 54, 54],
       secondary: [84, 84, 84],
@@ -197,7 +197,7 @@ export const PDF_THEMES: PDFTheme[] = [
   {
     id: 'rose-pink',
     name: 'Rose Pink',
-    description: 'Soft rose tones for feminine touch',
+    description: 'Soft rose feminine touch',
     colors: {
       primary: [188, 143, 143],
       secondary: [208, 163, 163],
@@ -213,6 +213,101 @@ export const PDF_THEMES: PDFTheme[] = [
     },
     fonts: { heading: 'helvetica', body: 'helvetica' }
   },
+  {
+    id: 'midnight-purple',
+    name: 'Midnight Purple',
+    description: 'Deep purple elegance',
+    colors: {
+      primary: [75, 0, 130],
+      secondary: [138, 43, 226],
+      accent: [147, 112, 219],
+      background: [255, 255, 255],
+      cardBackground: [250, 248, 255],
+      text: [45, 25, 70],
+      textSecondary: [100, 80, 130],
+      border: [200, 180, 220],
+      highlight: [230, 200, 255],
+      headerBg: [75, 0, 130],
+      headerText: [255, 255, 255],
+    },
+    fonts: { heading: 'helvetica', body: 'helvetica' }
+  },
+  {
+    id: 'slate-professional',
+    name: 'Slate Professional',
+    description: 'Clean slate gray business',
+    colors: {
+      primary: [71, 85, 105],
+      secondary: [100, 116, 139],
+      accent: [71, 85, 105],
+      background: [255, 255, 255],
+      cardBackground: [248, 250, 252],
+      text: [30, 41, 59],
+      textSecondary: [100, 116, 139],
+      border: [226, 232, 240],
+      highlight: [241, 245, 249],
+      headerBg: [71, 85, 105],
+      headerText: [255, 255, 255],
+    },
+    fonts: { heading: 'helvetica', body: 'helvetica' }
+  },
+  {
+    id: 'terracotta-warm',
+    name: 'Terracotta Warm',
+    description: 'Earthy terracotta warmth',
+    colors: {
+      primary: [180, 90, 60],
+      secondary: [200, 120, 90],
+      accent: [180, 90, 60],
+      background: [255, 255, 255],
+      cardBackground: [255, 250, 245],
+      text: [70, 40, 30],
+      textSecondary: [130, 100, 80],
+      border: [230, 200, 180],
+      highlight: [255, 220, 200],
+      headerBg: [180, 90, 60],
+      headerText: [255, 255, 255],
+    },
+    fonts: { heading: 'helvetica', body: 'helvetica' }
+  },
+  {
+    id: 'navy-classic',
+    name: 'Navy Classic',
+    description: 'Timeless navy professional',
+    colors: {
+      primary: [0, 32, 63],
+      secondary: [0, 53, 102],
+      accent: [0, 82, 147],
+      background: [255, 255, 255],
+      cardBackground: [245, 248, 252],
+      text: [0, 32, 63],
+      textSecondary: [60, 80, 100],
+      border: [180, 200, 220],
+      highlight: [220, 235, 255],
+      headerBg: [0, 32, 63],
+      headerText: [255, 255, 255],
+    },
+    fonts: { heading: 'helvetica', body: 'helvetica' }
+  },
+  {
+    id: 'emerald-luxury',
+    name: 'Emerald Luxury',
+    description: 'Rich emerald sophistication',
+    colors: {
+      primary: [0, 100, 80],
+      secondary: [16, 185, 129],
+      accent: [52, 211, 153],
+      background: [255, 255, 255],
+      cardBackground: [240, 253, 250],
+      text: [6, 78, 59],
+      textSecondary: [20, 83, 45],
+      border: [167, 243, 208],
+      highlight: [209, 250, 229],
+      headerBg: [0, 100, 80],
+      headerText: [255, 255, 255],
+    },
+    fonts: { heading: 'helvetica', body: 'helvetica' }
+  },
 ];
 
 export interface PDFEditorSettings {
@@ -221,6 +316,9 @@ export interface PDFEditorSettings {
   highlightAmounts: boolean;
   showBorders: boolean;
   compactMode: boolean;
+  fontSize: 'small' | 'medium' | 'large';
+  tableStyle: 'minimal' | 'striped' | 'bordered';
+  headerStyle: 'simple' | 'boxed' | 'underlined';
   customColors?: {
     primary?: string;
     accent?: string;
@@ -234,6 +332,54 @@ export const defaultEditorSettings: PDFEditorSettings = {
   highlightAmounts: true,
   showBorders: true,
   compactMode: false,
+  fontSize: 'medium',
+  tableStyle: 'bordered',
+  headerStyle: 'simple',
+};
+
+// Invoice Settings
+export interface InvoiceSettings {
+  showCompanyLogo: boolean;
+  showCompanyAddress: boolean;
+  showClientAddress: boolean;
+  showProjectName: boolean;
+  showDueDate: boolean;
+  showPaymentStatus: boolean;
+  showTaxGst: boolean;
+  showPaymentHistory: boolean;
+  showSignatureArea: boolean;
+  showTermsConditions: boolean;
+  showNextPaymentDue: boolean;
+}
+
+export const defaultInvoiceSettings: InvoiceSettings = {
+  showCompanyLogo: true,
+  showCompanyAddress: true,
+  showClientAddress: true,
+  showProjectName: true,
+  showDueDate: true,
+  showPaymentStatus: true,
+  showTaxGst: true,
+  showPaymentHistory: true,
+  showSignatureArea: true,
+  showTermsConditions: true,
+  showNextPaymentDue: true,
+};
+
+export const getInvoiceSettings = (): InvoiceSettings => {
+  const stored = localStorage.getItem('invoiceSettings');
+  if (stored) {
+    try {
+      return { ...defaultInvoiceSettings, ...JSON.parse(stored) };
+    } catch {
+      return defaultInvoiceSettings;
+    }
+  }
+  return defaultInvoiceSettings;
+};
+
+export const saveInvoiceSettings = (settings: InvoiceSettings) => {
+  localStorage.setItem('invoiceSettings', JSON.stringify(settings));
 };
 
 export const getEditorSettings = (): PDFEditorSettings => {

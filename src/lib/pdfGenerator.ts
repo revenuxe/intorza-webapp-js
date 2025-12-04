@@ -99,32 +99,58 @@ const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: numb
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
+    
+    // Handle timeout
+    const timeout = setTimeout(() => {
+      reject(new Error('Image load timeout'));
+    }, 10000);
+    
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
+      clearTimeout(timeout);
+      try {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
 
-      if (width > maxWidth || height > maxHeight) {
-        const ratio = Math.min(maxWidth / width, maxHeight / height);
-        width = width * ratio;
-        height = height * ratio;
-      }
+        if (width > maxWidth || height > maxHeight) {
+          const ratio = Math.min(maxWidth / width, maxHeight / height);
+          width = Math.floor(width * ratio);
+          height = Math.floor(height * ratio);
+        }
 
-      canvas.width = width;
-      canvas.height = height;
+        canvas.width = width || 100;
+        canvas.height = height || 100;
 
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
-      } else {
-        reject(new Error('Canvas context not available'));
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        } else {
+          reject(new Error('Canvas context not available'));
+        }
+      } catch (e) {
+        reject(e);
       }
     };
-    img.onerror = reject;
-    img.src = imageUrl;
+    
+    img.onerror = (e) => {
+      clearTimeout(timeout);
+      console.error('Image load error:', e);
+      reject(new Error('Failed to load image'));
+    };
+    
+    // Handle different URL formats
+    if (imageUrl.startsWith('data:')) {
+      img.src = imageUrl;
+    } else if (imageUrl.startsWith('blob:')) {
+      img.src = imageUrl;
+    } else {
+      // For remote URLs, try with timestamp to avoid cache issues
+      const separator = imageUrl.includes('?') ? '&' : '?';
+      img.src = `${imageUrl}${separator}t=${Date.now()}`;
+    }
   });
 };
 
