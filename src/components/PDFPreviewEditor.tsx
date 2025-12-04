@@ -15,7 +15,8 @@ import {
   saveEditorSettings, 
   defaultEditorSettings,
   getThemeById,
-  rgbToHex 
+  rgbToHex,
+  PDFTheme
 } from "@/lib/pdfThemes";
 import { QuotationSettings } from "./CustomizeFieldsDrawer";
 
