@@ -144,6 +144,26 @@ const InvoiceDetail = () => {
 
   const handleAddPayment = async () => {
     try {
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please login to add a payment",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (paymentAmount <= 0) {
+        toast({
+          title: "Invalid Amount",
+          description: "Please enter a valid payment amount",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { error: paymentError } = await supabase
         .from('payments')
         .insert({
@@ -151,10 +171,13 @@ const InvoiceDetail = () => {
           amount: paymentAmount,
           payment_method: paymentMethod,
           payment_date: paymentDate,
-          notes: paymentNotes
+          notes: paymentNotes || null
         });
 
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error('Payment insert error:', paymentError);
+        throw paymentError;
+      }
 
       const newPaidAmount = (invoice?.paid_amount || 0) + paymentAmount;
       const newRemainingAmount = (invoice?.total_amount || 0) - newPaidAmount;
@@ -169,7 +192,10 @@ const InvoiceDetail = () => {
         })
         .eq('id', id);
 
-      if (invoiceError) throw invoiceError;
+      if (invoiceError) {
+        console.error('Invoice update error:', invoiceError);
+        throw invoiceError;
+      }
 
       toast({
         title: "Payment Added",
