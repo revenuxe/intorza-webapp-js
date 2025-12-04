@@ -1,6 +1,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { PDFEditorSettings, getThemeById, hexToRgb, PDFTheme } from './pdfThemes';
 
 // --- Settings Interface ---
 export interface QuotationPdfSettings {
@@ -15,6 +16,19 @@ export interface QuotationPdfSettings {
   showPaymentStages: boolean;
   showTermsConditions: boolean;
   showSignatureArea: boolean;
+  // New form field settings
+  showClientName: boolean;
+  showClientAddress: boolean;
+  showDateOfProposal: boolean;
+  showQuotationValidTill: boolean;
+  showProjectDeadline: boolean;
+  showPlaceOfProject: boolean;
+  showWarranty: boolean;
+  showProjectType: boolean;
+  showSideColumn: boolean;
+  showProductDetails: boolean;
+  showDiscount: boolean;
+  showSocialMediaDiscount: boolean;
 }
 
 // --- Interfaces ---
@@ -72,6 +86,7 @@ interface QuotationData {
     points: string[];
   }[];
   settings?: QuotationPdfSettings;
+  editorSettings?: PDFEditorSettings;
 }
 
 // --- Helpers ---
@@ -136,8 +151,26 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     showPaymentStages: true,
     showTermsConditions: true,
     showSignatureArea: true,
+    showClientName: true,
+    showClientAddress: true,
+    showDateOfProposal: true,
+    showQuotationValidTill: true,
+    showProjectDeadline: true,
+    showPlaceOfProject: true,
+    showWarranty: true,
+    showProjectType: true,
+    showSideColumn: true,
+    showProductDetails: true,
+    showDiscount: true,
+    showSocialMediaDiscount: true,
     ...data.settings
   };
+
+  // Get theme from editor settings
+  const editorSettings = data.editorSettings;
+  const theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
+  const logoPlacement = editorSettings?.logoPlacement || 'left';
+  const highlightAmounts = editorSettings?.highlightAmounts ?? true;
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -145,44 +178,74 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   const contentWidth = pageWidth - (margin * 2);
   let yPosition = 15;
 
-  // --- Design System Colors ---
+  // --- Design System Colors (from theme) ---
+  const getHighlightColor = (): [number, number, number] => {
+    if (editorSettings?.customColors?.highlight) {
+      return hexToRgb(editorSettings.customColors.highlight);
+    }
+    return theme.colors.highlight;
+  };
+
   const COLORS = {
-    TEXT_PRIMARY: [20, 20, 20] as [number, number, number],      // Almost black
-    TEXT_SECONDARY: [80, 80, 80] as [number, number, number],    // Dark Grey
-    TEXT_LIGHT: [120, 120, 120] as [number, number, number],     // Light Grey
-    BG_CARD: [250, 250, 250] as [number, number, number],        // Very light grey for cards
-    BORDER: [230, 230, 230] as [number, number, number],         // Subtle borders
-    ACCENT: [0, 0, 0] as [number, number, number],               // Black accent
-    HIGHLIGHT: [255, 240, 0] as [number, number, number],        // Yellow highlight
+    TEXT_PRIMARY: theme.colors.text,
+    TEXT_SECONDARY: theme.colors.textSecondary,
+    TEXT_LIGHT: [120, 120, 120] as [number, number, number],
+    BG_CARD: theme.colors.cardBackground,
+    BORDER: theme.colors.border,
+    ACCENT: theme.colors.accent,
+    HIGHLIGHT: getHighlightColor(),
+    HEADER_BG: theme.colors.headerBg,
+    HEADER_TEXT: theme.colors.headerText,
   };
 
   // --- 1. Header Section (Clean & Minimal) ---
   
-  // Logo - Top Left corner with rounded corners (10% corner radius)
+  // Logo placement based on editor settings
   let compressedLogo: string | null = null;
+  const logoSize = 25;
+  const cornerRadius = logoSize * 0.1;
+  
   if (settings.showCompanyLogo && data.companyLogo) {
     try {
       compressedLogo = await compressImage(data.companyLogo, 400, 400);
-      const logoSize = 25; // Smaller size for corner placement
-      const cornerRadius = logoSize * 0.1; // 10% corner radius
       
-      // Draw rounded rectangle for logo background (black)
-      doc.setFillColor(0, 0, 0);
-      doc.roundedRect(margin, yPosition, logoSize, logoSize, cornerRadius, cornerRadius, 'F');
+      let logoX = margin;
+      if (logoPlacement === 'center') {
+        logoX = (pageWidth - logoSize) / 2;
+      } else if (logoPlacement === 'right') {
+        logoX = pageWidth - margin - logoSize;
+      }
+      
+      // Draw rounded rectangle for logo background
+      doc.setFillColor(COLORS.HEADER_BG[0], COLORS.HEADER_BG[1], COLORS.HEADER_BG[2]);
+      doc.roundedRect(logoX, yPosition, logoSize, logoSize, cornerRadius, cornerRadius, 'F');
       
       // Add logo on top of background
-      doc.addImage(compressedLogo, 'JPEG', margin, yPosition, logoSize, logoSize, undefined, 'FAST');
+      doc.addImage(compressedLogo, 'JPEG', logoX, yPosition, logoSize, logoSize, undefined, 'FAST');
     } catch (e) { console.error(e); }
   }
 
-  // Company Details - Top Right
-  const companyInfoX = pageWidth - margin;
+  // Company Details positioning based on logo placement
+  let companyInfoX = pageWidth - margin;
+  let companyInfoAlign: 'right' | 'left' | 'center' = 'right';
+  
+  if (logoPlacement === 'right') {
+    companyInfoX = margin;
+    companyInfoAlign = 'left';
+  } else if (logoPlacement === 'center') {
+    companyInfoX = pageWidth / 2;
+    companyInfoAlign = 'center';
+  }
+  
   let headerTextY = yPosition + 5;
+  if (logoPlacement === 'center') {
+    headerTextY = yPosition + logoSize + 8;
+  }
   
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-  doc.text((data.companyName || 'COMPANY NAME').toUpperCase(), companyInfoX, headerTextY, { align: 'right' });
+  doc.text((data.companyName || 'COMPANY NAME').toUpperCase(), companyInfoX, headerTextY, { align: companyInfoAlign });
   
   headerTextY += 7;
   doc.setFont('helvetica', 'normal');
@@ -194,7 +257,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     if (data.companyAddress) {
       const addressLines = doc.splitTextToSize(data.companyAddress, 90);
       addressLines.forEach((line: string) => {
-        doc.text(line, companyInfoX, headerTextY, { align: 'right' });
+        doc.text(line, companyInfoX, headerTextY, { align: companyInfoAlign });
         headerTextY += 4.5;
       });
     }
@@ -204,7 +267,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     if (data.companyEmail) contactDetails.push(data.companyEmail);
     
     if (contactDetails.length > 0) {
-      doc.text(contactDetails.join(' | '), companyInfoX, headerTextY, { align: 'right' });
+      doc.text(contactDetails.join(' | '), companyInfoX, headerTextY, { align: companyInfoAlign });
       headerTextY += 4.5;
     }
     
@@ -367,47 +430,51 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         }
       });
     } else {
-      // Detailed layout with size columns
+      // Detailed layout with size columns - respect all settings
       const showSizeColumns = settings.showDetailedSizeColumns;
-      const tableHead = showSizeColumns 
-        ? [['Side', 'Product', 'Details', 'W (ft)', 'H (ft)', 'Sq.Ft', 'Price/Sq.ft', 'Amount']]
-        : [['Side', 'Product', 'Details', 'Sq.Ft', 'Price/Sq.ft', 'Amount']];
+      const showSide = settings.showSideColumn;
+      const showDetails = settings.showProductDetails;
       
-      const tableBody = section.items.map(item => showSizeColumns ? [
-        item.side || '-',
-        item.productName,
-        item.productDetails,
-        item.widthFt.toFixed(1),
-        item.heightFt.toFixed(1),
-        item.sftArea.toFixed(2),
-        formatCurrency(item.ratePerSft),
-        formatCurrency(item.amount) 
-      ] : [
-        item.side || '-',
-        item.productName,
-        item.productDetails,
-        item.sftArea.toFixed(2),
-        formatCurrency(item.ratePerSft),
-        formatCurrency(item.amount) 
-      ]);
+      // Build dynamic header
+      const headerCols: string[] = [];
+      if (showSide) headerCols.push('Side');
+      headerCols.push('Product');
+      if (showDetails) headerCols.push('Details');
+      if (showSizeColumns) {
+        headerCols.push('W (ft)', 'H (ft)', 'Sq.Ft');
+      }
+      headerCols.push('Price/Sq.ft', 'Amount');
+      
+      const tableHead = [headerCols];
+      
+      // Build dynamic body rows
+      const tableBody = section.items.map(item => {
+        const row: string[] = [];
+        if (showSide) row.push(item.side || '-');
+        row.push(item.productName);
+        if (showDetails) row.push(item.productDetails || '-');
+        if (showSizeColumns) {
+          row.push(item.widthFt.toFixed(1), item.heightFt.toFixed(1), item.sftArea.toFixed(2));
+        }
+        row.push(formatCurrency(item.ratePerSft), formatCurrency(item.amount));
+        return row;
+      });
 
-      const columnStyles = showSizeColumns ? {
-        0: { cellWidth: 12, halign: 'center', fontSize: 6 },
-        1: { cellWidth: 28, fontStyle: 'bold', fontSize: 7 },
-        2: { cellWidth: 'auto', fontSize: 6 },
-        3: { cellWidth: 12, halign: 'center', fontSize: 6 },
-        4: { cellWidth: 12, halign: 'center', fontSize: 6 },
-        5: { cellWidth: 14, halign: 'center', fontSize: 7 },
-        6: { cellWidth: 24, halign: 'right', fontStyle: 'bold', fontSize: 7 },
-        7: { cellWidth: 26, halign: 'right', fontStyle: 'bold', fontSize: 7 }
-      } : {
-        0: { cellWidth: 15, halign: 'center', fontSize: 6 },
-        1: { cellWidth: 35, fontStyle: 'bold', fontSize: 7 },
-        2: { cellWidth: 'auto', fontSize: 6 },
-        3: { cellWidth: 18, halign: 'center', fontSize: 7 },
-        4: { cellWidth: 28, halign: 'right', fontStyle: 'bold', fontSize: 7 },
-        5: { cellWidth: 30, halign: 'right', fontStyle: 'bold', fontSize: 7 }
-      };
+      // Dynamic column styles based on visible columns
+      const colStyles: any = {};
+      let colIndex = 0;
+      if (showSide) { colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6 }; }
+      colStyles[colIndex++] = { cellWidth: showDetails ? 28 : 40, fontStyle: 'bold', fontSize: 7 };
+      if (showDetails) { colStyles[colIndex++] = { cellWidth: 'auto', fontSize: 6 }; }
+      if (showSizeColumns) {
+        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6 };
+        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6 };
+        colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 7 };
+      }
+      colStyles[colIndex++] = { cellWidth: 24, halign: 'right', fontStyle: 'bold', fontSize: 7 };
+      colStyles[colIndex++] = { cellWidth: 26, halign: 'right', fontStyle: 'bold', fontSize: 7 };
+
+      const columnStyles = colStyles;
 
       autoTable(doc, {
         startY: yPosition,
