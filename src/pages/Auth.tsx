@@ -8,6 +8,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import intorzaLogo from "@/assets/intorza-logo.webp";
+import { z } from "zod";
+
+// Validation schemas
+const loginSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const signupSchema = z.object({
+  fullName: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  company: z.string().optional(),
+});
 
 const Auth = () => {
   const [loading, setLoading] = useState(false);
@@ -17,6 +31,7 @@ const Auth = () => {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupFullName, setSignupFullName] = useState("");
   const [signupCompany, setSignupCompany] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
   const getReturnPath = () => {
@@ -28,8 +43,25 @@ const Auth = () => {
     return "/";
   };
 
+  const clearErrors = () => setErrors({});
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    clearErrors();
+
+    // Validate inputs
+    const result = loginSchema.safeParse({ email: loginEmail, password: loginPassword });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          fieldErrors[`login_${err.path[0]}`] = err.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -45,7 +77,11 @@ const Auth = () => {
       sessionStorage.removeItem('returnPath');
       navigate(returnPath);
     } catch (error: any) {
-      toast.error(error.message || "Login failed");
+      if (error.message?.includes("Invalid login credentials")) {
+        toast.error("Invalid email or password");
+      } else {
+        toast.error(error.message || "Login failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -53,6 +89,27 @@ const Auth = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    clearErrors();
+
+    // Validate inputs
+    const result = signupSchema.safeParse({
+      fullName: signupFullName,
+      email: signupEmail,
+      password: signupPassword,
+      company: signupCompany,
+    });
+
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          fieldErrors[`signup_${err.path[0]}`] = err.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -68,7 +125,14 @@ const Auth = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes("already registered")) {
+          toast.error("This email is already registered. Please login instead.");
+        } else {
+          throw error;
+        }
+        return;
+      }
 
       toast.success("Account created! Please check your email to verify your account.");
       
@@ -98,7 +162,7 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs defaultValue="login" className="w-full" onValueChange={clearErrors}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -116,7 +180,11 @@ const Auth = () => {
                     onChange={(e) => setLoginEmail(e.target.value)}
                     required
                     disabled={loading}
+                    className={errors.login_email ? "border-destructive" : ""}
                   />
+                  {errors.login_email && (
+                    <p className="text-xs text-destructive">{errors.login_email}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="login-password">Password</Label>
@@ -128,7 +196,11 @@ const Auth = () => {
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
                     disabled={loading}
+                    className={errors.login_password ? "border-destructive" : ""}
                   />
+                  {errors.login_password && (
+                    <p className="text-xs text-destructive">{errors.login_password}</p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Logging in..." : "Login"}
@@ -148,7 +220,11 @@ const Auth = () => {
                     onChange={(e) => setSignupFullName(e.target.value)}
                     required
                     disabled={loading}
+                    className={errors.signup_fullName ? "border-destructive" : ""}
                   />
+                  {errors.signup_fullName && (
+                    <p className="text-xs text-destructive">{errors.signup_fullName}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-company">Company Name (Optional)</Label>
@@ -171,7 +247,11 @@ const Auth = () => {
                     onChange={(e) => setSignupEmail(e.target.value)}
                     required
                     disabled={loading}
+                    className={errors.signup_email ? "border-destructive" : ""}
                   />
+                  {errors.signup_email && (
+                    <p className="text-xs text-destructive">{errors.signup_email}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Password</Label>
@@ -183,8 +263,11 @@ const Auth = () => {
                     onChange={(e) => setSignupPassword(e.target.value)}
                     required
                     disabled={loading}
-                    minLength={6}
+                    className={errors.signup_password ? "border-destructive" : ""}
                   />
+                  {errors.signup_password && (
+                    <p className="text-xs text-destructive">{errors.signup_password}</p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Creating account..." : "Sign Up"}
