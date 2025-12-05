@@ -308,6 +308,102 @@ export const PDF_THEMES: PDFTheme[] = [
     },
     fonts: { heading: 'helvetica', body: 'helvetica' }
   },
+  // New themes
+  {
+    id: 'copper-rust',
+    name: 'Copper Rust',
+    description: 'Industrial copper tones',
+    colors: {
+      primary: [184, 115, 51],
+      secondary: [205, 127, 50],
+      accent: [184, 115, 51],
+      background: [255, 255, 255],
+      cardBackground: [255, 251, 245],
+      text: [60, 40, 30],
+      textSecondary: [120, 90, 70],
+      border: [220, 190, 160],
+      highlight: [255, 210, 160],
+      headerBg: [184, 115, 51],
+      headerText: [255, 255, 255],
+    },
+    fonts: { heading: 'helvetica', body: 'helvetica' }
+  },
+  {
+    id: 'sage-minimal',
+    name: 'Sage Minimal',
+    description: 'Soft sage green minimal',
+    colors: {
+      primary: [143, 166, 142],
+      secondary: [163, 186, 162],
+      accent: [143, 166, 142],
+      background: [255, 255, 255],
+      cardBackground: [248, 252, 248],
+      text: [50, 60, 50],
+      textSecondary: [100, 120, 100],
+      border: [200, 220, 200],
+      highlight: [220, 240, 220],
+      headerBg: [143, 166, 142],
+      headerText: [255, 255, 255],
+    },
+    fonts: { heading: 'helvetica', body: 'helvetica' }
+  },
+  {
+    id: 'lavender-dream',
+    name: 'Lavender Dream',
+    description: 'Soft lavender elegance',
+    colors: {
+      primary: [150, 123, 182],
+      secondary: [170, 143, 202],
+      accent: [150, 123, 182],
+      background: [255, 255, 255],
+      cardBackground: [252, 250, 255],
+      text: [60, 50, 80],
+      textSecondary: [110, 100, 130],
+      border: [210, 200, 230],
+      highlight: [235, 225, 255],
+      headerBg: [150, 123, 182],
+      headerText: [255, 255, 255],
+    },
+    fonts: { heading: 'helvetica', body: 'helvetica' }
+  },
+  {
+    id: 'sand-dune',
+    name: 'Sand Dune',
+    description: 'Desert sand natural tones',
+    colors: {
+      primary: [194, 178, 128],
+      secondary: [214, 198, 148],
+      accent: [194, 178, 128],
+      background: [255, 255, 255],
+      cardBackground: [255, 253, 248],
+      text: [70, 60, 40],
+      textSecondary: [130, 120, 100],
+      border: [220, 210, 190],
+      highlight: [255, 245, 220],
+      headerBg: [194, 178, 128],
+      headerText: [40, 35, 25],
+    },
+    fonts: { heading: 'helvetica', body: 'helvetica' }
+  },
+  {
+    id: 'arctic-blue',
+    name: 'Arctic Blue',
+    description: 'Cool arctic ice tones',
+    colors: {
+      primary: [100, 149, 237],
+      secondary: [135, 206, 250],
+      accent: [100, 149, 237],
+      background: [255, 255, 255],
+      cardBackground: [248, 252, 255],
+      text: [30, 50, 80],
+      textSecondary: [80, 100, 140],
+      border: [190, 210, 240],
+      highlight: [220, 235, 255],
+      headerBg: [100, 149, 237],
+      headerText: [255, 255, 255],
+    },
+    fonts: { heading: 'helvetica', body: 'helvetica' }
+  },
 ];
 
 export interface PDFEditorSettings {
@@ -317,8 +413,11 @@ export interface PDFEditorSettings {
   showBorders: boolean;
   compactMode: boolean;
   fontSize: 'small' | 'medium' | 'large';
-  tableStyle: 'minimal' | 'striped' | 'bordered';
-  headerStyle: 'simple' | 'boxed' | 'underlined';
+  tableStyle: 'minimal' | 'striped' | 'bordered' | 'grid';
+  headerStyle: 'simple' | 'boxed' | 'underlined' | 'full-width';
+  sectionStyle: 'standard' | 'card' | 'line' | 'minimal';
+  summaryStyle: 'right' | 'center' | 'full-width';
+  pageMargins: 'narrow' | 'normal' | 'wide';
   customColors?: {
     primary?: string;
     accent?: string;
@@ -335,6 +434,9 @@ export const defaultEditorSettings: PDFEditorSettings = {
   fontSize: 'medium',
   tableStyle: 'bordered',
   headerStyle: 'simple',
+  sectionStyle: 'standard',
+  summaryStyle: 'right',
+  pageMargins: 'normal',
 };
 
 // Invoice Settings
@@ -350,6 +452,11 @@ export interface InvoiceSettings {
   showSignatureArea: boolean;
   showTermsConditions: boolean;
   showNextPaymentDue: boolean;
+  showInvoiceNumber: boolean;
+  showInvoiceDate: boolean;
+  showPaymentProgress: boolean;
+  showBankDetails: boolean;
+  showQRCode: boolean;
 }
 
 export const defaultInvoiceSettings: InvoiceSettings = {
@@ -364,6 +471,11 @@ export const defaultInvoiceSettings: InvoiceSettings = {
   showSignatureArea: true,
   showTermsConditions: true,
   showNextPaymentDue: true,
+  showInvoiceNumber: true,
+  showInvoiceDate: true,
+  showPaymentProgress: true,
+  showBankDetails: false,
+  showQRCode: false,
 };
 
 export const getInvoiceSettings = (): InvoiceSettings => {

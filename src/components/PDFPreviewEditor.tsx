@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Type, Grid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   PDF_THEMES, 
   PDFEditorSettings, 
@@ -234,7 +235,7 @@ export const PDFPreviewEditor = ({
             </div>
           </TabsContent>
 
-          <TabsContent value="style" className="mt-0 space-y-4">
+          <TabsContent value="style" className="mt-0 space-y-4 pb-4">
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Visual Options</Label>
               <div className="space-y-4">
@@ -263,6 +264,78 @@ export const PDFPreviewEditor = ({
                   />
                 </div>
               </div>
+            </div>
+
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-semibold">Font Size</Label>
+              <Select value={editorSettings.fontSize} onValueChange={(v) => updateSettings({ fontSize: v as any })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="small">Small</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="large">Large</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-semibold">Table Style</Label>
+              <Select value={editorSettings.tableStyle} onValueChange={(v) => updateSettings({ tableStyle: v as any })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="minimal">Minimal</SelectItem>
+                  <SelectItem value="striped">Striped Rows</SelectItem>
+                  <SelectItem value="bordered">Bordered</SelectItem>
+                  <SelectItem value="grid">Full Grid</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-semibold">Header Style</Label>
+              <Select value={editorSettings.headerStyle} onValueChange={(v) => updateSettings({ headerStyle: v as any })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="simple">Simple</SelectItem>
+                  <SelectItem value="boxed">Boxed</SelectItem>
+                  <SelectItem value="underlined">Underlined</SelectItem>
+                  <SelectItem value="full-width">Full Width</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-semibold">Summary Position</Label>
+              <Select value={editorSettings.summaryStyle} onValueChange={(v) => updateSettings({ summaryStyle: v as any })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="right">Right Aligned</SelectItem>
+                  <SelectItem value="center">Center</SelectItem>
+                  <SelectItem value="full-width">Full Width</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-semibold">Page Margins</Label>
+              <Select value={editorSettings.pageMargins} onValueChange={(v) => updateSettings({ pageMargins: v as any })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="narrow">Narrow</SelectItem>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="wide">Wide</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </TabsContent>
         </ScrollArea>
@@ -475,6 +548,9 @@ export const PDFPreviewEditor = ({
                 <Download className="h-4 w-4 mr-1 md:mr-2" />
                 <span className="hidden sm:inline">Download PDF</span>
                 <span className="sm:hidden">Download</span>
+              </Button>
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Close
               </Button>
             </div>
           </div>
