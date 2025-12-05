@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { FileText, Plus, Edit } from "lucide-react";
+import { FileText, Plus, Edit, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Quotation {
   id: string;
@@ -41,6 +42,7 @@ const Quotations = () => {
   const { toast } = useToast();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuotations();
@@ -69,6 +71,57 @@ const Quotations = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteQuotation = async (quotationId: string) => {
+    try {
+      setDeletingId(quotationId);
+      
+      // First get all sections for this quotation
+      const { data: sections } = await supabase
+        .from('quotation_sections')
+        .select('id')
+        .eq('quotation_id', quotationId);
+      
+      if (sections && sections.length > 0) {
+        // Delete all items from all sections
+        const sectionIds = sections.map(s => s.id);
+        await supabase
+          .from('quotation_items')
+          .delete()
+          .in('section_id', sectionIds);
+        
+        // Delete all sections
+        await supabase
+          .from('quotation_sections')
+          .delete()
+          .eq('quotation_id', quotationId);
+      }
+      
+      // Finally delete the quotation
+      const { error } = await supabase
+        .from('quotations')
+        .delete()
+        .eq('id', quotationId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Quotation Deleted",
+        description: "The quotation has been permanently deleted",
+      });
+      
+      loadQuotations();
+    } catch (error) {
+      console.error('Error deleting quotation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete quotation",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -138,24 +191,51 @@ const Quotations = () => {
                         </p>
                       </div>
                     </div>
-                     {quotation.status === 'draft' ? (
-                      <Button 
-                        variant="outline" 
-                        className="w-full mt-2"
-                        onClick={() => navigate(`/?id=${quotation.id}`)}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit Draft
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        className="w-full mt-2"
-                        onClick={() => navigate(`/quotations/${quotation.id}`)}
-                      >
-                        View Details
-                      </Button>
-                    )}
+                    <div className="flex gap-2 mt-2">
+                      {quotation.status === 'draft' ? (
+                        <Button 
+                          variant="outline" 
+                          className="flex-1"
+                          onClick={() => navigate(`/?id=${quotation.id}`)}
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Draft
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="outline" 
+                          className="flex-1"
+                          onClick={() => navigate(`/quotations/${quotation.id}`)}
+                        >
+                          View Details
+                        </Button>
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="icon" className="text-destructive hover:text-destructive shrink-0">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Quotation?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete this quotation and all its sections and items. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => handleDeleteQuotation(quotation.id)} 
+                              disabled={deletingId === quotation.id}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {deletingId === quotation.id ? 'Deleting...' : 'Delete'}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Receipt } from "lucide-react";
+import { Receipt, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Invoice {
   id: string;
@@ -21,7 +22,8 @@ interface Invoice {
 }
 
 const getStatusColor = (status: string) => {
-  switch (status?.toLowerCase()) {
+  const normalizedStatus = status?.toLowerCase().replace(/_/g, ' ');
+  switch (normalizedStatus) {
     case "paid":
       return "bg-green-500/10 text-green-700 hover:bg-green-500/20";
     case "partially paid":
@@ -35,11 +37,17 @@ const getStatusColor = (status: string) => {
   }
 };
 
+const formatStatusDisplay = (status: string) => {
+  if (!status) return 'Unpaid';
+  return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
 const Invoices = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadInvoices();
@@ -71,6 +79,42 @@ const Invoices = () => {
     }
   };
 
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    try {
+      setDeletingId(invoiceId);
+      
+      // First delete all payments
+      await supabase
+        .from('payments')
+        .delete()
+        .eq('invoice_id', invoiceId);
+      
+      // Then delete the invoice
+      const { error } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceId);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Invoice Deleted",
+        description: "The invoice has been permanently deleted",
+      });
+      
+      loadInvoices();
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete invoice",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -85,10 +129,6 @@ const Invoices = () => {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Invoices</h1>
             <p className="text-sm text-muted-foreground mt-1">Track payments and manage invoices</p>
           </div>
-          <Button>
-            <Receipt className="h-4 w-4 mr-2" />
-            New Invoice
-          </Button>
         </div>
 
         {loading ? (
@@ -100,11 +140,7 @@ const Invoices = () => {
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Receipt className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No invoices yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">Create your first invoice to get started</p>
-              <Button>
-                <Receipt className="h-4 w-4 mr-2" />
-                Create Invoice
-              </Button>
+              <p className="text-sm text-muted-foreground mb-4">Invoices are created when quotations are accepted</p>
             </CardContent>
           </Card>
         ) : (
@@ -120,7 +156,7 @@ const Invoices = () => {
                         <p className="text-sm text-muted-foreground">{invoice.client_name}</p>
                       </div>
                       <Badge className={getStatusColor(invoice.status)}>
-                        {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1) || 'Unpaid'}
+                        {formatStatusDisplay(invoice.status)}
                       </Badge>
                     </div>
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">
@@ -149,13 +185,40 @@ const Invoices = () => {
                         </p>
                       </div>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      className="w-full mt-2"
-                      onClick={() => navigate(`/invoices/${invoice.id}`)}
-                    >
-                      View Details
-                    </Button>
+                    <div className="flex gap-2 mt-2">
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => navigate(`/invoices/${invoice.id}`)}
+                      >
+                        View Details
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="icon" className="text-destructive hover:text-destructive shrink-0">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Invoice?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete this invoice and all its payment records. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => handleDeleteInvoice(invoice.id)} 
+                              disabled={deletingId === invoice.id}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {deletingId === invoice.id ? 'Deleting...' : 'Delete'}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Plus, CheckCircle, Eye, Calendar, CreditCard } from "lucide-react";
+import { ArrowLeft, Download, Plus, CheckCircle, Eye, Calendar, CreditCard, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,7 +41,8 @@ interface Payment {
 }
 
 const getStatusColor = (status: string) => {
-  switch (status?.toLowerCase()) {
+  const normalizedStatus = status?.toLowerCase().replace(/_/g, ' ');
+  switch (normalizedStatus) {
     case "paid":
       return "bg-green-500/10 text-green-700 border-green-200";
     case "partially paid":
@@ -52,6 +54,11 @@ const getStatusColor = (status: string) => {
     default:
       return "bg-gray-500/10 text-gray-700 border-gray-200";
   }
+};
+
+const formatStatusDisplay = (status: string) => {
+  if (!status) return 'Unpaid';
+  return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
 const InvoiceDetail = () => {
@@ -66,6 +73,7 @@ const InvoiceDetail = () => {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
   
   // Payment form state
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -164,12 +172,49 @@ const InvoiceDetail = () => {
   };
 
   const openPaymentDialog = () => {
-    // Pre-fill with remaining amount
     setPaymentAmount(invoice?.remaining_amount || 0);
     setNextPaymentAmount(0);
     setNextPaymentDue("");
     setPaymentNotes("");
     setPaymentDialogOpen(true);
+  };
+
+  const handleDeleteInvoice = async () => {
+    try {
+      setDeleting(true);
+      
+      // First delete all payments associated with this invoice
+      const { error: paymentsError } = await supabase
+        .from('payments')
+        .delete()
+        .eq('invoice_id', id);
+      
+      if (paymentsError) throw paymentsError;
+      
+      // Then delete the invoice
+      const { error: invoiceError } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', id);
+      
+      if (invoiceError) throw invoiceError;
+      
+      toast({
+        title: "Invoice Deleted",
+        description: "The invoice has been permanently deleted",
+      });
+      
+      navigate('/invoices');
+    } catch (error) {
+      console.error('Error deleting invoice:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete invoice",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleAddPayment = async () => {
@@ -216,7 +261,8 @@ const InvoiceDetail = () => {
 
       const newPaidAmount = (invoice?.paid_amount || 0) + paymentAmount;
       const newRemainingAmount = (invoice?.total_amount || 0) - newPaidAmount;
-      const newStatus = newRemainingAmount <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partially paid' : 'unpaid');
+      // Use underscore format to match database constraint
+      const newStatus = newRemainingAmount <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partially_paid' : 'unpaid');
 
       // Update invoice with new due date if provided
       const updateData: any = {
@@ -267,7 +313,6 @@ const InvoiceDetail = () => {
     try {
       setPdfLoading(true);
       
-      // Get next payment info from latest payment notes
       let nextDue = invoice.due_date ? formatDate(invoice.due_date) : undefined;
       let nextAmount = invoice.remaining_amount;
 
@@ -308,6 +353,45 @@ const InvoiceDetail = () => {
       });
     } finally {
       setPdfLoading(false);
+    }
+  };
+
+  const handleDownloadPaymentReceipt = async (payment: Payment) => {
+    if (!invoice) return;
+    
+    try {
+      await generateInvoicePDF({
+        invoiceNumber: `${invoice.invoice_number}-R${payments.indexOf(payment) + 1}`,
+        invoiceDate: formatDate(payment.payment_date),
+        clientName: invoice.client_name,
+        projectName: invoice.project_name,
+        totalAmount: payment.amount,
+        paidAmount: payment.amount,
+        remainingAmount: 0,
+        status: 'paid',
+        notes: `Payment receipt for ${invoice.invoice_number}\n${payment.notes || ''}`,
+        payments: [{
+          amount: payment.amount,
+          payment_date: formatDate(payment.payment_date),
+          payment_method: payment.payment_method,
+          notes: payment.notes
+        }],
+        profile: profile || {},
+        editorSettings: getEditorSettings(),
+        invoiceSettings: getInvoiceSettings()
+      });
+
+      toast({
+        title: "Receipt Generated",
+        description: "Payment receipt has been downloaded",
+      });
+    } catch (error) {
+      console.error('Error generating receipt:', error);
+      toast({
+        title: "Error",
+        description: "Failed to generate receipt",
+        variant: "destructive",
+      });
     }
   };
 
@@ -369,6 +453,28 @@ const InvoiceDetail = () => {
             <Download className="h-4 w-4 mr-2" />
             {pdfLoading ? '...' : 'PDF'}
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="flex-1 sm:flex-none text-destructive hover:text-destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Invoice?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete this invoice and all its payment records. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteInvoice} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -381,7 +487,7 @@ const InvoiceDetail = () => {
               <p className="text-sm text-muted-foreground mt-1">{invoice.invoice_number}</p>
             </div>
             <Badge className={`w-fit ${getStatusColor(invoice.status)}`}>
-              {invoice.status?.charAt(0).toUpperCase() + invoice.status?.slice(1) || 'Unpaid'}
+              {formatStatusDisplay(invoice.status)}
             </Badge>
           </div>
         </CardHeader>
@@ -468,11 +574,14 @@ const InvoiceDetail = () => {
                         </p>
                       </div>
                     </div>
-                    {payment.notes && (
-                      <p className="text-xs text-muted-foreground max-w-[100px] truncate hidden sm:block">
-                        {payment.notes}
-                      </p>
-                    )}
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => handleDownloadPaymentReceipt(payment)}
+                      className="h-8 px-2"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -492,12 +601,12 @@ const InvoiceDetail = () => {
                   >
                     <div>
                       <p className="font-medium text-sm">{relInvoice.invoice_number}</p>
-                      <p className="text-xs text-muted-foreground">{relInvoice.project_name}</p>
+                      <p className="text-xs text-muted-foreground">{formatDate(relInvoice.invoice_date)}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium tabular-nums text-sm">₹{relInvoice.total_amount?.toLocaleString('en-IN')}</p>
-                      <Badge className={`text-[10px] ${getStatusColor(relInvoice.status)}`}>
-                        {relInvoice.status}
+                      <p className="font-semibold tabular-nums">₹{relInvoice.total_amount?.toLocaleString('en-IN')}</p>
+                      <Badge className={`text-xs ${getStatusColor(relInvoice.status)}`}>
+                        {formatStatusDisplay(relInvoice.status)}
                       </Badge>
                     </div>
                   </div>
@@ -506,10 +615,11 @@ const InvoiceDetail = () => {
             </div>
           )}
 
+          {/* Notes */}
           {invoice.notes && (
             <div>
               <h3 className="font-semibold text-sm mb-2">Notes</h3>
-              <p className="text-sm text-muted-foreground bg-muted/30 p-3 rounded-lg">{invoice.notes}</p>
+              <p className="text-sm text-muted-foreground">{invoice.notes}</p>
             </div>
           )}
         </CardContent>
@@ -521,41 +631,40 @@ const InvoiceDetail = () => {
           <DialogHeader>
             <DialogTitle>Add Payment</DialogTitle>
             <DialogDescription>
-              Balance: ₹{(invoice.remaining_amount || 0).toLocaleString('en-IN')}
+              Record a payment for {invoice.invoice_number}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            {/* Payment Amount */}
+          
+          <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="payment-amount">Payment Amount *</Label>
+              <Label>Payment Amount (₹)</Label>
               <Input
-                id="payment-amount"
                 type="number"
-                placeholder="₹0"
-                value={paymentAmount || ''}
+                value={paymentAmount}
                 onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                placeholder="Enter amount"
               />
+              {/* Quick amount buttons */}
               <div className="flex gap-2">
                 <Button 
                   type="button" 
                   variant="outline" 
                   size="sm"
-                  onClick={() => setPaymentAmount(invoice.remaining_amount || 0)}
+                  onClick={() => setPaymentAmount(invoice?.remaining_amount || 0)}
                 >
-                  Full (₹{(invoice.remaining_amount || 0).toLocaleString()})
+                  Full (₹{(invoice?.remaining_amount || 0).toLocaleString('en-IN')})
                 </Button>
                 <Button 
                   type="button" 
                   variant="outline" 
                   size="sm"
-                  onClick={() => setPaymentAmount((invoice.remaining_amount || 0) / 2)}
+                  onClick={() => setPaymentAmount((invoice?.remaining_amount || 0) / 2)}
                 >
-                  Half
+                  Half (₹{((invoice?.remaining_amount || 0) / 2).toLocaleString('en-IN')})
                 </Button>
               </div>
             </div>
-
-            {/* Payment Method */}
+            
             <div className="space-y-2">
               <Label>Payment Method</Label>
               <Select value={paymentMethod} onValueChange={setPaymentMethod}>
@@ -567,68 +676,55 @@ const InvoiceDetail = () => {
                   <SelectItem value="upi">UPI</SelectItem>
                   <SelectItem value="bank">Bank Transfer</SelectItem>
                   <SelectItem value="cheque">Cheque</SelectItem>
-                  <SelectItem value="card">Card</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Payment Date */}
+            
             <div className="space-y-2">
-              <Label htmlFor="payment-date">Payment Date</Label>
+              <Label>Payment Date</Label>
               <Input
-                id="payment-date"
                 type="date"
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
               />
             </div>
-
-            {/* Next Payment Due - Only show if partial payment */}
-            {paymentAmount < (invoice.remaining_amount || 0) && paymentAmount > 0 && (
-              <div className="border-t pt-4 space-y-3">
-                <Label className="text-sm font-semibold">Next Payment Schedule (Optional)</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="next-due" className="text-xs">Due Date</Label>
-                    <Input
-                      id="next-due"
-                      type="date"
-                      value={nextPaymentDue}
-                      onChange={(e) => setNextPaymentDue(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="next-amount" className="text-xs">Amount</Label>
-                    <Input
-                      id="next-amount"
-                      type="number"
-                      placeholder="₹0"
-                      value={nextPaymentAmount || ''}
-                      onChange={(e) => setNextPaymentAmount(parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Notes */}
+            
             <div className="space-y-2">
-              <Label htmlFor="payment-notes">Notes (Optional)</Label>
+              <Label>Next Payment Due Date (Optional)</Label>
+              <Input
+                type="date"
+                value={nextPaymentDue}
+                onChange={(e) => setNextPaymentDue(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Next Payment Amount (Optional)</Label>
+              <Input
+                type="number"
+                value={nextPaymentAmount || ''}
+                onChange={(e) => setNextPaymentAmount(parseFloat(e.target.value) || 0)}
+                placeholder="Expected next payment"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Notes (Optional)</Label>
               <Textarea
-                id="payment-notes"
-                placeholder="Add any notes..."
                 value={paymentNotes}
                 onChange={(e) => setPaymentNotes(e.target.value)}
+                placeholder="Any additional notes"
                 rows={2}
               />
             </div>
           </div>
+          
           <DialogFooter>
             <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddPayment} disabled={paymentAmount <= 0}>
-              Record Payment
+            <Button onClick={handleAddPayment}>
+              Add Payment
             </Button>
           </DialogFooter>
         </DialogContent>
