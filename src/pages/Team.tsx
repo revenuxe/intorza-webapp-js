@@ -536,12 +536,12 @@ const Team = () => {
                 {!editingMember && (
                   <div className="space-y-2">
                     <Label>Assign to Project (Optional)</Label>
-                    <Select value={memberForm.project_id} onValueChange={(v) => setMemberForm({ ...memberForm, project_id: v })}>
+                    <Select value={memberForm.project_id || "none"} onValueChange={(v) => setMemberForm({ ...memberForm, project_id: v === "none" ? "" : v })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select project" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No project</SelectItem>
+                        <SelectItem value="none">No project</SelectItem>
                         {quotations.map((q) => (
                           <SelectItem key={q.id} value={q.id}>
                             {q.project_name} - {q.client_name}
