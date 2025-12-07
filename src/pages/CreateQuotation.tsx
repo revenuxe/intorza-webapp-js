@@ -15,8 +15,6 @@ import { useAuthAction } from "@/hooks/useAuthAction";
 import { CustomizeFieldsDrawer, QuotationSettings, getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
 import { PDFPreviewEditor } from "@/components/PDFPreviewEditor";
 import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
-
-
 interface LineItem {
   id: string;
   side: string;
@@ -28,37 +26,45 @@ interface LineItem {
   ratePerSft: number;
   amount: number;
 }
-
 interface Section {
   id: string;
   title: string;
   items: LineItem[];
 }
-
 interface PaymentStage {
   id: string;
   stage: string;
   milestone: string;
   percentage: number;
 }
-
-
 const CreateQuotation = () => {
-  const { toast } = useToast();
-  const { requireAuth, clearPendingAction, getPendingAction } = useAuthAction();
+  const {
+    toast
+  } = useToast();
+  const {
+    requireAuth,
+    clearPendingAction,
+    getPendingAction
+  } = useAuthAction();
   const [searchParams, setSearchParams] = useSearchParams();
   const quotationId = searchParams.get('id');
   const continueAction = searchParams.get('continueAction');
   const [actionExecuted, setActionExecuted] = useState(false);
-  const [sections, setSections] = useState<Section[]>([
-    {
+  const [sections, setSections] = useState<Section[]>([{
+    id: "1",
+    title: "KITCHEN WITHOUT CIVIL AND ACCESSORIES",
+    items: [{
       id: "1",
-      title: "KITCHEN WITHOUT CIVIL AND ACCESSORIES",
-      items: [
-        { id: "1", side: "A", productName: "BASE UNIT-1", productDetails: "", widthFt: 0, heightFt: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
-      ],
-    },
-  ]);
+      side: "A",
+      productName: "BASE UNIT-1",
+      productDetails: "",
+      widthFt: 0,
+      heightFt: 0,
+      sftArea: 0,
+      ratePerSft: 0,
+      amount: 0
+    }]
+  }]);
   const [projectTitle, setProjectTitle] = useState("BEST BUDGET");
   const [clientName, setClientName] = useState("");
   const [clientAddress, setClientAddress] = useState("");
@@ -73,13 +79,32 @@ const CreateQuotation = () => {
   const [discountPercentage, setDiscountPercentage] = useState(0);
   const [enableSocialMediaDiscount, setEnableSocialMediaDiscount] = useState(false);
   const [socialMediaDiscountRate, setSocialMediaDiscountRate] = useState(6);
-  const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([
-    { id: "1", stage: "1", milestone: "Design Phase", percentage: 10 },
-    { id: "2", stage: "2", milestone: "Material Procurement", percentage: 30 },
-    { id: "3", stage: "3", milestone: "Execution Start", percentage: 30 },
-    { id: "4", stage: "4", milestone: "Mid-Execution", percentage: 20 },
-    { id: "5", stage: "5", milestone: "Final Handover", percentage: 10 },
-  ]);
+  const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([{
+    id: "1",
+    stage: "1",
+    milestone: "Design Phase",
+    percentage: 10
+  }, {
+    id: "2",
+    stage: "2",
+    milestone: "Material Procurement",
+    percentage: 30
+  }, {
+    id: "3",
+    stage: "3",
+    milestone: "Execution Start",
+    percentage: 30
+  }, {
+    id: "4",
+    stage: "4",
+    milestone: "Mid-Execution",
+    percentage: 20
+  }, {
+    id: "5",
+    stage: "5",
+    milestone: "Final Handover",
+    percentage: 10
+  }]);
   const [profile, setProfile] = useState({
     company_name: "",
     logo_url: "",
@@ -95,7 +120,7 @@ const CreateQuotation = () => {
     bank_ifsc_code: "",
     bank_account_holder: "",
     upi_id: "",
-    payment_qr_url: "",
+    payment_qr_url: ""
   });
   const [formRestored, setFormRestored] = useState(false);
   const [customizeSettings, setCustomizeSettings] = useState<QuotationSettings>(getQuotationSettings());
@@ -104,7 +129,9 @@ const CreateQuotation = () => {
   // Restore form data from sessionStorage after login
   useEffect(() => {
     if (continueAction && !formRestored) {
-      const { formData } = getPendingAction();
+      const {
+        formData
+      } = getPendingAction();
       if (formData) {
         if (formData.sections) setSections(formData.sections);
         if (formData.projectTitle) setProjectTitle(formData.projectTitle);
@@ -125,7 +152,6 @@ const CreateQuotation = () => {
       setFormRestored(true);
     }
   }, [continueAction, formRestored]);
-
   useEffect(() => {
     loadProfile();
     if (quotationId) {
@@ -139,12 +165,14 @@ const CreateQuotation = () => {
       if (continueAction && formRestored && !actionExecuted) {
         setActionExecuted(true);
         clearPendingAction();
-        
+
         // Remove continueAction from URL
         const newParams = new URLSearchParams(searchParams);
         newParams.delete('continueAction');
-        setSearchParams(newParams, { replace: true });
-        
+        setSearchParams(newParams, {
+          replace: true
+        });
+
         // Small delay to ensure state is fully updated
         setTimeout(async () => {
           if (continueAction === 'saveDraft') {
@@ -157,21 +185,20 @@ const CreateQuotation = () => {
         }, 800);
       }
     };
-    
     executePendingAction();
   }, [continueAction, formRestored, actionExecuted]);
-
   const loadProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: {
+          user
+        }
+      } = await supabase.auth.getUser();
       if (!user) return;
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
+      const {
+        data,
+        error
+      } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       if (error) throw error;
       if (data) {
         setProfile({
@@ -183,15 +210,15 @@ const CreateQuotation = () => {
           gstin: data.gstin || "",
           professional_advantages: data.professional_advantages || "",
           signature_url: data.signature_url || "",
-          terms_conditions: (data.terms_conditions as any) || [],
+          terms_conditions: data.terms_conditions as any || [],
           bank_name: (data as any).bank_name || "",
           bank_account_number: (data as any).bank_account_number || "",
           bank_ifsc_code: (data as any).bank_ifsc_code || "",
           bank_account_holder: (data as any).bank_account_holder || "",
           upi_id: (data as any).upi_id || "",
-          payment_qr_url: (data as any).payment_qr_url || "",
+          payment_qr_url: (data as any).payment_qr_url || ""
         });
-        
+
         // Load payment stages from profile
         if (data.payment_stages) {
           setPaymentStages(data.payment_stages as any);
@@ -201,16 +228,13 @@ const CreateQuotation = () => {
       console.error('Error loading profile:', error);
     }
   };
-
   const loadQuotation = async (id: string) => {
     try {
       // Load quotation data
-      const { data: quotation, error: quotationError } = await supabase
-        .from('quotations')
-        .select('*')
-        .eq('id', id)
-        .single();
-
+      const {
+        data: quotation,
+        error: quotationError
+      } = await supabase.from('quotations').select('*').eq('id', id).single();
       if (quotationError) throw quotationError;
 
       // Pre-fill form fields
@@ -225,33 +249,28 @@ const CreateQuotation = () => {
       setProjectType(quotation.project_type || "");
       setGstEnabled(quotation.gst_enabled || false);
       setGstRate(quotation.gst_percentage?.toString() || "18");
-      
+
       // Calculate discount percentage from discount amount
       if (quotation.discount_amount && quotation.subtotal) {
-        const discountPercent = (quotation.discount_amount / quotation.subtotal) * 100;
+        const discountPercent = quotation.discount_amount / quotation.subtotal * 100;
         setDiscountPercentage(discountPercent);
       }
 
       // Load sections
-      const { data: sectionsData, error: sectionsError } = await supabase
-        .from('quotation_sections')
-        .select('*')
-        .eq('quotation_id', id)
-        .order('sort_order');
-
+      const {
+        data: sectionsData,
+        error: sectionsError
+      } = await supabase.from('quotation_sections').select('*').eq('quotation_id', id).order('sort_order');
       if (sectionsError) throw sectionsError;
 
       // Load items for each section
       const loadedSections: Section[] = [];
       for (const section of sectionsData || []) {
-        const { data: itemsData, error: itemsError } = await supabase
-          .from('quotation_items')
-          .select('*')
-          .eq('section_id', section.id)
-          .order('sort_order');
-
+        const {
+          data: itemsData,
+          error: itemsError
+        } = await supabase.from('quotation_items').select('*').eq('section_id', section.id).order('sort_order');
         if (itemsError) throw itemsError;
-
         loadedSections.push({
           id: section.id,
           title: section.section_name,
@@ -264,112 +283,105 @@ const CreateQuotation = () => {
             heightFt: item.height_ft || 0,
             sftArea: item.sft_area || 0,
             ratePerSft: item.rate_per_sft || 0,
-            amount: item.amount || 0,
+            amount: item.amount || 0
           }))
         });
       }
-
       if (loadedSections.length > 0) {
         setSections(loadedSections);
       }
-
       toast({
         title: "Quotation loaded",
-        description: "Existing quotation data has been loaded for editing",
+        description: "Existing quotation data has been loaded for editing"
       });
     } catch (error) {
       console.error('Error loading quotation:', error);
       toast({
         title: "Load failed",
         description: "Failed to load quotation data",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const addSection = () => {
-    setSections([
-      ...sections,
-      {
+    setSections([...sections, {
+      id: Date.now().toString(),
+      title: "NEW SECTION",
+      items: [{
         id: Date.now().toString(),
-        title: "NEW SECTION",
-        items: [
-          { id: Date.now().toString(), side: "A", productName: "", productDetails: "", widthFt: 0, heightFt: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
-        ],
-      },
-    ]);
+        side: "A",
+        productName: "",
+        productDetails: "",
+        widthFt: 0,
+        heightFt: 0,
+        sftArea: 0,
+        ratePerSft: 0,
+        amount: 0
+      }]
+    }]);
   };
-
   const addItemToSection = (sectionId: string) => {
-    setSections(sections.map(section => 
-      section.id === sectionId
-        ? {
-            ...section,
-            items: [
-              ...section.items,
-              { id: Date.now().toString(), side: "A", productName: "", productDetails: "", widthFt: 0, heightFt: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
-            ],
-          }
-        : section
-    ));
+    setSections(sections.map(section => section.id === sectionId ? {
+      ...section,
+      items: [...section.items, {
+        id: Date.now().toString(),
+        side: "A",
+        productName: "",
+        productDetails: "",
+        widthFt: 0,
+        heightFt: 0,
+        sftArea: 0,
+        ratePerSft: 0,
+        amount: 0
+      }]
+    } : section));
   };
-
   const removeItem = (sectionId: string, itemId: string) => {
-    setSections(sections.map(section =>
-      section.id === sectionId
-        ? { ...section, items: section.items.filter(item => item.id !== itemId) }
-        : section
-    ));
+    setSections(sections.map(section => section.id === sectionId ? {
+      ...section,
+      items: section.items.filter(item => item.id !== itemId)
+    } : section));
   };
-
   const removeSection = (sectionId: string) => {
     setSections(sections.filter(section => section.id !== sectionId));
   };
-
   const updateSectionTitle = (sectionId: string, title: string) => {
-    setSections(sections.map(section =>
-      section.id === sectionId ? { ...section, title } : section
-    ));
+    setSections(sections.map(section => section.id === sectionId ? {
+      ...section,
+      title
+    } : section));
   };
-
   const updateItem = (sectionId: string, itemId: string, field: keyof LineItem, value: any) => {
-    setSections(sections.map(section =>
-      section.id === sectionId
-        ? {
-            ...section,
-            items: section.items.map(item => {
-              if (item.id === itemId) {
-                const updatedItem = { ...item, [field]: value };
-                // Auto-calculate sftArea when dimensions change
-                if (field === 'widthFt' || field === 'heightFt') {
-                  updatedItem.sftArea = updatedItem.widthFt * updatedItem.heightFt;
-                  updatedItem.amount = updatedItem.sftArea * updatedItem.ratePerSft;
-                }
-                // Auto-calculate amount when rate or sftArea changes
-                if (field === 'ratePerSft' || field === 'sftArea') {
-                  updatedItem.amount = updatedItem.sftArea * updatedItem.ratePerSft;
-                }
-                return updatedItem;
-              }
-              return item;
-            }),
+    setSections(sections.map(section => section.id === sectionId ? {
+      ...section,
+      items: section.items.map(item => {
+        if (item.id === itemId) {
+          const updatedItem = {
+            ...item,
+            [field]: value
+          };
+          // Auto-calculate sftArea when dimensions change
+          if (field === 'widthFt' || field === 'heightFt') {
+            updatedItem.sftArea = updatedItem.widthFt * updatedItem.heightFt;
+            updatedItem.amount = updatedItem.sftArea * updatedItem.ratePerSft;
           }
-        : section
-    ));
+          // Auto-calculate amount when rate or sftArea changes
+          if (field === 'ratePerSft' || field === 'sftArea') {
+            updatedItem.amount = updatedItem.sftArea * updatedItem.ratePerSft;
+          }
+          return updatedItem;
+        }
+        return item;
+      })
+    } : section));
   };
+  const subtotal = sections.reduce((sum, section) => sum + section.items.reduce((itemSum, item) => itemSum + item.amount, 0), 0);
 
-  const subtotal = sections.reduce(
-    (sum, section) => sum + section.items.reduce((itemSum, item) => itemSum + item.amount, 0),
-    0
-  );
-  
   // Calculate social media discount based on custom rate
   const socialMediaDiscountAmount = enableSocialMediaDiscount ? subtotal * (socialMediaDiscountRate / 100) : 0;
-  const discountAmount = enableSocialMediaDiscount ? socialMediaDiscountAmount : (subtotal * discountPercentage / 100);
-  
-  const gstAmount = gstEnabled ? ((subtotal - discountAmount) * parseFloat(gstRate)) / 100 : 0;
+  const discountAmount = enableSocialMediaDiscount ? socialMediaDiscountAmount : subtotal * discountPercentage / 100;
+  const gstAmount = gstEnabled ? (subtotal - discountAmount) * parseFloat(gstRate) / 100 : 0;
   const grandTotal = subtotal - discountAmount + gstAmount;
-
   const getFormData = () => ({
     sections,
     projectTitle,
@@ -385,72 +397,66 @@ const CreateQuotation = () => {
     gstRate,
     discountPercentage,
     enableSocialMediaDiscount,
-    socialMediaDiscountRate,
+    socialMediaDiscountRate
   });
-
   const handleSaveQuotation = async (status: string) => {
     try {
       if (!clientName || !projectTitle) {
         toast({
           title: "Missing information",
           description: "Please fill in client name and project title",
-          variant: "destructive",
+          variant: "destructive"
         });
         return;
       }
-
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: {
+          user
+        }
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
-
       if (quotationId) {
         // Update existing quotation
-        const { error: quotationError } = await supabase
-          .from('quotations')
-          .update({
-            quotation_title: projectTitle,
-            client_name: clientName,
-            client_address: clientAddress,
-            project_name: projectTitle,
-            date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
-            valid_till: quotationValidTill,
-            project_deadline: projectDeadline || null,
-            place_of_project: placeOfProject,
-            warranty: warranty,
-            project_type: projectType,
-            status: status,
-            gst_enabled: gstEnabled,
-            gst_percentage: parseFloat(gstRate),
-            gst_amount: gstAmount,
-            discount_amount: discountAmount,
-            subtotal: subtotal,
-            grand_total: grandTotal,
-          })
-          .eq('id', quotationId);
-
+        const {
+          error: quotationError
+        } = await supabase.from('quotations').update({
+          quotation_title: projectTitle,
+          client_name: clientName,
+          client_address: clientAddress,
+          project_name: projectTitle,
+          date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
+          valid_till: quotationValidTill,
+          project_deadline: projectDeadline || null,
+          place_of_project: placeOfProject,
+          warranty: warranty,
+          project_type: projectType,
+          status: status,
+          gst_enabled: gstEnabled,
+          gst_percentage: parseFloat(gstRate),
+          gst_amount: gstAmount,
+          discount_amount: discountAmount,
+          subtotal: subtotal,
+          grand_total: grandTotal
+        }).eq('id', quotationId);
         if (quotationError) throw quotationError;
 
         // Delete existing sections and items
-        const { error: deleteSectionsError } = await supabase
-          .from('quotation_sections')
-          .delete()
-          .eq('quotation_id', quotationId);
-
+        const {
+          error: deleteSectionsError
+        } = await supabase.from('quotation_sections').delete().eq('quotation_id', quotationId);
         if (deleteSectionsError) throw deleteSectionsError;
 
         // Insert updated sections and items
         for (const section of sections) {
-          const { data: sectionData, error: sectionError } = await supabase
-            .from('quotation_sections')
-            .insert({
-              quotation_id: quotationId,
-              section_name: section.title,
-              sort_order: sections.indexOf(section),
-            })
-            .select()
-            .single();
-
+          const {
+            data: sectionData,
+            error: sectionError
+          } = await supabase.from('quotation_sections').insert({
+            quotation_id: quotationId,
+            section_name: section.title,
+            sort_order: sections.indexOf(section)
+          }).select().single();
           if (sectionError) throw sectionError;
-
           const itemsToInsert = section.items.map((item, index) => ({
             section_id: sectionData.id,
             side: item.side,
@@ -461,65 +467,55 @@ const CreateQuotation = () => {
             sft_area: item.sftArea,
             rate_per_sft: item.ratePerSft,
             amount: item.amount,
-            sort_order: index,
+            sort_order: index
           }));
-
-          const { error: itemsError } = await supabase
-            .from('quotation_items')
-            .insert(itemsToInsert);
-
+          const {
+            error: itemsError
+          } = await supabase.from('quotation_items').insert(itemsToInsert);
           if (itemsError) throw itemsError;
         }
-
         toast({
           title: "Quotation updated",
-          description: "Quotation has been updated successfully",
+          description: "Quotation has been updated successfully"
         });
       } else {
         // Create new quotation
         const quotationNumber = `QT-${Date.now()}`;
-
-        const { data: quotationData, error: quotationError } = await supabase
-          .from('quotations')
-          .insert({
-            user_id: user.id,
-            quotation_number: quotationNumber,
-            quotation_title: projectTitle,
-            client_name: clientName,
-            client_address: clientAddress,
-            project_name: projectTitle,
-            date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
-            valid_till: quotationValidTill,
-            project_deadline: projectDeadline || null,
-            place_of_project: placeOfProject,
-            warranty: warranty,
-            project_type: projectType,
-            status: status,
-            gst_enabled: gstEnabled,
-            gst_percentage: parseFloat(gstRate),
-            gst_amount: gstAmount,
-            discount_amount: discountAmount,
-            subtotal: subtotal,
-            grand_total: grandTotal,
-          })
-          .select()
-          .single();
-
+        const {
+          data: quotationData,
+          error: quotationError
+        } = await supabase.from('quotations').insert({
+          user_id: user.id,
+          quotation_number: quotationNumber,
+          quotation_title: projectTitle,
+          client_name: clientName,
+          client_address: clientAddress,
+          project_name: projectTitle,
+          date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
+          valid_till: quotationValidTill,
+          project_deadline: projectDeadline || null,
+          place_of_project: placeOfProject,
+          warranty: warranty,
+          project_type: projectType,
+          status: status,
+          gst_enabled: gstEnabled,
+          gst_percentage: parseFloat(gstRate),
+          gst_amount: gstAmount,
+          discount_amount: discountAmount,
+          subtotal: subtotal,
+          grand_total: grandTotal
+        }).select().single();
         if (quotationError) throw quotationError;
-
         for (const section of sections) {
-          const { data: sectionData, error: sectionError } = await supabase
-            .from('quotation_sections')
-            .insert({
-              quotation_id: quotationData.id,
-              section_name: section.title,
-              sort_order: sections.indexOf(section),
-            })
-            .select()
-            .single();
-
+          const {
+            data: sectionData,
+            error: sectionError
+          } = await supabase.from('quotation_sections').insert({
+            quotation_id: quotationData.id,
+            section_name: section.title,
+            sort_order: sections.indexOf(section)
+          }).select().single();
           if (sectionError) throw sectionError;
-
           const itemsToInsert = section.items.map((item, index) => ({
             section_id: sectionData.id,
             side: item.side,
@@ -530,19 +526,16 @@ const CreateQuotation = () => {
             sft_area: item.sftArea,
             rate_per_sft: item.ratePerSft,
             amount: item.amount,
-            sort_order: index,
+            sort_order: index
           }));
-
-          const { error: itemsError } = await supabase
-            .from('quotation_items')
-            .insert(itemsToInsert);
-
+          const {
+            error: itemsError
+          } = await supabase.from('quotation_items').insert(itemsToInsert);
           if (itemsError) throw itemsError;
         }
-
         toast({
           title: "Quotation saved",
-          description: `Quotation ${quotationNumber} has been saved successfully`,
+          description: `Quotation ${quotationNumber} has been saved successfully`
         });
       }
 
@@ -554,37 +547,41 @@ const CreateQuotation = () => {
         setQuotationValidTill("");
         setPlaceOfProject("");
         setProjectType("");
-        setSections([
-          {
+        setSections([{
+          id: "1",
+          title: "KITCHEN WITHOUT CIVIL AND ACCESSORIES",
+          items: [{
             id: "1",
-            title: "KITCHEN WITHOUT CIVIL AND ACCESSORIES",
-            items: [
-              { id: "1", side: "A", productName: "BASE UNIT-1", productDetails: "", widthFt: 0, heightFt: 0, sftArea: 0, ratePerSft: 0, amount: 0 },
-            ],
-          },
-        ]);
+            side: "A",
+            productName: "BASE UNIT-1",
+            productDetails: "",
+            widthFt: 0,
+            heightFt: 0,
+            sftArea: 0,
+            ratePerSft: 0,
+            amount: 0
+          }]
+        }]);
       }
     } catch (error) {
       console.error('Error saving quotation:', error);
       toast({
         title: "Save failed",
         description: "Failed to save quotation. Please try again.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const handleDownloadPDF = async (editorSettings?: PDFEditorSettings) => {
     try {
       if (!clientName || !clientAddress) {
         toast({
           title: "Missing information",
           description: "Please fill in client name and address before downloading PDF",
-          variant: "destructive",
+          variant: "destructive"
         });
         return;
       }
-
       await generateQuotationPDF({
         quotationTitle: projectTitle,
         clientName,
@@ -627,26 +624,24 @@ const CreateQuotation = () => {
           ifscCode: profile.bank_ifsc_code,
           accountHolder: profile.bank_account_holder,
           upiId: profile.upi_id,
-          qrCodeUrl: profile.payment_qr_url,
+          qrCodeUrl: profile.payment_qr_url
         },
         settings: customizeSettings,
         editorSettings: editorSettings || getEditorSettings()
       });
-
       toast({
         title: "PDF Downloaded",
-        description: "Your quotation PDF has been generated successfully",
+        description: "Your quotation PDF has been generated successfully"
       });
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast({
         title: "PDF Generation Failed",
         description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
-
   const getQuotationPreviewData = () => ({
     quotationTitle: projectTitle,
     clientName,
@@ -656,11 +651,9 @@ const CreateQuotation = () => {
     subtotal,
     grandTotal,
     companyName: profile.company_name,
-    companyLogo: profile.logo_url,
+    companyLogo: profile.logo_url
   });
-
-  return (
-    <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
+  return <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
       <div className="flex flex-col gap-6">
         {/* Header Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -672,11 +665,7 @@ const CreateQuotation = () => {
             <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
               Templates
             </Button>
-            <CustomizeFieldsDrawer 
-              type="quotation"
-              settings={customizeSettings}
-              onSettingsChange={(s) => setCustomizeSettings(s as QuotationSettings)}
-            />
+            <CustomizeFieldsDrawer type="quotation" settings={customizeSettings} onSettingsChange={s => setCustomizeSettings(s as QuotationSettings)} />
           </div>
         </div>
 
@@ -688,135 +677,58 @@ const CreateQuotation = () => {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="projectTitle">Quotation Title</Label>
-              <Input 
-                id="projectTitle" 
-                value={projectTitle}
-                onChange={(e) => setProjectTitle(e.target.value)}
-                placeholder="e.g., BEST BUDGET, PREMIUM PACKAGE" 
-              />
+              <Input id="projectTitle" value={projectTitle} onChange={e => setProjectTitle(e.target.value)} placeholder="e.g., BEST BUDGET, PREMIUM PACKAGE" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {customizeSettings.showClientName && (
-                <div className="space-y-2">
+              {customizeSettings.showClientName && <div className="space-y-2">
                   <Label htmlFor="clientName">Client Name</Label>
-                  <Input 
-                    id="clientName" 
-                    placeholder="Enter client name"
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                  />
-                </div>
-              )}
-              {customizeSettings.showClientAddress && (
-                <div className="space-y-2">
+                  <Input id="clientName" placeholder="Enter client name" value={clientName} onChange={e => setClientName(e.target.value)} />
+                </div>}
+              {customizeSettings.showClientAddress && <div className="space-y-2">
                   <Label htmlFor="clientAddress">Client Address</Label>
-                  <Input 
-                    id="clientAddress" 
-                    placeholder="Enter address"
-                    value={clientAddress}
-                    onChange={(e) => setClientAddress(e.target.value)}
-                  />
-                </div>
-              )}
-              {customizeSettings.showDateOfProposal && (
-                <div className="space-y-2">
+                  <Input id="clientAddress" placeholder="Enter address" value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
+                </div>}
+              {customizeSettings.showDateOfProposal && <div className="space-y-2">
                   <Label htmlFor="dateOfProposal">Date of Proposal</Label>
-                  <Input 
-                    id="dateOfProposal" 
-                    type="date"
-                    value={dateOfProposal}
-                    onChange={(e) => setDateOfProposal(e.target.value)}
-                  />
-                </div>
-              )}
-              {customizeSettings.showQuotationValidTill && (
-                <div className="space-y-2">
+                  <Input id="dateOfProposal" type="date" value={dateOfProposal} onChange={e => setDateOfProposal(e.target.value)} />
+                </div>}
+              {customizeSettings.showQuotationValidTill && <div className="space-y-2">
                   <Label htmlFor="quotationValidTill">Quotation Valid Till</Label>
-                  <Input 
-                    id="quotationValidTill" 
-                    type="date"
-                    value={quotationValidTill}
-                    onChange={(e) => setQuotationValidTill(e.target.value)}
-                  />
-                </div>
-              )}
-              {customizeSettings.showProjectDeadline && (
-                <div className="space-y-2">
+                  <Input id="quotationValidTill" type="date" value={quotationValidTill} onChange={e => setQuotationValidTill(e.target.value)} />
+                </div>}
+              {customizeSettings.showProjectDeadline && <div className="space-y-2">
                   <Label htmlFor="projectDeadline">Project Deadline</Label>
-                  <Input 
-                    id="projectDeadline" 
-                    type="date"
-                    value={projectDeadline}
-                    onChange={(e) => setProjectDeadline(e.target.value)}
-                  />
-                </div>
-              )}
-              {customizeSettings.showPlaceOfProject && (
-                <div className="space-y-2">
+                  <Input id="projectDeadline" type="date" value={projectDeadline} onChange={e => setProjectDeadline(e.target.value)} />
+                </div>}
+              {customizeSettings.showPlaceOfProject && <div className="space-y-2">
                   <Label htmlFor="placeOfProject">Place of Project</Label>
-                  <Input 
-                    id="placeOfProject" 
-                    placeholder="Enter location"
-                    value={placeOfProject}
-                    onChange={(e) => setPlaceOfProject(e.target.value)}
-                  />
-                </div>
-              )}
-              {customizeSettings.showWarranty && (
-                <div className="space-y-2">
+                  <Input id="placeOfProject" placeholder="Enter location" value={placeOfProject} onChange={e => setPlaceOfProject(e.target.value)} />
+                </div>}
+              {customizeSettings.showWarranty && <div className="space-y-2">
                   <Label htmlFor="warranty">Warranty (Years)</Label>
-                  <Input 
-                    id="warranty" 
-                    type="number"
-                    value={warranty}
-                    onChange={(e) => setWarranty(e.target.value)}
-                    placeholder="10" 
-                  />
-                </div>
-              )}
-              {customizeSettings.showProjectType && (
-                <div className="space-y-2 md:col-span-2">
+                  <Input id="warranty" type="number" value={warranty} onChange={e => setWarranty(e.target.value)} placeholder="10" />
+                </div>}
+              {customizeSettings.showProjectType && <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="projectType">Project Type</Label>
-                  <Input 
-                    id="projectType" 
-                    value={projectType}
-                    onChange={(e) => setProjectType(e.target.value)}
-                    placeholder="e.g., Residential - 2BHK RENOVATION" 
-                  />
-                </div>
-              )}
-              {!profile.logo_url && (
-                <div className="space-y-2 md:col-span-2 p-3 bg-muted/30 rounded-lg">
+                  <Input id="projectType" value={projectType} onChange={e => setProjectType(e.target.value)} placeholder="e.g., Residential - 2BHK RENOVATION" />
+                </div>}
+              {!profile.logo_url && <div className="space-y-2 md:col-span-2 p-3 bg-muted/30 rounded-lg">
                   <p className="text-sm text-muted-foreground">
                     Company logo not uploaded. <a href="/settings" className="text-primary underline">Go to Settings</a> to upload your logo.
                   </p>
-                </div>
-              )}
+                </div>}
             </div>
           </CardContent>
         </Card>
 
         {/* Sections & Items */}
-        {sections.map((section, sectionIndex) => (
-          <Card key={section.id}>
+        {sections.map((section, sectionIndex) => <Card key={section.id}>
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
-                <Input
-                  value={section.title}
-                  onChange={(e) => updateSectionTitle(section.id, e.target.value)}
-                  className="text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0"
-                  placeholder="Section Title"
-                />
-                {sections.length > 1 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeSection(section.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
+                <Input value={section.title} onChange={e => updateSectionTitle(section.id, e.target.value)} className="text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0" placeholder="Section Title" />
+                {sections.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeSection(section.id)} className="text-destructive hover:text-destructive">
                     <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
+                  </Button>}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -824,18 +736,16 @@ const CreateQuotation = () => {
               <div className="hidden md:block overflow-x-auto">
                 <div className="min-w-[800px]">
                   <div className="grid gap-2 text-sm font-medium text-muted-foreground border-b pb-2" style={{
-                    gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
-                  }}>
+                gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
+              }}>
                     {customizeSettings.showSideColumn && <div>Side</div>}
                     <div>Product Name</div>
                     {customizeSettings.showProductDetails && <div>Product Details</div>}
-                    {customizeSettings.showDetailedSizeColumns && (
-                      <>
+                    {customizeSettings.showDetailedSizeColumns && <>
                         <div>Width (Ft)</div>
                         <div>Height (Ft)</div>
                         <div>Sft Area</div>
-                      </>
-                    )}
+                      </>}
                     <div>Rate/Sft</div>
                     <div>Amount</div>
                   </div>
@@ -843,87 +753,33 @@ const CreateQuotation = () => {
               </div>
 
               {/* Items */}
-              {section.items.map((item, itemIndex) => (
-                <div key={item.id} className="p-4 border border-border rounded-lg space-y-4 bg-muted/30">
+              {section.items.map((item, itemIndex) => <div key={item.id} className="p-4 border border-border rounded-lg space-y-4 bg-muted/30">
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-medium text-muted-foreground">Item {itemIndex + 1}</span>
-                    {section.items.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeItem(section.id, item.id)}
-                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
+                    {section.items.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(section.id, item.id)} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
                         <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                      </Button>}
                   </div>
 
                   {/* Desktop Table Row */}
                   <div className="hidden md:block overflow-x-auto">
                     <div className="min-w-[800px]">
                       <div className="grid gap-2" style={{
-                        gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
-                      }}>
-                        {customizeSettings.showSideColumn && (
-                          <Input
-                            value={item.side}
-                            onChange={(e) => updateItem(section.id, item.id, "side", e.target.value)}
-                            placeholder="A"
-                            className="h-9"
-                          />
-                        )}
-                        <Input
-                          value={item.productName}
-                          onChange={(e) => updateItem(section.id, item.id, "productName", e.target.value)}
-                          placeholder="Product"
-                          className="h-9"
-                        />
-                        {customizeSettings.showProductDetails && (
-                          <Textarea
-                            value={item.productDetails}
-                            onChange={(e) => updateItem(section.id, item.id, "productDetails", e.target.value)}
-                            placeholder="Detailed description..."
-                            className="resize-none h-9 min-h-[36px]"
-                            rows={1}
-                          />
-                        )}
-                        {customizeSettings.showDetailedSizeColumns && (
-                          <>
-                            <Input
-                              type="number"
-                              value={item.widthFt || ""}
-                              onChange={(e) => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)}
-                              placeholder="0"
-                              step="0.1"
-                              className="h-9"
-                            />
-                            <Input
-                              type="number"
-                              value={item.heightFt || ""}
-                              onChange={(e) => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)}
-                              placeholder="0"
-                              step="0.1"
-                              className="h-9"
-                            />
-                            <Input
-                              type="number"
-                              value={item.sftArea.toFixed(2)}
-                              readOnly
-                              className="h-9 bg-muted"
-                            />
-                          </>
-                        )}
-                        <Input
-                          type="number"
-                          value={item.ratePerSft || ""}
-                          onChange={(e) => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          step="0.01"
-                          className="h-9"
-                        />
+                  gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
+                }}>
+                        {customizeSettings.showSideColumn && <Input value={item.side} onChange={e => updateItem(section.id, item.id, "side", e.target.value)} placeholder="A" className="h-9" />}
+                        <Input value={item.productName} onChange={e => updateItem(section.id, item.id, "productName", e.target.value)} placeholder="Product" className="h-9" />
+                        {customizeSettings.showProductDetails && <Textarea value={item.productDetails} onChange={e => updateItem(section.id, item.id, "productDetails", e.target.value)} placeholder="Detailed description..." className="resize-none h-9 min-h-[36px]" rows={1} />}
+                        {customizeSettings.showDetailedSizeColumns && <>
+                            <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" className="h-9" />
+                            <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" className="h-9" />
+                            <Input type="number" value={item.sftArea.toFixed(2)} readOnly className="h-9 bg-muted" />
+                          </>}
+                        <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
                         <div className="h-9 flex items-center font-semibold tabular-nums">
-                          ₹{item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                          ₹{item.amount.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2
+                    })}
                         </div>
                       </div>
                     </div>
@@ -932,100 +788,61 @@ const CreateQuotation = () => {
                   {/* Mobile Stacked Layout */}
                   <div className="md:hidden space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      {customizeSettings.showSideColumn && (
-                        <div className="space-y-2">
+                      {customizeSettings.showSideColumn && <div className="space-y-2">
                           <Label>Side</Label>
-                          <Input
-                            value={item.side}
-                            onChange={(e) => updateItem(section.id, item.id, "side", e.target.value)}
-                            placeholder="A"
-                          />
-                        </div>
-                      )}
+                          <Input value={item.side} onChange={e => updateItem(section.id, item.id, "side", e.target.value)} placeholder="A" />
+                        </div>}
                       <div className={`space-y-2 ${!customizeSettings.showSideColumn ? 'col-span-2' : ''}`}>
                         <Label>Product Name</Label>
-                        <Input
-                          value={item.productName}
-                          onChange={(e) => updateItem(section.id, item.id, "productName", e.target.value)}
-                          placeholder="Product"
-                        />
+                        <Input value={item.productName} onChange={e => updateItem(section.id, item.id, "productName", e.target.value)} placeholder="Product" />
                       </div>
                     </div>
 
-                    {customizeSettings.showProductDetails && (
-                      <div className="space-y-2">
+                    {customizeSettings.showProductDetails && <div className="space-y-2">
                         <Label>Product Details</Label>
-                        <Textarea
-                          value={item.productDetails}
-                          onChange={(e) => updateItem(section.id, item.id, "productDetails", e.target.value)}
-                          placeholder="Detailed description..."
-                          rows={2}
-                        />
-                      </div>
-                    )}
+                        <Textarea value={item.productDetails} onChange={e => updateItem(section.id, item.id, "productDetails", e.target.value)} placeholder="Detailed description..." rows={2} />
+                      </div>}
 
-                    {customizeSettings.showDetailedSizeColumns && (
-                      <>
+                    {customizeSettings.showDetailedSizeColumns && <>
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-2">
                             <Label>Width (Ft)</Label>
-                            <Input
-                              type="number"
-                              value={item.widthFt || ""}
-                              onChange={(e) => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)}
-                              placeholder="0"
-                              step="0.1"
-                            />
+                            <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" />
                           </div>
                           <div className="space-y-2">
                             <Label>Height (Ft)</Label>
-                            <Input
-                              type="number"
-                              value={item.heightFt || ""}
-                              onChange={(e) => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)}
-                              placeholder="0"
-                              step="0.1"
-                            />
+                            <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" />
                           </div>
                         </div>
                         <div className="space-y-2">
                           <Label>Sft Area</Label>
-                          <Input
-                            type="number"
-                            value={item.sftArea.toFixed(2)}
-                            readOnly
-                            className="bg-muted"
-                          />
+                          <Input type="number" value={item.sftArea.toFixed(2)} readOnly className="bg-muted" />
                         </div>
-                      </>
-                    )}
+                      </>}
 
                     <div className="space-y-2">
                       <Label>Rate/Sft (₹)</Label>
-                      <Input
-                        type="number"
-                        value={item.ratePerSft || ""}
-                        onChange={(e) => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)}
-                        placeholder="0"
-                        step="0.01"
-                      />
+                      <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" />
                     </div>
 
                     <div className="space-y-1 pt-2 border-t">
                       <div className="flex justify-between">
                         <span className="text-sm font-medium">Amount:</span>
-                        <span className="font-semibold tabular-nums">₹{item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                        <span className="font-semibold tabular-nums">₹{item.amount.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2
+                    })}</span>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                </div>)}
 
               {/* Section Subtotal */}
               <div className="flex justify-between items-center pt-4 border-t border-border">
                 <span className="font-medium">Section Total</span>
                 <span className="text-lg font-bold text-primary">
-                  ₹{section.items.reduce((sum, item) => sum + item.amount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  ₹{section.items.reduce((sum, item) => sum + item.amount, 0).toLocaleString("en-IN", {
+                minimumFractionDigits: 2
+              })}
                 </span>
               </div>
 
@@ -1034,8 +851,7 @@ const CreateQuotation = () => {
                 Add Item to Section
               </Button>
             </CardContent>
-          </Card>
-        ))}
+          </Card>)}
 
         <Button onClick={addSection} variant="outline" className="w-full gap-2">
           <Plus className="h-4 w-4" />
@@ -1049,22 +865,20 @@ const CreateQuotation = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
-              {customizeSettings.showSubtotal && (
-                <div className="flex justify-between text-sm">
+              {customizeSettings.showSubtotal && <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">₹{subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                </div>
-              )}
+                  <span className="font-medium">₹{subtotal.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2
+                })}</span>
+                </div>}
 
-              {customizeSettings.showTaxGst && (
-                <>
+              {customizeSettings.showTaxGst && <>
                   <div className="flex items-center justify-between py-2 border-t border-border">
                     <div className="flex items-center gap-2">
                       <Switch checked={gstEnabled} onCheckedChange={setGstEnabled} />
                       <Label className="cursor-pointer">GST</Label>
                     </div>
-                    {gstEnabled && (
-                      <Select value={gstRate} onValueChange={setGstRate}>
+                    {gstEnabled && <Select value={gstRate} onValueChange={setGstRate}>
                         <SelectTrigger className="w-24">
                           <SelectValue />
                         </SelectTrigger>
@@ -1073,86 +887,57 @@ const CreateQuotation = () => {
                           <SelectItem value="12">12%</SelectItem>
                           <SelectItem value="18">18%</SelectItem>
                         </SelectContent>
-                      </Select>
-                    )}
+                      </Select>}
                   </div>
-                  {gstEnabled && (
-                    <div className="flex justify-between text-sm">
+                  {gstEnabled && <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">GST ({gstRate}%)</span>
-                      <span className="font-medium">₹{gstAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  )}
-                </>
-              )}
+                      <span className="font-medium">₹{gstAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2
+                  })}</span>
+                    </div>}
+                </>}
 
-              {customizeSettings.showSocialMediaDiscount && (
-                <>
+              {customizeSettings.showSocialMediaDiscount && <>
                   <div className="flex items-center justify-between py-2 border-t border-border">
                     <div className="flex items-center gap-2">
-                      <Switch 
-                        checked={enableSocialMediaDiscount} 
-                        onCheckedChange={setEnableSocialMediaDiscount}
-                      />
+                      <Switch checked={enableSocialMediaDiscount} onCheckedChange={setEnableSocialMediaDiscount} />
                       <Label className="cursor-pointer">Social Media Special Discount</Label>
                     </div>
-                    {enableSocialMediaDiscount && (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          value={socialMediaDiscountRate}
-                          onChange={(e) => setSocialMediaDiscountRate(parseFloat(e.target.value) || 0)}
-                          className="w-20 h-8"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                        />
+                    {enableSocialMediaDiscount && <div className="flex items-center gap-2">
+                        <Input type="number" value={socialMediaDiscountRate} onChange={e => setSocialMediaDiscountRate(parseFloat(e.target.value) || 0)} className="w-20 h-8" min="0" max="100" step="0.1" />
                         <span className="text-sm text-muted-foreground">%</span>
-                      </div>
-                    )}
+                      </div>}
                   </div>
-                  {enableSocialMediaDiscount && (
-                    <div className="flex justify-between text-sm">
+                  {enableSocialMediaDiscount && <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Social Media Discount ({socialMediaDiscountRate}%)</span>
-                      <span className="font-medium text-green-600">-₹{socialMediaDiscountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  )}
-                </>
-              )}
+                      <span className="font-medium text-green-600">-₹{socialMediaDiscountAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2
+                  })}</span>
+                    </div>}
+                </>}
 
-              {customizeSettings.showDiscount && !enableSocialMediaDiscount && (
-                <>
-                  {discountPercentage > 0 && (
-                    <div className="flex justify-between text-sm">
+              {customizeSettings.showDiscount && !enableSocialMediaDiscount && <>
+                  {discountPercentage > 0 && <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Discount ({discountPercentage}%)</span>
-                      <span className="font-medium text-green-600">-₹{discountAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  )}
+                      <span className="font-medium text-green-600">-₹{discountAmount.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2
+                  })}</span>
+                    </div>}
                   <div className="space-y-2">
                     <Label htmlFor="discount">Discount % (Optional)</Label>
                     <div className="flex items-center gap-2">
-                      <Input
-                        id="discount"
-                        type="number"
-                        value={discountPercentage}
-                        onChange={(e) => setDiscountPercentage(parseFloat(e.target.value) || 0)}
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        placeholder="0"
-                        className="h-8"
-                      />
+                      <Input id="discount" type="number" value={discountPercentage} onChange={e => setDiscountPercentage(parseFloat(e.target.value) || 0)} min="0" max="100" step="0.1" placeholder="0" className="h-8" />
                       <span className="text-sm text-muted-foreground">%</span>
                     </div>
                   </div>
-                </>
-              )}
+                </>}
 
-              {customizeSettings.showGrandTotal && (
-                <div className="flex justify-between text-lg font-bold pt-3 border-t border-border">
+              {customizeSettings.showGrandTotal && <div className="flex justify-between text-lg font-bold pt-3 border-t border-border">
                   <span>Grand Total</span>
-                  <span className="text-primary">₹{grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                </div>
-              )}
+                  <span className="text-primary">₹{grandTotal.toLocaleString("en-IN", {
+                  minimumFractionDigits: 2
+                })}</span>
+                </div>}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-4">
@@ -1174,16 +959,8 @@ const CreateQuotation = () => {
         </Card>
 
         {/* PDF Preview Editor */}
-        <PDFPreviewEditor
-          open={showPreview}
-          onClose={() => setShowPreview(false)}
-          onDownload={(settings) => handleDownloadPDF(settings)}
-          quotationData={getQuotationPreviewData()}
-          customizeSettings={customizeSettings}
-        />
+        <PDFPreviewEditor open={showPreview} onClose={() => setShowPreview(false)} onDownload={settings => handleDownloadPDF(settings)} quotationData={getQuotationPreviewData()} customizeSettings={customizeSettings} />
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default CreateQuotation;
