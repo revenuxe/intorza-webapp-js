@@ -36,8 +36,20 @@ const TeamLogin = () => {
     checkAuth();
   }, [navigate]);
 
+  // Check if email is valid team format
+  const isValidTeamEmail = (email: string) => {
+    return email.toLowerCase().endsWith('@intorza.com');
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate email format for team members
+    if (!isValidTeamEmail(formData.email)) {
+      toast.error("Team members must use their @intorza.com email. For company/user login, go to /auth");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -54,11 +66,11 @@ const TeamLogin = () => {
         .from('team_members')
         .select('id, name')
         .eq('user_id', data.user.id)
-        .single();
+        .maybeSingle();
 
       if (teamError || !teamMember) {
         await supabase.auth.signOut();
-        toast.error("This account is not linked to a team member profile");
+        toast.error("This account is not linked to a team member profile. Contact your employer.");
         setLoading(false);
         return;
       }
