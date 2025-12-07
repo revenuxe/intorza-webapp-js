@@ -6,17 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Users, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import intorzaLogo from "@/assets/intorza-logo.webp";
 
 const TeamLogin = () => {
   const navigate = useNavigate();
-  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    confirmPassword: '',
   });
 
   useEffect(() => {
@@ -43,80 +41,36 @@ const TeamLogin = () => {
     setLoading(true);
 
     try {
-      if (isSignUp) {
-        if (formData.password !== formData.confirmPassword) {
-          toast.error("Passwords do not match");
-          setLoading(false);
-          return;
-        }
+      // Login with credentials provided by employer
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
 
-        if (formData.password.length < 6) {
-          toast.error("Password must be at least 6 characters");
-          setLoading(false);
-          return;
-        }
+      if (error) throw error;
 
-        // Check if email exists in team_members
-        const { data: teamMember, error: checkError } = await supabase
-          .from('team_members')
-          .select('id, company_id, name')
-          .eq('email', formData.email)
-          .single();
+      // Check if user is a team member
+      const { data: teamMember, error: teamError } = await supabase
+        .from('team_members')
+        .select('id, name')
+        .eq('user_id', data.user.id)
+        .single();
 
-        if (checkError || !teamMember) {
-          toast.error("Your email is not registered with any company. Please contact your employer.");
-          setLoading(false);
-          return;
-        }
-
-        // Sign up the user
-        const { data: authData, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/team/dashboard`,
-          }
-        });
-
-        if (signUpError) throw signUpError;
-
-        if (authData.user) {
-          // Update team_member with user_id
-          await supabase
-            .from('team_members')
-            .update({ user_id: authData.user.id })
-            .eq('id', teamMember.id);
-
-          toast.success("Account created! Please check your email to confirm.");
-        }
-      } else {
-        // Login
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (error) throw error;
-
-        // Check if user is a team member
-        const { data: teamMember, error: teamError } = await supabase
-          .from('team_members')
-          .select('id')
-          .eq('user_id', data.user.id)
-          .single();
-
-        if (teamError || !teamMember) {
-          await supabase.auth.signOut();
-          toast.error("This account is not linked to a team member profile");
-          setLoading(false);
-          return;
-        }
-
-        toast.success("Welcome back!");
-        navigate('/team/dashboard');
+      if (teamError || !teamMember) {
+        await supabase.auth.signOut();
+        toast.error("This account is not linked to a team member profile");
+        setLoading(false);
+        return;
       }
+
+      toast.success(`Welcome back, ${teamMember.name}!`);
+      navigate('/team/dashboard');
     } catch (error: any) {
-      toast.error(error.message || "Authentication failed");
+      if (error.message.includes('Invalid login credentials')) {
+        toast.error("Invalid email or password. Please check your credentials.");
+      } else {
+        toast.error(error.message || "Authentication failed");
+      }
     } finally {
       setLoading(false);
     }
@@ -139,12 +93,9 @@ const TeamLogin = () => {
             <div className="mx-auto mb-4">
               <img src={intorzaLogo} alt="INTORZA" className="h-12 mx-auto" />
             </div>
-            <CardTitle>Team Member Portal</CardTitle>
+            <CardTitle>Team Member Login</CardTitle>
             <CardDescription>
-              {isSignUp 
-                ? "Create your account to access your dashboard" 
-                : "Sign in to view your tasks and clock in/out"
-              }
+              Sign in with credentials provided by your employer
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -156,7 +107,7 @@ const TeamLogin = () => {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="Your work email"
+                  placeholder="yourcompany.yourname@intorza.com"
                 />
               </div>
               <div className="space-y-2">
@@ -169,41 +120,14 @@ const TeamLogin = () => {
                   placeholder="••••••••"
                 />
               </div>
-              {isSignUp && (
-                <div className="space-y-2">
-                  <Label>Confirm Password</Label>
-                  <Input
-                    type="password"
-                    required
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                    placeholder="••••••••"
-                  />
-                </div>
-              )}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Please wait..." : (isSignUp ? "Create Account" : "Sign In")}
+                {loading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <button
-                type="button"
-                className="text-sm text-muted-foreground hover:text-foreground"
-                onClick={() => setIsSignUp(!isSignUp)}
-              >
-                {isSignUp 
-                  ? "Already have an account? Sign in" 
-                  : "First time? Create an account"
-                }
-              </button>
-            </div>
-
-            {isSignUp && (
-              <p className="mt-4 text-xs text-muted-foreground text-center">
-                Note: Your employer must add your email to their team first before you can create an account.
-              </p>
-            )}
+            <p className="mt-6 text-xs text-muted-foreground text-center">
+              Don't have login credentials? Contact your employer to get your account details.
+            </p>
           </CardContent>
         </Card>
       </div>

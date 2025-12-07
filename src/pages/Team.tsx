@@ -89,7 +89,9 @@ const Team = () => {
     phone: '',
     work_type: 'labour',
     project_id: '',
+    password: '',
   });
+  const [creatingAuth, setCreatingAuth] = useState(false);
 
   // Team form (create team = assign multiple members to project)
   const [teamForm, setTeamForm] = useState({
@@ -231,7 +233,18 @@ const Team = () => {
       return;
     }
 
+    if (!editingMember && !memberForm.password) {
+      toast.error("Password is required for new members");
+      return;
+    }
+
+    if (!editingMember && memberForm.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
     const generatedEmail = generateEmail(memberForm.name);
+    setCreatingAuth(true);
 
     try {
       if (editingMember) {
@@ -248,7 +261,7 @@ const Team = () => {
         if (error) throw error;
         toast.success("Team member updated");
       } else {
-        // Create member
+        // Create member record first
         const { data: newMember, error } = await supabase
           .from('team_members')
           .insert({
@@ -263,6 +276,26 @@ const Team = () => {
 
         if (error) throw error;
 
+        // Create auth account via edge function
+        const { data: session } = await supabase.auth.getSession();
+        const response = await supabase.functions.invoke('create-team-member-auth', {
+          body: {
+            email: generatedEmail,
+            password: memberForm.password,
+            name: memberForm.name,
+            phone: memberForm.phone,
+            work_type: memberForm.work_type,
+            company_id: user.id,
+            team_member_id: newMember.id,
+          },
+        });
+
+        if (response.error) {
+          // Clean up the team member record if auth creation fails
+          await supabase.from('team_members').delete().eq('id', newMember.id);
+          throw new Error(response.error.message || 'Failed to create login account');
+        }
+
         // If project selected, assign to project
         if (memberForm.project_id && newMember) {
           await supabase
@@ -273,16 +306,18 @@ const Team = () => {
             });
         }
 
-        toast.success("Team member added");
+        toast.success("Team member added with login credentials");
         trackAction('team_member_added');
       }
 
       setMemberDialogOpen(false);
       setEditingMember(null);
-      setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '' });
+      setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '', password: '' });
       fetchTeamMembers();
     } catch (error: any) {
       toast.error(error.message || "Error saving team member");
+    } finally {
+      setCreatingAuth(false);
     }
   };
 
@@ -354,6 +389,7 @@ const Team = () => {
       phone: member.phone || '',
       work_type: member.work_type,
       project_id: '',
+      password: '', // Password not shown when editing
     });
     setMemberDialogOpen(true);
   };
@@ -485,7 +521,7 @@ const Team = () => {
             setMemberDialogOpen(open);
             if (!open) {
               setEditingMember(null);
-              setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '' });
+              setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '', password: '' });
             }
           }}>
             <DialogTrigger asChild>
@@ -534,27 +570,43 @@ const Team = () => {
                   </Select>
                 </div>
                 {!editingMember && (
-                  <div className="space-y-2">
-                    <Label>Assign to Project (Optional)</Label>
-                    <Select value={memberForm.project_id || "none"} onValueChange={(v) => setMemberForm({ ...memberForm, project_id: v === "none" ? "" : v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No project</SelectItem>
-                        {quotations.map((q) => (
-                          <SelectItem key={q.id} value={q.id}>
-                            {q.project_name} - {q.client_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <>
+                    <div className="space-y-2">
+                      <Label>Login Password *</Label>
+                      <Input
+                        type="password"
+                        value={memberForm.password}
+                        onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })}
+                        placeholder="Create login password (min 6 chars)"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Share this password with the team member to login at /team/login
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Assign to Project (Optional)</Label>
+                      <Select value={memberForm.project_id || "none"} onValueChange={(v) => setMemberForm({ ...memberForm, project_id: v === "none" ? "" : v })}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No project</SelectItem>
+                          {quotations.map((q) => (
+                            <SelectItem key={q.id} value={q.id}>
+                              {q.project_name} - {q.client_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
                 )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setMemberDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleAddMember}>{editingMember ? 'Update' : 'Add'} Member</Button>
+                <Button onClick={handleAddMember} disabled={creatingAuth}>
+                  {creatingAuth ? 'Creating...' : editingMember ? 'Update' : 'Add'} Member
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
