@@ -187,7 +187,8 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   
   let headerTextY = yPosition + 5;
   if (logoPlacement === 'center') {
-    headerTextY = yPosition + logoSize + 8;
+    // For center layout, position text below logo with proper spacing
+    headerTextY = yPosition + logoSize + 10;
   }
   
   doc.setFont('helvetica', 'bold');
@@ -202,7 +203,8 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   
   if (invoiceSettings.showCompanyAddress) {
     if (data.profile.address) {
-      const addressLines = doc.splitTextToSize(data.profile.address, 90);
+      const maxAddressWidth = logoPlacement === 'center' ? contentWidth - 20 : 90;
+      const addressLines = doc.splitTextToSize(data.profile.address, maxAddressWidth);
       addressLines.forEach((line: string) => {
         doc.text(line, companyInfoX, headerTextY, { align: companyInfoAlign });
         headerTextY += 4.5;
@@ -221,10 +223,16 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     if (data.profile.gstin) {
       doc.setFont('helvetica', 'bold');
       doc.text(`GSTIN: ${data.profile.gstin}`, companyInfoX, headerTextY, { align: companyInfoAlign });
+      headerTextY += 4.5;
     }
   }
 
-  yPosition += 35;
+  // Calculate yPosition based on layout - ensure no overlap with cards
+  if (logoPlacement === 'center') {
+    yPosition = headerTextY + 8; // Add extra space after center-aligned header
+  } else {
+    yPosition += 35; // Standard spacing for left/right layouts
+  }
 
   // --- 2. Info Cards ---
   const cardHeight = 42;

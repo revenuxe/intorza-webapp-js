@@ -160,6 +160,10 @@ export type Database = {
       profiles: {
         Row: {
           address: string | null
+          bank_account_holder: string | null
+          bank_account_number: string | null
+          bank_ifsc_code: string | null
+          bank_name: string | null
           company_name: string | null
           created_at: string | null
           email: string | null
@@ -168,15 +172,21 @@ export type Database = {
           id: string
           invoice_terms_conditions: Json | null
           logo_url: string | null
+          payment_qr_url: string | null
           payment_stages: Json | null
           phone: string | null
           professional_advantages: string | null
           signature_url: string | null
           terms_conditions: Json | null
           updated_at: string | null
+          upi_id: string | null
         }
         Insert: {
           address?: string | null
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_ifsc_code?: string | null
+          bank_name?: string | null
           company_name?: string | null
           created_at?: string | null
           email?: string | null
@@ -185,15 +195,21 @@ export type Database = {
           id: string
           invoice_terms_conditions?: Json | null
           logo_url?: string | null
+          payment_qr_url?: string | null
           payment_stages?: Json | null
           phone?: string | null
           professional_advantages?: string | null
           signature_url?: string | null
           terms_conditions?: Json | null
           updated_at?: string | null
+          upi_id?: string | null
         }
         Update: {
           address?: string | null
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_ifsc_code?: string | null
+          bank_name?: string | null
           company_name?: string | null
           created_at?: string | null
           email?: string | null
@@ -202,12 +218,14 @@ export type Database = {
           id?: string
           invoice_terms_conditions?: Json | null
           logo_url?: string | null
+          payment_qr_url?: string | null
           payment_stages?: Json | null
           phone?: string | null
           professional_advantages?: string | null
           signature_url?: string | null
           terms_conditions?: Json | null
           updated_at?: string | null
+          upi_id?: string | null
         }
         Relationships: []
       }
