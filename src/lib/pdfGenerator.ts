@@ -90,6 +90,15 @@ interface QuotationData {
     title: string;
     points: string[];
   }[];
+  // Bank details
+  bankDetails?: {
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    accountHolder?: string;
+    upiId?: string;
+    qrCodeUrl?: string;
+  };
   settings?: QuotationPdfSettings;
   editorSettings?: PDFEditorSettings;
 }
@@ -816,7 +825,67 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   });
   } // End of showTermsConditions
 
-  // --- 7. Signature & Footer ---
+  // --- 6.5 Bank Details Section ---
+  if (settings.showBankDetails && data.bankDetails) {
+    const bank = data.bankDetails;
+    const hasBankInfo = bank.bankName || bank.accountNumber || bank.ifscCode || bank.upiId;
+    
+    if (hasBankInfo) {
+      if (yPosition > pageHeight - 80) {
+        doc.addPage();
+        yPosition = 15;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+      doc.text("BANK & PAYMENT DETAILS", margin, yPosition);
+      yPosition += 8;
+
+      // Bank details card
+      const cardWidth = settings.showQRCode && bank.qrCodeUrl ? contentWidth - 50 : contentWidth;
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+      doc.roundedRect(margin, yPosition, cardWidth, 35, 2, 2, 'FD');
+
+      let bankY = yPosition + 6;
+      const labelX = margin + 5;
+      const valueX = margin + 45;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+
+      const addBankRow = (label: string, value: string) => {
+        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+        doc.text(label, labelX, bankY);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+        doc.text(value, valueX, bankY);
+        doc.setFont('helvetica', 'normal');
+        bankY += 5.5;
+      };
+
+      if (bank.bankName) addBankRow('Bank:', bank.bankName);
+      if (bank.accountHolder) addBankRow('A/C Holder:', bank.accountHolder);
+      if (bank.accountNumber) addBankRow('A/C Number:', bank.accountNumber);
+      if (bank.ifscCode) addBankRow('IFSC Code:', bank.ifscCode);
+      if (bank.upiId) addBankRow('UPI ID:', bank.upiId);
+
+      // QR Code
+      if (settings.showQRCode && bank.qrCodeUrl) {
+        try {
+          const compressedQR = await compressImage(bank.qrCodeUrl, 200, 200);
+          const qrX = pageWidth - margin - 40;
+          doc.addImage(compressedQR, 'JPEG', qrX, yPosition, 35, 35, undefined, 'FAST');
+        } catch (e) {
+          console.error('QR code load error:', e);
+        }
+      }
+
+      yPosition += 42;
+    }
+  }
+
   if (settings.showSignatureArea) {
     if (yPosition > pageHeight - 50) {
       doc.addPage();

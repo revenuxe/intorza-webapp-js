@@ -32,6 +32,13 @@ interface InvoiceData {
     logo_url?: string;
     signature_url?: string;
     invoice_terms_conditions?: { id: string; title: string; points: string[] }[];
+    // Bank details
+    bank_name?: string;
+    bank_account_number?: string;
+    bank_ifsc_code?: string;
+    bank_account_holder?: string;
+    upi_id?: string;
+    payment_qr_url?: string;
   };
   editorSettings?: PDFEditorSettings;
   invoiceSettings?: InvoiceSettings;
@@ -493,6 +500,68 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         addBlock(term.title, term.points);
       }
     });
+  }
+
+  // --- 6.5 Bank Details Section ---
+  if (invoiceSettings.showBankDetails && data.profile) {
+    const bank = data.profile;
+    const hasBankInfo = bank.bank_name || bank.bank_account_number || bank.bank_ifsc_code || bank.upi_id;
+    
+    if (hasBankInfo) {
+      if (yPosition > pageHeight - 80) {
+        doc.addPage();
+        yPosition = 15;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+      doc.text("BANK & PAYMENT DETAILS", margin, yPosition);
+      yPosition += 8;
+
+      // Bank details card
+      const showQR = invoiceSettings.showQRCode && bank.payment_qr_url;
+      const cardWidth = showQR ? contentWidth - 50 : contentWidth;
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+      doc.roundedRect(margin, yPosition, cardWidth, 35, 2, 2, 'FD');
+
+      let bankY = yPosition + 6;
+      const labelX = margin + 5;
+      const valueX = margin + 45;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+
+      const addBankRow = (label: string, value: string) => {
+        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+        doc.text(label, labelX, bankY);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+        doc.text(value, valueX, bankY);
+        doc.setFont('helvetica', 'normal');
+        bankY += 5.5;
+      };
+
+      if (bank.bank_name) addBankRow('Bank:', bank.bank_name);
+      if (bank.bank_account_holder) addBankRow('A/C Holder:', bank.bank_account_holder);
+      if (bank.bank_account_number) addBankRow('A/C Number:', bank.bank_account_number);
+      if (bank.bank_ifsc_code) addBankRow('IFSC Code:', bank.bank_ifsc_code);
+      if (bank.upi_id) addBankRow('UPI ID:', bank.upi_id);
+
+      // QR Code
+      if (showQR && bank.payment_qr_url) {
+        try {
+          const compressedQR = await compressImage(bank.payment_qr_url, 200, 200);
+          const qrX = pageWidth - margin - 40;
+          doc.addImage(compressedQR, 'JPEG', qrX, yPosition, 35, 35, undefined, 'FAST');
+        } catch (e) {
+          console.error('QR code load error:', e);
+        }
+      }
+
+      yPosition += 42;
+    }
   }
 
   // --- 7. Signature & Footer ---
