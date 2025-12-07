@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Users, ArrowLeft } from "lucide-react";
+import intorzaLogo from "@/assets/intorza-logo.webp";
 
 const TeamLogin = () => {
   const navigate = useNavigate();
@@ -17,6 +18,25 @@ const TeamLogin = () => {
     password: '',
     confirmPassword: '',
   });
+
+  useEffect(() => {
+    // Check if already logged in as team member
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: teamMember } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (teamMember) {
+          navigate('/team/dashboard');
+        }
+      }
+    };
+    checkAuth();
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,8 +136,8 @@ const TeamLogin = () => {
 
         <Card>
           <CardHeader className="text-center">
-            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-              <Users className="h-6 w-6 text-primary" />
+            <div className="mx-auto mb-4">
+              <img src={intorzaLogo} alt="INTORZA" className="h-12 mx-auto" />
             </div>
             <CardTitle>Team Member Portal</CardTitle>
             <CardDescription>

@@ -88,6 +88,41 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback: {
+        Row: {
+          created_at: string
+          id: string
+          message: string | null
+          rating: number
+          trigger_action: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          rating: number
+          trigger_action: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          rating?: number
+          trigger_action?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           client_id: string | null
@@ -200,6 +235,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          action_count: number | null
           address: string | null
           bank_account_holder: string | null
           bank_account_number: string | null
@@ -212,6 +248,7 @@ export type Database = {
           gstin: string | null
           id: string
           invoice_terms_conditions: Json | null
+          last_feedback_at: string | null
           logo_url: string | null
           payment_qr_url: string | null
           payment_stages: Json | null
@@ -223,6 +260,7 @@ export type Database = {
           upi_id: string | null
         }
         Insert: {
+          action_count?: number | null
           address?: string | null
           bank_account_holder?: string | null
           bank_account_number?: string | null
@@ -235,6 +273,7 @@ export type Database = {
           gstin?: string | null
           id: string
           invoice_terms_conditions?: Json | null
+          last_feedback_at?: string | null
           logo_url?: string | null
           payment_qr_url?: string | null
           payment_stages?: Json | null
@@ -246,6 +285,7 @@ export type Database = {
           upi_id?: string | null
         }
         Update: {
+          action_count?: number | null
           address?: string | null
           bank_account_holder?: string | null
           bank_account_number?: string | null
@@ -258,6 +298,7 @@ export type Database = {
           gstin?: string | null
           id?: string
           invoice_terms_conditions?: Json | null
+          last_feedback_at?: string | null
           logo_url?: string | null
           payment_qr_url?: string | null
           payment_stages?: Json | null

@@ -3,15 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Users, Clock, MapPin, Phone, Mail, Briefcase, Trash2, Edit } from "lucide-react";
+import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useFeedback } from "@/components/FeedbackProvider";
 
 interface TeamMember {
   id: string;
@@ -29,7 +30,20 @@ interface TodayAttendance {
   team_member_id: string;
   clock_in: string;
   clock_out: string | null;
-  clock_in_location: { lat: number; lng: number; address?: string } | null;
+  clock_in_location: any;
+}
+
+interface Quotation {
+  id: string;
+  project_name: string;
+  client_name: string;
+  status: string;
+}
+
+interface ProjectAssignment {
+  id: string;
+  quotation_id: string;
+  quotation: Quotation;
 }
 
 const workTypes = [
@@ -47,16 +61,21 @@ const workTypes = [
 const Team = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { trackAction } = useFeedback();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendance[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [selectedQuotation, setSelectedQuotation] = useState("");
+  const [memberAssignments, setMemberAssignments] = useState<Record<string, ProjectAssignment[]>>({});
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [companyName, setCompanyName] = useState("");
   
   const [formData, setFormData] = useState({
     name: '',
-    email: '',
     phone: '',
     work_type: 'other',
     daily_rate: '',
@@ -67,6 +86,7 @@ const Team = () => {
       fetchTeamMembers();
       fetchTodayAttendance();
       fetchCompanyName();
+      fetchQuotations();
     }
   }, [user]);
 
@@ -80,6 +100,17 @@ const Team = () => {
     if (data?.company_name) {
       setCompanyName(data.company_name);
     }
+  };
+
+  const fetchQuotations = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('quotations')
+      .select('id, project_name, client_name, status')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    
+    setQuotations(data || []);
   };
 
   const fetchTeamMembers = async () => {
@@ -97,8 +128,30 @@ const Team = () => {
       console.error(error);
     } else {
       setTeamMembers(data || []);
+      // Fetch assignments for each member
+      if (data) {
+        for (const member of data) {
+          fetchMemberAssignments(member.id);
+        }
+      }
     }
     setLoading(false);
+  };
+
+  const fetchMemberAssignments = async (memberId: string) => {
+    const { data } = await supabase
+      .from('team_project_assignments')
+      .select('id, quotation_id, quotations:quotation_id(id, project_name, client_name, status)')
+      .eq('team_member_id', memberId);
+
+    if (data) {
+      const assignments = data.map((a: any) => ({
+        id: a.id,
+        quotation_id: a.quotation_id,
+        quotation: a.quotations,
+      }));
+      setMemberAssignments(prev => ({ ...prev, [memberId]: assignments }));
+    }
   };
 
   const fetchTodayAttendance = async () => {
@@ -117,16 +170,24 @@ const Team = () => {
     }
   };
 
+  const generateEmail = (name: string) => {
+    const cleanCompany = (companyName || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return `${cleanCompany}.${cleanName}@intorza.com`;
+  };
+
   const handleSubmit = async () => {
     if (!user) {
       toast.error("Please login first");
       return;
     }
 
-    if (!formData.name || !formData.email) {
-      toast.error("Name and email are required");
+    if (!formData.name) {
+      toast.error("Name is required");
       return;
     }
+
+    const generatedEmail = generateEmail(formData.name);
 
     try {
       if (editingMember) {
@@ -134,7 +195,7 @@ const Team = () => {
           .from('team_members')
           .update({
             name: formData.name,
-            email: formData.email,
+            email: generatedEmail,
             phone: formData.phone || null,
             work_type: formData.work_type as any,
             daily_rate: formData.daily_rate ? parseFloat(formData.daily_rate) : null,
@@ -149,7 +210,7 @@ const Team = () => {
           .insert({
             company_id: user.id,
             name: formData.name,
-            email: formData.email,
+            email: generatedEmail,
             phone: formData.phone || null,
             work_type: formData.work_type as any,
             daily_rate: formData.daily_rate ? parseFloat(formData.daily_rate) : null,
@@ -157,14 +218,54 @@ const Team = () => {
 
         if (error) throw error;
         toast.success("Team member added");
+        trackAction('team_member_added');
       }
 
       setDialogOpen(false);
       setEditingMember(null);
-      setFormData({ name: '', email: '', phone: '', work_type: 'other', daily_rate: '' });
+      setFormData({ name: '', phone: '', work_type: 'other', daily_rate: '' });
       fetchTeamMembers();
     } catch (error: any) {
       toast.error(error.message || "Error saving team member");
+    }
+  };
+
+  const handleAssignProject = async () => {
+    if (!selectedMember || !selectedQuotation) {
+      toast.error("Please select a project");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('team_project_assignments')
+        .insert({
+          team_member_id: selectedMember.id,
+          quotation_id: selectedQuotation,
+        });
+
+      if (error) throw error;
+      
+      toast.success("Project assigned successfully");
+      setAssignDialogOpen(false);
+      setSelectedQuotation("");
+      fetchMemberAssignments(selectedMember.id);
+    } catch (error: any) {
+      toast.error(error.message || "Error assigning project");
+    }
+  };
+
+  const handleRemoveAssignment = async (assignmentId: string, memberId: string) => {
+    const { error } = await supabase
+      .from('team_project_assignments')
+      .delete()
+      .eq('id', assignmentId);
+
+    if (error) {
+      toast.error("Error removing assignment");
+    } else {
+      toast.success("Assignment removed");
+      fetchMemberAssignments(memberId);
     }
   };
 
@@ -186,7 +287,6 @@ const Team = () => {
     setEditingMember(member);
     setFormData({
       name: member.name,
-      email: member.email,
       phone: member.phone || '',
       work_type: member.work_type,
       daily_rate: member.daily_rate?.toString() || '',
@@ -213,8 +313,6 @@ const Team = () => {
     return colors[type] || colors.other;
   };
 
-  const teamLoginUrl = `${window.location.origin}/team/login`;
-
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -237,7 +335,7 @@ const Team = () => {
           setDialogOpen(open);
           if (!open) {
             setEditingMember(null);
-            setFormData({ name: '', email: '', phone: '', work_type: 'other', daily_rate: '' });
+            setFormData({ name: '', phone: '', work_type: 'other', daily_rate: '' });
           }
         }}>
           <DialogTrigger asChild>
@@ -258,15 +356,11 @@ const Team = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Full name"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Email *</Label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="email@example.com"
-                />
+                {formData.name && companyName && (
+                  <p className="text-xs text-muted-foreground">
+                    Email: <span className="font-medium">{generateEmail(formData.name)}</span>
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Phone</Label>
@@ -307,25 +401,6 @@ const Team = () => {
         </Dialog>
       </div>
 
-      {/* Team Login Link Card */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="font-semibold">Team Member Login Portal</h3>
-              <p className="text-sm text-muted-foreground">Share this link with your team members to login</p>
-              <code className="text-xs bg-muted px-2 py-1 rounded mt-2 block break-all">{teamLoginUrl}</code>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => {
-              navigator.clipboard.writeText(teamLoginUrl);
-              toast.success("Link copied!");
-            }}>
-              Copy Link
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -364,7 +439,7 @@ const Team = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-amber-600" />
+              <FolderPlus className="h-5 w-5 text-amber-600" />
               <div>
                 <p className="text-2xl font-bold tabular-nums">{teamMembers.filter(m => m.status === 'active').length}</p>
                 <p className="text-xs text-muted-foreground">Active</p>
@@ -373,6 +448,36 @@ const Team = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Project Assignment Dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Project to {selectedMember?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Project</Label>
+              <Select value={selectedQuotation} onValueChange={setSelectedQuotation}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {quotations.map((q) => (
+                    <SelectItem key={q.id} value={q.id}>
+                      {q.project_name} - {q.client_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAssignProject}>Assign Project</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Team Members List */}
       <div className="space-y-4">
@@ -398,75 +503,113 @@ const Team = () => {
             {teamMembers.map((member) => {
               const attendance = getMemberAttendance(member.id);
               const isClockedIn = attendance && !attendance.clock_out;
+              const assignments = memberAssignments[member.id] || [];
               
               return (
                 <Card key={member.id} className="overflow-hidden">
                   <CardContent className="pt-6">
-                    <div className="flex flex-col sm:flex-row justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold">{member.name}</h3>
-                          <Badge className={getWorkTypeBadgeColor(member.work_type)}>
-                            {workTypes.find(t => t.value === member.work_type)?.label || member.work_type}
-                          </Badge>
-                          {isClockedIn && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              <Clock className="h-3 w-3 mr-1" />
-                              Working
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col sm:flex-row justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <h3 className="font-semibold">{member.name}</h3>
+                            <Badge className={getWorkTypeBadgeColor(member.work_type)}>
+                              {workTypes.find(t => t.value === member.work_type)?.label || member.work_type}
                             </Badge>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-4 w-4" />
-                            {member.email}
-                          </span>
-                          {member.phone && (
-                            <span className="flex items-center gap-1">
-                              <Phone className="h-4 w-4" />
-                              {member.phone}
-                            </span>
-                          )}
-                          {member.daily_rate && (
-                            <span className="flex items-center gap-1">
-                              ₹{member.daily_rate}/day
-                            </span>
-                          )}
-                        </div>
-                        {attendance && (
-                          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            <span>In: {new Date(attendance.clock_in).toLocaleTimeString()}</span>
-                            {attendance.clock_out && (
-                              <span>Out: {new Date(attendance.clock_out).toLocaleTimeString()}</span>
+                            {isClockedIn && (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Working
+                              </Badge>
                             )}
                           </div>
-                        )}
+                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Mail className="h-4 w-4" />
+                              {member.email}
+                            </span>
+                            {member.phone && (
+                              <span className="flex items-center gap-1">
+                                <Phone className="h-4 w-4" />
+                                {member.phone}
+                              </span>
+                            )}
+                            {member.daily_rate && (
+                              <span className="flex items-center gap-1">
+                                ₹{member.daily_rate}/day
+                              </span>
+                            )}
+                          </div>
+                          {attendance && (
+                            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                              <Clock className="h-3 w-3" />
+                              <span>In: {new Date(attendance.clock_in).toLocaleTimeString()}</span>
+                              {attendance.clock_out && (
+                                <span>Out: {new Date(attendance.clock_out).toLocaleTimeString()}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => {
+                              setSelectedMember(member);
+                              setAssignDialogOpen(true);
+                            }}
+                          >
+                            <FolderPlus className="h-4 w-4 mr-1" />
+                            Assign
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(member)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Team Member</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete {member.name}? This will also delete their attendance records.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(member.id)}>Delete</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(member)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Team Member</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to delete {member.name}? This will also delete their attendance records.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(member.id)}>Delete</AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                      
+                      {/* Assigned Projects */}
+                      {assignments.length > 0 && (
+                        <div className="border-t pt-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Assigned Projects</p>
+                          <div className="flex flex-wrap gap-2">
+                            {assignments.map((assignment) => (
+                              <Badge 
+                                key={assignment.id} 
+                                variant="secondary" 
+                                className="flex items-center gap-1"
+                              >
+                                {assignment.quotation?.project_name}
+                                <button
+                                  onClick={() => handleRemoveAssignment(assignment.id, member.id)}
+                                  className="ml-1 hover:text-destructive"
+                                >
+                                  ×
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
