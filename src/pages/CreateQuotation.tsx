@@ -89,7 +89,13 @@ const CreateQuotation = () => {
     gstin: "",
     professional_advantages: "",
     signature_url: "",
-    terms_conditions: [] as any[]
+    terms_conditions: [] as any[],
+    bank_name: "",
+    bank_account_number: "",
+    bank_ifsc_code: "",
+    bank_account_holder: "",
+    upi_id: "",
+    payment_qr_url: "",
   });
   const [formRestored, setFormRestored] = useState(false);
   const [customizeSettings, setCustomizeSettings] = useState<QuotationSettings>(getQuotationSettings());
@@ -177,7 +183,13 @@ const CreateQuotation = () => {
           gstin: data.gstin || "",
           professional_advantages: data.professional_advantages || "",
           signature_url: data.signature_url || "",
-          terms_conditions: (data.terms_conditions as any) || []
+          terms_conditions: (data.terms_conditions as any) || [],
+          bank_name: (data as any).bank_name || "",
+          bank_account_number: (data as any).bank_account_number || "",
+          bank_ifsc_code: (data as any).bank_ifsc_code || "",
+          bank_account_holder: (data as any).bank_account_holder || "",
+          upi_id: (data as any).upi_id || "",
+          payment_qr_url: (data as any).payment_qr_url || "",
         });
         
         // Load payment stages from profile
@@ -609,6 +621,14 @@ const CreateQuotation = () => {
           percentage: s.percentage
         })),
         termsConditions: profile.terms_conditions,
+        bankDetails: {
+          bankName: profile.bank_name,
+          accountNumber: profile.bank_account_number,
+          ifscCode: profile.bank_ifsc_code,
+          accountHolder: profile.bank_account_holder,
+          upiId: profile.upi_id,
+          qrCodeUrl: profile.payment_qr_url,
+        },
         settings: customizeSettings,
         editorSettings: editorSettings || getEditorSettings()
       });
