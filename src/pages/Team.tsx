@@ -761,7 +761,7 @@ const Team = () => {
                   <Card 
                     key={team.quotation.id} 
                     className="cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => openProjectDetail(team)}
+                    onClick={() => navigate(`/team/project/${team.quotation.id}`)}
                   >
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">

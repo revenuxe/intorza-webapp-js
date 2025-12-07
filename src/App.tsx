@@ -19,6 +19,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import Team from "./pages/Team";
 import TeamLogin from "./pages/team/TeamLogin";
 import TeamDashboard from "./pages/team/TeamDashboard";
+import ProjectDetail from "./pages/team/ProjectDetail";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ const App = () => (
             <Route path="/invoices/:id" element={<Layout><InvoiceDetail /></Layout>} />
             <Route path="/clients" element={<Layout><Clients /></Layout>} />
             <Route path="/team" element={<Layout><Team /></Layout>} />
+            <Route path="/team/project/:projectId" element={<Layout><ProjectDetail /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
