@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,37 @@ const Auth = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
 
+  // Check if already logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Check if team member - redirect to team dashboard
+        const { data: teamMember } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (teamMember) {
+          navigate('/team/dashboard');
+          return;
+        }
+        
+        // Check if admin - redirect to admin dashboard
+        const { data: isAdmin } = await supabase.rpc('is_admin');
+        if (isAdmin) {
+          navigate('/admin/dashboard');
+          return;
+        }
+        
+        // Regular user - go to home
+        navigate('/');
+      }
+    };
+    checkAuth();
+  }, [navigate]);
+
   const getReturnPath = () => {
     const returnPath = sessionStorage.getItem('returnPath');
     const pendingAction = sessionStorage.getItem('pendingAction');
@@ -45,9 +76,20 @@ const Auth = () => {
 
   const clearErrors = () => setErrors({});
 
+  // Check if email is a team member email
+  const isTeamMemberEmail = (email: string) => {
+    return email.toLowerCase().endsWith('@intorza.com');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     clearErrors();
+
+    // Block team member emails from company login
+    if (isTeamMemberEmail(loginEmail)) {
+      toast.error("Team member accounts must login at /team/login");
+      return;
+    }
 
     // Validate inputs
     const result = loginSchema.safeParse({ email: loginEmail, password: loginPassword });
@@ -72,6 +114,27 @@ const Auth = () => {
 
       if (error) throw error;
 
+      // Double-check: make sure this user is not a team member
+      const { data: teamMember } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('user_id', data.user.id)
+        .maybeSingle();
+
+      if (teamMember) {
+        await supabase.auth.signOut();
+        toast.error("Team member accounts must login at /team/login");
+        return;
+      }
+
+      // Check if admin - redirect appropriately
+      const { data: isAdmin } = await supabase.rpc('is_admin');
+      if (isAdmin) {
+        toast.success("Welcome back, Admin!");
+        navigate('/admin/dashboard');
+        return;
+      }
+
       toast.success("Welcome back!");
       const returnPath = getReturnPath();
       sessionStorage.removeItem('returnPath');
@@ -90,6 +153,12 @@ const Auth = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     clearErrors();
+
+    // Block @intorza.com emails from regular signup
+    if (isTeamMemberEmail(signupEmail)) {
+      toast.error("@intorza.com emails are reserved for team members. Contact your employer for access.");
+      return;
+    }
 
     // Validate inputs
     const result = signupSchema.safeParse({

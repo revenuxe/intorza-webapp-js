@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,34 @@ const AdminLogin = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Check if already logged in as admin
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: isAdmin } = await supabase.rpc('is_admin');
+        if (isAdmin) {
+          navigate('/admin/dashboard');
+        }
+      }
+    };
+    checkAuth();
+  }, [navigate]);
+
+  // Block team member emails
+  const isTeamMemberEmail = (email: string) => {
+    return email.toLowerCase().endsWith('@intorza.com');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Block team member emails from admin login
+    if (isTeamMemberEmail(email)) {
+      toast.error("Team member accounts cannot access admin portal");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -46,7 +72,11 @@ const AdminLogin = () => {
         navigate("/admin/dashboard");
       }
     } catch (error: any) {
-      toast.error(error.message || "Login failed");
+      if (error.message?.includes("Invalid login credentials")) {
+        toast.error("Invalid email or password");
+      } else {
+        toast.error(error.message || "Login failed");
+      }
     } finally {
       setLoading(false);
     }
