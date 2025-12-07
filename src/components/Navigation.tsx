@@ -1,4 +1,4 @@
-import { FileText, Receipt, Users, Settings, PlusCircle } from "lucide-react";
+import { FileText, Receipt, Users, Settings, PlusCircle, UsersRound } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +26,11 @@ const navItems = [
     title: "Clients",
     href: "/clients",
     icon: Users,
+  },
+  {
+    title: "Team",
+    href: "/team",
+    icon: UsersRound,
   },
   {
     title: "Settings",
