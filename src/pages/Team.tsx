@@ -3,14 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus } from "lucide-react";
+import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useFeedback } from "@/components/FeedbackProvider";
 
@@ -43,7 +44,13 @@ interface Quotation {
 interface ProjectAssignment {
   id: string;
   quotation_id: string;
+  team_member_id: string;
   quotation: Quotation;
+}
+
+interface ProjectTeam {
+  quotation: Quotation;
+  members: (TeamMember & { assignmentId: string })[];
 }
 
 const workTypes = [
@@ -55,6 +62,8 @@ const workTypes = [
   { value: 'mason', label: 'Mason' },
   { value: 'welder', label: 'Welder' },
   { value: 'supervisor', label: 'Supervisor' },
+  { value: 'helper', label: 'Helper' },
+  { value: 'driver', label: 'Driver' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -65,30 +74,44 @@ const Team = () => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [todayAttendance, setTodayAttendance] = useState<TodayAttendance[]>([]);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [projectTeams, setProjectTeams] = useState<ProjectTeam[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
-  const [selectedQuotation, setSelectedQuotation] = useState("");
-  const [memberAssignments, setMemberAssignments] = useState<Record<string, ProjectAssignment[]>>({});
+  
+  // Dialogs
+  const [memberDialogOpen, setMemberDialogOpen] = useState(false);
+  const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [companyName, setCompanyName] = useState("");
   
-  const [formData, setFormData] = useState({
+  // Member form
+  const [memberForm, setMemberForm] = useState({
     name: '',
     phone: '',
-    work_type: 'other',
-    daily_rate: '',
+    work_type: 'labour',
+    project_id: '',
+  });
+
+  // Team form (create team = assign multiple members to project)
+  const [teamForm, setTeamForm] = useState({
+    project_id: '',
+    selectedMembers: [] as string[],
   });
 
   useEffect(() => {
     if (user) {
-      fetchTeamMembers();
-      fetchTodayAttendance();
-      fetchCompanyName();
-      fetchQuotations();
+      fetchAll();
     }
   }, [user]);
+
+  const fetchAll = async () => {
+    await Promise.all([
+      fetchCompanyName(),
+      fetchTeamMembers(),
+      fetchTodayAttendance(),
+      fetchQuotations(),
+    ]);
+    setLoading(false);
+  };
 
   const fetchCompanyName = async () => {
     if (!user) return;
@@ -115,7 +138,6 @@ const Team = () => {
 
   const fetchTeamMembers = async () => {
     if (!user) return;
-    setLoading(true);
     
     const { data, error } = await supabase
       .from('team_members')
@@ -124,35 +146,57 @@ const Team = () => {
       .order('created_at', { ascending: false });
 
     if (error) {
-      toast.error("Error fetching team members");
       console.error(error);
     } else {
       setTeamMembers(data || []);
-      // Fetch assignments for each member
-      if (data) {
-        for (const member of data) {
-          fetchMemberAssignments(member.id);
-        }
-      }
     }
-    setLoading(false);
   };
 
-  const fetchMemberAssignments = async (memberId: string) => {
-    const { data } = await supabase
+  const fetchProjectTeams = async () => {
+    if (!user) return;
+    
+    const { data: assignments } = await supabase
       .from('team_project_assignments')
-      .select('id, quotation_id, quotations:quotation_id(id, project_name, client_name, status)')
-      .eq('team_member_id', memberId);
+      .select(`
+        id,
+        quotation_id,
+        team_member_id,
+        quotations:quotation_id(id, project_name, client_name, status)
+      `);
 
-    if (data) {
-      const assignments = data.map((a: any) => ({
-        id: a.id,
-        quotation_id: a.quotation_id,
-        quotation: a.quotations,
-      }));
-      setMemberAssignments(prev => ({ ...prev, [memberId]: assignments }));
+    if (assignments) {
+      // Group by project
+      const teamsMap = new Map<string, ProjectTeam>();
+      
+      for (const assignment of assignments) {
+        const quotation = assignment.quotations as unknown as Quotation;
+        if (!quotation) continue;
+        
+        const member = teamMembers.find(m => m.id === assignment.team_member_id);
+        if (!member) continue;
+        
+        if (!teamsMap.has(quotation.id)) {
+          teamsMap.set(quotation.id, {
+            quotation,
+            members: [],
+          });
+        }
+        
+        teamsMap.get(quotation.id)!.members.push({
+          ...member,
+          assignmentId: assignment.id,
+        });
+      }
+      
+      setProjectTeams(Array.from(teamsMap.values()));
     }
   };
+
+  useEffect(() => {
+    if (teamMembers.length > 0) {
+      fetchProjectTeams();
+    }
+  }, [teamMembers]);
 
   const fetchTodayAttendance = async () => {
     if (!user) return;
@@ -160,12 +204,12 @@ const Team = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('attendance')
       .select('team_member_id, clock_in, clock_out, clock_in_location')
       .gte('clock_in', today.toISOString());
 
-    if (!error && data) {
+    if (data) {
       setTodayAttendance(data as TodayAttendance[]);
     }
   };
@@ -176,100 +220,120 @@ const Team = () => {
     return `${cleanCompany}.${cleanName}@intorza.com`;
   };
 
-  const handleSubmit = async () => {
+  const handleAddMember = async () => {
     if (!user) {
       toast.error("Please login first");
       return;
     }
 
-    if (!formData.name) {
+    if (!memberForm.name) {
       toast.error("Name is required");
       return;
     }
 
-    const generatedEmail = generateEmail(formData.name);
+    const generatedEmail = generateEmail(memberForm.name);
 
     try {
       if (editingMember) {
         const { error } = await supabase
           .from('team_members')
           .update({
-            name: formData.name,
+            name: memberForm.name,
             email: generatedEmail,
-            phone: formData.phone || null,
-            work_type: formData.work_type as any,
-            daily_rate: formData.daily_rate ? parseFloat(formData.daily_rate) : null,
+            phone: memberForm.phone || null,
+            work_type: memberForm.work_type as any,
           })
           .eq('id', editingMember.id);
 
         if (error) throw error;
         toast.success("Team member updated");
       } else {
-        const { error } = await supabase
+        // Create member
+        const { data: newMember, error } = await supabase
           .from('team_members')
           .insert({
             company_id: user.id,
-            name: formData.name,
+            name: memberForm.name,
             email: generatedEmail,
-            phone: formData.phone || null,
-            work_type: formData.work_type as any,
-            daily_rate: formData.daily_rate ? parseFloat(formData.daily_rate) : null,
-          });
+            phone: memberForm.phone || null,
+            work_type: memberForm.work_type as any,
+          })
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // If project selected, assign to project
+        if (memberForm.project_id && newMember) {
+          await supabase
+            .from('team_project_assignments')
+            .insert({
+              team_member_id: newMember.id,
+              quotation_id: memberForm.project_id,
+            });
+        }
+
         toast.success("Team member added");
         trackAction('team_member_added');
       }
 
-      setDialogOpen(false);
+      setMemberDialogOpen(false);
       setEditingMember(null);
-      setFormData({ name: '', phone: '', work_type: 'other', daily_rate: '' });
+      setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '' });
       fetchTeamMembers();
     } catch (error: any) {
       toast.error(error.message || "Error saving team member");
     }
   };
 
-  const handleAssignProject = async () => {
-    if (!selectedMember || !selectedQuotation) {
+  const handleCreateTeam = async () => {
+    if (!teamForm.project_id) {
       toast.error("Please select a project");
       return;
     }
 
+    if (teamForm.selectedMembers.length === 0) {
+      toast.error("Please select at least one member");
+      return;
+    }
+
     try {
+      const assignments = teamForm.selectedMembers.map(memberId => ({
+        team_member_id: memberId,
+        quotation_id: teamForm.project_id,
+      }));
+
       const { error } = await supabase
         .from('team_project_assignments')
-        .insert({
-          team_member_id: selectedMember.id,
-          quotation_id: selectedQuotation,
-        });
+        .insert(assignments);
 
       if (error) throw error;
-      
-      toast.success("Project assigned successfully");
-      setAssignDialogOpen(false);
-      setSelectedQuotation("");
-      fetchMemberAssignments(selectedMember.id);
+
+      toast.success("Team created successfully");
+      trackAction('team_created');
+      setTeamDialogOpen(false);
+      setTeamForm({ project_id: '', selectedMembers: [] });
+      fetchProjectTeams();
     } catch (error: any) {
-      toast.error(error.message || "Error assigning project");
+      toast.error(error.message || "Error creating team");
     }
   };
 
-  const handleRemoveAssignment = async (assignmentId: string, memberId: string) => {
+  const handleRemoveMemberFromProject = async (assignmentId: string) => {
     const { error } = await supabase
       .from('team_project_assignments')
       .delete()
       .eq('id', assignmentId);
 
     if (error) {
-      toast.error("Error removing assignment");
+      toast.error("Error removing member");
     } else {
-      toast.success("Assignment removed");
-      fetchMemberAssignments(memberId);
+      toast.success("Member removed from project");
+      fetchProjectTeams();
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteMember = async (id: string) => {
     const { error } = await supabase
       .from('team_members')
       .delete()
@@ -283,15 +347,15 @@ const Team = () => {
     }
   };
 
-  const handleEdit = (member: TeamMember) => {
+  const handleEditMember = (member: TeamMember) => {
     setEditingMember(member);
-    setFormData({
+    setMemberForm({
       name: member.name,
       phone: member.phone || '',
       work_type: member.work_type,
-      daily_rate: member.daily_rate?.toString() || '',
+      project_id: '',
     });
-    setDialogOpen(true);
+    setMemberDialogOpen(true);
   };
 
   const getMemberAttendance = (memberId: string) => {
@@ -308,9 +372,20 @@ const Team = () => {
       mason: 'bg-orange-100 text-orange-800',
       welder: 'bg-red-100 text-red-800',
       supervisor: 'bg-green-100 text-green-800',
+      helper: 'bg-teal-100 text-teal-800',
+      driver: 'bg-indigo-100 text-indigo-800',
       other: 'bg-muted text-muted-foreground',
     };
     return colors[type] || colors.other;
+  };
+
+  const toggleMemberSelection = (memberId: string) => {
+    setTeamForm(prev => ({
+      ...prev,
+      selectedMembers: prev.selectedMembers.includes(memberId)
+        ? prev.selectedMembers.filter(id => id !== memberId)
+        : [...prev.selectedMembers, memberId],
+    }));
   };
 
   if (!user) {
@@ -329,76 +404,161 @@ const Team = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold">Team Management</h1>
-          <p className="text-muted-foreground">Manage your team members and track attendance</p>
+          <p className="text-muted-foreground">Manage your team members and project assignments</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) {
-            setEditingMember(null);
-            setFormData({ name: '', phone: '', work_type: 'other', daily_rate: '' });
-          }
-        }}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Member
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>{editingMember ? 'Edit' : 'Add'} Team Member</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Name *</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Full name"
-                />
-                {formData.name && companyName && (
-                  <p className="text-xs text-muted-foreground">
-                    Email: <span className="font-medium">{generateEmail(formData.name)}</span>
-                  </p>
+        <div className="flex gap-2">
+          {/* Add Team Dialog */}
+          <Dialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <FolderPlus className="h-4 w-4 mr-2" />
+                Add Team
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create Project Team</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Select Project *</Label>
+                  <Select value={teamForm.project_id} onValueChange={(v) => setTeamForm({ ...teamForm, project_id: v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {quotations.map((q) => (
+                        <SelectItem key={q.id} value={q.id}>
+                          {q.project_name} - {q.client_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Select Team Members *</Label>
+                  <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
+                    {teamMembers.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">No members yet. Add members first.</p>
+                    ) : (
+                      teamMembers.map((member) => (
+                        <label
+                          key={member.id}
+                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                            teamForm.selectedMembers.includes(member.id)
+                              ? 'bg-primary/10 border border-primary/30'
+                              : 'hover:bg-muted'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={teamForm.selectedMembers.includes(member.id)}
+                            onChange={() => toggleMemberSelection(member.id)}
+                            className="rounded"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{member.name}</p>
+                            <p className="text-xs text-muted-foreground">{member.email}</p>
+                          </div>
+                          <Badge className={getWorkTypeBadgeColor(member.work_type)} variant="secondary">
+                            {workTypes.find(t => t.value === member.work_type)?.label}
+                          </Badge>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {teamForm.selectedMembers.length > 0 && (
+                    <p className="text-xs text-muted-foreground">{teamForm.selectedMembers.length} member(s) selected</p>
+                  )}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setTeamDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateTeam}>Create Team</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Add Member Dialog */}
+          <Dialog open={memberDialogOpen} onOpenChange={(open) => {
+            setMemberDialogOpen(open);
+            if (!open) {
+              setEditingMember(null);
+              setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '' });
+            }
+          }}>
+            <DialogTrigger asChild>
+              <Button>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Member
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>{editingMember ? 'Edit' : 'Add'} Team Member</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Full Name *</Label>
+                  <Input
+                    value={memberForm.name}
+                    onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
+                    placeholder="Enter full name"
+                  />
+                  {memberForm.name && companyName && (
+                    <p className="text-xs text-muted-foreground">
+                      Login Email: <span className="font-medium text-foreground">{generateEmail(memberForm.name)}</span>
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone Number</Label>
+                  <Input
+                    value={memberForm.phone}
+                    onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Work Type *</Label>
+                  <Select value={memberForm.work_type} onValueChange={(v) => setMemberForm({ ...memberForm, work_type: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {!editingMember && (
+                  <div className="space-y-2">
+                    <Label>Assign to Project (Optional)</Label>
+                    <Select value={memberForm.project_id} onValueChange={(v) => setMemberForm({ ...memberForm, project_id: v })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No project</SelectItem>
+                        {quotations.map((q) => (
+                          <SelectItem key={q.id} value={q.id}>
+                            {q.project_name} - {q.client_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label>Phone</Label>
-                <Input
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="Phone number"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Work Type</Label>
-                <Select value={formData.work_type} onValueChange={(v) => setFormData({ ...formData, work_type: v })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {workTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Daily Rate (₹)</Label>
-                <Input
-                  type="number"
-                  value={formData.daily_rate}
-                  onChange={(e) => setFormData({ ...formData, daily_rate: e.target.value })}
-                  placeholder="500"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSubmit}>{editingMember ? 'Update' : 'Add'} Member</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setMemberDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleAddMember}>{editingMember ? 'Update' : 'Add'} Member</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -417,6 +577,17 @@ const Team = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-blue-600" />
+              <div>
+                <p className="text-2xl font-bold tabular-nums">{projectTeams.length}</p>
+                <p className="text-xs text-muted-foreground">Active Teams</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-green-600" />
               <div>
                 <p className="text-2xl font-bold tabular-nums">{todayAttendance.filter(a => a.clock_in && !a.clock_out).length}</p>
@@ -428,7 +599,7 @@ const Team = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-blue-600" />
+              <MapPin className="h-5 w-5 text-amber-600" />
               <div>
                 <p className="text-2xl font-bold tabular-nums">{todayAttendance.length}</p>
                 <p className="text-xs text-muted-foreground">Attended Today</p>
@@ -436,85 +607,114 @@ const Team = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2">
-              <FolderPlus className="h-5 w-5 text-amber-600" />
-              <div>
-                <p className="text-2xl font-bold tabular-nums">{teamMembers.filter(m => m.status === 'active').length}</p>
-                <p className="text-xs text-muted-foreground">Active</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Project Assignment Dialog */}
-      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Assign Project to {selectedMember?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Select Project</Label>
-              <Select value={selectedQuotation} onValueChange={setSelectedQuotation}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {quotations.map((q) => (
-                    <SelectItem key={q.id} value={q.id}>
-                      {q.project_name} - {q.client_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAssignProject}>Assign Project</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Tabs for Teams and Members */}
+      <Tabs defaultValue="teams" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="teams">Project Teams</TabsTrigger>
+          <TabsTrigger value="members">All Members</TabsTrigger>
+        </TabsList>
 
-      {/* Team Members List */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Team Members</h2>
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="pt-6 h-24 bg-muted/50" />
-              </Card>
-            ))}
-          </div>
-        ) : teamMembers.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6 text-center py-12">
-              <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No team members yet</p>
-              <p className="text-sm text-muted-foreground">Add your first team member to get started</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {teamMembers.map((member) => {
-              const attendance = getMemberAttendance(member.id);
-              const isClockedIn = attendance && !attendance.clock_out;
-              const assignments = memberAssignments[member.id] || [];
-              
-              return (
-                <Card key={member.id} className="overflow-hidden">
-                  <CardContent className="pt-6">
-                    <div className="flex flex-col gap-4">
-                      <div className="flex flex-col sm:flex-row justify-between gap-4">
+        <TabsContent value="teams" className="space-y-4">
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardContent className="pt-6 h-32 bg-muted/50" />
+                </Card>
+              ))}
+            </div>
+          ) : projectTeams.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6 text-center py-12">
+                <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No project teams yet</p>
+                <p className="text-sm text-muted-foreground mb-4">Create a team by assigning members to a project</p>
+                <Button variant="outline" onClick={() => setTeamDialogOpen(true)}>
+                  <FolderPlus className="h-4 w-4 mr-2" />
+                  Create First Team
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {projectTeams.map((team) => (
+                <Card key={team.quotation.id}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">{team.quotation.project_name}</CardTitle>
+                        <p className="text-sm text-muted-foreground">{team.quotation.client_name}</p>
+                      </div>
+                      <Badge variant="outline">{team.members.length} members</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      {team.members.map((member) => (
+                        <div 
+                          key={member.assignmentId}
+                          className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{member.name}</p>
+                            <Badge className={`${getWorkTypeBadgeColor(member.work_type)} text-xs`} variant="secondary">
+                              {workTypes.find(t => t.value === member.work_type)?.label}
+                            </Badge>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveMemberFromProject(member.assignmentId)}
+                            className="text-muted-foreground hover:text-destructive ml-2"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="members" className="space-y-4">
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardContent className="pt-6 h-24 bg-muted/50" />
+                </Card>
+              ))}
+            </div>
+          ) : teamMembers.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6 text-center py-12">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No team members yet</p>
+                <p className="text-sm text-muted-foreground mb-4">Add your first team member to get started</p>
+                <Button onClick={() => setMemberDialogOpen(true)}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add First Member
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3">
+              {teamMembers.map((member) => {
+                const attendance = getMemberAttendance(member.id);
+                const isClockedIn = attendance && !attendance.clock_out;
+                
+                return (
+                  <Card key={member.id}>
+                    <CardContent className="pt-4 pb-4">
+                      <div className="flex flex-col sm:flex-row justify-between gap-3">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <h3 className="font-semibold">{member.name}</h3>
                             <Badge className={getWorkTypeBadgeColor(member.work_type)}>
-                              {workTypes.find(t => t.value === member.work_type)?.label || member.work_type}
+                              {workTypes.find(t => t.value === member.work_type)?.label}
                             </Badge>
                             {isClockedIn && (
                               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
@@ -523,25 +723,20 @@ const Team = () => {
                               </Badge>
                             )}
                           </div>
-                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
-                              <Mail className="h-4 w-4" />
+                              <Mail className="h-3 w-3" />
                               {member.email}
                             </span>
                             {member.phone && (
                               <span className="flex items-center gap-1">
-                                <Phone className="h-4 w-4" />
+                                <Phone className="h-3 w-3" />
                                 {member.phone}
-                              </span>
-                            )}
-                            {member.daily_rate && (
-                              <span className="flex items-center gap-1">
-                                ₹{member.daily_rate}/day
                               </span>
                             )}
                           </div>
                           {attendance && (
-                            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                               <Clock className="h-3 w-3" />
                               <span>In: {new Date(attendance.clock_in).toLocaleTimeString()}</span>
                               {attendance.clock_out && (
@@ -550,19 +745,8 @@ const Team = () => {
                             </div>
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => {
-                              setSelectedMember(member);
-                              setAssignDialogOpen(true);
-                            }}
-                          >
-                            <FolderPlus className="h-4 w-4 mr-1" />
-                            Assign
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(member)}>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleEditMember(member)}>
                             <Edit className="h-4 w-4" />
                           </Button>
                           <AlertDialog>
@@ -580,44 +764,20 @@ const Team = () => {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDelete(member.id)}>Delete</AlertDialogAction>
+                                <AlertDialogAction onClick={() => handleDeleteMember(member.id)}>Delete</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
                         </div>
                       </div>
-                      
-                      {/* Assigned Projects */}
-                      {assignments.length > 0 && (
-                        <div className="border-t pt-3">
-                          <p className="text-xs font-medium text-muted-foreground mb-2">Assigned Projects</p>
-                          <div className="flex flex-wrap gap-2">
-                            {assignments.map((assignment) => (
-                              <Badge 
-                                key={assignment.id} 
-                                variant="secondary" 
-                                className="flex items-center gap-1"
-                              >
-                                {assignment.quotation?.project_name}
-                                <button
-                                  onClick={() => handleRemoveAssignment(assignment.id, member.id)}
-                                  className="ml-1 hover:text-destructive"
-                                >
-                                  ×
-                                </button>
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
