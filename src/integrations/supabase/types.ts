@@ -14,6 +14,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      attendance: {
+        Row: {
+          clock_in: string
+          clock_in_location: Json | null
+          clock_out: string | null
+          clock_out_location: Json | null
+          created_at: string
+          id: string
+          notes: string | null
+          team_member_id: string
+        }
+        Insert: {
+          clock_in?: string
+          clock_in_location?: Json | null
+          clock_out?: string | null
+          clock_out_location?: Json | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          team_member_id: string
+        }
+        Update: {
+          clock_in?: string
+          clock_in_location?: Json | null
+          clock_out?: string | null
+          clock_out_location?: Json | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          team_member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -409,6 +450,162 @@ export type Database = {
           },
         ]
       }
+      tasks: {
+        Row: {
+          assigned_to: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: string | null
+          quotation_id: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string | null
+          quotation_id?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string | null
+          quotation_id?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          company_id: string
+          created_at: string
+          daily_rate: number | null
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          status: Database["public"]["Enums"]["team_member_status"]
+          updated_at: string
+          user_id: string | null
+          work_type: Database["public"]["Enums"]["work_type"]
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          daily_rate?: number | null
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["team_member_status"]
+          updated_at?: string
+          user_id?: string | null
+          work_type?: Database["public"]["Enums"]["work_type"]
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          daily_rate?: number | null
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          status?: Database["public"]["Enums"]["team_member_status"]
+          updated_at?: string
+          user_id?: string | null
+          work_type?: Database["public"]["Enums"]["work_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_project_assignments: {
+        Row: {
+          assigned_at: string
+          id: string
+          notes: string | null
+          quotation_id: string | null
+          team_member_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          id?: string
+          notes?: string | null
+          quotation_id?: string | null
+          team_member_id: string
+        }
+        Update: {
+          assigned_at?: string
+          id?: string
+          notes?: string | null
+          quotation_id?: string | null
+          team_member_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_project_assignments_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_project_assignments_team_member_id_fkey"
+            columns: ["team_member_id"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -446,6 +643,17 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      team_member_status: "active" | "inactive" | "on_leave"
+      work_type:
+        | "carpenter"
+        | "labour"
+        | "plumber"
+        | "electrician"
+        | "painter"
+        | "mason"
+        | "welder"
+        | "supervisor"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -574,6 +782,18 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      team_member_status: ["active", "inactive", "on_leave"],
+      work_type: [
+        "carpenter",
+        "labour",
+        "plumber",
+        "electrician",
+        "painter",
+        "mason",
+        "welder",
+        "supervisor",
+        "other",
+      ],
     },
   },
 } as const

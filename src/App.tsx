@@ -15,6 +15,9 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import Team from "./pages/Team";
+import TeamLogin from "./pages/team/TeamLogin";
+import TeamDashboard from "./pages/team/TeamDashboard";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +35,10 @@ const App = () => (
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           
+          {/* Team member routes */}
+          <Route path="/team/login" element={<TeamLogin />} />
+          <Route path="/team/dashboard" element={<TeamDashboard />} />
+          
           {/* Public routes with Layout - auth triggered on actions */}
           <Route path="/" element={<Layout><Index /></Layout>} />
           <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
@@ -39,6 +46,7 @@ const App = () => (
           <Route path="/invoices" element={<Layout><Invoices /></Layout>} />
           <Route path="/invoices/:id" element={<Layout><InvoiceDetail /></Layout>} />
           <Route path="/clients" element={<Layout><Clients /></Layout>} />
+          <Route path="/team" element={<Layout><Team /></Layout>} />
           <Route path="/settings" element={<Layout><Settings /></Layout>} />
           
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
