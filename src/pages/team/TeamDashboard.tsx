@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Clock, MapPin, LogOut, CheckCircle, Calendar, Briefcase, Play, Square, Navigation } from "lucide-react";
+import { Clock, MapPin, LogOut, CheckCircle, Calendar, Briefcase, Play, Square, Navigation, Circle } from "lucide-react";
 import { getAddressFromCoords } from "@/lib/geocoding";
 
 interface TeamMember {
@@ -57,7 +57,25 @@ const TeamDashboard = () => {
 
   useEffect(() => {
     checkAuthAndFetch();
-  }, []);
+    
+    // Real-time subscription for tasks
+    const tasksChannel = supabase
+      .channel('member-tasks')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'tasks',
+      }, () => {
+        if (teamMember) {
+          fetchTasks(teamMember.id);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tasksChannel);
+    };
+  }, [teamMember?.id]);
 
   const checkAuthAndFetch = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -150,7 +168,7 @@ const TeamDashboard = () => {
       .from('tasks')
       .select('*')
       .eq('assigned_to', memberId)
-      .neq('status', 'completed')
+      .order('status', { ascending: true })
       .order('due_date', { ascending: true });
 
     setTasks(data || []);
@@ -275,6 +293,47 @@ const TeamDashboard = () => {
   };
 
   const isClockedIn = todayAttendance && !todayAttendance.clock_out;
+  
+  // Check if clock buttons should be disabled (already clocked out today, wait until next day 12:00)
+  const isClockDisabled = () => {
+    if (!todayAttendance) return false; // Never clocked in, can clock in
+    if (!todayAttendance.clock_out) return false; // Currently clocked in, can clock out
+    
+    // Already clocked in and out today - disable until next day at 12:00
+    const now = new Date();
+    const clockOutTime = new Date(todayAttendance.clock_out);
+    const nextDayNoon = new Date(clockOutTime);
+    nextDayNoon.setDate(nextDayNoon.getDate() + 1);
+    nextDayNoon.setHours(0, 0, 0, 0); // Next day at midnight (12 AM)
+    
+    return now < nextDayNoon;
+  };
+
+  const clockDisabled = isClockDisabled();
+
+  // Task status update
+  const handleUpdateTaskStatus = async (taskId: string, newStatus: string) => {
+    const updates: any = { status: newStatus };
+    if (newStatus === 'completed') {
+      updates.completed_at = new Date().toISOString();
+    } else {
+      updates.completed_at = null;
+    }
+
+    const { error } = await supabase
+      .from('tasks')
+      .update(updates)
+      .eq('id', taskId);
+
+    if (error) {
+      toast.error("Error updating task");
+    } else {
+      toast.success(`Task marked as ${newStatus}`);
+      if (teamMember) {
+        fetchTasks(teamMember.id);
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -331,6 +390,24 @@ const TeamDashboard = () => {
                   >
                     <Square className="h-4 w-4 mr-2" />
                     {clockingOut ? "Clocking Out..." : "Clock Out"}
+                  </Button>
+                </>
+              ) : clockDisabled ? (
+                <>
+                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 mb-2">
+                    Already Clocked Out Today
+                  </Badge>
+                  <p className="text-lg font-medium mb-2">See you tomorrow!</p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    You've completed your shift for today. Clock-in will be available tomorrow.
+                  </p>
+                  <Button 
+                    size="lg" 
+                    className="w-full max-w-xs"
+                    disabled
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Clock In (Tomorrow)
                   </Button>
                 </>
               ) : (
@@ -428,40 +505,76 @@ const TeamDashboard = () => {
         )}
 
         {/* Tasks */}
-        {tasks.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <CheckCircle className="h-4 w-4" />
-                Your Tasks
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CheckCircle className="h-4 w-4" />
+              Your Tasks ({tasks.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {tasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No pending tasks</p>
+            ) : (
               <div className="space-y-3">
                 {tasks.map((task) => (
-                  <div key={task.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                    <CheckCircle className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{task.title}</p>
-                      {task.description && (
-                        <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
-                      )}
-                      {task.due_date && (
-                        <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Due: {new Date(task.due_date).toLocaleDateString()}
+                  <div 
+                    key={task.id} 
+                    className={`p-3 rounded-lg border transition-colors ${
+                      task.status === 'completed' ? 'bg-green-50/50 border-green-200' : 
+                      task.status === 'in_progress' ? 'bg-blue-50/50 border-blue-200' : 'bg-muted/50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <button 
+                        onClick={() => handleUpdateTaskStatus(
+                          task.id, 
+                          task.status === 'completed' ? 'pending' : 'completed'
+                        )}
+                        className="mt-0.5"
+                      >
+                        {task.status === 'completed' ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <Circle className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </button>
+                      <div className="flex-1">
+                        <p className={`font-medium text-sm ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+                          {task.title}
                         </p>
-                      )}
+                        {task.description && (
+                          <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          {task.due_date && (
+                            <Badge variant="outline" className="text-xs">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {new Date(task.due_date).toLocaleDateString()}
+                            </Badge>
+                          )}
+                          <Badge variant={task.priority === 'high' ? 'destructive' : 'secondary'} className="text-xs">
+                            {task.priority || 'medium'}
+                          </Badge>
+                        </div>
+                      </div>
+                      {/* Status select */}
+                      <select
+                        value={task.status}
+                        onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
+                        className="text-xs border rounded px-2 py-1 bg-background"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                      </select>
                     </div>
-                    <Badge variant={task.priority === 'high' ? 'destructive' : 'secondary'} className="text-xs">
-                      {task.priority || 'medium'}
-                    </Badge>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
         {/* Recent Attendance */}
         <Card>
