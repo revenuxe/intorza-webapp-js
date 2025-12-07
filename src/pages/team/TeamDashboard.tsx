@@ -408,18 +408,20 @@ const TeamDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {assignedProjects.map((assignment) => (
-                  <div key={assignment.id} className="p-3 rounded-lg bg-muted/50">
-                    <p className="font-medium text-sm">{assignment.quotations.project_name}</p>
-                    <p className="text-xs text-muted-foreground">{assignment.quotations.client_name}</p>
-                    {assignment.quotations.place_of_project && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                        <Navigation className="h-3 w-3" />
-                        {assignment.quotations.place_of_project}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                {assignedProjects
+                  .filter((assignment) => assignment.quotations)
+                  .map((assignment) => (
+                    <div key={assignment.id} className="p-3 rounded-lg bg-muted/50">
+                      <p className="font-medium text-sm">{assignment.quotations.project_name}</p>
+                      <p className="text-xs text-muted-foreground">{assignment.quotations.client_name}</p>
+                      {assignment.quotations.place_of_project && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                          <Navigation className="h-3 w-3" />
+                          {assignment.quotations.place_of_project}
+                        </p>
+                      )}
+                    </div>
+                  ))}
               </div>
             </CardContent>
           </Card>
