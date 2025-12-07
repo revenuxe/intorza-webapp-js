@@ -23,7 +23,13 @@ const Settings = () => {
     gstin: "",
     logo_url: "",
     signature_url: "",
-    professional_advantages: `You've imagined your ideal home and are determined to make it a reality. You can get numerous different quotations from different Interior Designers. But since you've chosen us, let's have a look at how we can make your idea a reality.`
+    professional_advantages: `You've imagined your ideal home and are determined to make it a reality. You can get numerous different quotations from different Interior Designers. But since you've chosen us, let's have a look at how we can make your idea a reality.`,
+    bank_name: "",
+    bank_account_number: "",
+    bank_ifsc_code: "",
+    bank_account_holder: "",
+    upi_id: "",
+    payment_qr_url: "",
   });
 
   const [paymentStages, setPaymentStages] = useState([
@@ -119,7 +125,13 @@ const Settings = () => {
           gstin: data.gstin || "",
           logo_url: data.logo_url || "",
           signature_url: data.signature_url || "",
-          professional_advantages: data.professional_advantages || profile.professional_advantages
+          professional_advantages: data.professional_advantages || profile.professional_advantages,
+          bank_name: (data as any).bank_name || "",
+          bank_account_number: (data as any).bank_account_number || "",
+          bank_ifsc_code: (data as any).bank_ifsc_code || "",
+          bank_account_holder: (data as any).bank_account_holder || "",
+          upi_id: (data as any).upi_id || "",
+          payment_qr_url: (data as any).payment_qr_url || "",
         });
         
         if (data.payment_stages) {
@@ -296,6 +308,12 @@ const Settings = () => {
           payment_stages: paymentStages,
           terms_conditions: termsConditions,
           invoice_terms_conditions: invoiceTerms,
+          bank_name: profile.bank_name,
+          bank_account_number: profile.bank_account_number,
+          bank_ifsc_code: profile.bank_ifsc_code,
+          bank_account_holder: profile.bank_account_holder,
+          upi_id: profile.upi_id,
+          payment_qr_url: profile.payment_qr_url,
           updated_at: new Date().toISOString(),
         });
 
@@ -536,6 +554,127 @@ const Settings = () => {
               <FileText className="h-4 w-4 mr-2" />
               Edit Invoice Terms & Conditions
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* Bank Details Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Bank & Payment Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Add your bank details and UPI information. These can be displayed on quotations and invoices.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="bank_name">Bank Name</Label>
+                <Input
+                  id="bank_name"
+                  value={profile.bank_name}
+                  onChange={(e) => setProfile({ ...profile, bank_name: e.target.value })}
+                  placeholder="e.g., State Bank of India"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bank_account_holder">Account Holder Name</Label>
+                <Input
+                  id="bank_account_holder"
+                  value={profile.bank_account_holder}
+                  onChange={(e) => setProfile({ ...profile, bank_account_holder: e.target.value })}
+                  placeholder="Account Holder Name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bank_account_number">Account Number</Label>
+                <Input
+                  id="bank_account_number"
+                  value={profile.bank_account_number}
+                  onChange={(e) => setProfile({ ...profile, bank_account_number: e.target.value })}
+                  placeholder="Account Number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bank_ifsc_code">IFSC Code</Label>
+                <Input
+                  id="bank_ifsc_code"
+                  value={profile.bank_ifsc_code}
+                  onChange={(e) => setProfile({ ...profile, bank_ifsc_code: e.target.value })}
+                  placeholder="IFSC Code"
+                />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="upi_id">UPI ID</Label>
+                <Input
+                  id="upi_id"
+                  value={profile.upi_id}
+                  onChange={(e) => setProfile({ ...profile, upi_id: e.target.value })}
+                  placeholder="yourname@upi"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Payment QR Code</Label>
+              {profile.payment_qr_url && (
+                <div className="flex justify-center p-4 bg-muted/30 rounded-lg">
+                  <img 
+                    src={profile.payment_qr_url} 
+                    alt="Payment QR Code" 
+                    className="max-h-32 object-contain"
+                  />
+                </div>
+              )}
+              <div className="flex items-center gap-4">
+                <Input
+                  id="payment_qr"
+                  type="file"
+                  accept="image/*"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    
+                    try {
+                      const { data: { user } } = await supabase.auth.getUser();
+                      if (!user) return;
+                      
+                      const fileExt = file.name.split('.').pop();
+                      const fileName = `${user.id}/payment-qr.${fileExt}`;
+                      
+                      const { error: uploadError } = await supabase.storage
+                        .from('company-logos')
+                        .upload(fileName, file, { upsert: true });
+                      
+                      if (uploadError) throw uploadError;
+                      
+                      const { data: { publicUrl } } = supabase.storage
+                        .from('company-logos')
+                        .getPublicUrl(fileName);
+                      
+                      setProfile({ ...profile, payment_qr_url: publicUrl });
+                      toast({
+                        title: "QR Code uploaded",
+                        description: "Your payment QR code has been uploaded successfully",
+                      });
+                    } catch (error) {
+                      console.error('Error uploading QR:', error);
+                      toast({
+                        title: "Upload failed",
+                        description: "Failed to upload QR code. Please try again.",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  className="flex-1"
+                />
+                <Button type="button">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload QR
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Upload your UPI or bank payment QR code. This will appear on quotations and invoices when enabled.
+              </p>
+            </div>
           </CardContent>
         </Card>
 

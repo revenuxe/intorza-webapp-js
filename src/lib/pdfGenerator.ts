@@ -16,7 +16,7 @@ export interface QuotationPdfSettings {
   showPaymentStages: boolean;
   showTermsConditions: boolean;
   showSignatureArea: boolean;
-  // New form field settings
+  // Form field settings
   showClientName: boolean;
   showClientAddress: boolean;
   showDateOfProposal: boolean;
@@ -29,6 +29,11 @@ export interface QuotationPdfSettings {
   showProductDetails: boolean;
   showDiscount: boolean;
   showSocialMediaDiscount: boolean;
+  // Payment & Bank Details
+  showBankDetails: boolean;
+  showQRCode: boolean;
+  showProfessionalAdvantages: boolean;
+  showQuotationNumber: boolean;
 }
 
 // --- Interfaces ---
@@ -189,6 +194,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     showProductDetails: true,
     showDiscount: true,
     showSocialMediaDiscount: true,
+    showBankDetails: false,
+    showQRCode: false,
+    showProfessionalAdvantages: true,
+    showQuotationNumber: true,
     ...data.settings
   };
 
@@ -254,6 +263,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // Company Details positioning based on logo placement
   let companyInfoX = pageWidth - margin;
   let companyInfoAlign: 'right' | 'left' | 'center' = 'right';
+  let headerStartY = yPosition;
   
   if (logoPlacement === 'right') {
     companyInfoX = margin;
@@ -265,7 +275,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   
   let headerTextY = yPosition + 5;
   if (logoPlacement === 'center') {
-    headerTextY = yPosition + logoSize + 8;
+    // For center layout, position text below logo with proper spacing
+    headerTextY = yPosition + logoSize + 10;
   }
   
   doc.setFont('helvetica', 'bold');
@@ -281,7 +292,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // Company address and contact details
   if (settings.showCompanyAddress) {
     if (data.companyAddress) {
-      const addressLines = doc.splitTextToSize(data.companyAddress, 90);
+      const maxAddressWidth = logoPlacement === 'center' ? contentWidth - 20 : 90;
+      const addressLines = doc.splitTextToSize(data.companyAddress, maxAddressWidth);
       addressLines.forEach((line: string) => {
         doc.text(line, companyInfoX, headerTextY, { align: companyInfoAlign });
         headerTextY += 4.5;
@@ -299,11 +311,17 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     
     if (data.gstin) {
       doc.setFont('helvetica', 'bold');
-      doc.text(`GSTIN: ${data.gstin}`, companyInfoX, headerTextY, { align: 'right' });
+      doc.text(`GSTIN: ${data.gstin}`, companyInfoX, headerTextY, { align: companyInfoAlign });
+      headerTextY += 4.5;
     }
   }
 
-  yPosition += 35; // Move past header
+  // Calculate yPosition based on layout - ensure no overlap with cards
+  if (logoPlacement === 'center') {
+    yPosition = headerTextY + 8; // Add extra space after center-aligned header
+  } else {
+    yPosition += 35; // Standard spacing for left/right layouts
+  }
 
   // --- 2. Info Cards (Client & Project) ---
   if (settings.showProjectDetails) {

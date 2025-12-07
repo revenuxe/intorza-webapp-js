@@ -54,10 +54,16 @@ export interface QuotationSettings {
   showPaymentStages: boolean;
   showTermsConditions: boolean;
   showSignatureArea: boolean;
+  // Payment & Bank Details
+  showBankDetails: boolean;
+  showQRCode: boolean;
+  showProfessionalAdvantages: boolean;
+  showQuotationNumber: boolean;
 }
 
 export interface InvoiceSettings {
   showCompanyLogo: boolean;
+  showCompanyAddress: boolean;
   showClientAddress: boolean;
   showProjectName: boolean;
   showDueDate: boolean;
@@ -65,6 +71,13 @@ export interface InvoiceSettings {
   showTaxGst: boolean;
   showPaymentHistory: boolean;
   showSignatureFooter: boolean;
+  showTermsConditions: boolean;
+  showNextPaymentDue: boolean;
+  showInvoiceNumber: boolean;
+  showInvoiceDate: boolean;
+  showPaymentProgress: boolean;
+  showBankDetails: boolean;
+  showQRCode: boolean;
 }
 
 const defaultQuotationSettings: QuotationSettings = {
@@ -91,10 +104,15 @@ const defaultQuotationSettings: QuotationSettings = {
   showPaymentStages: true,
   showTermsConditions: true,
   showSignatureArea: true,
+  showBankDetails: false,
+  showQRCode: false,
+  showProfessionalAdvantages: true,
+  showQuotationNumber: true,
 };
 
 const defaultInvoiceSettings: InvoiceSettings = {
   showCompanyLogo: true,
+  showCompanyAddress: true,
   showClientAddress: true,
   showProjectName: true,
   showDueDate: true,
@@ -102,6 +120,13 @@ const defaultInvoiceSettings: InvoiceSettings = {
   showTaxGst: true,
   showPaymentHistory: true,
   showSignatureFooter: true,
+  showTermsConditions: true,
+  showNextPaymentDue: true,
+  showInvoiceNumber: true,
+  showInvoiceDate: true,
+  showPaymentProgress: true,
+  showBankDetails: false,
+  showQRCode: false,
 };
 
 interface CustomizeFieldsDrawerProps {
@@ -331,6 +356,16 @@ const QuotationCustomizeContent = ({
         <h4 className="text-sm font-semibold text-foreground mb-3">Extra Sections (PDF)</h4>
         <div className="space-y-1">
           <ToggleItem 
+            label="Show quotation number" 
+            checked={settings.showQuotationNumber}
+            onCheckedChange={(v) => updateSetting('showQuotationNumber', v)}
+          />
+          <ToggleItem 
+            label="Show professional advantages" 
+            checked={settings.showProfessionalAdvantages}
+            onCheckedChange={(v) => updateSetting('showProfessionalAdvantages', v)}
+          />
+          <ToggleItem 
             label="Show stage-wise payment plan" 
             checked={settings.showPaymentStages}
             onCheckedChange={(v) => updateSetting('showPaymentStages', v)}
@@ -350,6 +385,28 @@ const QuotationCustomizeContent = ({
 
       <Separator />
 
+      {/* Group 6 - Payment & Bank Details */}
+      <div>
+        <h4 className="text-sm font-semibold text-foreground mb-3">Payment & Bank Details</h4>
+        <div className="space-y-1">
+          <ToggleItem 
+            label="Show bank account details" 
+            checked={settings.showBankDetails}
+            onCheckedChange={(v) => updateSetting('showBankDetails', v)}
+          />
+          <ToggleItem 
+            label="Show payment QR code" 
+            checked={settings.showQRCode}
+            onCheckedChange={(v) => updateSetting('showQRCode', v)}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Bank details and QR code can be configured in Settings.
+        </p>
+      </div>
+
+      <Separator />
+
       <div className="space-y-3">
         <p className="text-xs text-muted-foreground">
           These settings will be saved and used for your future quotations.
@@ -362,7 +419,7 @@ const QuotationCustomizeContent = ({
   );
 };
 
-const InvoiceCustomizeContent = ({ 
+const InvoiceCustomizeContent = ({
   settings, 
   onSettingsChange,
   onReset
@@ -389,6 +446,11 @@ const InvoiceCustomizeContent = ({
             onCheckedChange={(v) => updateSetting('showCompanyLogo', v)}
           />
           <ToggleItem 
+            label="Show company address" 
+            checked={settings.showCompanyAddress}
+            onCheckedChange={(v) => updateSetting('showCompanyAddress', v)}
+          />
+          <ToggleItem 
             label="Show client address" 
             checked={settings.showClientAddress}
             onCheckedChange={(v) => updateSetting('showClientAddress', v)}
@@ -408,6 +470,16 @@ const InvoiceCustomizeContent = ({
         <h4 className="text-sm font-semibold text-foreground mb-3">Invoice Details</h4>
         <div className="space-y-1">
           <ToggleItem 
+            label="Show invoice number" 
+            checked={settings.showInvoiceNumber}
+            onCheckedChange={(v) => updateSetting('showInvoiceNumber', v)}
+          />
+          <ToggleItem 
+            label="Show invoice date" 
+            checked={settings.showInvoiceDate}
+            onCheckedChange={(v) => updateSetting('showInvoiceDate', v)}
+          />
+          <ToggleItem 
             label="Show due date" 
             checked={settings.showDueDate}
             onCheckedChange={(v) => updateSetting('showDueDate', v)}
@@ -418,9 +490,19 @@ const InvoiceCustomizeContent = ({
             onCheckedChange={(v) => updateSetting('showPaymentStatus', v)}
           />
           <ToggleItem 
-            label="Show tax/GST line (if used)" 
+            label="Show payment progress bar" 
+            checked={settings.showPaymentProgress}
+            onCheckedChange={(v) => updateSetting('showPaymentProgress', v)}
+          />
+          <ToggleItem 
+            label="Show tax/GST line" 
             checked={settings.showTaxGst}
             onCheckedChange={(v) => updateSetting('showTaxGst', v)}
+          />
+          <ToggleItem 
+            label="Show next payment due" 
+            checked={settings.showNextPaymentDue}
+            onCheckedChange={(v) => updateSetting('showNextPaymentDue', v)}
           />
         </div>
       </div>
@@ -429,12 +511,17 @@ const InvoiceCustomizeContent = ({
 
       {/* Group 3 */}
       <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Extra</h4>
+        <h4 className="text-sm font-semibold text-foreground mb-3">Extra Sections</h4>
         <div className="space-y-1">
           <ToggleItem 
-            label="Show payment history section in PDF" 
+            label="Show payment history in PDF" 
             checked={settings.showPaymentHistory}
             onCheckedChange={(v) => updateSetting('showPaymentHistory', v)}
+          />
+          <ToggleItem 
+            label="Show terms & conditions" 
+            checked={settings.showTermsConditions}
+            onCheckedChange={(v) => updateSetting('showTermsConditions', v)}
           />
           <ToggleItem 
             label="Show signature/footer block" 
@@ -442,6 +529,28 @@ const InvoiceCustomizeContent = ({
             onCheckedChange={(v) => updateSetting('showSignatureFooter', v)}
           />
         </div>
+      </div>
+
+      <Separator />
+
+      {/* Group 4 - Payment & Bank Details */}
+      <div>
+        <h4 className="text-sm font-semibold text-foreground mb-3">Payment & Bank Details</h4>
+        <div className="space-y-1">
+          <ToggleItem 
+            label="Show bank account details" 
+            checked={settings.showBankDetails}
+            onCheckedChange={(v) => updateSetting('showBankDetails', v)}
+          />
+          <ToggleItem 
+            label="Show payment QR code" 
+            checked={settings.showQRCode}
+            onCheckedChange={(v) => updateSetting('showQRCode', v)}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Bank details and QR code can be configured in Settings.
+        </p>
       </div>
 
       <Separator />
