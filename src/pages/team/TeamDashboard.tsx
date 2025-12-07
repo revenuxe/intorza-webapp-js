@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Clock, MapPin, LogOut, CheckCircle, Calendar, Briefcase, Play, Square } from "lucide-react";
+import { Clock, MapPin, LogOut, CheckCircle, Calendar, Briefcase, Play, Square, Navigation } from "lucide-react";
+import { getAddressFromCoords } from "@/lib/geocoding";
 
 interface TeamMember {
   id: string;
@@ -32,6 +33,16 @@ interface Task {
   due_date: string | null;
 }
 
+interface ProjectAssignment {
+  id: string;
+  quotation_id: string;
+  quotations: {
+    project_name: string;
+    client_name: string;
+    place_of_project: string | null;
+  };
+}
+
 const TeamDashboard = () => {
   const navigate = useNavigate();
   const [teamMember, setTeamMember] = useState<TeamMember | null>(null);
@@ -39,6 +50,7 @@ const TeamDashboard = () => {
   const [todayAttendance, setTodayAttendance] = useState<Attendance | null>(null);
   const [recentAttendance, setRecentAttendance] = useState<Attendance[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [assignedProjects, setAssignedProjects] = useState<ProjectAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [clockingIn, setClockingIn] = useState(false);
   const [clockingOut, setClockingOut] = useState(false);
@@ -85,9 +97,25 @@ const TeamDashboard = () => {
       fetchTodayAttendance(member.id),
       fetchRecentAttendance(member.id),
       fetchTasks(member.id),
+      fetchAssignedProjects(member.id),
     ]);
 
     setLoading(false);
+  };
+
+  const fetchAssignedProjects = async (memberId: string) => {
+    const { data } = await supabase
+      .from('team_project_assignments')
+      .select(`
+        id,
+        quotation_id,
+        quotations:quotation_id(project_name, client_name, place_of_project)
+      `)
+      .eq('team_member_id', memberId);
+
+    if (data) {
+      setAssignedProjects(data as unknown as ProjectAssignment[]);
+    }
   };
 
   const fetchTodayAttendance = async (memberId: string) => {
@@ -101,7 +129,7 @@ const TeamDashboard = () => {
       .gte('clock_in', today.toISOString())
       .order('clock_in', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     setTodayAttendance(data);
   };
@@ -128,7 +156,7 @@ const TeamDashboard = () => {
     setTasks(data || []);
   };
 
-  const getCurrentLocation = (): Promise<{ lat: number; lng: number; address?: string }> => {
+  const getCurrentLocation = async (): Promise<{ lat: number; lng: number; address?: string }> => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error("Geolocation not supported"));
@@ -136,11 +164,14 @@ const TeamDashboard = () => {
       }
 
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          resolve({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
+        async (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          
+          // Get area name
+          const address = await getAddressFromCoords(lat, lng);
+          
+          resolve({ lat, lng, address });
         },
         (error) => {
           reject(error);
@@ -158,6 +189,7 @@ const TeamDashboard = () => {
       let location = null;
       try {
         location = await getCurrentLocation();
+        toast.info(`Location: ${location.address || 'Captured'}`);
       } catch (locError) {
         console.log("Location not available:", locError);
       }
@@ -190,6 +222,7 @@ const TeamDashboard = () => {
       let location = null;
       try {
         location = await getCurrentLocation();
+        toast.info(`Location: ${location.address || 'Captured'}`);
       } catch (locError) {
         console.log("Location not available:", locError);
       }
@@ -234,6 +267,11 @@ const TeamDashboard = () => {
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${minutes}m`;
+  };
+
+  const formatLocationAddress = (location: any) => {
+    if (!location) return null;
+    return location.address || (location.lat && location.lng ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : null);
   };
 
   const isClockedIn = todayAttendance && !todayAttendance.clock_out;
@@ -328,10 +366,12 @@ const TeamDashboard = () => {
                   <p className="text-xs text-muted-foreground">Clock In</p>
                   <p className="font-medium tabular-nums">{formatTime(todayAttendance.clock_in)}</p>
                   {todayAttendance.clock_in_location && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                      <MapPin className="h-3 w-3" />
-                      Location captured
-                    </p>
+                    <div className="mt-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {formatLocationAddress(todayAttendance.clock_in_location) || 'Location captured'}
+                      </p>
+                    </div>
                   )}
                 </div>
                 <div>
@@ -340,10 +380,12 @@ const TeamDashboard = () => {
                     <>
                       <p className="font-medium tabular-nums">{formatTime(todayAttendance.clock_out)}</p>
                       {todayAttendance.clock_out_location && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                          <MapPin className="h-3 w-3" />
-                          Location captured
-                        </p>
+                        <div className="mt-1">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {formatLocationAddress(todayAttendance.clock_out_location) || 'Location captured'}
+                          </p>
+                        </div>
                       )}
                     </>
                   ) : (
@@ -355,12 +397,40 @@ const TeamDashboard = () => {
           </Card>
         )}
 
+        {/* Assigned Projects */}
+        {assignedProjects.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Briefcase className="h-4 w-4" />
+                Your Projects
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {assignedProjects.map((assignment) => (
+                  <div key={assignment.id} className="p-3 rounded-lg bg-muted/50">
+                    <p className="font-medium text-sm">{assignment.quotations.project_name}</p>
+                    <p className="text-xs text-muted-foreground">{assignment.quotations.client_name}</p>
+                    {assignment.quotations.place_of_project && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                        <Navigation className="h-3 w-3" />
+                        {assignment.quotations.place_of_project}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Tasks */}
         {tasks.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <Briefcase className="h-4 w-4" />
+                <CheckCircle className="h-4 w-4" />
                 Your Tasks
               </CardTitle>
             </CardHeader>
@@ -405,23 +475,34 @@ const TeamDashboard = () => {
             ) : (
               <div className="space-y-3">
                 {recentAttendance.map((record) => (
-                  <div key={record.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <div>
+                  <div key={record.id} className="p-3 rounded-lg bg-muted/30 space-y-2">
+                    <div className="flex items-center justify-between">
                       <p className="text-sm font-medium">{formatDate(record.clock_in)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatTime(record.clock_in)} - {record.clock_out ? formatTime(record.clock_out) : 'Working'}
-                      </p>
-                    </div>
-                    <div className="text-right">
                       <p className="text-sm font-medium tabular-nums">
                         {calculateDuration(record.clock_in, record.clock_out)}
                       </p>
-                      {record.clock_in_location && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end">
-                          <MapPin className="h-3 w-3" />
-                          Located
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">In: {formatTime(record.clock_in)}</p>
+                        {record.clock_in_location && (
+                          <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{formatLocationAddress(record.clock_in_location)}</span>
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">
+                          Out: {record.clock_out ? formatTime(record.clock_out) : 'Working'}
                         </p>
-                      )}
+                        {record.clock_out_location && (
+                          <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{formatLocationAddress(record.clock_out_location)}</span>
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
