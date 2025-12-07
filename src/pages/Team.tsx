@@ -7,13 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase } from "lucide-react";
+import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Eye, Navigation, Calendar, ChevronRight } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useFeedback } from "@/components/FeedbackProvider";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface TeamMember {
   id: string;
@@ -32,13 +33,18 @@ interface TodayAttendance {
   clock_in: string;
   clock_out: string | null;
   clock_in_location: any;
+  clock_out_location: any;
 }
 
 interface Quotation {
   id: string;
   project_name: string;
   client_name: string;
+  client_address: string | null;
+  place_of_project: string | null;
   status: string;
+  project_deadline: string | null;
+  grand_total: number | null;
 }
 
 interface ProjectAssignment {
@@ -51,6 +57,15 @@ interface ProjectAssignment {
 interface ProjectTeam {
   quotation: Quotation;
   members: (TeamMember & { assignmentId: string })[];
+}
+
+interface MemberAttendance {
+  id: string;
+  clock_in: string;
+  clock_out: string | null;
+  clock_in_location: any;
+  clock_out_location: any;
+  team_member_id: string;
 }
 
 const workTypes = [
@@ -80,6 +95,9 @@ const Team = () => {
   // Dialogs
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
+  const [projectDetailOpen, setProjectDetailOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<ProjectTeam | null>(null);
+  const [projectAttendance, setProjectAttendance] = useState<MemberAttendance[]>([]);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [companyName, setCompanyName] = useState("");
   
@@ -131,7 +149,7 @@ const Team = () => {
     if (!user) return;
     const { data } = await supabase
       .from('quotations')
-      .select('id, project_name, client_name, status')
+      .select('id, project_name, client_name, client_address, place_of_project, status, project_deadline, grand_total')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
     
@@ -163,7 +181,7 @@ const Team = () => {
         id,
         quotation_id,
         team_member_id,
-        quotations:quotation_id(id, project_name, client_name, status)
+        quotations:quotation_id(id, project_name, client_name, client_address, place_of_project, status, project_deadline, grand_total)
       `);
 
     if (assignments) {
@@ -208,12 +226,54 @@ const Team = () => {
     
     const { data } = await supabase
       .from('attendance')
-      .select('team_member_id, clock_in, clock_out, clock_in_location')
+      .select('team_member_id, clock_in, clock_out, clock_in_location, clock_out_location')
       .gte('clock_in', today.toISOString());
 
     if (data) {
       setTodayAttendance(data as TodayAttendance[]);
     }
+  };
+
+  const openProjectDetail = async (team: ProjectTeam) => {
+    setSelectedProject(team);
+    setProjectDetailOpen(true);
+    
+    // Fetch attendance for all members in this project
+    const memberIds = team.members.map(m => m.id);
+    
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const { data } = await supabase
+      .from('attendance')
+      .select('*')
+      .in('team_member_id', memberIds)
+      .gte('clock_in', sevenDaysAgo.toISOString())
+      .order('clock_in', { ascending: false });
+
+    setProjectAttendance((data || []) as MemberAttendance[]);
+  };
+
+  const formatLocationAddress = (location: any) => {
+    if (!location) return null;
+    return location.address || (location.lat && location.lng ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : null);
+  };
+
+  const formatTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  };
+
+  const calculateDuration = (clockIn: string, clockOut: string | null) => {
+    const start = new Date(clockIn);
+    const end = clockOut ? new Date(clockOut) : new Date();
+    const diff = end.getTime() - start.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${minutes}m`;
   };
 
   const generateEmail = (name: string) => {
@@ -691,42 +751,75 @@ const Team = () => {
             </Card>
           ) : (
             <div className="grid gap-4">
-              {projectTeams.map((team) => (
-                <Card key={team.quotation.id}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{team.quotation.project_name}</CardTitle>
-                        <p className="text-sm text-muted-foreground">{team.quotation.client_name}</p>
-                      </div>
-                      <Badge variant="outline">{team.members.length} members</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {team.members.map((member) => (
-                        <div 
-                          key={member.assignmentId}
-                          className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2"
-                        >
-                          <div>
-                            <p className="text-sm font-medium">{member.name}</p>
-                            <Badge className={`${getWorkTypeBadgeColor(member.work_type)} text-xs`} variant="secondary">
-                              {workTypes.find(t => t.value === member.work_type)?.label}
-                            </Badge>
-                          </div>
-                          <button
-                            onClick={() => handleRemoveMemberFromProject(member.assignmentId)}
-                            className="text-muted-foreground hover:text-destructive ml-2"
-                          >
-                            ×
-                          </button>
+              {projectTeams.map((team) => {
+                const teamTodayAttendance = todayAttendance.filter(a => 
+                  team.members.some(m => m.id === a.team_member_id)
+                );
+                const activeCount = teamTodayAttendance.filter(a => a.clock_in && !a.clock_out).length;
+                
+                return (
+                  <Card 
+                    key={team.quotation.id} 
+                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => openProjectDetail(team)}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            {team.quotation.project_name}
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          </CardTitle>
+                          <p className="text-sm text-muted-foreground">{team.quotation.client_name}</p>
+                          {team.quotation.place_of_project && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                              <Navigation className="h-3 w-3" />
+                              {team.quotation.place_of_project}
+                            </p>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge variant="outline">{team.members.length} members</Badge>
+                          {activeCount > 0 && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {activeCount} working
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-wrap gap-2">
+                        {team.members.slice(0, 5).map((member) => (
+                          <div 
+                            key={member.assignmentId}
+                            className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2"
+                          >
+                            <div>
+                              <p className="text-sm font-medium">{member.name}</p>
+                              <Badge className={`${getWorkTypeBadgeColor(member.work_type)} text-xs`} variant="secondary">
+                                {workTypes.find(t => t.value === member.work_type)?.label}
+                              </Badge>
+                            </div>
+                            <button
+                              onClick={() => handleRemoveMemberFromProject(member.assignmentId)}
+                              className="text-muted-foreground hover:text-destructive ml-2"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        {team.members.length > 5 && (
+                          <div className="flex items-center justify-center bg-muted/50 rounded-lg px-3 py-2">
+                            <p className="text-sm text-muted-foreground">+{team.members.length - 5} more</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
@@ -830,6 +923,158 @@ const Team = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Project Detail Dialog */}
+      <Dialog open={projectDetailOpen} onOpenChange={setProjectDetailOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{selectedProject?.quotation.project_name}</DialogTitle>
+            <DialogDescription>{selectedProject?.quotation.client_name}</DialogDescription>
+          </DialogHeader>
+          
+          {selectedProject && (
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-6">
+                {/* Project Info */}
+                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
+                  {selectedProject.quotation.place_of_project && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Location</p>
+                      <p className="text-sm font-medium flex items-center gap-1">
+                        <Navigation className="h-3 w-3" />
+                        {selectedProject.quotation.place_of_project}
+                      </p>
+                    </div>
+                  )}
+                  {selectedProject.quotation.project_deadline && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Deadline</p>
+                      <p className="text-sm font-medium flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(selectedProject.quotation.project_deadline).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <Badge variant="outline">{selectedProject.quotation.status}</Badge>
+                  </div>
+                  {selectedProject.quotation.grand_total && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Project Value</p>
+                      <p className="text-sm font-medium tabular-nums">
+                        ₹{selectedProject.quotation.grand_total.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Team Members */}
+                <div>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Team Members ({selectedProject.members.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedProject.members.map((member) => {
+                      const memberAttToday = todayAttendance.find(a => a.team_member_id === member.id);
+                      const isWorking = memberAttToday && !memberAttToday.clock_out;
+                      
+                      return (
+                        <div key={member.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="font-medium text-sm">{member.name}</p>
+                              <div className="flex items-center gap-2">
+                                <Badge className={`${getWorkTypeBadgeColor(member.work_type)} text-xs`} variant="secondary">
+                                  {workTypes.find(t => t.value === member.work_type)?.label}
+                                </Badge>
+                                {isWorking && (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                                    Working
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {memberAttToday && (
+                            <div className="text-right text-xs text-muted-foreground">
+                              <p>In: {formatTime(memberAttToday.clock_in)}</p>
+                              {memberAttToday.clock_in_location && (
+                                <p className="flex items-center gap-1 justify-end">
+                                  <MapPin className="h-3 w-3" />
+                                  <span className="truncate max-w-[120px]">
+                                    {formatLocationAddress(memberAttToday.clock_in_location)}
+                                  </span>
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Recent Attendance */}
+                <div>
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Recent Attendance (Last 7 Days)
+                  </h3>
+                  {projectAttendance.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">No attendance records</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {projectAttendance.slice(0, 15).map((record) => {
+                        const member = selectedProject.members.find(m => m.id === record.team_member_id);
+                        
+                        return (
+                          <div key={record.id} className="p-3 bg-muted/30 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="font-medium text-sm">{member?.name || 'Unknown'}</p>
+                                <p className="text-xs text-muted-foreground">{formatDate(record.clock_in)}</p>
+                              </div>
+                              <p className="text-sm font-medium tabular-nums">
+                                {calculateDuration(record.clock_in, record.clock_out)}
+                              </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                              <div>
+                                <p>In: {formatTime(record.clock_in)}</p>
+                                {record.clock_in_location && (
+                                  <p className="flex items-center gap-1 mt-0.5">
+                                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate">{formatLocationAddress(record.clock_in_location)}</span>
+                                  </p>
+                                )}
+                              </div>
+                              <div>
+                                <p>Out: {record.clock_out ? formatTime(record.clock_out) : 'Working'}</p>
+                                {record.clock_out_location && (
+                                  <p className="flex items-center gap-1 mt-0.5">
+                                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate">{formatLocationAddress(record.clock_out_location)}</span>
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProjectDetailOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
