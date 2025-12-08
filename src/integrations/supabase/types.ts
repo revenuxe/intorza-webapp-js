@@ -491,6 +491,169 @@ export type Database = {
           },
         ]
       }
+      room_photos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          id: string
+          photo_url: string
+          room_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          photo_url: string
+          room_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          id?: string
+          photo_url?: string
+          room_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_photos_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "site_measurement_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_measurement_projects: {
+        Row: {
+          assigned_to: string | null
+          client_name: string
+          created_at: string
+          id: string
+          photo_count: number | null
+          quotation_id: string | null
+          room_count: number | null
+          site_location: string | null
+          status: string
+          total_area: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          client_name: string
+          created_at?: string
+          id?: string
+          photo_count?: number | null
+          quotation_id?: string | null
+          room_count?: number | null
+          site_location?: string | null
+          status?: string
+          total_area?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          client_name?: string
+          created_at?: string
+          id?: string
+          photo_count?: number | null
+          quotation_id?: string | null
+          room_count?: number | null
+          site_location?: string | null
+          status?: string
+          total_area?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_measurement_projects_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "team_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_measurement_projects_quotation_id_fkey"
+            columns: ["quotation_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_measurement_rooms: {
+        Row: {
+          area_sqft: number | null
+          created_at: string
+          final_amount: number | null
+          height_ft: number | null
+          id: string
+          length_ft: number
+          lump_sum_amount: number | null
+          notes: string | null
+          pricing_mode: string | null
+          project_id: string
+          quantity: number | null
+          rate_per_sqft: number | null
+          rate_per_unit: number | null
+          room_name: string | null
+          room_type: string
+          sort_order: number | null
+          updated_at: string
+          width_ft: number
+        }
+        Insert: {
+          area_sqft?: number | null
+          created_at?: string
+          final_amount?: number | null
+          height_ft?: number | null
+          id?: string
+          length_ft?: number
+          lump_sum_amount?: number | null
+          notes?: string | null
+          pricing_mode?: string | null
+          project_id: string
+          quantity?: number | null
+          rate_per_sqft?: number | null
+          rate_per_unit?: number | null
+          room_name?: string | null
+          room_type: string
+          sort_order?: number | null
+          updated_at?: string
+          width_ft?: number
+        }
+        Update: {
+          area_sqft?: number | null
+          created_at?: string
+          final_amount?: number | null
+          height_ft?: number | null
+          id?: string
+          length_ft?: number
+          lump_sum_amount?: number | null
+          notes?: string | null
+          pricing_mode?: string | null
+          project_id?: string
+          quantity?: number | null
+          rate_per_sqft?: number | null
+          rate_per_unit?: number | null
+          room_name?: string | null
+          room_type?: string
+          sort_order?: number | null
+          updated_at?: string
+          width_ft?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_measurement_rooms_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "site_measurement_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assigned_to: string | null

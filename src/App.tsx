@@ -8,6 +8,12 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { FeedbackProvider } from "./components/FeedbackProvider";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
+import SiteMeasurement from "./pages/SiteMeasurement";
+import SiteMeasurementNew from "./pages/SiteMeasurementNew";
+import SiteMeasurementDetail from "./pages/SiteMeasurementDetail";
+import SiteMeasurementPricing from "./pages/SiteMeasurementPricing";
+import MyProjects from "./pages/MyProjects";
+import MyProjectDetail from "./pages/MyProjectDetail";
 import Quotations from "./pages/Quotations";
 import QuotationDetail from "./pages/QuotationDetail";
 import Invoices from "./pages/Invoices";
@@ -47,6 +53,12 @@ const App = () => (
             {/* Public routes with Layout - auth triggered on actions */}
             <Route path="/" element={<Layout><Index /></Layout>} />
             <Route path="/dashboard" element={<Layout><ProtectedRoute><Dashboard /></ProtectedRoute></Layout>} />
+            <Route path="/site-measurement" element={<Layout><ProtectedRoute><SiteMeasurement /></ProtectedRoute></Layout>} />
+            <Route path="/site-measurement/new" element={<Layout><ProtectedRoute><SiteMeasurementNew /></ProtectedRoute></Layout>} />
+            <Route path="/site-measurement/:id" element={<Layout><ProtectedRoute><SiteMeasurementDetail /></ProtectedRoute></Layout>} />
+            <Route path="/site-measurement/:id/pricing" element={<Layout><ProtectedRoute><SiteMeasurementPricing /></ProtectedRoute></Layout>} />
+            <Route path="/my-projects" element={<Layout><ProtectedRoute><MyProjects /></ProtectedRoute></Layout>} />
+            <Route path="/my-projects/:id" element={<Layout><ProtectedRoute><MyProjectDetail /></ProtectedRoute></Layout>} />
             <Route path="/quotations" element={<Layout><ProtectedRoute><Quotations /></ProtectedRoute></Layout>} />
             <Route path="/quotations/:id" element={<Layout><ProtectedRoute><QuotationDetail /></ProtectedRoute></Layout>} />
             <Route path="/invoices" element={<Layout><ProtectedRoute><Invoices /></ProtectedRoute></Layout>} />
