@@ -41,7 +41,7 @@ const Auth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth`,
+          redirectTo: `${window.location.origin}/create-quotation`,
         },
       });
       if (error) throw error;
@@ -75,8 +75,8 @@ const Auth = () => {
           return;
         }
         
-        // Regular user - go to home
-        navigate('/');
+        // Regular user - go to create quotation
+        navigate('/create-quotation');
       }
     };
     checkAuth();
@@ -88,7 +88,7 @@ const Auth = () => {
     if (returnPath && pendingAction) {
       return `${returnPath}${returnPath.includes('?') ? '&' : '?'}continueAction=${pendingAction}`;
     }
-    return "/";
+    return "/create-quotation";
   };
 
   const clearErrors = () => setErrors({});
@@ -203,7 +203,7 @@ const Auth = () => {
         email: signupEmail,
         password: signupPassword,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: `${window.location.origin}/create-quotation`,
           data: {
             full_name: signupFullName,
             company_name: signupCompany,
