@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import { FeedbackProvider } from "./components/FeedbackProvider";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
@@ -45,15 +46,15 @@ const App = () => (
             
             {/* Public routes with Layout - auth triggered on actions */}
             <Route path="/" element={<Layout><Index /></Layout>} />
-            <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
-            <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
-            <Route path="/quotations/:id" element={<Layout><QuotationDetail /></Layout>} />
-            <Route path="/invoices" element={<Layout><Invoices /></Layout>} />
-            <Route path="/invoices/:id" element={<Layout><InvoiceDetail /></Layout>} />
-            <Route path="/clients" element={<Layout><Clients /></Layout>} />
-            <Route path="/team" element={<Layout><Team /></Layout>} />
-            <Route path="/team/project/:projectId" element={<Layout><ProjectDetail /></Layout>} />
-            <Route path="/settings" element={<Layout><Settings /></Layout>} />
+            <Route path="/dashboard" element={<Layout><ProtectedRoute><Dashboard /></ProtectedRoute></Layout>} />
+            <Route path="/quotations" element={<Layout><ProtectedRoute><Quotations /></ProtectedRoute></Layout>} />
+            <Route path="/quotations/:id" element={<Layout><ProtectedRoute><QuotationDetail /></ProtectedRoute></Layout>} />
+            <Route path="/invoices" element={<Layout><ProtectedRoute><Invoices /></ProtectedRoute></Layout>} />
+            <Route path="/invoices/:id" element={<Layout><ProtectedRoute><InvoiceDetail /></ProtectedRoute></Layout>} />
+            <Route path="/clients" element={<Layout><ProtectedRoute><Clients /></ProtectedRoute></Layout>} />
+            <Route path="/team" element={<Layout><ProtectedRoute><Team /></ProtectedRoute></Layout>} />
+            <Route path="/team/project/:projectId" element={<Layout><ProtectedRoute><ProjectDetail /></ProtectedRoute></Layout>} />
+            <Route path="/settings" element={<Layout><ProtectedRoute><Settings /></ProtectedRoute></Layout>} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
