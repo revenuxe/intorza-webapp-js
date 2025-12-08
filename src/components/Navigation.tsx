@@ -1,4 +1,4 @@
-import { FileText, Receipt, Users, Settings, PlusCircle, UsersRound, LayoutDashboard } from "lucide-react";
+import { FileText, Receipt, Users, Settings, PlusCircle, UsersRound, LayoutDashboard, Ruler, FolderOpen } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,16 @@ const navItems = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Site Measurement",
+    href: "/site-measurement",
+    icon: Ruler,
+  },
+  {
+    title: "My Projects",
+    href: "/my-projects",
+    icon: FolderOpen,
   },
   {
     title: "Create Quotation",
