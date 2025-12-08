@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Clock, MapPin, LogOut, CheckCircle, Calendar, Briefcase, Play, Square, Navigation, Circle } from "lucide-react";
+import { Clock, MapPin, LogOut, CheckCircle, Calendar, Briefcase, Play, Square, Navigation, Circle, Ruler } from "lucide-react";
 import { getAddressFromCoords } from "@/lib/geocoding";
 
 interface TeamMember {
@@ -43,6 +43,15 @@ interface ProjectAssignment {
   };
 }
 
+interface SiteMeasurementProject {
+  id: string;
+  client_name: string;
+  site_location: string | null;
+  status: string;
+  room_count: number;
+  total_area: number;
+}
+
 const TeamDashboard = () => {
   const navigate = useNavigate();
   const [teamMember, setTeamMember] = useState<TeamMember | null>(null);
@@ -51,29 +60,48 @@ const TeamDashboard = () => {
   const [recentAttendance, setRecentAttendance] = useState<Attendance[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [assignedProjects, setAssignedProjects] = useState<ProjectAssignment[]>([]);
+  const [siteMeasurementProjects, setSiteMeasurementProjects] = useState<SiteMeasurementProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [clockingIn, setClockingIn] = useState(false);
   const [clockingOut, setClockingOut] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetch();
-    
-    // Real-time subscription for tasks
+  }, []);
+
+  // Set up real-time subscription after teamMember is loaded
+  useEffect(() => {
+    if (!teamMember) return;
+
+    // Real-time subscription for tasks assigned to this member
     const tasksChannel = supabase
-      .channel('member-tasks')
+      .channel(`member-tasks-${teamMember.id}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'tasks',
+        filter: `assigned_to=eq.${teamMember.id}`
       }, () => {
-        if (teamMember) {
-          fetchTasks(teamMember.id);
-        }
+        fetchTasks(teamMember.id);
+      })
+      .subscribe();
+
+    // Real-time subscription for site measurement projects assigned to this member
+    const projectsChannel = supabase
+      .channel(`member-projects-${teamMember.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'site_measurement_projects',
+        filter: `assigned_to=eq.${teamMember.id}`
+      }, () => {
+        fetchAssignedProjects(teamMember.id);
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(tasksChannel);
+      supabase.removeChannel(projectsChannel);
     };
   }, [teamMember?.id]);
 
@@ -116,6 +144,7 @@ const TeamDashboard = () => {
       fetchRecentAttendance(member.id),
       fetchTasks(member.id),
       fetchAssignedProjects(member.id),
+      fetchSiteMeasurementProjects(member.id),
     ]);
 
     setLoading(false);
@@ -133,6 +162,18 @@ const TeamDashboard = () => {
 
     if (data) {
       setAssignedProjects(data as unknown as ProjectAssignment[]);
+    }
+  };
+
+  const fetchSiteMeasurementProjects = async (memberId: string) => {
+    const { data } = await supabase
+      .from('site_measurement_projects')
+      .select('id, client_name, site_location, status, room_count, total_area')
+      .eq('assigned_to', memberId)
+      .order('updated_at', { ascending: false });
+
+    if (data) {
+      setSiteMeasurementProjects(data);
     }
   };
 
@@ -469,6 +510,47 @@ const TeamDashboard = () => {
                     <p className="text-muted-foreground">--:--</p>
                   )}
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Site Measurement Projects */}
+        {siteMeasurementProjects.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Ruler className="h-4 w-4" />
+                Site Measurements ({siteMeasurementProjects.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {siteMeasurementProjects.map((project) => (
+                  <div 
+                    key={project.id} 
+                    className="p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                    onClick={() => navigate(`/site-measurement/${project.id}`)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{project.client_name}</p>
+                        {project.site_location && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                            <MapPin className="h-3 w-3" />
+                            {project.site_location}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {project.room_count || 0} rooms · {project.total_area?.toFixed(0) || 0} sq.ft
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="capitalize">
+                        {project.status}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

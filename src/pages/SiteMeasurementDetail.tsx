@@ -174,17 +174,29 @@ export default function SiteMeasurementDetail() {
 
     const { data: roomsData } = await supabase
       .from('site_measurement_rooms')
-      .select('area_sqft')
+      .select('id, area_sqft')
       .eq('project_id', id);
 
     const totalArea = roomsData?.reduce((sum, r) => sum + (r.area_sqft || 0), 0) || 0;
     const roomCount = roomsData?.length || 0;
 
+    // Count photos across all rooms
+    let photoCount = 0;
+    if (roomsData && roomsData.length > 0) {
+      const roomIds = roomsData.map(r => r.id);
+      const { count } = await supabase
+        .from('room_photos')
+        .select('id', { count: 'exact', head: true })
+        .in('room_id', roomIds);
+      photoCount = count || 0;
+    }
+
     await supabase
       .from('site_measurement_projects')
       .update({ 
         total_area: totalArea, 
-        room_count: roomCount 
+        room_count: roomCount,
+        photo_count: photoCount
       })
       .eq('id', id);
   };

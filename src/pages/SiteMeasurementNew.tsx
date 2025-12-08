@@ -55,13 +55,16 @@ export default function SiteMeasurementNew() {
 
     setLoading(true);
 
+    // Handle "unassigned" value - convert to null
+    const assignedToValue = assignedTo && assignedTo !== "unassigned" ? assignedTo : null;
+
     const { data, error } = await supabase
       .from('site_measurement_projects')
       .insert({
         user_id: user.id,
         client_name: clientName.trim(),
         site_location: siteLocation.trim() || null,
-        assigned_to: assignedTo || null,
+        assigned_to: assignedToValue,
         status: 'draft'
       })
       .select()
