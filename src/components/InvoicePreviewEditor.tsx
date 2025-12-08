@@ -327,7 +327,7 @@ export const InvoicePreviewEditor = ({
 
   // Preview Panel Component
   const PreviewPanel = () => (
-    <div className="flex-1 bg-muted/30 overflow-auto p-4">
+    <div className="flex-1 min-h-0 bg-muted/30 overflow-y-auto p-4">
       <div 
         className="bg-white shadow-lg mx-auto max-w-[400px] min-h-[500px] p-4 text-xs rounded"
         style={getPreviewStyles()}
@@ -479,7 +479,7 @@ export const InvoicePreviewEditor = ({
         </SheetHeader>
 
         {/* Mobile View: Show either preview or editor */}
-        <div className="flex-1 overflow-hidden md:hidden">
+        <div className="flex-1 min-h-0 overflow-hidden md:hidden flex flex-col">
           {showEditor ? (
             <EditorPanel />
           ) : (

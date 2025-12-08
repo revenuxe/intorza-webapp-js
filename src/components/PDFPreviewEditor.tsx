@@ -351,7 +351,7 @@ export const PDFPreviewEditor = ({
 
   // Preview Panel Component
   const PreviewPanel = () => (
-    <div className="flex-1 bg-muted/30 overflow-auto p-4 md:p-6">
+    <div className="flex-1 min-h-0 bg-muted/30 overflow-y-auto p-4 md:p-6">
       <div 
         ref={previewRef}
         className="bg-white shadow-lg mx-auto max-w-[595px] min-h-[600px] md:min-h-[842px] p-6 md:p-8 text-sm"
@@ -557,7 +557,7 @@ export const PDFPreviewEditor = ({
         </SheetHeader>
 
         {/* Mobile View: Show either preview or editor */}
-        <div className="flex-1 overflow-hidden md:hidden">
+        <div className="flex-1 min-h-0 overflow-hidden md:hidden flex flex-col">
           {showEditor ? (
             <EditorPanel />
           ) : (
