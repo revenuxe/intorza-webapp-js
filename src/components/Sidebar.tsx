@@ -1,11 +1,33 @@
-import { LogOut, LogIn } from "lucide-react";
+import { LogOut, LogIn, Settings, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Navigation } from "./Navigation";
 import { useAuth } from "@/hooks/useAuth";
 import logo from "@/assets/intorza-logo.webp";
 
 export const Sidebar = () => {
-  const { signOut, isAuthenticated } = useAuth();
+  const { user, signOut, isAuthenticated } = useAuth();
+
+  const getInitials = () => {
+    if (user?.user_metadata?.full_name) {
+      return user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    if (!user?.email) return "U";
+    return user.email.charAt(0).toUpperCase();
+  };
+
+  const getUserDisplayName = () => {
+    if (user?.user_metadata?.full_name) return user.user_metadata.full_name;
+    if (user?.email) return user.email.split('@')[0];
+    return "User";
+  };
 
   return (
     <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card h-screen sticky top-0">
@@ -21,10 +43,34 @@ export const Sidebar = () => {
       </div>
       <div className="p-4 border-t border-border shrink-0">
         {isAuthenticated ? (
-          <Button variant="outline" className="w-full" onClick={signOut}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="w-full justify-start gap-3 h-auto py-3 px-3">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture} />
+                  <AvatarFallback className="text-sm bg-primary text-primary-foreground">
+                    {getInitials()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-medium truncate">{getUserDisplayName()}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           <Button variant="default" className="w-full" onClick={() => window.location.href = '/auth'}>
             <LogIn className="mr-2 h-4 w-4" />
