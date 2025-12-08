@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { FeedbackProvider } from "./components/FeedbackProvider";
 import Index from "./pages/Index";
+import Dashboard from "./pages/Dashboard";
 import Quotations from "./pages/Quotations";
 import QuotationDetail from "./pages/QuotationDetail";
 import Invoices from "./pages/Invoices";
@@ -44,6 +45,7 @@ const App = () => (
             
             {/* Public routes with Layout - auth triggered on actions */}
             <Route path="/" element={<Layout><Index /></Layout>} />
+            <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
             <Route path="/quotations" element={<Layout><Quotations /></Layout>} />
             <Route path="/quotations/:id" element={<Layout><QuotationDetail /></Layout>} />
             <Route path="/invoices" element={<Layout><Invoices /></Layout>} />
