@@ -20,17 +20,21 @@ const TeamLogin = () => {
   useEffect(() => {
     // Check if already logged in as team member
     const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: teamMember } = await supabase
-          .from('team_members')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (teamMember) {
-          navigate('/team/dashboard');
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: teamMember } = await supabase
+            .from('team_members')
+            .select('id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+          
+          if (teamMember) {
+            navigate('/team/dashboard', { replace: true });
+          }
         }
+      } catch (error) {
+        console.error('Auth check error:', error);
       }
     };
     checkAuth();
