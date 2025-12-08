@@ -110,9 +110,9 @@ export const InvoicePreviewEditor = ({
 
   // Editor Panel Component
   const EditorPanel = () => (
-    <div className="flex flex-col h-full">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid grid-cols-3 m-3">
+    <div className="flex flex-col h-full overflow-hidden">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <TabsList className="grid grid-cols-3 m-3 flex-shrink-0">
           <TabsTrigger value="themes" className="text-xs">
             <Palette className="h-3 w-3 mr-1" />
             Theme
@@ -127,7 +127,7 @@ export const InvoicePreviewEditor = ({
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1 px-3">
+        <div className="flex-1 min-h-0 overflow-auto px-3">
           <TabsContent value="themes" className="mt-0 space-y-3 pb-4">
             <Label className="text-xs font-semibold">Select Theme</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -320,7 +320,7 @@ export const InvoicePreviewEditor = ({
               </div>
             </div>
           </TabsContent>
-        </ScrollArea>
+        </div>
       </Tabs>
     </div>
   );

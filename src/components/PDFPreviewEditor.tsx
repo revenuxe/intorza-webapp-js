@@ -106,9 +106,9 @@ export const PDFPreviewEditor = ({
 
   // Editor Panel Component
   const EditorPanel = () => (
-    <div className="flex flex-col h-full">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-        <TabsList className="grid grid-cols-3 m-4">
+    <div className="flex flex-col h-full overflow-hidden">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <TabsList className="grid grid-cols-3 m-4 flex-shrink-0">
           <TabsTrigger value="themes" className="text-xs">
             <Palette className="h-3 w-3 mr-1" />
             Themes
@@ -123,7 +123,7 @@ export const PDFPreviewEditor = ({
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1 px-4">
+        <div className="flex-1 min-h-0 overflow-auto px-4">
           <TabsContent value="themes" className="mt-0 space-y-4">
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Select Theme</Label>
@@ -338,7 +338,7 @@ export const PDFPreviewEditor = ({
               </Select>
             </div>
           </TabsContent>
-        </ScrollArea>
+        </div>
       </Tabs>
 
       <div className="p-4 border-t">
