@@ -28,6 +28,8 @@ import Team from "./pages/Team";
 import TeamLogin from "./pages/team/TeamLogin";
 import TeamDashboard from "./pages/team/TeamDashboard";
 import ProjectDetail from "./pages/team/ProjectDetail";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +69,8 @@ const App = () => (
             <Route path="/team" element={<Layout><ProtectedRoute><Team /></ProtectedRoute></Layout>} />
             <Route path="/team/project/:projectId" element={<Layout><ProtectedRoute><ProjectDetail /></ProtectedRoute></Layout>} />
             <Route path="/settings" element={<Layout><ProtectedRoute><Settings /></ProtectedRoute></Layout>} />
+            <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
