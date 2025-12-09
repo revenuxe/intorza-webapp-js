@@ -1,9 +1,14 @@
+import { useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 const TermsAndConditions = () => {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-4xl mx-auto px-4 py-8">
@@ -223,7 +228,7 @@ const TermsAndConditions = () => {
             </p>
             <div className="mt-4 p-4 bg-muted/50 rounded-lg">
               <p className="text-foreground font-medium">INTORZA</p>
-              <p className="text-muted-foreground">Email: support@intorza.com</p>
+              <p className="text-muted-foreground">Email: intorza.com@gmail.com</p>
               <p className="text-muted-foreground">Website: www.intorza.com</p>
             </div>
           </section>

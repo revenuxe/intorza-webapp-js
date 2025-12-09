@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { ArrowLeft, Shield, Lock, Eye, Database, Bell, Users, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,10 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent } from "@/components/ui/card";
 
 const PrivacyPolicy = () => {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container max-w-4xl mx-auto px-4 py-8">
@@ -221,7 +226,7 @@ const PrivacyPolicy = () => {
               <li><strong>Opt-Out:</strong> Opt out of marketing communications at any time</li>
             </ul>
             <p className="text-muted-foreground leading-relaxed mt-4">
-              To exercise any of these rights, please contact us at support@intorza.com
+              To exercise any of these rights, please contact us at intorza.com@gmail.com
             </p>
           </section>
 
@@ -315,8 +320,7 @@ const PrivacyPolicy = () => {
             </p>
             <div className="mt-4 p-4 bg-muted/50 rounded-lg">
               <p className="text-foreground font-medium">INTORZA - Data Protection</p>
-              <p className="text-muted-foreground">Email: privacy@intorza.com</p>
-              <p className="text-muted-foreground">Support: support@intorza.com</p>
+              <p className="text-muted-foreground">Email: intorza.com@gmail.com</p>
               <p className="text-muted-foreground">Website: www.intorza.com</p>
             </div>
           </section>
