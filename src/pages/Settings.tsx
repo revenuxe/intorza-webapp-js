@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, Upload, Loader2, Plus, Trash2, FileText } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Settings as SettingsIcon, Upload, Loader2, Plus, Trash2, FileText, Shield } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -988,6 +990,29 @@ const Settings = () => {
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Save Settings
           </Button>
+        </div>
+
+        {/* Legal Section */}
+        <Separator className="my-8" />
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-foreground">Legal</h3>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Link to="/terms-and-conditions">
+              <Button variant="outline" className="w-full sm:w-auto">
+                <FileText className="h-4 w-4 mr-2" />
+                Terms and Conditions
+              </Button>
+            </Link>
+            <Link to="/privacy-policy">
+              <Button variant="outline" className="w-full sm:w-auto">
+                <Shield className="h-4 w-4 mr-2" />
+                Privacy Policy
+              </Button>
+            </Link>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Read our terms of service and privacy policy to understand how we protect your data.
+          </p>
         </div>
       </div>
     </div>
