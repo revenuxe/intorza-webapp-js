@@ -5,6 +5,59 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Input validation helpers
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.endsWith('@intorza.com');
+}
+
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+function isValidPassword(password: string): boolean {
+  return typeof password === 'string' && password.length >= 8;
+}
+
+function isValidName(name: string): boolean {
+  return typeof name === 'string' && name.trim().length >= 1 && name.length <= 100;
+}
+
+function validateInput(data: Record<string, unknown>): { valid: boolean; error?: string } {
+  const { email, password, name, phone, work_type, company_id, team_member_id } = data;
+
+  if (!email || typeof email !== 'string' || !isValidEmail(email)) {
+    return { valid: false, error: 'Invalid email format. Must be a valid @intorza.com email.' };
+  }
+
+  if (!password || typeof password !== 'string' || !isValidPassword(password)) {
+    return { valid: false, error: 'Password must be at least 8 characters long.' };
+  }
+
+  if (!name || typeof name !== 'string' || !isValidName(name)) {
+    return { valid: false, error: 'Name must be between 1 and 100 characters.' };
+  }
+
+  if (phone !== undefined && phone !== null && typeof phone !== 'string') {
+    return { valid: false, error: 'Phone must be a string if provided.' };
+  }
+
+  if (!work_type || typeof work_type !== 'string') {
+    return { valid: false, error: 'Work type is required.' };
+  }
+
+  if (!company_id || typeof company_id !== 'string' || !isValidUUID(company_id)) {
+    return { valid: false, error: 'Invalid company ID format.' };
+  }
+
+  if (!team_member_id || typeof team_member_id !== 'string' || !isValidUUID(team_member_id)) {
+    return { valid: false, error: 'Invalid team member ID format.' };
+  }
+
+  return { valid: true };
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -38,7 +91,21 @@ Deno.serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    const { email, password, name, phone, work_type, company_id, team_member_id } = await req.json();
+    // Parse and validate input
+    const requestBody = await req.json();
+    const validation = validateInput(requestBody);
+    
+    if (!validation.valid) {
+      return new Response(
+        JSON.stringify({ error: validation.error }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400 
+        }
+      );
+    }
+
+    const { email, password, name, phone, work_type, company_id, team_member_id } = requestBody;
 
     console.log('Creating auth account for team member:', { email, name, company_id, team_member_id });
 
