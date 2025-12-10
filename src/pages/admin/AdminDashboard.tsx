@@ -579,93 +579,86 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Mobile-optimized header */}
       <header className="border-b bg-card sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <SettingsIcon className="h-6 w-6 text-primary" />
+        <div className="container mx-auto px-3 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-1.5 rounded-lg bg-primary/10 shrink-0">
+              <SettingsIcon className="h-5 w-5 text-primary" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold">Admin Dashboard</h1>
-              <p className="text-sm text-muted-foreground">INTORZA Management • Real-time</p>
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-xl font-bold truncate">Admin Dashboard</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">INTORZA Management</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={refreshData}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button variant="outline" size="icon" onClick={refreshData} className="h-8 w-8">
+              <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button variant="outline" onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
+            <Button variant="outline" size="sm" onClick={handleLogout} className="h-8 px-2 sm:px-3">
+              <LogOut className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Logout</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Overview Stats - Clean 4-column grid */}
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6">
+        {/* Overview Stats */}
         <section>
-          <h2 className="text-lg font-semibold mb-4">Overview</h2>
-          <div className="grid gap-6 grid-cols-2 lg:grid-cols-4">
-            <Card className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-full bg-blue-100">
-                    <Users className="h-6 w-6 text-blue-600" />
+          <h2 className="text-base sm:text-lg font-semibold mb-3">Overview</h2>
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-2 rounded-full bg-blue-100 shrink-0">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                   </div>
-                  <div>
-                    <p className="text-3xl font-bold tabular-nums">{stats.totalUsers}</p>
-                    <p className="text-sm text-muted-foreground">Users</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-full bg-green-100">
-                    <FileText className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-3xl font-bold tabular-nums">{stats.totalQuotations}</p>
-                    <p className="text-sm text-muted-foreground">Quotations</p>
+                  <div className="min-w-0">
+                    <p className="text-xl sm:text-2xl font-bold tabular-nums">{stats.totalUsers}</p>
+                    <p className="text-xs text-muted-foreground">Users</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-full bg-purple-100">
-                    <Receipt className="h-6 w-6 text-purple-600" />
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-2 rounded-full bg-green-100 shrink-0">
+                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                   </div>
-                  <div>
-                    <p className="text-3xl font-bold tabular-nums">{stats.totalInvoices}</p>
-                    <p className="text-sm text-muted-foreground">Invoices</p>
+                  <div className="min-w-0">
+                    <p className="text-xl sm:text-2xl font-bold tabular-nums">{stats.totalQuotations}</p>
+                    <p className="text-xs text-muted-foreground">Quotations</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-full bg-yellow-100">
-                    <Star className="h-6 w-6 text-yellow-600" />
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-2 rounded-full bg-purple-100 shrink-0">
+                    <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-3xl font-bold tabular-nums">{stats.avgRating.toFixed(1)}</p>
-                      <div className="flex">
-                        {[1,2,3,4,5].map(s => (
-                          <Star key={s} className={`h-4 w-4 ${s <= Math.round(stats.avgRating) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/30'}`} />
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-sm text-muted-foreground">Avg Rating</p>
+                  <div className="min-w-0">
+                    <p className="text-xl sm:text-2xl font-bold tabular-nums">{stats.totalInvoices}</p>
+                    <p className="text-xs text-muted-foreground">Invoices</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-2 rounded-full bg-yellow-100 shrink-0">
+                    <Star className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xl sm:text-2xl font-bold tabular-nums">{stats.avgRating.toFixed(1)}</p>
+                    <p className="text-xs text-muted-foreground">Rating</p>
                   </div>
                 </div>
               </CardContent>
@@ -675,31 +668,31 @@ const AdminDashboard = () => {
 
         {/* Revenue Section */}
         <section>
-          <h2 className="text-lg font-semibold mb-4">Revenue</h2>
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
-            <Card className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
+          <h2 className="text-base sm:text-lg font-semibold mb-3">Revenue</h2>
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+            <Card>
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Total Revenue</p>
-                    <p className="text-3xl font-bold text-green-600 tabular-nums">{formatCurrency(stats.totalRevenue)}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground mb-0.5">Total Revenue</p>
+                    <p className="text-xl sm:text-2xl font-bold text-green-600 tabular-nums truncate">{formatCurrency(stats.totalRevenue)}</p>
                   </div>
-                  <div className="p-3 rounded-full bg-green-100">
-                    <TrendingUp className="h-6 w-6 text-green-600" />
+                  <div className="p-2 rounded-full bg-green-100 shrink-0">
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
+            <Card>
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Pending Revenue</p>
-                    <p className="text-3xl font-bold text-orange-600 tabular-nums">{formatCurrency(stats.pendingRevenue)}</p>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground mb-0.5">Pending Revenue</p>
+                    <p className="text-xl sm:text-2xl font-bold text-orange-600 tabular-nums truncate">{formatCurrency(stats.pendingRevenue)}</p>
                   </div>
-                  <div className="p-3 rounded-full bg-orange-100">
-                    <Clock className="h-6 w-6 text-orange-600" />
+                  <div className="p-2 rounded-full bg-orange-100 shrink-0">
+                    <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />
                   </div>
                 </div>
               </CardContent>
@@ -707,162 +700,100 @@ const AdminDashboard = () => {
           </div>
         </section>
 
-        {/* User Activity & Quick Stats */}
+        {/* Activity Stats - Scrollable on mobile */}
         <section>
-          <h2 className="text-lg font-semibold mb-4">Activity & Engagement</h2>
-          <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          <h2 className="text-base sm:text-lg font-semibold mb-3">Activity</h2>
+          <div className="grid gap-2 grid-cols-3 sm:grid-cols-6">
             <Card>
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold tabular-nums">{stats.dailyActiveUsers}</p>
-                <p className="text-xs text-muted-foreground mt-1">Active Today</p>
+              <CardContent className="p-2 sm:p-3 text-center">
+                <p className="text-lg sm:text-xl font-bold tabular-nums">{stats.dailyActiveUsers}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Today</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold tabular-nums">{stats.weeklyActiveUsers}</p>
-                <p className="text-xs text-muted-foreground mt-1">Weekly Active</p>
+              <CardContent className="p-2 sm:p-3 text-center">
+                <p className="text-lg sm:text-xl font-bold tabular-nums">{stats.weeklyActiveUsers}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Weekly</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold tabular-nums">{stats.monthlyActiveUsers}</p>
-                <p className="text-xs text-muted-foreground mt-1">Monthly Active</p>
+              <CardContent className="p-2 sm:p-3 text-center">
+                <p className="text-lg sm:text-xl font-bold tabular-nums">{stats.monthlyActiveUsers}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Monthly</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold text-green-600 tabular-nums">+{stats.newUsersWeek}</p>
-                <p className="text-xs text-muted-foreground mt-1">New This Week</p>
+              <CardContent className="p-2 sm:p-3 text-center">
+                <p className="text-lg sm:text-xl font-bold text-green-600 tabular-nums">+{stats.newUsersWeek}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">New</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold text-purple-600 tabular-nums">{stats.returningUsers}</p>
-                <p className="text-xs text-muted-foreground mt-1">Returning Users</p>
+              <CardContent className="p-2 sm:p-3 text-center">
+                <p className="text-lg sm:text-xl font-bold text-red-600 tabular-nums">{stats.bugReports}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Bugs</p>
               </CardContent>
             </Card>
             <Card>
-              <CardContent className="p-4 text-center">
-                <p className="text-2xl font-bold tabular-nums">{stats.totalFeedback}</p>
-                <p className="text-xs text-muted-foreground mt-1">Total Feedback</p>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-
-        {/* Quick Numbers Row */}
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Quick Numbers</h2>
-          <div className="grid gap-6 grid-cols-2 md:grid-cols-4 lg:grid-cols-5">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Ruler className="h-5 w-5 text-orange-500" />
-                  <div>
-                    <p className="text-xl font-bold tabular-nums">{stats.totalSiteMeasurements}</p>
-                    <p className="text-xs text-muted-foreground">Site Surveys</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Building2 className="h-5 w-5 text-teal-500" />
-                  <div>
-                    <p className="text-xl font-bold tabular-nums">{stats.totalTeamMembers}</p>
-                    <p className="text-xs text-muted-foreground">Team Members</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-green-500" />
-                  <div>
-                    <p className="text-xl font-bold tabular-nums">{stats.quotationsToday}</p>
-                    <p className="text-xs text-muted-foreground">Quotes Today</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <Bug className="h-5 w-5 text-red-500" />
-                  <div>
-                    <p className="text-xl font-bold tabular-nums">{stats.bugReports}</p>
-                    <p className="text-xs text-muted-foreground">Bug Reports</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="h-5 w-5 text-orange-500" />
-                  <div>
-                    <p className="text-xl font-bold tabular-nums">{stats.issueReports}</p>
-                    <p className="text-xs text-muted-foreground">Issues</p>
-                  </div>
-                </div>
+              <CardContent className="p-2 sm:p-3 text-center">
+                <p className="text-lg sm:text-xl font-bold text-orange-600 tabular-nums">{stats.issueReports}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Issues</p>
               </CardContent>
             </Card>
           </div>
         </section>
 
         {/* Data Tables */}
-        <Tabs defaultValue="users" className="space-y-4">
-          <TabsList className="flex-wrap h-auto gap-1">
-            <TabsTrigger value="users">Users ({stats.totalUsers})</TabsTrigger>
-            <TabsTrigger value="companies">Companies</TabsTrigger>
-            <TabsTrigger value="feedback">Feedback ({stats.totalFeedback})</TabsTrigger>
-            <TabsTrigger value="quotations">Quotations ({stats.totalQuotations})</TabsTrigger>
-            <TabsTrigger value="invoices">Invoices ({stats.totalInvoices})</TabsTrigger>
-            <TabsTrigger value="sites">Site Surveys ({stats.totalSiteMeasurements})</TabsTrigger>
-            <TabsTrigger value="teams">Teams ({stats.totalTeamMembers})</TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="users" className="space-y-3">
+          <div className="overflow-x-auto -mx-3 px-3">
+            <TabsList className="inline-flex h-auto gap-1 p-1 w-max">
+              <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3">Users</TabsTrigger>
+              <TabsTrigger value="companies" className="text-xs sm:text-sm px-2 sm:px-3">Companies</TabsTrigger>
+              <TabsTrigger value="feedback" className="text-xs sm:text-sm px-2 sm:px-3">Feedback</TabsTrigger>
+              <TabsTrigger value="quotations" className="text-xs sm:text-sm px-2 sm:px-3">Quotes</TabsTrigger>
+              <TabsTrigger value="invoices" className="text-xs sm:text-sm px-2 sm:px-3">Invoices</TabsTrigger>
+              <TabsTrigger value="sites" className="text-xs sm:text-sm px-2 sm:px-3">Sites</TabsTrigger>
+              <TabsTrigger value="teams" className="text-xs sm:text-sm px-2 sm:px-3">Teams</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="users" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>
-                  View all registered users with their activity stats
+              <CardHeader className="p-3 sm:p-6">
+                <CardTitle className="text-base sm:text-lg">Users</CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  All registered users
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0 sm:p-6 sm:pt-0">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead className="text-center">Quotations</TableHead>
-                        <TableHead className="text-center">Invoices</TableHead>
-                        <TableHead className="text-center">Team</TableHead>
-                        <TableHead>Joined</TableHead>
+                        <TableHead className="text-xs">Email</TableHead>
+                        <TableHead className="text-xs hidden sm:table-cell">Name</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Company</TableHead>
+                        <TableHead className="text-xs text-center">Quotes</TableHead>
+                        <TableHead className="text-xs text-center hidden sm:table-cell">Invoices</TableHead>
+                        <TableHead className="text-xs hidden lg:table-cell">Joined</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {users.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8 text-sm">
                             No users found
                           </TableCell>
                         </TableRow>
                       ) : (
                         users.map((user) => (
                           <TableRow key={user.id}>
-                            <TableCell className="font-medium">{user.email}</TableCell>
-                            <TableCell>{user.full_name || 'N/A'}</TableCell>
-                            <TableCell>{user.company_name || 'N/A'}</TableCell>
-                            <TableCell className="text-center tabular-nums">{user.quotation_count}</TableCell>
-                            <TableCell className="text-center tabular-nums">{user.invoice_count}</TableCell>
-                            <TableCell className="text-center tabular-nums">{user.team_count}</TableCell>
-                            <TableCell>{format(new Date(user.created_at), 'dd MMM yyyy')}</TableCell>
+                            <TableCell className="text-xs font-medium max-w-[120px] sm:max-w-none truncate">{user.email}</TableCell>
+                            <TableCell className="text-xs hidden sm:table-cell">{user.full_name || '-'}</TableCell>
+                            <TableCell className="text-xs hidden md:table-cell">{user.company_name || '-'}</TableCell>
+                            <TableCell className="text-xs text-center tabular-nums">{user.quotation_count}</TableCell>
+                            <TableCell className="text-xs text-center tabular-nums hidden sm:table-cell">{user.invoice_count}</TableCell>
+                            <TableCell className="text-xs hidden lg:table-cell">{format(new Date(user.created_at), 'dd MMM')}</TableCell>
                           </TableRow>
                         ))
                       )}
