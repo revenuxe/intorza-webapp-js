@@ -91,6 +91,7 @@ export type Database = {
       feedback: {
         Row: {
           created_at: string
+          feedback_type: string | null
           id: string
           message: string | null
           rating: number
@@ -99,6 +100,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          feedback_type?: string | null
           id?: string
           message?: string | null
           rating: number
@@ -107,6 +109,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          feedback_type?: string | null
           id?: string
           message?: string | null
           rating?: number
@@ -809,6 +812,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_activity: {
+        Row: {
+          activity_date: string
+          activity_type: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          activity_date?: string
+          activity_type: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          activity_date?: string
+          activity_type?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
