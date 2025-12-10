@@ -603,231 +603,216 @@ const AdminDashboard = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
-        {/* Quick Stats Row */}
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4 lg:grid-cols-6 mb-6">
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <Users className="h-8 w-8 text-blue-600" />
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-blue-900 tabular-nums">{stats.totalUsers}</p>
-                  <p className="text-xs text-blue-700">Total Users</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <FileText className="h-8 w-8 text-green-600" />
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-green-900 tabular-nums">{stats.totalQuotations}</p>
-                  <p className="text-xs text-green-700">Quotations</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <Receipt className="h-8 w-8 text-purple-600" />
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-purple-900 tabular-nums">{stats.totalInvoices}</p>
-                  <p className="text-xs text-purple-700">Invoices</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <Ruler className="h-8 w-8 text-orange-600" />
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-orange-900 tabular-nums">{stats.totalSiteMeasurements}</p>
-                  <p className="text-xs text-orange-700">Site Surveys</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <Building2 className="h-8 w-8 text-teal-600" />
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-teal-900 tabular-nums">{stats.totalTeamMembers}</p>
-                  <p className="text-xs text-teal-700">Team Members</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <Star className="h-8 w-8 text-yellow-600" />
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-yellow-900 tabular-nums">{stats.avgRating.toFixed(1)}</p>
-                  <p className="text-xs text-yellow-700">Avg Rating</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Revenue & Activity Row */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-500" />
-                Total Revenue
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-green-600 tabular-nums">{formatCurrency(stats.totalRevenue)}</p>
-              <p className="text-xs text-muted-foreground">Paid amount across all invoices</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Clock className="h-4 w-4 text-orange-500" />
-                Pending Revenue
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-orange-600 tabular-nums">{formatCurrency(stats.pendingRevenue)}</p>
-              <p className="text-xs text-muted-foreground">Outstanding payments</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Activity className="h-4 w-4 text-blue-500" />
-                Daily Active Users
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-blue-600 tabular-nums">{stats.dailyActiveUsers}</p>
-              <p className="text-xs text-muted-foreground">Active today</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <UserCheck className="h-4 w-4 text-purple-500" />
-                Returning Users
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-purple-600 tabular-nums">{stats.returningUsers}</p>
-              <p className="text-xs text-muted-foreground">Multi-day users</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* User Activity & Feedback Row */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6 mb-6">
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Weekly Active</p>
-              <p className="text-xl font-bold tabular-nums">{stats.weeklyActiveUsers}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">Monthly Active</p>
-              <p className="text-xl font-bold tabular-nums">{stats.monthlyActiveUsers}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">New Today</p>
-              <p className="text-xl font-bold text-green-600 tabular-nums">+{stats.newUsersToday}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground">New This Week</p>
-              <p className="text-xl font-bold text-green-600 tabular-nums">+{stats.newUsersWeek}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                <Bug className="h-3 w-3 text-red-500" /> Bug Reports
-              </p>
-              <p className="text-xl font-bold text-red-600 tabular-nums">{stats.bugReports}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                <AlertTriangle className="h-3 w-3 text-orange-500" /> Issues
-              </p>
-              <p className="text-xl font-bold text-orange-600 tabular-nums">{stats.issueReports}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Today's Activity */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-          <Card className="border-l-4 border-l-green-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Quotations Today</p>
-                  <p className="text-2xl font-bold tabular-nums">{stats.quotationsToday}</p>
-                </div>
-                <FileText className="h-8 w-8 text-green-500/30" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-purple-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Invoices Today</p>
-                  <p className="text-2xl font-bold tabular-nums">{stats.invoicesToday}</p>
-                </div>
-                <Receipt className="h-8 w-8 text-purple-500/30" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-blue-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Total Feedback</p>
-                  <p className="text-2xl font-bold tabular-nums">{stats.totalFeedback}</p>
-                </div>
-                <MessageSquare className="h-8 w-8 text-blue-500/30" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-l-4 border-l-yellow-500">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Avg Rating</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-2xl font-bold tabular-nums">{stats.avgRating.toFixed(1)}</p>
-                    {renderStars(Math.round(stats.avgRating))}
+      <main className="container mx-auto px-4 py-8 space-y-8">
+        {/* Overview Stats - Clean 4-column grid */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Overview</h2>
+          <div className="grid gap-6 grid-cols-2 lg:grid-cols-4">
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-full bg-blue-100">
+                    <Users className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold tabular-nums">{stats.totalUsers}</p>
+                    <p className="text-sm text-muted-foreground">Users</p>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
 
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-full bg-green-100">
+                    <FileText className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold tabular-nums">{stats.totalQuotations}</p>
+                    <p className="text-sm text-muted-foreground">Quotations</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-full bg-purple-100">
+                    <Receipt className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold tabular-nums">{stats.totalInvoices}</p>
+                    <p className="text-sm text-muted-foreground">Invoices</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-full bg-yellow-100">
+                    <Star className="h-6 w-6 text-yellow-600" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-3xl font-bold tabular-nums">{stats.avgRating.toFixed(1)}</p>
+                      <div className="flex">
+                        {[1,2,3,4,5].map(s => (
+                          <Star key={s} className={`h-4 w-4 ${s <= Math.round(stats.avgRating) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/30'}`} />
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Avg Rating</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {/* Revenue Section */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Revenue</h2>
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Total Revenue</p>
+                    <p className="text-3xl font-bold text-green-600 tabular-nums">{formatCurrency(stats.totalRevenue)}</p>
+                  </div>
+                  <div className="p-3 rounded-full bg-green-100">
+                    <TrendingUp className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Pending Revenue</p>
+                    <p className="text-3xl font-bold text-orange-600 tabular-nums">{formatCurrency(stats.pendingRevenue)}</p>
+                  </div>
+                  <div className="p-3 rounded-full bg-orange-100">
+                    <Clock className="h-6 w-6 text-orange-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {/* User Activity & Quick Stats */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Activity & Engagement</h2>
+          <div className="grid gap-6 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold tabular-nums">{stats.dailyActiveUsers}</p>
+                <p className="text-xs text-muted-foreground mt-1">Active Today</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold tabular-nums">{stats.weeklyActiveUsers}</p>
+                <p className="text-xs text-muted-foreground mt-1">Weekly Active</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold tabular-nums">{stats.monthlyActiveUsers}</p>
+                <p className="text-xs text-muted-foreground mt-1">Monthly Active</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold text-green-600 tabular-nums">+{stats.newUsersWeek}</p>
+                <p className="text-xs text-muted-foreground mt-1">New This Week</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold text-purple-600 tabular-nums">{stats.returningUsers}</p>
+                <p className="text-xs text-muted-foreground mt-1">Returning Users</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <p className="text-2xl font-bold tabular-nums">{stats.totalFeedback}</p>
+                <p className="text-xs text-muted-foreground mt-1">Total Feedback</p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {/* Quick Numbers Row */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4">Quick Numbers</h2>
+          <div className="grid gap-6 grid-cols-2 md:grid-cols-4 lg:grid-cols-5">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Ruler className="h-5 w-5 text-orange-500" />
+                  <div>
+                    <p className="text-xl font-bold tabular-nums">{stats.totalSiteMeasurements}</p>
+                    <p className="text-xs text-muted-foreground">Site Surveys</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-5 w-5 text-teal-500" />
+                  <div>
+                    <p className="text-xl font-bold tabular-nums">{stats.totalTeamMembers}</p>
+                    <p className="text-xs text-muted-foreground">Team Members</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-green-500" />
+                  <div>
+                    <p className="text-xl font-bold tabular-nums">{stats.quotationsToday}</p>
+                    <p className="text-xs text-muted-foreground">Quotes Today</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Bug className="h-5 w-5 text-red-500" />
+                  <div>
+                    <p className="text-xl font-bold tabular-nums">{stats.bugReports}</p>
+                    <p className="text-xs text-muted-foreground">Bug Reports</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-orange-500" />
+                  <div>
+                    <p className="text-xl font-bold tabular-nums">{stats.issueReports}</p>
+                    <p className="text-xs text-muted-foreground">Issues</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+
+        {/* Data Tables */}
         <Tabs defaultValue="users" className="space-y-4">
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="users">Users ({stats.totalUsers})</TabsTrigger>
