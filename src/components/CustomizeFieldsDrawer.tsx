@@ -30,9 +30,14 @@ export interface QuotationSettings {
   showCompanyLogo: boolean;
   showCompanyAddress: boolean;
   showProjectDetails: boolean;
+  showCompanyPhone: boolean;
+  showCompanyEmail: boolean;
+  showGstin: boolean;
   // Form Fields
   showClientName: boolean;
   showClientAddress: boolean;
+  showClientPhone: boolean;
+  showClientEmail: boolean;
   showDateOfProposal: boolean;
   showQuotationValidTill: boolean;
   showProjectDeadline: boolean;
@@ -44,27 +49,38 @@ export interface QuotationSettings {
   useSimpleItemLayout: boolean;
   showSideColumn: boolean;
   showProductDetails: boolean;
+  showItemNotes: boolean;
+  showSerialNumbers: boolean;
   // Totals & Summary
   showSubtotal: boolean;
   showTaxGst: boolean;
   showGrandTotal: boolean;
   showDiscount: boolean;
   showSocialMediaDiscount: boolean;
+  showAmountInWords: boolean;
   // Extra Sections
   showPaymentStages: boolean;
   showTermsConditions: boolean;
   showSignatureArea: boolean;
+  showNotes: boolean;
+  showValidityNote: boolean;
   // Payment & Bank Details
   showBankDetails: boolean;
   showQRCode: boolean;
   showProfessionalAdvantages: boolean;
   showQuotationNumber: boolean;
+  showUpiId: boolean;
 }
 
 export interface InvoiceSettings {
   showCompanyLogo: boolean;
   showCompanyAddress: boolean;
+  showCompanyPhone: boolean;
+  showCompanyEmail: boolean;
+  showGstin: boolean;
   showClientAddress: boolean;
+  showClientPhone: boolean;
+  showClientEmail: boolean;
   showProjectName: boolean;
   showDueDate: boolean;
   showPaymentStatus: boolean;
@@ -78,14 +94,22 @@ export interface InvoiceSettings {
   showPaymentProgress: boolean;
   showBankDetails: boolean;
   showQRCode: boolean;
+  showAmountInWords: boolean;
+  showNotes: boolean;
+  showUpiId: boolean;
 }
 
 const defaultQuotationSettings: QuotationSettings = {
   showCompanyLogo: true,
   showCompanyAddress: true,
   showProjectDetails: true,
+  showCompanyPhone: true,
+  showCompanyEmail: true,
+  showGstin: true,
   showClientName: true,
   showClientAddress: true,
+  showClientPhone: true,
+  showClientEmail: true,
   showDateOfProposal: true,
   showQuotationValidTill: true,
   showProjectDeadline: true,
@@ -96,24 +120,35 @@ const defaultQuotationSettings: QuotationSettings = {
   useSimpleItemLayout: false,
   showSideColumn: true,
   showProductDetails: true,
+  showItemNotes: false,
+  showSerialNumbers: true,
   showSubtotal: true,
   showTaxGst: true,
   showGrandTotal: true,
   showDiscount: true,
   showSocialMediaDiscount: true,
+  showAmountInWords: true,
   showPaymentStages: true,
   showTermsConditions: true,
   showSignatureArea: true,
+  showNotes: true,
+  showValidityNote: true,
   showBankDetails: false,
   showQRCode: false,
   showProfessionalAdvantages: true,
   showQuotationNumber: true,
+  showUpiId: false,
 };
 
 const defaultInvoiceSettings: InvoiceSettings = {
   showCompanyLogo: true,
   showCompanyAddress: true,
+  showCompanyPhone: true,
+  showCompanyEmail: true,
+  showGstin: true,
   showClientAddress: true,
+  showClientPhone: true,
+  showClientEmail: true,
   showProjectName: true,
   showDueDate: true,
   showPaymentStatus: true,
@@ -127,6 +162,9 @@ const defaultInvoiceSettings: InvoiceSettings = {
   showPaymentProgress: true,
   showBankDetails: false,
   showQRCode: false,
+  showAmountInWords: true,
+  showNotes: true,
+  showUpiId: false,
 };
 
 interface CustomizeFieldsDrawerProps {
@@ -222,9 +260,24 @@ const QuotationCustomizeContent = ({
             onCheckedChange={(v) => updateSetting('showCompanyLogo', v)}
           />
           <ToggleItem 
-            label="Show company address and contact" 
+            label="Show company address" 
             checked={settings.showCompanyAddress}
             onCheckedChange={(v) => updateSetting('showCompanyAddress', v)}
+          />
+          <ToggleItem 
+            label="Show company phone" 
+            checked={settings.showCompanyPhone}
+            onCheckedChange={(v) => updateSetting('showCompanyPhone', v)}
+          />
+          <ToggleItem 
+            label="Show company email" 
+            checked={settings.showCompanyEmail}
+            onCheckedChange={(v) => updateSetting('showCompanyEmail', v)}
+          />
+          <ToggleItem 
+            label="Show GSTIN" 
+            checked={settings.showGstin}
+            onCheckedChange={(v) => updateSetting('showGstin', v)}
           />
           <ToggleItem 
             label="Show project details block (in PDF)" 
@@ -249,6 +302,16 @@ const QuotationCustomizeContent = ({
             label="Client address" 
             checked={settings.showClientAddress}
             onCheckedChange={(v) => updateSetting('showClientAddress', v)}
+          />
+          <ToggleItem 
+            label="Client phone" 
+            checked={settings.showClientPhone}
+            onCheckedChange={(v) => updateSetting('showClientPhone', v)}
+          />
+          <ToggleItem 
+            label="Client email" 
+            checked={settings.showClientEmail}
+            onCheckedChange={(v) => updateSetting('showClientEmail', v)}
           />
           <ToggleItem 
             label="Date of proposal" 
@@ -309,6 +372,16 @@ const QuotationCustomizeContent = ({
             checked={settings.showProductDetails}
             onCheckedChange={(v) => updateSetting('showProductDetails', v)}
           />
+          <ToggleItem 
+            label="Show item notes" 
+            checked={settings.showItemNotes}
+            onCheckedChange={(v) => updateSetting('showItemNotes', v)}
+          />
+          <ToggleItem 
+            label="Show serial numbers (S.No)" 
+            checked={settings.showSerialNumbers}
+            onCheckedChange={(v) => updateSetting('showSerialNumbers', v)}
+          />
         </div>
         <p className="text-xs text-muted-foreground mt-2">
           Only one layout mode can be active at a time.
@@ -346,6 +419,11 @@ const QuotationCustomizeContent = ({
             checked={settings.showGrandTotal}
             onCheckedChange={(v) => updateSetting('showGrandTotal', v)}
           />
+          <ToggleItem 
+            label="Show amount in words" 
+            checked={settings.showAmountInWords}
+            onCheckedChange={(v) => updateSetting('showAmountInWords', v)}
+          />
         </div>
       </div>
 
@@ -380,6 +458,16 @@ const QuotationCustomizeContent = ({
             checked={settings.showSignatureArea}
             onCheckedChange={(v) => updateSetting('showSignatureArea', v)}
           />
+          <ToggleItem 
+            label="Show notes section" 
+            checked={settings.showNotes}
+            onCheckedChange={(v) => updateSetting('showNotes', v)}
+          />
+          <ToggleItem 
+            label="Show validity note" 
+            checked={settings.showValidityNote}
+            onCheckedChange={(v) => updateSetting('showValidityNote', v)}
+          />
         </div>
       </div>
 
@@ -398,6 +486,11 @@ const QuotationCustomizeContent = ({
             label="Show payment QR code" 
             checked={settings.showQRCode}
             onCheckedChange={(v) => updateSetting('showQRCode', v)}
+          />
+          <ToggleItem 
+            label="Show UPI ID" 
+            checked={settings.showUpiId}
+            onCheckedChange={(v) => updateSetting('showUpiId', v)}
           />
         </div>
         <p className="text-xs text-muted-foreground mt-2">
@@ -436,9 +529,9 @@ const InvoiceCustomizeContent = ({
 
   return (
     <div className="space-y-6 py-4">
-      {/* Group 1 */}
+      {/* Group 1 - Header Info */}
       <div>
-        <h4 className="text-sm font-semibold text-foreground mb-3">Header Info</h4>
+        <h4 className="text-sm font-semibold text-foreground mb-3">Header & Company Info</h4>
         <div className="space-y-1">
           <ToggleItem 
             label="Show company logo" 
@@ -451,9 +544,43 @@ const InvoiceCustomizeContent = ({
             onCheckedChange={(v) => updateSetting('showCompanyAddress', v)}
           />
           <ToggleItem 
+            label="Show company phone" 
+            checked={settings.showCompanyPhone}
+            onCheckedChange={(v) => updateSetting('showCompanyPhone', v)}
+          />
+          <ToggleItem 
+            label="Show company email" 
+            checked={settings.showCompanyEmail}
+            onCheckedChange={(v) => updateSetting('showCompanyEmail', v)}
+          />
+          <ToggleItem 
+            label="Show GSTIN" 
+            checked={settings.showGstin}
+            onCheckedChange={(v) => updateSetting('showGstin', v)}
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      {/* Group 2 - Client Info */}
+      <div>
+        <h4 className="text-sm font-semibold text-foreground mb-3">Client Info</h4>
+        <div className="space-y-1">
+          <ToggleItem 
             label="Show client address" 
             checked={settings.showClientAddress}
             onCheckedChange={(v) => updateSetting('showClientAddress', v)}
+          />
+          <ToggleItem 
+            label="Show client phone" 
+            checked={settings.showClientPhone}
+            onCheckedChange={(v) => updateSetting('showClientPhone', v)}
+          />
+          <ToggleItem 
+            label="Show client email" 
+            checked={settings.showClientEmail}
+            onCheckedChange={(v) => updateSetting('showClientEmail', v)}
           />
           <ToggleItem 
             label="Show project name" 
@@ -465,7 +592,7 @@ const InvoiceCustomizeContent = ({
 
       <Separator />
 
-      {/* Group 2 */}
+      {/* Group 3 - Invoice Details */}
       <div>
         <h4 className="text-sm font-semibold text-foreground mb-3">Invoice Details</h4>
         <div className="space-y-1">
@@ -504,12 +631,17 @@ const InvoiceCustomizeContent = ({
             checked={settings.showNextPaymentDue}
             onCheckedChange={(v) => updateSetting('showNextPaymentDue', v)}
           />
+          <ToggleItem 
+            label="Show amount in words" 
+            checked={settings.showAmountInWords}
+            onCheckedChange={(v) => updateSetting('showAmountInWords', v)}
+          />
         </div>
       </div>
 
       <Separator />
 
-      {/* Group 3 */}
+      {/* Group 4 - Extra Sections */}
       <div>
         <h4 className="text-sm font-semibold text-foreground mb-3">Extra Sections</h4>
         <div className="space-y-1">
@@ -528,12 +660,17 @@ const InvoiceCustomizeContent = ({
             checked={settings.showSignatureFooter}
             onCheckedChange={(v) => updateSetting('showSignatureFooter', v)}
           />
+          <ToggleItem 
+            label="Show notes section" 
+            checked={settings.showNotes}
+            onCheckedChange={(v) => updateSetting('showNotes', v)}
+          />
         </div>
       </div>
 
       <Separator />
 
-      {/* Group 4 - Payment & Bank Details */}
+      {/* Group 5 - Payment & Bank Details */}
       <div>
         <h4 className="text-sm font-semibold text-foreground mb-3">Payment & Bank Details</h4>
         <div className="space-y-1">
@@ -546,6 +683,11 @@ const InvoiceCustomizeContent = ({
             label="Show payment QR code" 
             checked={settings.showQRCode}
             onCheckedChange={(v) => updateSetting('showQRCode', v)}
+          />
+          <ToggleItem 
+            label="Show UPI ID" 
+            checked={settings.showUpiId}
+            onCheckedChange={(v) => updateSetting('showUpiId', v)}
           />
         </div>
         <p className="text-xs text-muted-foreground mt-2">
