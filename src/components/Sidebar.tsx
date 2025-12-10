@@ -45,21 +45,23 @@ export const Sidebar = () => {
         {isAuthenticated ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="w-full justify-start gap-3 h-auto py-3 px-3">
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture} />
-                  <AvatarFallback className="text-sm bg-primary text-primary-foreground">
-                    {getInitials()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 text-left">
-                  <p className="text-sm font-medium truncate">{getUserDisplayName()}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+              <Button variant="ghost" className="w-full justify-start h-auto py-3 px-3 hover:bg-muted/50">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <Avatar className="h-9 w-9 shrink-0">
+                    <AvatarImage src={user?.user_metadata?.avatar_url || user?.user_metadata?.picture} />
+                    <AvatarFallback className="text-sm bg-primary text-primary-foreground">
+                      {getInitials()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-sm font-medium truncate max-w-[140px]">{getUserDisplayName()}</p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[140px]">{user?.email}</p>
+                  </div>
                 </div>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 ml-1" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="start" side="top" className="w-56 bg-popover border border-border shadow-lg">
               <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
