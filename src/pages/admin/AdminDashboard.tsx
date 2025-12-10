@@ -19,6 +19,7 @@ interface User {
   email: string;
   full_name: string;
   company_name: string;
+  phone: string;
   created_at: string;
   quotation_count?: number;
   invoice_count?: number;
@@ -244,7 +245,7 @@ const AdminDashboard = () => {
     try {
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, company_name, created_at')
+        .select('id, email, full_name, company_name, phone, created_at')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -830,6 +831,7 @@ const AdminDashboard = () => {
         <Tabs defaultValue="users" className="space-y-4">
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="users">Users ({stats.totalUsers})</TabsTrigger>
+            <TabsTrigger value="companies">Companies</TabsTrigger>
             <TabsTrigger value="feedback">Feedback ({stats.totalFeedback})</TabsTrigger>
             <TabsTrigger value="quotations">Quotations ({stats.totalQuotations})</TabsTrigger>
             <TabsTrigger value="invoices">Invoices ({stats.totalInvoices})</TabsTrigger>
@@ -872,6 +874,60 @@ const AdminDashboard = () => {
                             <TableCell className="font-medium">{user.email}</TableCell>
                             <TableCell>{user.full_name || 'N/A'}</TableCell>
                             <TableCell>{user.company_name || 'N/A'}</TableCell>
+                            <TableCell className="text-center tabular-nums">{user.quotation_count}</TableCell>
+                            <TableCell className="text-center tabular-nums">{user.invoice_count}</TableCell>
+                            <TableCell className="text-center tabular-nums">{user.team_count}</TableCell>
+                            <TableCell>{format(new Date(user.created_at), 'dd MMM yyyy')}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="companies" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Companies
+                </CardTitle>
+                <CardDescription>
+                  All company names saved by users
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Company Name</TableHead>
+                        <TableHead>Owner</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead className="text-center">Quotations</TableHead>
+                        <TableHead className="text-center">Invoices</TableHead>
+                        <TableHead className="text-center">Team Size</TableHead>
+                        <TableHead>Joined</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.filter(u => u.company_name).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                            No companies found
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        users.filter(u => u.company_name).map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">{user.company_name}</TableCell>
+                            <TableCell>{user.full_name || 'N/A'}</TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>{(user as any).phone || 'N/A'}</TableCell>
                             <TableCell className="text-center tabular-nums">{user.quotation_count}</TableCell>
                             <TableCell className="text-center tabular-nums">{user.invoice_count}</TableCell>
                             <TableCell className="text-center tabular-nums">{user.team_count}</TableCell>
