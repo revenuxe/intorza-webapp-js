@@ -123,7 +123,27 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
       .order('created_at');
     
     if (data) {
-      setPhotos(data);
+      // Generate signed URLs for each photo
+      const photosWithSignedUrls = await Promise.all(
+        data.map(async (photo) => {
+          // Extract file path from stored URL
+          const urlParts = photo.photo_url.split('/room-photos/');
+          const filePath = urlParts[1]?.split('?')[0]; // Remove any existing query params
+          
+          if (filePath) {
+            const { data: signedData } = await supabase.storage
+              .from('room-photos')
+              .createSignedUrl(filePath, 3600); // 1 hour expiry
+            
+            return {
+              ...photo,
+              photo_url: signedData?.signedUrl || photo.photo_url
+            };
+          }
+          return photo;
+        })
+      );
+      setPhotos(photosWithSignedUrls);
     }
   };
 
@@ -175,17 +195,16 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
           continue;
         }
 
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('room-photos')
-          .getPublicUrl(fileName);
+        // Store the file path reference (not the full URL)
+        // We'll generate signed URLs when fetching
+        const storedPath = `${supabase.storage.from('room-photos').getPublicUrl(fileName).data.publicUrl}`;
 
-        // Save to room_photos table
+        // Save to room_photos table with the path reference
         const { data: photoData, error: dbError } = await supabase
           .from('room_photos')
           .insert({
             room_id: room.id,
-            photo_url: publicUrl,
+            photo_url: storedPath, // Store the path for reference
           })
           .select()
           .single();
@@ -196,7 +215,15 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
           continue;
         }
 
-        setPhotos(prev => [...prev, photoData]);
+        // Generate signed URL for immediate display
+        const { data: signedData } = await supabase.storage
+          .from('room-photos')
+          .createSignedUrl(fileName, 3600);
+
+        setPhotos(prev => [...prev, { 
+          ...photoData, 
+          photo_url: signedData?.signedUrl || storedPath 
+        }]);
       }
       
       toast.success('Photos uploaded successfully');
