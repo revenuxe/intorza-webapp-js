@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { 
   LogOut, Users, FileText, Receipt, Settings as SettingsIcon, MessageSquare, Star, 
   TrendingUp, TrendingDown, Activity, Calendar, Ruler, UserCheck, Building2, 
-  AlertTriangle, Bug, ThumbsUp, RefreshCw, Eye, Clock
+  AlertTriangle, Bug, ThumbsUp, RefreshCw, Eye, Clock, Crown
 } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 
@@ -245,7 +245,7 @@ const AdminDashboard = () => {
     try {
       const { data: profiles, error } = await supabase
         .from('profiles')
-        .select('id, email, full_name, company_name, phone, created_at')
+        .select('id, email, full_name, company_name, phone, created_at, is_pro, pro_since, pro_expiry')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -749,6 +749,7 @@ const AdminDashboard = () => {
             <TabsList className="inline-flex h-auto gap-1 p-1 w-max">
               <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3">Users</TabsTrigger>
               <TabsTrigger value="companies" className="text-xs sm:text-sm px-2 sm:px-3">Companies</TabsTrigger>
+              <TabsTrigger value="billing" className="text-xs sm:text-sm px-2 sm:px-3">Billing</TabsTrigger>
               <TabsTrigger value="feedback" className="text-xs sm:text-sm px-2 sm:px-3">Feedback</TabsTrigger>
               <TabsTrigger value="quotations" className="text-xs sm:text-sm px-2 sm:px-3">Quotes</TabsTrigger>
               <TabsTrigger value="invoices" className="text-xs sm:text-sm px-2 sm:px-3">Invoices</TabsTrigger>
@@ -848,6 +849,62 @@ const AdminDashboard = () => {
                             <TableCell className="text-center tabular-nums">{user.invoice_count}</TableCell>
                             <TableCell className="text-center tabular-nums">{user.team_count}</TableCell>
                             <TableCell>{format(new Date(user.created_at), 'dd MMM yyyy')}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="billing" className="space-y-4">
+            <Card>
+              <CardHeader className="p-3 sm:p-6">
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  <Crown className="h-4 w-4 text-amber-500" />
+                  Pro Subscribers
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  Users with active Pro subscriptions
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0 sm:p-6 sm:pt-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Email</TableHead>
+                        <TableHead className="text-xs">Plan</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs hidden sm:table-cell">Since</TableHead>
+                        <TableHead className="text-xs hidden sm:table-cell">Expires</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {users.filter(u => (u as any).is_pro).length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8 text-sm">
+                            No Pro subscribers yet
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        users.filter(u => (u as any).is_pro).map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell className="text-xs font-medium">{user.email}</TableCell>
+                            <TableCell className="text-xs">
+                              <Badge className="bg-amber-500/10 text-amber-700 text-[10px]">Monthly</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              <Badge className="bg-green-500/10 text-green-700 text-[10px]">Active</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs hidden sm:table-cell">
+                              {(user as any).pro_since ? format(new Date((user as any).pro_since), 'dd MMM') : '-'}
+                            </TableCell>
+                            <TableCell className="text-xs hidden sm:table-cell">
+                              {(user as any).pro_expiry ? format(new Date((user as any).pro_expiry), 'dd MMM') : '-'}
+                            </TableCell>
                           </TableRow>
                         ))
                       )}
