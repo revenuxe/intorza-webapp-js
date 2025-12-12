@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Settings as SettingsIcon, Upload, Loader2, Plus, Trash2, FileText, Shield } from "lucide-react";
+import { Settings as SettingsIcon, Upload, Loader2, Plus, Trash2, FileText, Shield, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -996,7 +996,7 @@ const Settings = () => {
         <Separator className="my-8" />
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-foreground">Legal</h3>
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
             <Link to="/terms-and-conditions">
               <Button variant="outline" className="w-full sm:w-auto">
                 <FileText className="h-4 w-4 mr-2" />
@@ -1009,9 +1009,15 @@ const Settings = () => {
                 Privacy Policy
               </Button>
             </Link>
+            <Link to="/cancellation-refund-policy">
+              <Button variant="outline" className="w-full sm:w-auto">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Cancellation & Refunds
+              </Button>
+            </Link>
           </div>
           <p className="text-sm text-muted-foreground">
-            Read our terms of service and privacy policy to understand how we protect your data.
+            Read our terms of service, privacy policy, and cancellation & refund policy to understand our services.
           </p>
         </div>
       </div>
