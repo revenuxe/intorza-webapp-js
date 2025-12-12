@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { FeedbackProvider } from "./components/FeedbackProvider";
+import { SubscriptionProvider } from "./contexts/SubscriptionContext";
+import { PaywallModal } from "./components/PaywallModal";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import SiteMeasurement from "./pages/SiteMeasurement";
@@ -40,7 +42,9 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <FeedbackProvider>
+        <SubscriptionProvider>
+          <FeedbackProvider>
+            <PaywallModal />
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
@@ -77,7 +81,8 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </FeedbackProvider>
+          </FeedbackProvider>
+        </SubscriptionProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
