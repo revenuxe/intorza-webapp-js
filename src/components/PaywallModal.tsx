@@ -2,16 +2,13 @@ import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Check, Crown, Sparkles, Zap } from 'lucide-react';
+import { Check, Crown, Sparkles } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -21,17 +18,14 @@ declare global {
 
 const PRO_FEATURES = [
   'Mark quotations as accepted',
-  'Save quotations to cloud',
+  'Save & manage projects',
   'Convert to invoices',
-  'Access My Projects',
-  'Site Measurement module',
+  'Site measurement tools',
   'Add team members',
-  'Photo & file attachments',
-  'All professional tools',
 ];
 
 export const PaywallModal: React.FC = () => {
-  const { paywallOpen, setPaywallOpen, paywallAction, refreshSubscription } = useSubscription();
+  const { paywallOpen, setPaywallOpen, refreshSubscription } = useSubscription();
   const { session } = useAuth();
   const [loading, setLoading] = useState(false);
 
@@ -58,13 +52,11 @@ export const PaywallModal: React.FC = () => {
     setLoading(true);
 
     try {
-      // Load Razorpay script
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
         throw new Error('Failed to load payment gateway');
       }
 
-      // Create subscription order
       const { data, error } = await supabase.functions.invoke('razorpay-create-subscription', {
         body: { plan: 'monthly' },
         headers: {
@@ -82,22 +74,20 @@ export const PaywallModal: React.FC = () => {
         return;
       }
 
-      // Open Razorpay checkout
       const options = {
         key: data.keyId,
         amount: data.amount,
         currency: data.currency,
         name: 'Intorza',
-        description: 'Intorza Pro - Monthly Subscription',
+        description: 'Pro Monthly - ₹49/month',
         order_id: data.orderId,
         prefill: data.prefill,
         notes: data.notes,
         theme: {
-          color: '#000000',
+          color: '#f59e0b',
         },
         handler: async function (response: any) {
           try {
-            // Verify payment
             const { data: verifyData, error: verifyError } = await supabase.functions.invoke(
               'razorpay-verify-payment',
               {
@@ -117,16 +107,13 @@ export const PaywallModal: React.FC = () => {
               throw new Error(verifyError.message);
             }
 
-            toast.success('Welcome to Intorza Pro! 🎉');
-            
-            // Trigger refresh
+            toast.success('Welcome to Pro! 🎉');
             window.dispatchEvent(new Event('subscription-payment-success'));
             await refreshSubscription();
-            
             setPaywallOpen(false);
           } catch (error: any) {
             console.error('Payment verification error:', error);
-            toast.error('Payment verification failed. Please contact support.');
+            toast.error('Payment verification failed. Contact support.');
           }
         },
         modal: {
@@ -149,62 +136,56 @@ export const PaywallModal: React.FC = () => {
 
   return (
     <Dialog open={paywallOpen} onOpenChange={(open) => setPaywallOpen(open)}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center">
-            <Crown className="w-8 h-8 text-white" />
+      <DialogContent className="sm:max-w-sm p-0 gap-0 overflow-hidden rounded-2xl">
+        {/* Header */}
+        <div className="bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 p-6 text-center text-white">
+          <div className="w-12 h-12 mx-auto mb-3 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+            <Crown className="w-6 h-6" />
           </div>
-          <DialogTitle className="text-2xl font-bold">Unlock Intorza Pro</DialogTitle>
-          <DialogDescription className="text-base">
-            <span className="line-through text-muted-foreground">₹1,999</span>{' '}
-            <span className="text-2xl font-bold text-foreground">₹49</span>
-            <span className="text-muted-foreground">/month</span>
-            <span className="ml-2 inline-flex items-center gap-1 text-amber-600 font-medium">
-              <Sparkles className="w-4 h-4" />
-              Limited Offer
-            </span>
-          </DialogDescription>
-        </DialogHeader>
-
-        {paywallAction && (
-          <div className="bg-muted/50 rounded-lg p-3 text-center text-sm">
-            <Zap className="w-4 h-4 inline mr-1 text-amber-500" />
-            <span className="text-muted-foreground">
-              Upgrade to <strong>{paywallAction}</strong>
-            </span>
+          <h2 className="text-xl font-bold mb-1">Upgrade to Pro</h2>
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-white/70 line-through text-sm">₹1,999</span>
+            <span className="text-2xl font-bold">₹49</span>
+            <span className="text-white/80 text-sm">/month</span>
           </div>
-        )}
+          <div className="inline-flex items-center gap-1 mt-2 text-xs bg-white/20 px-2 py-1 rounded-full">
+            <Sparkles className="w-3 h-3" />
+            Limited Offer
+          </div>
+        </div>
 
-        <div className="space-y-3 py-4">
+        {/* Features */}
+        <div className="p-5 space-y-2.5">
           {PRO_FEATURES.map((feature, index) => (
-            <div key={index} className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                <Check className="w-3 h-3 text-green-600" />
+            <div key={index} className="flex items-center gap-2.5">
+              <div className="w-4 h-4 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                <Check className="w-2.5 h-2.5 text-green-600" />
               </div>
-              <span className="text-sm">{feature}</span>
+              <span className="text-sm text-foreground">{feature}</span>
             </div>
           ))}
         </div>
 
-        <div className="flex flex-col gap-3 pt-2">
+        {/* Actions */}
+        <div className="p-5 pt-0 space-y-2">
           <Button
             onClick={handleUpgrade}
             disabled={loading}
-            className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold py-6"
+            className="w-full h-11 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-xl shadow-lg shadow-amber-500/25"
           >
-            {loading ? 'Processing...' : 'Upgrade for ₹49/month'}
+            {loading ? 'Processing...' : 'Upgrade Now'}
           </Button>
           <Button
             variant="ghost"
             onClick={() => setPaywallOpen(false)}
-            className="w-full text-muted-foreground"
+            className="w-full h-9 text-muted-foreground text-sm"
           >
             Maybe later
           </Button>
         </div>
 
-        <p className="text-xs text-center text-muted-foreground">
-          Cancel anytime. Secure payment via Razorpay.
+        <p className="text-[10px] text-center text-muted-foreground pb-4 px-5">
+          Secure payment via Razorpay • Cancel anytime
         </p>
       </DialogContent>
     </Dialog>
