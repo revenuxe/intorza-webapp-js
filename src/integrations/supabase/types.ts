@@ -198,6 +198,53 @@ export type Database = {
           },
         ]
       }
+      payment_logs: {
+        Row: {
+          amount: number | null
+          created_at: string
+          currency: string | null
+          event_type: string
+          id: string
+          provider: string
+          provider_event_id: string | null
+          raw_payload: Json | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          currency?: string | null
+          event_type: string
+          id?: string
+          provider?: string
+          provider_event_id?: string | null
+          raw_payload?: Json | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          currency?: string | null
+          event_type?: string
+          id?: string
+          provider?: string
+          provider_event_id?: string | null
+          raw_payload?: Json | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -251,12 +298,21 @@ export type Database = {
           gstin: string | null
           id: string
           invoice_terms_conditions: Json | null
+          is_pro: boolean | null
           last_feedback_at: string | null
           logo_url: string | null
+          payment_provider: string | null
           payment_qr_url: string | null
           payment_stages: Json | null
+          payment_status: string | null
           phone: string | null
+          pro_expiry: string | null
+          pro_plan: string | null
+          pro_since: string | null
           professional_advantages: string | null
+          promo_code: string | null
+          provider_customer_id: string | null
+          provider_subscription_id: string | null
           signature_url: string | null
           terms_conditions: Json | null
           updated_at: string | null
@@ -276,12 +332,21 @@ export type Database = {
           gstin?: string | null
           id: string
           invoice_terms_conditions?: Json | null
+          is_pro?: boolean | null
           last_feedback_at?: string | null
           logo_url?: string | null
+          payment_provider?: string | null
           payment_qr_url?: string | null
           payment_stages?: Json | null
+          payment_status?: string | null
           phone?: string | null
+          pro_expiry?: string | null
+          pro_plan?: string | null
+          pro_since?: string | null
           professional_advantages?: string | null
+          promo_code?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
           signature_url?: string | null
           terms_conditions?: Json | null
           updated_at?: string | null
@@ -301,12 +366,21 @@ export type Database = {
           gstin?: string | null
           id?: string
           invoice_terms_conditions?: Json | null
+          is_pro?: boolean | null
           last_feedback_at?: string | null
           logo_url?: string | null
+          payment_provider?: string | null
           payment_qr_url?: string | null
           payment_stages?: Json | null
+          payment_status?: string | null
           phone?: string | null
+          pro_expiry?: string | null
+          pro_plan?: string | null
+          pro_since?: string | null
           professional_advantages?: string | null
+          promo_code?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
           signature_url?: string | null
           terms_conditions?: Json | null
           updated_at?: string | null
@@ -653,6 +727,41 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "site_measurement_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscription_events: {
+        Row: {
+          actor: string | null
+          created_at: string
+          event: string
+          id: string
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          actor?: string | null
+          created_at?: string
+          event: string
+          id?: string
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          actor?: string | null
+          created_at?: string
+          event?: string
+          id?: string
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
