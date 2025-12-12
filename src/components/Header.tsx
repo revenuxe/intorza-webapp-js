@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Menu, LogOut, User, Settings, ChevronDown, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sheet,
@@ -61,6 +62,13 @@ export const Header = () => {
 
         {/* Mobile auth section */}
         <div className="lg:hidden flex items-center gap-2">
+          {/* Pro badge for Pro users */}
+          {isAuthenticated && isPro && (
+            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-[10px] px-1.5 py-0.5">
+              <Crown className="h-3 w-3 mr-0.5" />
+              Pro
+            </Badge>
+          )}
           {/* Upgrade button for non-Pro users */}
           {isAuthenticated && !isPro && (
             <Button

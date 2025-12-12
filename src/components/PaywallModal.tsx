@@ -136,55 +136,55 @@ export const PaywallModal: React.FC = () => {
 
   return (
     <Dialog open={paywallOpen} onOpenChange={(open) => setPaywallOpen(open)}>
-      <DialogContent className="sm:max-w-sm p-0 gap-0 overflow-hidden rounded-2xl">
+      <DialogContent className="max-w-[280px] sm:max-w-xs p-0 gap-0 overflow-hidden rounded-xl">
         {/* Header */}
-        <div className="bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 p-6 text-center text-white">
-          <div className="w-12 h-12 mx-auto mb-3 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-            <Crown className="w-6 h-6" />
+        <div className="bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 p-4 text-center text-white">
+          <div className="w-10 h-10 mx-auto mb-2 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+            <Crown className="w-5 h-5" />
           </div>
-          <h2 className="text-xl font-bold mb-1">Upgrade to Pro</h2>
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-white/70 line-through text-sm">₹1,999</span>
-            <span className="text-2xl font-bold">₹49</span>
-            <span className="text-white/80 text-sm">/month</span>
+          <h2 className="text-lg font-bold mb-0.5">Upgrade to Pro</h2>
+          <div className="flex items-center justify-center gap-1.5">
+            <span className="text-white/70 line-through text-xs">₹1,999</span>
+            <span className="text-xl font-bold">₹49</span>
+            <span className="text-white/80 text-xs">/month</span>
           </div>
-          <div className="inline-flex items-center gap-1 mt-2 text-xs bg-white/20 px-2 py-1 rounded-full">
-            <Sparkles className="w-3 h-3" />
+          <div className="inline-flex items-center gap-1 mt-1.5 text-[10px] bg-white/20 px-2 py-0.5 rounded-full">
+            <Sparkles className="w-2.5 h-2.5" />
             Limited Offer
           </div>
         </div>
 
         {/* Features */}
-        <div className="p-5 space-y-2.5">
+        <div className="p-3 space-y-1.5">
           {PRO_FEATURES.map((feature, index) => (
-            <div key={index} className="flex items-center gap-2.5">
-              <div className="w-4 h-4 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                <Check className="w-2.5 h-2.5 text-green-600" />
+            <div key={index} className="flex items-center gap-2">
+              <div className="w-3.5 h-3.5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                <Check className="w-2 h-2 text-green-600" />
               </div>
-              <span className="text-sm text-foreground">{feature}</span>
+              <span className="text-xs text-foreground">{feature}</span>
             </div>
           ))}
         </div>
 
         {/* Actions */}
-        <div className="p-5 pt-0 space-y-2">
+        <div className="p-3 pt-0 space-y-1.5">
           <Button
             onClick={handleUpgrade}
             disabled={loading}
-            className="w-full h-11 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-xl shadow-lg shadow-amber-500/25"
+            className="w-full h-9 text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg shadow-amber-500/25"
           >
             {loading ? 'Processing...' : 'Upgrade Now'}
           </Button>
           <Button
             variant="ghost"
             onClick={() => setPaywallOpen(false)}
-            className="w-full h-9 text-muted-foreground text-sm"
+            className="w-full h-7 text-muted-foreground text-xs"
           >
             Maybe later
           </Button>
         </div>
 
-        <p className="text-[10px] text-center text-muted-foreground pb-4 px-5">
+        <p className="text-[9px] text-center text-muted-foreground pb-3 px-3">
           Secure payment via Razorpay • Cancel anytime
         </p>
       </DialogContent>
