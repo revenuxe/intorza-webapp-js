@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { BillingSection } from "@/components/BillingSection";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -344,6 +345,9 @@ const Settings = () => {
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">Settings</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage your company profile and branding</p>
         </div>
+
+        {/* Billing Section */}
+        <BillingSection />
 
         <Card>
           <CardHeader>

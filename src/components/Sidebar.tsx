@@ -1,4 +1,4 @@
-import { LogOut, LogIn, Settings, ChevronDown } from "lucide-react";
+import { LogOut, LogIn, Settings, ChevronDown, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -10,10 +10,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Navigation } from "./Navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import logo from "@/assets/intorza-logo.webp";
 
 export const Sidebar = () => {
   const { user, signOut, isAuthenticated } = useAuth();
+  const { isPro, setPaywallOpen } = useSubscription();
 
   const getInitials = () => {
     if (user?.user_metadata?.full_name) {
