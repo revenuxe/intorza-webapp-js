@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 interface Quotation {
   id: string;
@@ -57,6 +58,7 @@ const QuotationDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { checkProFeature } = useSubscription();
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [loading, setLoading] = useState(true);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
@@ -309,7 +311,7 @@ const QuotationDetail = () => {
                 {quotation.status !== 'accepted' && quotation.status !== 'rejected' && (
                   <>
                     <Button 
-                      onClick={() => handleMarkStatus('accepted')}
+                      onClick={() => checkProFeature('Mark as Accepted', () => handleMarkStatus('accepted'))}
                       className="flex-1"
                       variant="default"
                     >
@@ -328,7 +330,7 @@ const QuotationDetail = () => {
                 )}
                 {quotation.status === 'accepted' && (
                   <Button 
-                    onClick={() => setConvertDialogOpen(true)}
+                    onClick={() => checkProFeature('Convert to Invoice', () => setConvertDialogOpen(true))}
                     className="flex-1"
                   >
                     <FileUp className="h-4 w-4 mr-2" />

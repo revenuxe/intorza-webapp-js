@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, LogOut, User, Settings, ChevronDown } from "lucide-react";
+import { Menu, LogOut, User, Settings, ChevronDown, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -16,10 +16,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Navigation } from "./Navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import logo from "@/assets/intorza-logo.webp";
 
 export const Header = () => {
   const { user, signOut, isAuthenticated } = useAuth();
+  const { isPro, setPaywallOpen } = useSubscription();
   
   const getInitials = () => {
     if (!user?.email) return "U";
@@ -58,7 +60,18 @@ export const Header = () => {
         </div>
 
         {/* Mobile auth section */}
-        <div className="lg:hidden">
+        <div className="lg:hidden flex items-center gap-2">
+          {/* Upgrade button for non-Pro users */}
+          {isAuthenticated && !isPro && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setPaywallOpen(true, 'Upgrade')}
+              className="h-9 px-2 text-amber-600"
+            >
+              <Crown className="h-4 w-4" />
+            </Button>
+          )}
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
