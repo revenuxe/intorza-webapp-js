@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Package, TrendingUp, IndianRupee, Trash2, Search, Plus } from "lucide-react";
+import { Package, TrendingUp, IndianRupee, Trash2, Search, Plus, Tag, Filter } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,24 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+const CATEGORIES = [
+  "General",
+  "Kitchen",
+  "Wardrobe",
+  "TV Unit",
+  "Bedroom",
+  "Living Room",
+  "Bathroom",
+  "Study",
+  "Dining",
+  "Storage",
+  "Hardware",
+  "Accessories",
+];
 
 interface ItemPattern {
   id: string;
@@ -18,6 +34,7 @@ interface ItemPattern {
   default_rate: number | null;
   usage_count: number;
   last_used_at: string;
+  category: string;
 }
 
 export const ItemsPricingTab = () => {
@@ -25,8 +42,9 @@ export const ItemsPricingTab = () => {
   const [items, setItems] = useState<ItemPattern[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newItem, setNewItem] = useState({ name: "", details: "", rate: "" });
+  const [newItem, setNewItem] = useState({ name: "", details: "", rate: "", category: "General" });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -65,10 +83,9 @@ export const ItemsPricingTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Check if item already exists
       const existing = items.find(i => i.product_name.toLowerCase() === newItem.name.trim().toLowerCase());
       if (existing) {
-        toast({ title: "Item already exists", description: "Update the existing item instead", variant: "destructive" });
+        toast({ title: "Item already exists", variant: "destructive" });
         return;
       }
 
@@ -79,6 +96,7 @@ export const ItemsPricingTab = () => {
         product_details: newItem.details.trim() || null,
         default_rate: rate,
         preferred_rate: rate,
+        category: newItem.category,
         usage_count: 0,
         last_used_at: new Date().toISOString(),
       });
@@ -87,13 +105,27 @@ export const ItemsPricingTab = () => {
 
       toast({ title: "Item added to library" });
       setShowAddDialog(false);
-      setNewItem({ name: "", details: "", rate: "" });
+      setNewItem({ name: "", details: "", rate: "", category: "General" });
       loadItems();
     } catch (error) {
       console.error('Error adding item:', error);
       toast({ title: "Failed to add item", variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleUpdateCategory = async (id: string, category: string) => {
+    try {
+      const { error } = await supabase
+        .from('item_usage_patterns')
+        .update({ category, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+      setItems(items.map(item => item.id === id ? { ...item, category } : item));
+    } catch (error) {
+      console.error('Error updating category:', error);
     }
   };
 
@@ -105,12 +137,7 @@ export const ItemsPricingTab = () => {
         .eq('id', id);
 
       if (error) throw error;
-      
-      setItems(items.map(item => 
-        item.id === id ? { ...item, preferred_rate: newRate } : item
-      ));
-      
-      toast({ title: "Rate updated" });
+      setItems(items.map(item => item.id === id ? { ...item, preferred_rate: newRate } : item));
     } catch (error) {
       console.error('Error updating rate:', error);
       toast({ title: "Failed to update rate", variant: "destructive" });
@@ -125,19 +152,24 @@ export const ItemsPricingTab = () => {
         .eq('id', id);
 
       if (error) throw error;
-      
       setItems(items.filter(item => item.id !== id));
-      toast({ title: "Item removed from library" });
+      toast({ title: "Item removed" });
     } catch (error) {
       console.error('Error deleting item:', error);
-      toast({ title: "Failed to delete", variant: "destructive" });
     }
   };
 
-  const filteredItems = items.filter(item =>
-    item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (item.product_details?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredItems = items.filter(item => {
+    const matchesSearch = item.product_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.product_details?.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  const categoryCounts = items.reduce((acc, item) => {
+    acc[item.category || 'General'] = (acc[item.category || 'General'] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
   if (loading) {
     return <div className="text-center py-8 text-muted-foreground">Loading items...</div>;
@@ -147,14 +179,14 @@ export const ItemsPricingTab = () => {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
                 Items & Pricing Library
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Add items manually or they're auto-learned from quotations
+                Organize items by category for faster quotation creation
               </p>
             </div>
             <Button onClick={() => setShowAddDialog(true)}>
@@ -164,6 +196,27 @@ export const ItemsPricingTab = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Category Filter Pills */}
+          <div className="flex flex-wrap gap-2">
+            <Badge
+              variant={categoryFilter === "all" ? "default" : "outline"}
+              className="cursor-pointer"
+              onClick={() => setCategoryFilter("all")}
+            >
+              All ({items.length})
+            </Badge>
+            {CATEGORIES.filter(cat => categoryCounts[cat]).map(cat => (
+              <Badge
+                key={cat}
+                variant={categoryFilter === cat ? "default" : "outline"}
+                className="cursor-pointer"
+                onClick={() => setCategoryFilter(cat)}
+              >
+                {cat} ({categoryCounts[cat]})
+              </Badge>
+            ))}
+          </div>
+
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -177,19 +230,19 @@ export const ItemsPricingTab = () => {
           {filteredItems.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {items.length === 0 
-                ? "No items yet. Add items manually or create quotations to auto-learn."
-                : "No items match your search."}
+                ? "No items yet. Add items manually or create quotations."
+                : "No items match your filter."}
             </div>
           ) : (
             <div className="space-y-3">
               {filteredItems.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/30 transition-colors"
+                  className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg bg-card hover:bg-muted/30 transition-colors gap-3"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-medium truncate">{item.product_name}</h4>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="font-medium">{item.product_name}</h4>
                       {item.usage_count > 0 && (
                         <Badge variant="secondary" className="flex items-center gap-1">
                           <TrendingUp className="h-3 w-3" />
@@ -203,22 +256,35 @@ export const ItemsPricingTab = () => {
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 ml-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Select
+                      value={item.category || 'General'}
+                      onValueChange={(val) => handleUpdateCategory(item.id, val)}
+                    >
+                      <SelectTrigger className="w-28 h-8">
+                        <Tag className="h-3 w-3 mr-1" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CATEGORIES.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <div className="flex items-center gap-1">
                       <IndianRupee className="h-4 w-4 text-muted-foreground" />
                       <Input
                         type="number"
                         value={item.preferred_rate || item.default_rate || ''}
                         onChange={(e) => handleUpdateRate(item.id, parseFloat(e.target.value) || 0)}
-                        className="w-24 h-8 text-right"
+                        className="w-20 h-8 text-right"
                         placeholder="Rate"
                       />
-                      <span className="text-xs text-muted-foreground">/sft</span>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      className="h-8 w-8 text-destructive"
                       onClick={() => handleDelete(item.id)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -228,10 +294,6 @@ export const ItemsPricingTab = () => {
               ))}
             </div>
           )}
-
-          <p className="text-xs text-muted-foreground text-center pt-4">
-            {items.length} items in your library
-          </p>
         </CardContent>
       </Card>
 
@@ -242,28 +304,38 @@ export const ItemsPricingTab = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="item-name">Product Name *</Label>
+              <Label>Category</Label>
+              <Select value={newItem.category} onValueChange={(val) => setNewItem({ ...newItem, category: val })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Product Name *</Label>
               <Input
-                id="item-name"
                 value={newItem.name}
                 onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
                 placeholder="e.g., Modular Kitchen Cabinet"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="item-details">Product Details</Label>
+              <Label>Product Details</Label>
               <Textarea
-                id="item-details"
                 value={newItem.details}
                 onChange={(e) => setNewItem({ ...newItem, details: e.target.value })}
-                placeholder="Optional description or specifications"
-                rows={3}
+                placeholder="Optional specifications"
+                rows={2}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="item-rate">Default Rate (₹/sft)</Label>
+              <Label>Default Rate (₹/sft)</Label>
               <Input
-                id="item-rate"
                 type="number"
                 value={newItem.rate}
                 onChange={(e) => setNewItem({ ...newItem, rate: e.target.value })}
