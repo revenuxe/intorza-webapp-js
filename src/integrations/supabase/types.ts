@@ -245,6 +245,7 @@ export type Database = {
       }
       item_usage_patterns: {
         Row: {
+          category: string | null
           created_at: string
           default_rate: number | null
           id: string
@@ -257,6 +258,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string | null
           created_at?: string
           default_rate?: number | null
           id?: string
@@ -269,6 +271,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string | null
           created_at?: string
           default_rate?: number | null
           id?: string
@@ -798,6 +801,50 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "site_measurement_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      section_templates: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_default: boolean | null
+          items: Json
+          template_name: string
+          updated_at: string
+          usage_count: number | null
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          items?: Json
+          template_name: string
+          updated_at?: string
+          usage_count?: number | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          items?: Json
+          template_name?: string
+          updated_at?: string
+          usage_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "section_templates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

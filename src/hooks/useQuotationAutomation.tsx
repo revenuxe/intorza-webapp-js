@@ -30,6 +30,7 @@ interface ItemUsagePattern {
   preferred_rate: number | null;
   usage_count: number;
   last_used_at: string;
+  category: string;
 }
 
 interface Client {
@@ -221,6 +222,7 @@ export const useQuotationAutomation = () => {
     productName: string;
     productDetails: string;
     ratePerSft: number;
+    category?: string;
   }>) => {
     if (!user || items.length === 0) return;
 
@@ -257,6 +259,7 @@ export const useQuotationAutomation = () => {
               product_details: item.productDetails || null,
               default_rate: item.ratePerSft > 0 ? item.ratePerSft : null,
               preferred_rate: item.ratePerSft > 0 ? item.ratePerSft : null,
+              category: item.category || 'General',
               usage_count: 1,
               last_used_at: new Date().toISOString(),
             });
