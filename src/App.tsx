@@ -22,6 +22,7 @@ import Invoices from "./pages/Invoices";
 import InvoiceDetail from "./pages/InvoiceDetail";
 import Clients from "./pages/Clients";
 import Settings from "./pages/Settings";
+import MyLibrary from "./pages/MyLibrary";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -75,6 +76,7 @@ const App = () => (
             <Route path="/clients" element={<Layout><ProtectedRoute><Clients /></ProtectedRoute></Layout>} />
             <Route path="/team" element={<Layout><ProtectedRoute><Team /></ProtectedRoute></Layout>} />
             <Route path="/team/project/:projectId" element={<Layout><ProtectedRoute><ProjectDetail /></ProtectedRoute></Layout>} />
+            <Route path="/library" element={<Layout><ProtectedRoute><MyLibrary /></ProtectedRoute></Layout>} />
             <Route path="/settings" element={<Layout><ProtectedRoute><Settings /></ProtectedRoute></Layout>} />
             <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />

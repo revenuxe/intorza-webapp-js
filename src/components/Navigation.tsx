@@ -1,4 +1,4 @@
-import { FileText, Receipt, Users, Settings, PlusCircle, UsersRound, LayoutDashboard, Ruler, FolderOpen, Lock, Crown } from "lucide-react";
+import { FileText, Receipt, Users, Settings, PlusCircle, UsersRound, LayoutDashboard, Ruler, FolderOpen, Lock, Crown, Library } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -57,6 +57,12 @@ const navItems = [
     href: "/team",
     icon: UsersRound,
     requiresPro: true,
+  },
+  {
+    title: "My Library",
+    href: "/library",
+    icon: Library,
+    requiresPro: false,
   },
   {
     title: "Settings",

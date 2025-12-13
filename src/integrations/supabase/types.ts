@@ -55,6 +55,51 @@ export type Database = {
           },
         ]
       }
+      bank_detail_templates: {
+        Row: {
+          account_holder_name: string | null
+          account_number: string | null
+          bank_name: string | null
+          created_at: string
+          id: string
+          ifsc_code: string | null
+          is_default: boolean | null
+          qr_code_url: string | null
+          template_name: string
+          updated_at: string
+          upi_id: string | null
+          user_id: string
+        }
+        Insert: {
+          account_holder_name?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          created_at?: string
+          id?: string
+          ifsc_code?: string | null
+          is_default?: boolean | null
+          qr_code_url?: string | null
+          template_name: string
+          updated_at?: string
+          upi_id?: string | null
+          user_id: string
+        }
+        Update: {
+          account_holder_name?: string | null
+          account_number?: string | null
+          bank_name?: string | null
+          created_at?: string
+          id?: string
+          ifsc_code?: string | null
+          is_default?: boolean | null
+          qr_code_url?: string | null
+          template_name?: string
+          updated_at?: string
+          upi_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           address: string | null
@@ -291,6 +336,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_templates: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean | null
+          stages: Json
+          template_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          stages?: Json
+          template_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          stages?: Json
+          template_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       payments: {
         Row: {
@@ -1049,6 +1124,39 @@ export type Database = {
           },
         ]
       }
+      terms_templates: {
+        Row: {
+          content: Json
+          created_at: string
+          id: string
+          is_default: boolean | null
+          template_name: string
+          template_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          template_name: string
+          template_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          template_name?: string
+          template_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_activity: {
         Row: {
           activity_date: string
@@ -1093,6 +1201,36 @@ export type Database = {
           created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      warranty_templates: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_default: boolean | null
+          template_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          template_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          template_name?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
