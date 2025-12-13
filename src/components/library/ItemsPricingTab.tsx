@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
-import { Package, TrendingUp, IndianRupee, Trash2, Search } from "lucide-react";
+import { Package, TrendingUp, IndianRupee, Trash2, Search, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -22,6 +25,9 @@ export const ItemsPricingTab = () => {
   const [items, setItems] = useState<ItemPattern[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newItem, setNewItem] = useState({ name: "", details: "", rate: "" });
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadItems();
@@ -45,6 +51,49 @@ export const ItemsPricingTab = () => {
       console.error('Error loading items:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddItem = async () => {
+    if (!newItem.name.trim()) {
+      toast({ title: "Product name is required", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Check if item already exists
+      const existing = items.find(i => i.product_name.toLowerCase() === newItem.name.trim().toLowerCase());
+      if (existing) {
+        toast({ title: "Item already exists", description: "Update the existing item instead", variant: "destructive" });
+        return;
+      }
+
+      const rate = parseFloat(newItem.rate) || null;
+      const { error } = await supabase.from('item_usage_patterns').insert({
+        user_id: user.id,
+        product_name: newItem.name.trim(),
+        product_details: newItem.details.trim() || null,
+        default_rate: rate,
+        preferred_rate: rate,
+        usage_count: 0,
+        last_used_at: new Date().toISOString(),
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Item added to library" });
+      setShowAddDialog(false);
+      setNewItem({ name: "", details: "", rate: "" });
+      loadItems();
+    } catch (error) {
+      console.error('Error adding item:', error);
+      toast({ title: "Failed to add item", variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -98,13 +147,21 @@ export const ItemsPricingTab = () => {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Items & Pricing Library
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            All items from your quotations are automatically learned and saved here. Edit rates to set defaults for future quotations.
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Items & Pricing Library
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Add items manually or they're auto-learned from quotations
+              </p>
+            </div>
+            <Button onClick={() => setShowAddDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="relative">
@@ -120,7 +177,7 @@ export const ItemsPricingTab = () => {
           {filteredItems.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {items.length === 0 
-                ? "No items yet. Items will appear here as you create quotations."
+                ? "No items yet. Add items manually or create quotations to auto-learn."
                 : "No items match your search."}
             </div>
           ) : (
@@ -133,10 +190,12 @@ export const ItemsPricingTab = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <h4 className="font-medium truncate">{item.product_name}</h4>
-                      <Badge variant="secondary" className="flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3" />
-                        {item.usage_count}
-                      </Badge>
+                      {item.usage_count > 0 && (
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3" />
+                          {item.usage_count}
+                        </Badge>
+                      )}
                     </div>
                     {item.product_details && (
                       <p className="text-sm text-muted-foreground truncate mt-1">
@@ -171,10 +230,55 @@ export const ItemsPricingTab = () => {
           )}
 
           <p className="text-xs text-muted-foreground text-center pt-4">
-            {items.length} items in your library • Auto-learned from {items.reduce((sum, i) => sum + i.usage_count, 0)} quotation entries
+            {items.length} items in your library
           </p>
         </CardContent>
       </Card>
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add New Item</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="item-name">Product Name *</Label>
+              <Input
+                id="item-name"
+                value={newItem.name}
+                onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                placeholder="e.g., Modular Kitchen Cabinet"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="item-details">Product Details</Label>
+              <Textarea
+                id="item-details"
+                value={newItem.details}
+                onChange={(e) => setNewItem({ ...newItem, details: e.target.value })}
+                placeholder="Optional description or specifications"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="item-rate">Default Rate (₹/sft)</Label>
+              <Input
+                id="item-rate"
+                type="number"
+                value={newItem.rate}
+                onChange={(e) => setNewItem({ ...newItem, rate: e.target.value })}
+                placeholder="e.g., 850"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
+            <Button onClick={handleAddItem} disabled={saving}>
+              {saving ? "Adding..." : "Add Item"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
