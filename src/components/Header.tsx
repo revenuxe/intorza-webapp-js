@@ -15,14 +15,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Navigation } from "./Navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import logo from "@/assets/intorza-logo.webp";
+import { format } from "date-fns";
 
 export const Header = () => {
   const { user, signOut, isAuthenticated } = useAuth();
-  const { isPro, setPaywallOpen } = useSubscription();
+  const { isPro, expiry, setPaywallOpen } = useSubscription();
   
   const getInitials = () => {
     if (!user?.email) return "U";
@@ -33,6 +35,15 @@ export const Header = () => {
     if (user?.user_metadata?.full_name) return user.user_metadata.full_name;
     if (user?.email) return user.email.split('@')[0];
     return "User";
+  };
+
+  const formatExpiry = () => {
+    if (!expiry) return null;
+    try {
+      return format(new Date(expiry), 'MMM dd, yyyy');
+    } catch {
+      return null;
+    }
   };
 
   return (
@@ -64,10 +75,20 @@ export const Header = () => {
         <div className="lg:hidden flex items-center gap-2">
           {/* Pro badge for Pro users */}
           {isAuthenticated && isPro && (
-            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-[10px] px-1.5 py-0.5">
-              <Crown className="h-3 w-3 mr-0.5" />
-              Pro
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-[10px] px-1.5 py-0.5 cursor-default">
+                  <Crown className="h-3 w-3 mr-0.5" />
+                  Pro
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs font-medium">Intorza Pro — Active</p>
+                {formatExpiry() && (
+                  <p className="text-xs text-muted-foreground">Expires: {formatExpiry()}</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
           )}
           {/* Upgrade button for non-Pro users */}
           {isAuthenticated && !isPro && (
@@ -95,8 +116,16 @@ export const Header = () => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-3 py-2">
-                  <p className="text-sm font-medium">{getUserDisplayName()}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{getUserDisplayName()}</p>
+                    {isPro && (
+                      <Crown className="h-3.5 w-3.5 text-amber-500" />
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  {isPro && formatExpiry() && (
+                    <p className="text-xs text-amber-600 mt-1">Pro until {formatExpiry()}</p>
+                  )}
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
