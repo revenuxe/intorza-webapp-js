@@ -15,7 +15,6 @@ const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingSignature, setUploadingSignature] = useState(false);
-  const [migrating, setMigrating] = useState(false);
   const [profile, setProfile] = useState({
     company_name: "",
     full_name: "",
@@ -59,119 +58,6 @@ const Settings = () => {
       }
     } catch (error) {
       console.error('Error loading profile:', error);
-    }
-  };
-
-  const migrateToLibrary = async () => {
-    try {
-      setMigrating(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('payment_stages, terms_conditions, invoice_terms_conditions, bank_name, bank_account_number, bank_ifsc_code, bank_account_holder, upi_id, payment_qr_url')
-        .eq('id', user.id)
-        .single();
-
-      if (!profileData) return;
-
-      // Migrate payment stages
-      if (profileData.payment_stages && Array.isArray(profileData.payment_stages)) {
-        const { data: existingPayment } = await supabase
-          .from('payment_templates')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('template_name', 'Default (Migrated)')
-          .single();
-
-        if (!existingPayment) {
-          await supabase.from('payment_templates').insert({
-            user_id: user.id,
-            template_name: 'Default (Migrated)',
-            stages: profileData.payment_stages,
-            is_default: true
-          });
-        }
-      }
-
-      // Migrate quotation terms
-      if (profileData.terms_conditions && Array.isArray(profileData.terms_conditions)) {
-        const { data: existingTerms } = await supabase
-          .from('terms_templates')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('template_name', 'Default Quotation (Migrated)')
-          .single();
-
-        if (!existingTerms) {
-          await supabase.from('terms_templates').insert({
-            user_id: user.id,
-            template_name: 'Default Quotation (Migrated)',
-            template_type: 'quotation',
-            content: profileData.terms_conditions,
-            is_default: true
-          });
-        }
-      }
-
-      // Migrate invoice terms
-      if (profileData.invoice_terms_conditions && Array.isArray(profileData.invoice_terms_conditions)) {
-        const { data: existingInvTerms } = await supabase
-          .from('terms_templates')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('template_name', 'Default Invoice (Migrated)')
-          .single();
-
-        if (!existingInvTerms) {
-          await supabase.from('terms_templates').insert({
-            user_id: user.id,
-            template_name: 'Default Invoice (Migrated)',
-            template_type: 'invoice',
-            content: profileData.invoice_terms_conditions,
-            is_default: true
-          });
-        }
-      }
-
-      // Migrate bank details
-      if (profileData.bank_name || profileData.bank_account_number || profileData.upi_id) {
-        const { data: existingBank } = await supabase
-          .from('bank_detail_templates')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('template_name', 'Primary Account (Migrated)')
-          .single();
-
-        if (!existingBank) {
-          await supabase.from('bank_detail_templates').insert({
-            user_id: user.id,
-            template_name: 'Primary Account (Migrated)',
-            bank_name: profileData.bank_name,
-            account_number: profileData.bank_account_number,
-            ifsc_code: profileData.bank_ifsc_code,
-            account_holder_name: profileData.bank_account_holder,
-            upi_id: profileData.upi_id,
-            qr_code_url: profileData.payment_qr_url,
-            is_default: true
-          });
-        }
-      }
-
-      toast({
-        title: "Migration complete",
-        description: "Your data has been moved to My Library",
-      });
-    } catch (error) {
-      console.error('Error migrating data:', error);
-      toast({
-        title: "Migration failed",
-        description: "Please try again or manually add items in My Library",
-        variant: "destructive",
-      });
-    } finally {
-      setMigrating(false);
     }
   };
 
@@ -341,31 +227,22 @@ const Settings = () => {
           <p className="text-sm text-muted-foreground mt-1">Manage your company profile and branding</p>
         </div>
 
-        {/* Billing Section */}
         <BillingSection />
 
-        {/* Migration Notice */}
+        {/* Library Link */}
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-              <div className="flex-1">
-                <h3 className="font-semibold text-foreground flex items-center gap-2">
-                  <Library className="h-5 w-5" />
-                  Terms, Payment Stages & Bank Details moved to My Library
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Manage all your reusable templates in one place. Click below to migrate existing data.
-                </p>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Library className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="font-medium">Terms, Payment & Bank Details</h3>
+                  <p className="text-sm text-muted-foreground">Manage in My Library</p>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={migrateToLibrary} disabled={migrating}>
-                  {migrating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Migrate Data
-                </Button>
-                <Button asChild>
-                  <Link to="/library">Open My Library</Link>
-                </Button>
-              </div>
+              <Button asChild>
+                <Link to="/library">Open Library</Link>
+              </Button>
             </div>
           </CardContent>
         </Card>
