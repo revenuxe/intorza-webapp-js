@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus, Trash2, Upload, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,9 +12,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useSearchParams } from "react-router-dom";
 import { useAuthAction } from "@/hooks/useAuthAction";
+import { useQuotationAutomation } from "@/hooks/useQuotationAutomation";
 import { CustomizeFieldsDrawer, QuotationSettings, getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
 import { PDFPreviewEditor } from "@/components/PDFPreviewEditor";
 import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
+import { ClientSelector } from "@/components/quotation/ClientSelector";
+import { ProductNameInput } from "@/components/quotation/ProductNameInput";
+
 interface LineItem {
   id: string;
   side: string;
@@ -50,6 +54,20 @@ const CreateQuotation = () => {
   const quotationId = searchParams.get('id');
   const continueAction = searchParams.get('continueAction');
   const [actionExecuted, setActionExecuted] = useState(false);
+  const smartDefaultsApplied = useRef(false);
+  
+  // Use automation hook
+  const {
+    loading: automationLoading,
+    clients,
+    itemPatterns,
+    getSmartDefaults,
+    getClientAddress,
+    getItemDefaults,
+    saveLastUsedPreferences,
+    trackItemUsage,
+  } = useQuotationAutomation();
+
   const [sections, setSections] = useState<Section[]>([{
     id: "1",
     title: "KITCHEN WITHOUT CIVIL AND ACCESSORIES",
@@ -152,6 +170,25 @@ const CreateQuotation = () => {
       setFormRestored(true);
     }
   }, [continueAction, formRestored]);
+
+  // Apply smart defaults on initial load (only for new quotations)
+  useEffect(() => {
+    if (!automationLoading && !quotationId && !smartDefaultsApplied.current && !continueAction) {
+      const defaults = getSmartDefaults();
+      setDateOfProposal(defaults.dateOfProposal);
+      setQuotationValidTill(defaults.quotationValidTill);
+      setWarranty(defaults.warranty);
+      setProjectType(defaults.projectType);
+      setPlaceOfProject(defaults.placeOfProject);
+      setGstEnabled(defaults.gstEnabled);
+      setGstRate(defaults.gstRate);
+      setDiscountPercentage(defaults.discountPercentage);
+      setEnableSocialMediaDiscount(defaults.enableSocialMediaDiscount);
+      setSocialMediaDiscountRate(defaults.socialMediaDiscountRate);
+      smartDefaultsApplied.current = true;
+    }
+  }, [automationLoading, quotationId, continueAction, getSmartDefaults]);
+
   useEffect(() => {
     loadProfile();
     if (quotationId) {
@@ -539,6 +576,28 @@ const CreateQuotation = () => {
         });
       }
 
+      // Silently save last used preferences and track item usage
+      saveLastUsedPreferences({
+        warranty,
+        projectType,
+        placeOfProject,
+        gstEnabled,
+        gstRate,
+        discountPercentage,
+        enableSocialMediaDiscount,
+        socialMediaDiscountRate,
+      });
+
+      // Track item usage for smart suggestions
+      const allItems = sections.flatMap(section => 
+        section.items.map(item => ({
+          productName: item.productName,
+          productDetails: item.productDetails,
+          ratePerSft: item.ratePerSft,
+        }))
+      );
+      trackItemUsage(allItems);
+
       // Reset form if saved as pending
       if (status === 'pending') {
         setClientName("");
@@ -562,6 +621,11 @@ const CreateQuotation = () => {
             amount: 0
           }]
         }]);
+        
+        // Re-apply smart defaults after reset
+        const defaults = getSmartDefaults();
+        setDateOfProposal(defaults.dateOfProposal);
+        setQuotationValidTill(defaults.quotationValidTill);
       }
     } catch (error) {
       console.error('Error saving quotation:', error);
@@ -682,7 +746,17 @@ const CreateQuotation = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {customizeSettings.showClientName && <div className="space-y-2">
                   <Label htmlFor="clientName">Client Name</Label>
-                  <Input id="clientName" placeholder="Enter client name" value={clientName} onChange={e => setClientName(e.target.value)} />
+                  <ClientSelector
+                    value={clientName}
+                    onChange={setClientName}
+                    clients={clients}
+                    onClientSelect={(client) => {
+                      if (client.address && !clientAddress) {
+                        setClientAddress(client.address);
+                      }
+                    }}
+                    placeholder="Enter or select client name"
+                  />
                 </div>}
               {customizeSettings.showClientAddress && <div className="space-y-2">
                   <Label htmlFor="clientAddress">Client Address</Label>
@@ -768,12 +842,27 @@ const CreateQuotation = () => {
                   gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
                 }}>
                         {customizeSettings.showSideColumn && <Input value={item.side} onChange={e => updateItem(section.id, item.id, "side", e.target.value)} placeholder="A" className="h-9" />}
-                        <Input value={item.productName} onChange={e => updateItem(section.id, item.id, "productName", e.target.value)} placeholder="Product" className="h-9" />
+                        <ProductNameInput
+                          value={item.productName}
+                          onChange={(name) => updateItem(section.id, item.id, "productName", name)}
+                          patterns={itemPatterns}
+                          onProductSelect={(pattern) => {
+                            // Auto-fill details and rate when product is selected
+                            if (pattern.product_details && !item.productDetails) {
+                              updateItem(section.id, item.id, "productDetails", pattern.product_details);
+                            }
+                            if (pattern.preferred_rate && pattern.preferred_rate > 0 && !item.ratePerSft) {
+                              updateItem(section.id, item.id, "ratePerSft", pattern.preferred_rate);
+                            }
+                          }}
+                          placeholder="Product"
+                          className="h-9"
+                        />
                         {customizeSettings.showProductDetails && <Textarea value={item.productDetails} onChange={e => updateItem(section.id, item.id, "productDetails", e.target.value)} placeholder="Detailed description..." className="resize-none h-9 min-h-[36px]" rows={1} />}
                         {customizeSettings.showDetailedSizeColumns && <>
                             <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" className="h-9" />
                             <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" className="h-9" />
-                            <Input type="number" value={item.sftArea.toFixed(2)} readOnly className="h-9 bg-muted" />
+                            <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
                           </>}
                         <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
                         <div className="h-9 flex items-center font-semibold tabular-nums">
@@ -794,7 +883,20 @@ const CreateQuotation = () => {
                         </div>}
                       <div className={`space-y-2 ${!customizeSettings.showSideColumn ? 'col-span-2' : ''}`}>
                         <Label>Product Name</Label>
-                        <Input value={item.productName} onChange={e => updateItem(section.id, item.id, "productName", e.target.value)} placeholder="Product" />
+                        <ProductNameInput
+                          value={item.productName}
+                          onChange={(name) => updateItem(section.id, item.id, "productName", name)}
+                          patterns={itemPatterns}
+                          onProductSelect={(pattern) => {
+                            if (pattern.product_details && !item.productDetails) {
+                              updateItem(section.id, item.id, "productDetails", pattern.product_details);
+                            }
+                            if (pattern.preferred_rate && pattern.preferred_rate > 0 && !item.ratePerSft) {
+                              updateItem(section.id, item.id, "ratePerSft", pattern.preferred_rate);
+                            }
+                          }}
+                          placeholder="Product"
+                        />
                       </div>
                     </div>
 
@@ -816,7 +918,7 @@ const CreateQuotation = () => {
                         </div>
                         <div className="space-y-2">
                           <Label>Sft Area</Label>
-                          <Input type="number" value={item.sftArea.toFixed(2)} readOnly className="bg-muted" />
+                          <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" />
                         </div>
                       </>}
 
