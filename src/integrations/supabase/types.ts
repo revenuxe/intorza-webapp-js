@@ -198,6 +198,53 @@ export type Database = {
           },
         ]
       }
+      item_usage_patterns: {
+        Row: {
+          created_at: string
+          default_rate: number | null
+          id: string
+          last_used_at: string | null
+          preferred_rate: number | null
+          product_details: string | null
+          product_name: string
+          updated_at: string
+          usage_count: number | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_rate?: number | null
+          id?: string
+          last_used_at?: string | null
+          preferred_rate?: number | null
+          product_details?: string | null
+          product_name: string
+          updated_at?: string
+          usage_count?: number | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_rate?: number | null
+          id?: string
+          last_used_at?: string | null
+          preferred_rate?: number | null
+          product_details?: string | null
+          product_name?: string
+          updated_at?: string
+          usage_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_usage_patterns_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_logs: {
         Row: {
           amount: number | null
@@ -443,6 +490,86 @@ export type Database = {
             columns: ["section_id"]
             isOneToOne: false
             referencedRelation: "quotation_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotation_preferences: {
+        Row: {
+          created_at: string
+          default_discount_percentage: number | null
+          default_gst_enabled: boolean | null
+          default_gst_rate: string | null
+          default_place_of_project: string | null
+          default_project_type: string | null
+          default_quotation_valid_days: number | null
+          default_social_media_discount_enabled: boolean | null
+          default_social_media_discount_rate: number | null
+          default_warranty: string | null
+          id: string
+          last_discount_percentage: number | null
+          last_gst_enabled: boolean | null
+          last_gst_rate: string | null
+          last_place_of_project: string | null
+          last_project_type: string | null
+          last_social_media_discount_enabled: boolean | null
+          last_social_media_discount_rate: number | null
+          last_warranty: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_discount_percentage?: number | null
+          default_gst_enabled?: boolean | null
+          default_gst_rate?: string | null
+          default_place_of_project?: string | null
+          default_project_type?: string | null
+          default_quotation_valid_days?: number | null
+          default_social_media_discount_enabled?: boolean | null
+          default_social_media_discount_rate?: number | null
+          default_warranty?: string | null
+          id?: string
+          last_discount_percentage?: number | null
+          last_gst_enabled?: boolean | null
+          last_gst_rate?: string | null
+          last_place_of_project?: string | null
+          last_project_type?: string | null
+          last_social_media_discount_enabled?: boolean | null
+          last_social_media_discount_rate?: number | null
+          last_warranty?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_discount_percentage?: number | null
+          default_gst_enabled?: boolean | null
+          default_gst_rate?: string | null
+          default_place_of_project?: string | null
+          default_project_type?: string | null
+          default_quotation_valid_days?: number | null
+          default_social_media_discount_enabled?: boolean | null
+          default_social_media_discount_rate?: number | null
+          default_warranty?: string | null
+          id?: string
+          last_discount_percentage?: number | null
+          last_gst_enabled?: boolean | null
+          last_gst_rate?: string | null
+          last_place_of_project?: string | null
+          last_project_type?: string | null
+          last_social_media_discount_enabled?: boolean | null
+          last_social_media_discount_rate?: number | null
+          last_warranty?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
