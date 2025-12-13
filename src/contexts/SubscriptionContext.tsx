@@ -6,8 +6,10 @@ interface SubscriptionState {
   isPro: boolean;
   plan: string | null;
   expiry: string | null;
+  proSince: string | null;
   status: string;
   loading: boolean;
+  initialLoadComplete: boolean;
 }
 
 interface SubscriptionContextType extends SubscriptionState {
@@ -18,23 +20,81 @@ interface SubscriptionContextType extends SubscriptionState {
   paywallAction: string;
 }
 
+const STORAGE_KEY = 'intorza_pro_status';
+
+// Load initial state from localStorage to prevent flicker
+const getInitialState = (): SubscriptionState => {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Check if expiry is still valid
+      if (parsed.expiry) {
+        const expiry = new Date(parsed.expiry);
+        if (expiry > new Date()) {
+          return {
+            isPro: parsed.isPro || false,
+            plan: parsed.plan || null,
+            expiry: parsed.expiry || null,
+            proSince: parsed.proSince || null,
+            status: parsed.status || 'inactive',
+            loading: true,
+            initialLoadComplete: false,
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error reading stored subscription:', e);
+  }
+  return {
+    isPro: false,
+    plan: null,
+    expiry: null,
+    proSince: null,
+    status: 'inactive',
+    loading: true,
+    initialLoadComplete: false,
+  };
+};
+
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, session } = useAuth();
-  const [state, setState] = useState<SubscriptionState>({
-    isPro: false,
-    plan: null,
-    expiry: null,
-    status: 'inactive',
-    loading: true,
-  });
+  const [state, setState] = useState<SubscriptionState>(getInitialState);
   const [paywallOpen, setPaywallOpenState] = useState(false);
   const [paywallAction, setPaywallAction] = useState('');
 
+  // Persist Pro status to localStorage
+  const persistStatus = useCallback((newState: Partial<SubscriptionState>) => {
+    try {
+      const toStore = {
+        isPro: newState.isPro,
+        plan: newState.plan,
+        expiry: newState.expiry,
+        proSince: newState.proSince,
+        status: newState.status,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
+    } catch (e) {
+      console.error('Error persisting subscription:', e);
+    }
+  }, []);
+
   const refreshSubscription = useCallback(async () => {
     if (!session?.access_token) {
-      setState(prev => ({ ...prev, loading: false, isPro: false }));
+      const newState = { 
+        isPro: false, 
+        plan: null, 
+        expiry: null, 
+        proSince: null,
+        status: 'inactive',
+        loading: false, 
+        initialLoadComplete: true 
+      };
+      setState(newState);
+      localStorage.removeItem(STORAGE_KEY);
       return;
     }
 
@@ -47,22 +107,27 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       if (error) {
         console.error('Error fetching subscription status:', error);
-        setState(prev => ({ ...prev, loading: false }));
+        setState(prev => ({ ...prev, loading: false, initialLoadComplete: true }));
         return;
       }
 
-      setState({
+      const newState = {
         isPro: data.isPro || false,
         plan: data.plan,
         expiry: data.expiry,
+        proSince: data.proSince,
         status: data.status || 'inactive',
         loading: false,
-      });
+        initialLoadComplete: true,
+      };
+      
+      setState(newState);
+      persistStatus(newState);
     } catch (error) {
       console.error('Failed to refresh subscription:', error);
-      setState(prev => ({ ...prev, loading: false }));
+      setState(prev => ({ ...prev, loading: false, initialLoadComplete: true }));
     }
-  }, [session?.access_token]);
+  }, [session?.access_token, persistStatus]);
 
   // Fetch subscription status on mount and when user changes
   useEffect(() => {
@@ -73,17 +138,18 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         isPro: false,
         plan: null,
         expiry: null,
+        proSince: null,
         status: 'inactive',
         loading: false,
+        initialLoadComplete: true,
       });
+      localStorage.removeItem(STORAGE_KEY);
     }
   }, [user, session, refreshSubscription]);
 
-  // Poll for subscription updates after payment
+  // Listen for payment success event
   useEffect(() => {
-    // Listen for custom event from payment success
     const handlePaymentSuccess = () => {
-      // Poll for 30 seconds with 3-second intervals
       let attempts = 0;
       const maxAttempts = 10;
       

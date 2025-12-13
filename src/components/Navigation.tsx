@@ -3,6 +3,7 @@ import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NavigationProps {
   mobile?: boolean;
@@ -97,6 +98,7 @@ export const Navigation = ({ mobile }: NavigationProps) => {
       {navItems.map((item) => {
         const Icon = item.icon;
         const isLocked = item.requiresPro && !isPro;
+        const showProBadge = item.requiresPro && isPro;
         
         return (
           <NavLink
@@ -114,6 +116,16 @@ export const Navigation = ({ mobile }: NavigationProps) => {
           >
             <Icon className="h-5 w-5" />
             <span className="flex-1">{item.title}</span>
+            {showProBadge && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Crown className="h-3.5 w-3.5 text-amber-500" />
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs">
+                  Pro Feature
+                </TooltipContent>
+              </Tooltip>
+            )}
             {isLocked && (
               <Lock className="h-3.5 w-3.5 text-muted-foreground/50" />
             )}

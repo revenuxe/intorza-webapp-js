@@ -33,6 +33,7 @@ import ProjectDetail from "./pages/team/ProjectDetail";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import CancellationRefundPolicy from "./pages/CancellationRefundPolicy";
+import PaymentProcessing from "./pages/PaymentProcessing";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
+            <Route path="/payment-processing" element={<PaymentProcessing />} />
             
             {/* Admin routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
