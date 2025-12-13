@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Check, Package, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,11 +30,12 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Filter and prioritize products
   const filteredProducts = useMemo(() => {
     if (!inputValue) {
-      // Show top used products when empty
       return patterns.slice(0, 8);
     }
     const term = inputValue.toLowerCase();
@@ -48,7 +48,7 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
     const newValue = e.target.value;
     setInputValue(newValue);
     onChange(newValue);
-    if (newValue && !open && patterns.length > 0) {
+    if (newValue && patterns.length > 0) {
       setOpen(true);
     }
   };
@@ -58,6 +58,16 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
     onChange(pattern.product_name);
     onProductSelect?.(pattern);
     setOpen(false);
+    inputRef.current?.blur();
+  };
+
+  const handleBlur = (e: React.FocusEvent) => {
+    // Delay close to allow click on dropdown items
+    setTimeout(() => {
+      if (!containerRef.current?.contains(document.activeElement)) {
+        setOpen(false);
+      }
+    }, 150);
   };
 
   // Sync external value changes
@@ -68,21 +78,20 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
   }, [value]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Input
-          value={inputValue}
-          onChange={handleInputChange}
-          onFocus={() => patterns.length > 0 && setOpen(true)}
-          placeholder={placeholder}
-          className={className}
-        />
-      </PopoverTrigger>
-      {filteredProducts.length > 0 && (
-        <PopoverContent className="w-64 p-0 bg-popover" align="start">
+    <div ref={containerRef} className="relative">
+      <Input
+        ref={inputRef}
+        value={inputValue}
+        onChange={handleInputChange}
+        onFocus={() => patterns.length > 0 && setOpen(true)}
+        onBlur={handleBlur}
+        placeholder={placeholder}
+        className={className}
+      />
+      {open && filteredProducts.length > 0 && (
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg">
           <Command>
             <CommandList>
-              <CommandEmpty>Type to search or add new item</CommandEmpty>
               <CommandGroup heading="Recent & Popular Items">
                 {filteredProducts.map((pattern, index) => (
                   <CommandItem
@@ -114,8 +123,8 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
               </CommandGroup>
             </CommandList>
           </Command>
-        </PopoverContent>
+        </div>
       )}
-    </Popover>
+    </div>
   );
 };
