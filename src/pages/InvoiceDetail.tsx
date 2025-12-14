@@ -105,7 +105,43 @@ const InvoiceDetail = () => {
         .select('*')
         .eq('id', user.id)
         .single();
-      if (data) setProfile(data);
+      if (data) {
+        // Fetch library templates
+        const [termsResult, bankResult] = await Promise.all([
+          supabase
+            .from('terms_templates')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('template_type', 'invoice')
+            .eq('is_default', true)
+            .limit(1),
+          supabase
+            .from('bank_detail_templates')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('is_default', true)
+            .limit(1)
+        ]);
+        
+        // Merge library data with profile
+        const termsTemplate = termsResult.data?.[0];
+        const bankTemplate = bankResult.data?.[0];
+        
+        const enrichedProfile = {
+          ...data,
+          // Use library terms if available, otherwise use profile defaults
+          invoice_terms_conditions: termsTemplate?.content || data.invoice_terms_conditions,
+          // Use library bank details if available
+          bank_name: bankTemplate?.bank_name || data.bank_name,
+          bank_account_number: bankTemplate?.account_number || data.bank_account_number,
+          bank_ifsc_code: bankTemplate?.ifsc_code || data.bank_ifsc_code,
+          bank_account_holder: bankTemplate?.account_holder_name || data.bank_account_holder,
+          upi_id: bankTemplate?.upi_id || data.upi_id,
+          payment_qr_url: bankTemplate?.qr_code_url || data.payment_qr_url,
+        };
+        
+        setProfile(enrichedProfile);
+      }
     }
   };
 
