@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Plus, Edit, Trash2 } from "lucide-react";
+import { FileText, Plus, Edit, Trash2, Copy } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -125,6 +125,103 @@ const Quotations = () => {
     }
   };
 
+  const handleDuplicateQuotation = async (quotationId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get original quotation
+      const { data: original, error: fetchError } = await supabase
+        .from('quotations')
+        .select('*')
+        .eq('id', quotationId)
+        .single();
+
+      if (fetchError || !original) throw fetchError;
+
+      // Create new quotation with copied data
+      const newQuotationNumber = `QT-${Date.now()}`;
+      const { data: newQuotation, error: insertError } = await supabase
+        .from('quotations')
+        .insert({
+          user_id: user.id,
+          quotation_number: newQuotationNumber,
+          quotation_title: original.quotation_title ? `${original.quotation_title} (Copy)` : 'Copy',
+          client_name: original.client_name,
+          client_address: original.client_address,
+          project_name: original.project_name ? `${original.project_name} (Copy)` : 'Copy',
+          date_of_proposal: new Date().toISOString().split('T')[0],
+          valid_till: original.valid_till,
+          project_deadline: original.project_deadline,
+          place_of_project: original.place_of_project,
+          warranty: original.warranty,
+          project_type: original.project_type,
+          status: 'draft',
+          gst_enabled: original.gst_enabled,
+          gst_percentage: original.gst_percentage,
+          gst_amount: original.gst_amount,
+          discount_amount: original.discount_amount,
+          subtotal: original.subtotal,
+          grand_total: original.grand_total
+        })
+        .select()
+        .single();
+
+      if (insertError || !newQuotation) throw insertError;
+
+      // Copy sections and items
+      const { data: sections } = await supabase
+        .from('quotation_sections')
+        .select('*, quotation_items(*)')
+        .eq('quotation_id', quotationId)
+        .order('sort_order');
+
+      if (sections) {
+        for (const section of sections) {
+          const { data: newSection } = await supabase
+            .from('quotation_sections')
+            .insert({
+              quotation_id: newQuotation.id,
+              section_name: section.section_name,
+              sort_order: section.sort_order
+            })
+            .select()
+            .single();
+
+          if (newSection && section.quotation_items?.length > 0) {
+            const itemsToInsert = section.quotation_items.map((item: any) => ({
+              section_id: newSection.id,
+              product_name: item.product_name,
+              product_details: item.product_details,
+              side: item.side,
+              width_ft: item.width_ft,
+              height_ft: item.height_ft,
+              sft_area: item.sft_area,
+              rate_per_sft: item.rate_per_sft,
+              amount: item.amount,
+              sort_order: item.sort_order
+            }));
+            await supabase.from('quotation_items').insert(itemsToInsert);
+          }
+        }
+      }
+
+      toast({
+        title: "Quotation Duplicated",
+        description: `Created ${newQuotationNumber} as a copy`,
+      });
+
+      loadQuotations();
+    } catch (error) {
+      console.error('Error duplicating quotation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate quotation",
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -210,6 +307,15 @@ const Quotations = () => {
                           View Details
                         </Button>
                       )}
+                      <Button 
+                        variant="outline" 
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => handleDuplicateQuotation(quotation.id)}
+                        title="Duplicate"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button variant="outline" size="icon" className="text-destructive hover:text-destructive shrink-0">

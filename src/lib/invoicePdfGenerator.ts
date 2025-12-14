@@ -339,7 +339,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   const summaryData = [
     ['Total Amount', formatCurrency(data.totalAmount)],
     ['Paid Amount', `${formatCurrency(data.paidAmount)} (${paidPercentage}%)`],
-    ['Remaining Amount', `${formatCurrency(data.remainingAmount)} (${remainingPercentage}%)`],
+    ['Total Remaining', formatCurrency(data.remainingAmount)],
   ];
 
   autoTable(doc, {

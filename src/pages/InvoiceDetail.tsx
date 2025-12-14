@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Plus, CheckCircle, Eye, Calendar, CreditCard, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Plus, CheckCircle, Eye, Calendar, CreditCard, Trash2, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -395,6 +395,14 @@ const InvoiceDetail = () => {
     }
   };
 
+  const handleShareInvoice = async () => {
+    await handleDownloadPDF();
+    toast({
+      title: "Invoice PDF Downloaded",
+      description: "Share the downloaded PDF via WhatsApp, Email or any app",
+    });
+  };
+
   const isFullyPaid = invoice && (invoice.remaining_amount || 0) <= 0;
 
   if (loading) {
@@ -452,6 +460,10 @@ const InvoiceDetail = () => {
           <Button variant="outline" onClick={() => handleDownloadPDF()} disabled={pdfLoading} className="flex-1 sm:flex-none">
             <Download className="h-4 w-4 mr-2" />
             {pdfLoading ? '...' : 'PDF'}
+          </Button>
+          <Button variant="outline" onClick={handleShareInvoice} className="flex-1 sm:flex-none">
+            <Share2 className="h-4 w-4 mr-2" />
+            Share
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
