@@ -60,6 +60,7 @@ export type Database = {
           account_holder_name: string | null
           account_number: string | null
           bank_name: string | null
+          country_code: string | null
           created_at: string
           id: string
           ifsc_code: string | null
@@ -74,6 +75,7 @@ export type Database = {
           account_holder_name?: string | null
           account_number?: string | null
           bank_name?: string | null
+          country_code?: string | null
           created_at?: string
           id?: string
           ifsc_code?: string | null
@@ -88,6 +90,7 @@ export type Database = {
           account_holder_name?: string | null
           account_number?: string | null
           bank_name?: string | null
+          country_code?: string | null
           created_at?: string
           id?: string
           ifsc_code?: string | null
@@ -246,6 +249,7 @@ export type Database = {
       item_usage_patterns: {
         Row: {
           category: string | null
+          country_code: string | null
           created_at: string
           default_rate: number | null
           id: string
@@ -259,6 +263,7 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          country_code?: string | null
           created_at?: string
           default_rate?: number | null
           id?: string
@@ -272,6 +277,7 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          country_code?: string | null
           created_at?: string
           default_rate?: number | null
           id?: string
@@ -342,6 +348,7 @@ export type Database = {
       }
       payment_templates: {
         Row: {
+          country_code: string | null
           created_at: string
           id: string
           is_default: boolean | null
@@ -351,6 +358,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          country_code?: string | null
           created_at?: string
           id?: string
           is_default?: boolean | null
@@ -360,6 +368,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          country_code?: string | null
           created_at?: string
           id?: string
           is_default?: boolean | null
@@ -417,7 +426,12 @@ export type Database = {
           bank_ifsc_code: string | null
           bank_name: string | null
           company_name: string | null
+          country_code: string | null
+          country_name: string | null
           created_at: string | null
+          currency_code: string | null
+          currency_symbol: string | null
+          date_format: string | null
           email: string | null
           full_name: string | null
           gstin: string | null
@@ -425,7 +439,10 @@ export type Database = {
           invoice_terms_conditions: Json | null
           is_pro: boolean | null
           last_feedback_at: string | null
+          locale: string | null
           logo_url: string | null
+          measurement_system: string | null
+          number_format: string | null
           payment_provider: string | null
           payment_qr_url: string | null
           payment_stages: Json | null
@@ -439,7 +456,9 @@ export type Database = {
           provider_customer_id: string | null
           provider_subscription_id: string | null
           signature_url: string | null
+          tax_label: string | null
           terms_conditions: Json | null
+          timezone: string | null
           updated_at: string | null
           upi_id: string | null
         }
@@ -451,7 +470,12 @@ export type Database = {
           bank_ifsc_code?: string | null
           bank_name?: string | null
           company_name?: string | null
+          country_code?: string | null
+          country_name?: string | null
           created_at?: string | null
+          currency_code?: string | null
+          currency_symbol?: string | null
+          date_format?: string | null
           email?: string | null
           full_name?: string | null
           gstin?: string | null
@@ -459,7 +483,10 @@ export type Database = {
           invoice_terms_conditions?: Json | null
           is_pro?: boolean | null
           last_feedback_at?: string | null
+          locale?: string | null
           logo_url?: string | null
+          measurement_system?: string | null
+          number_format?: string | null
           payment_provider?: string | null
           payment_qr_url?: string | null
           payment_stages?: Json | null
@@ -473,7 +500,9 @@ export type Database = {
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
           signature_url?: string | null
+          tax_label?: string | null
           terms_conditions?: Json | null
+          timezone?: string | null
           updated_at?: string | null
           upi_id?: string | null
         }
@@ -485,7 +514,12 @@ export type Database = {
           bank_ifsc_code?: string | null
           bank_name?: string | null
           company_name?: string | null
+          country_code?: string | null
+          country_name?: string | null
           created_at?: string | null
+          currency_code?: string | null
+          currency_symbol?: string | null
+          date_format?: string | null
           email?: string | null
           full_name?: string | null
           gstin?: string | null
@@ -493,7 +527,10 @@ export type Database = {
           invoice_terms_conditions?: Json | null
           is_pro?: boolean | null
           last_feedback_at?: string | null
+          locale?: string | null
           logo_url?: string | null
+          measurement_system?: string | null
+          number_format?: string | null
           payment_provider?: string | null
           payment_qr_url?: string | null
           payment_stages?: Json | null
@@ -507,7 +544,9 @@ export type Database = {
           provider_customer_id?: string | null
           provider_subscription_id?: string | null
           signature_url?: string | null
+          tax_label?: string | null
           terms_conditions?: Json | null
+          timezone?: string | null
           updated_at?: string | null
           upi_id?: string | null
         }
@@ -808,6 +847,7 @@ export type Database = {
       section_templates: {
         Row: {
           category: string
+          country_code: string | null
           created_at: string
           id: string
           is_default: boolean | null
@@ -819,6 +859,7 @@ export type Database = {
         }
         Insert: {
           category?: string
+          country_code?: string | null
           created_at?: string
           id?: string
           is_default?: boolean | null
@@ -830,6 +871,7 @@ export type Database = {
         }
         Update: {
           category?: string
+          country_code?: string | null
           created_at?: string
           id?: string
           is_default?: boolean | null
@@ -1174,6 +1216,7 @@ export type Database = {
       terms_templates: {
         Row: {
           content: Json
+          country_code: string | null
           created_at: string
           id: string
           is_default: boolean | null
@@ -1184,6 +1227,7 @@ export type Database = {
         }
         Insert: {
           content?: Json
+          country_code?: string | null
           created_at?: string
           id?: string
           is_default?: boolean | null
@@ -1194,6 +1238,7 @@ export type Database = {
         }
         Update: {
           content?: Json
+          country_code?: string | null
           created_at?: string
           id?: string
           is_default?: boolean | null
@@ -1255,6 +1300,7 @@ export type Database = {
       warranty_templates: {
         Row: {
           content: string
+          country_code: string | null
           created_at: string
           id: string
           is_default: boolean | null
@@ -1264,6 +1310,7 @@ export type Database = {
         }
         Insert: {
           content?: string
+          country_code?: string | null
           created_at?: string
           id?: string
           is_default?: boolean | null
@@ -1273,6 +1320,7 @@ export type Database = {
         }
         Update: {
           content?: string
+          country_code?: string | null
           created_at?: string
           id?: string
           is_default?: boolean | null

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Settings as SettingsIcon, Upload, Loader2, Library } from "lucide-react";
+import { Settings as SettingsIcon, Upload, Loader2, Library, Globe, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { BillingSection } from "@/components/BillingSection";
+import { useLocalization } from "@/contexts/LocalizationContext";
+import { CountrySelectionDialog } from "@/components/CountrySelectionDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Settings = () => {
   const { toast } = useToast();
+  const { country } = useLocalization();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingSignature, setUploadingSignature] = useState(false);
+  const [showCountryDialog, setShowCountryDialog] = useState(false);
+  const [showCountryConfirm, setShowCountryConfirm] = useState(false);
   const [profile, setProfile] = useState({
     company_name: "",
     full_name: "",
@@ -229,6 +244,54 @@ const Settings = () => {
 
         <BillingSection />
 
+        {/* Country & Localization */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Country & Localization
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <button
+              onClick={() => setShowCountryConfirm(true)}
+              className="w-full flex items-center justify-between p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-muted/50 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3">
+                {country && <span className="text-2xl">{country.flag}</span>}
+                <div>
+                  <p className="font-medium">{country?.name || 'Select Country'}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {country ? `${country.currencySymbol} ${country.currencyCode} • ${country.taxLabel}` : 'Set your country preference'}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </button>
+
+            {country && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-muted-foreground text-xs">Currency</p>
+                  <p className="font-medium">{country.currencySymbol} {country.currencyCode}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-muted-foreground text-xs">Tax Label</p>
+                  <p className="font-medium">{country.taxLabel}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-muted-foreground text-xs">Date Format</p>
+                  <p className="font-medium">{country.dateFormat}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-muted-foreground text-xs">Measurement</p>
+                  <p className="font-medium capitalize">{country.measurementSystem}</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Library Link */}
         <Card className="border-primary/20 bg-primary/5">
           <CardContent className="pt-6">
@@ -246,6 +309,32 @@ const Settings = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Country Change Confirmation Dialog */}
+        <AlertDialog open={showCountryConfirm} onOpenChange={setShowCountryConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Change Country?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Changing your country will update currency, tax labels, and date formats for all future quotations and invoices. Past documents will remain unchanged.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                setShowCountryConfirm(false);
+                setShowCountryDialog(true);
+              }}>
+                Continue
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <CountrySelectionDialog 
+          open={showCountryDialog} 
+          onOpenChange={setShowCountryDialog}
+        />
 
         <Card>
           <CardHeader>
