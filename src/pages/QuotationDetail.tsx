@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { getEditorSettings } from "@/lib/pdfThemes";
+import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
 
 interface Quotation {
   id: string;
@@ -118,6 +120,62 @@ const QuotationDetail = () => {
         .eq('quotation_id', quotation.id)
         .order('sort_order');
 
+      // Fetch latest templates from My Library
+      const { data: { user } } = await supabase.auth.getUser();
+      let paymentStages = profile?.payment_stages;
+      let termsConditions = profile?.terms_conditions;
+      let bankDetails = undefined;
+
+      if (user) {
+        // Get default payment template
+        const { data: paymentTemplate } = await supabase
+          .from('payment_templates')
+          .select('stages')
+          .eq('user_id', user.id)
+          .eq('is_default', true)
+          .single();
+        
+        if (paymentTemplate?.stages) {
+          paymentStages = paymentTemplate.stages;
+        }
+
+        // Get default terms template
+        const { data: termsTemplate } = await supabase
+          .from('terms_templates')
+          .select('content')
+          .eq('user_id', user.id)
+          .eq('is_default', true)
+          .eq('template_type', 'quotation')
+          .single();
+        
+        if (termsTemplate?.content) {
+          termsConditions = termsTemplate.content;
+        }
+
+        // Get default bank details template
+        const { data: bankTemplate } = await supabase
+          .from('bank_detail_templates')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('is_default', true)
+          .single();
+        
+        if (bankTemplate) {
+          bankDetails = {
+            bankName: bankTemplate.bank_name,
+            accountNumber: bankTemplate.account_number,
+            ifscCode: bankTemplate.ifsc_code,
+            accountHolder: bankTemplate.account_holder_name,
+            upiId: bankTemplate.upi_id,
+            qrCodeUrl: bankTemplate.qr_code_url
+          };
+        }
+      }
+
+      // Get saved editor settings and customization settings
+      const editorSettings = getEditorSettings();
+      const customizeSettings = getQuotationSettings();
+
       await generateQuotationPDF({
         quotationTitle: quotation.quotation_title || quotation.project_name,
         dateOfProposal: quotation.date_of_proposal,
@@ -153,8 +211,18 @@ const QuotationDetail = () => {
         gstin: profile?.gstin,
         professionalAdvantages: profile?.professional_advantages,
         signatureUrl: profile?.signature_url,
-        paymentStages: (profile?.payment_stages as any) || undefined,
-        termsConditions: (profile?.terms_conditions as any) || undefined,
+        paymentStages: paymentStages as any,
+        termsConditions: termsConditions as any,
+        bankDetails: bankDetails || {
+          bankName: profile?.bank_name,
+          accountNumber: profile?.bank_account_number,
+          ifscCode: profile?.bank_ifsc_code,
+          accountHolder: profile?.bank_account_holder,
+          upiId: profile?.upi_id,
+          qrCodeUrl: profile?.payment_qr_url
+        },
+        settings: customizeSettings,
+        editorSettings: editorSettings,
       });
 
       toast({
