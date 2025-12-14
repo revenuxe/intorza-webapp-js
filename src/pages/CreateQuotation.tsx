@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Upload, Eye } from "lucide-react";
+import { Plus, Trash2, Upload, Eye, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -461,7 +461,7 @@ const CreateQuotation = () => {
     enableSocialMediaDiscount,
     socialMediaDiscountRate
   });
-  const handleSaveQuotation = async (status: string) => {
+  const handleSaveQuotation = async (status: string, showShare: boolean = false) => {
     try {
       if (!clientName || !projectTitle) {
         toast({
@@ -625,6 +625,17 @@ const CreateQuotation = () => {
 
       // Reset form if saved as pending
       if (status === 'pending') {
+        if (showShare) {
+          // Generate PDF and trigger share
+          await handleDownloadPDF();
+          
+          // Show toast with share instructions
+          toast({
+            title: "Quotation Saved & Downloaded",
+            description: "PDF downloaded! Share it via WhatsApp, Email or any app",
+          });
+        }
+        
         setClientName("");
         setClientAddress("");
         setDateOfProposal("");
@@ -1079,7 +1090,8 @@ const CreateQuotation = () => {
               <Button variant="outline" className="w-full" onClick={() => requireAuth(() => handleDownloadPDF(), 'downloadPdf', getFormData())}>
                 Download PDF
               </Button>
-              <Button className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('pending'), 'saveAndSend', getFormData())}>
+              <Button className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('pending', true), 'saveAndSend', getFormData())}>
+                <Share2 className="h-4 w-4 mr-2" />
                 Save & Send
               </Button>
             </div>
