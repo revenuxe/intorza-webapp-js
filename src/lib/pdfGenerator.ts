@@ -54,6 +54,7 @@ interface Section {
 }
 
 interface QuotationData {
+  quotationId?: string;
   quotationTitle: string;
   clientName: string;
   clientAddress: string;
@@ -920,6 +921,75 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
     doc.line(companySignX, yPosition, companySignX + signBoxWidth, yPosition);
     doc.text("Authorized Signatory", companySignX, yPosition + 5);
+  }
+
+  // --- Accept/Reject Links Section ---
+  if (data.quotationId) {
+    if (yPosition > pageHeight - 35) {
+      doc.addPage();
+      yPosition = 15;
+    } else {
+      yPosition += 15;
+    }
+
+    // Get the base URL for the app
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://intorza.com';
+    const acceptUrl = `${baseUrl}/quotation-response?id=${data.quotationId}&action=accept`;
+    const rejectUrl = `${baseUrl}/quotation-response?id=${data.quotationId}&action=reject`;
+
+    // Draw a separator line
+    doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+    doc.setLineWidth(0.3);
+    doc.line(margin, yPosition, pageWidth - margin, yPosition);
+    yPosition += 8;
+
+    // Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+    doc.text("RESPOND TO THIS QUOTATION", pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 6;
+
+    // Accept link
+    const acceptButtonWidth = 50;
+    const rejectButtonWidth = 50;
+    const buttonGap = 20;
+    const totalButtonWidth = acceptButtonWidth + rejectButtonWidth + buttonGap;
+    const startX = (pageWidth - totalButtonWidth) / 2;
+
+    // Accept button
+    doc.setFillColor(34, 197, 94); // Green
+    doc.roundedRect(startX, yPosition, acceptButtonWidth, 10, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.textWithLink("✓ ACCEPT", startX + acceptButtonWidth / 2, yPosition + 7, {
+      url: acceptUrl,
+      align: 'center'
+    });
+
+    // Reject button
+    const rejectX = startX + acceptButtonWidth + buttonGap;
+    doc.setFillColor(239, 68, 68); // Red
+    doc.roundedRect(rejectX, yPosition, rejectButtonWidth, 10, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.textWithLink("✗ REJECT", rejectX + rejectButtonWidth / 2, yPosition + 7, {
+      url: rejectUrl,
+      align: 'center'
+    });
+
+    yPosition += 15;
+
+    // URL text for manual access
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+    doc.text("Click the buttons above or visit the links below:", pageWidth / 2, yPosition, { align: 'center' });
+    yPosition += 4;
+    doc.setTextColor(COLORS.ACCENT[0], COLORS.ACCENT[1], COLORS.ACCENT[2]);
+    doc.textWithLink(`Accept: ${acceptUrl}`, pageWidth / 2, yPosition, { url: acceptUrl, align: 'center' });
+    yPosition += 3;
+    doc.textWithLink(`Reject: ${rejectUrl}`, pageWidth / 2, yPosition, { url: rejectUrl, align: 'center' });
   }
 
   // Footer

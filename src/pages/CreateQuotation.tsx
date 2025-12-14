@@ -70,11 +70,11 @@ const CreateQuotation = () => {
 
   const [sections, setSections] = useState<Section[]>([{
     id: "1",
-    title: "KITCHEN WITHOUT CIVIL AND ACCESSORIES",
+    title: "",
     items: [{
       id: "1",
       side: "A",
-      productName: "BASE UNIT-1",
+      productName: "",
       productDetails: "",
       widthFt: 0,
       heightFt: 0,
@@ -83,7 +83,7 @@ const CreateQuotation = () => {
       amount: 0
     }]
   }]);
-  const [projectTitle, setProjectTitle] = useState("BEST BUDGET");
+  const [projectTitle, setProjectTitle] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientAddress, setClientAddress] = useState("");
   const [dateOfProposal, setDateOfProposal] = useState("");
@@ -368,7 +368,7 @@ const CreateQuotation = () => {
   const addSection = () => {
     setSections([...sections, {
       id: Date.now().toString(),
-      title: "NEW SECTION",
+      title: "",
       items: [{
         id: Date.now().toString(),
         side: "A",
@@ -633,11 +633,11 @@ const CreateQuotation = () => {
         setProjectType("");
         setSections([{
           id: "1",
-          title: "KITCHEN WITHOUT CIVIL AND ACCESSORIES",
+          title: "",
           items: [{
             id: "1",
             side: "A",
-            productName: "BASE UNIT-1",
+            productName: "",
             productDetails: "",
             widthFt: 0,
             heightFt: 0,
@@ -672,6 +672,7 @@ const CreateQuotation = () => {
         return;
       }
       await generateQuotationPDF({
+        quotationId: quotationId || undefined,
         quotationTitle: projectTitle,
         clientName,
         clientAddress,

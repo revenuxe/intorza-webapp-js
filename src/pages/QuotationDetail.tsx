@@ -177,6 +177,7 @@ const QuotationDetail = () => {
       const customizeSettings = getQuotationSettings();
 
       await generateQuotationPDF({
+        quotationId: quotation.id,
         quotationTitle: quotation.quotation_title || quotation.project_name,
         dateOfProposal: quotation.date_of_proposal,
         quotationValidTill: quotation.valid_till,
