@@ -238,6 +238,29 @@ const CreateQuotation = () => {
       } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       if (error) throw error;
       if (data) {
+        // Get default templates from My Library
+        const { data: paymentTemplate } = await supabase
+          .from('payment_templates')
+          .select('stages')
+          .eq('user_id', user.id)
+          .eq('is_default', true)
+          .single();
+
+        const { data: termsTemplate } = await supabase
+          .from('terms_templates')
+          .select('content')
+          .eq('user_id', user.id)
+          .eq('is_default', true)
+          .eq('template_type', 'quotation')
+          .single();
+
+        const { data: bankTemplate } = await supabase
+          .from('bank_detail_templates')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('is_default', true)
+          .single();
+
         setProfile({
           company_name: data.company_name || "",
           logo_url: data.logo_url || "",
@@ -247,17 +270,19 @@ const CreateQuotation = () => {
           gstin: data.gstin || "",
           professional_advantages: data.professional_advantages || "",
           signature_url: data.signature_url || "",
-          terms_conditions: data.terms_conditions as any || [],
-          bank_name: (data as any).bank_name || "",
-          bank_account_number: (data as any).bank_account_number || "",
-          bank_ifsc_code: (data as any).bank_ifsc_code || "",
-          bank_account_holder: (data as any).bank_account_holder || "",
-          upi_id: (data as any).upi_id || "",
-          payment_qr_url: (data as any).payment_qr_url || ""
+          terms_conditions: (termsTemplate?.content as any) || data.terms_conditions as any || [],
+          bank_name: bankTemplate?.bank_name || (data as any).bank_name || "",
+          bank_account_number: bankTemplate?.account_number || (data as any).bank_account_number || "",
+          bank_ifsc_code: bankTemplate?.ifsc_code || (data as any).bank_ifsc_code || "",
+          bank_account_holder: bankTemplate?.account_holder_name || (data as any).bank_account_holder || "",
+          upi_id: bankTemplate?.upi_id || (data as any).upi_id || "",
+          payment_qr_url: bankTemplate?.qr_code_url || (data as any).payment_qr_url || ""
         });
 
-        // Load payment stages from profile
-        if (data.payment_stages) {
+        // Load payment stages - prefer template over profile
+        if (paymentTemplate?.stages) {
+          setPaymentStages(paymentTemplate.stages as any);
+        } else if (data.payment_stages) {
           setPaymentStages(data.payment_stages as any);
         }
       }

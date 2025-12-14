@@ -328,10 +328,18 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   doc.text("PAYMENT SUMMARY", margin, yPosition);
   yPosition += 6;
 
+  // Calculate remaining percentage
+  const remainingPercentage = data.totalAmount > 0 
+    ? ((data.remainingAmount / data.totalAmount) * 100).toFixed(1)
+    : '0.0';
+  const paidPercentage = data.totalAmount > 0 
+    ? ((data.paidAmount / data.totalAmount) * 100).toFixed(1)
+    : '0.0';
+
   const summaryData = [
     ['Total Amount', formatCurrency(data.totalAmount)],
-    ['Paid Amount', formatCurrency(data.paidAmount)],
-    ['Remaining Amount', formatCurrency(data.remainingAmount)],
+    ['Paid Amount', `${formatCurrency(data.paidAmount)} (${paidPercentage}%)`],
+    ['Remaining Amount', `${formatCurrency(data.remainingAmount)} (${remainingPercentage}%)`],
   ];
 
   autoTable(doc, {
