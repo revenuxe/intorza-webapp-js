@@ -10,10 +10,9 @@ import { toast } from "sonner";
 import { 
   LogOut, Users, FileText, Receipt, Settings as SettingsIcon, MessageSquare, Star, 
   TrendingUp, TrendingDown, Activity, Calendar, Ruler, UserCheck, Building2, 
-  AlertTriangle, Bug, ThumbsUp, RefreshCw, Eye, Clock, Crown, Globe
+  AlertTriangle, Bug, ThumbsUp, RefreshCw, Eye, Clock, Crown
 } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
-import { COUNTRIES } from "@/lib/countries";
 
 interface User {
   id: string;
@@ -81,15 +80,6 @@ interface TeamMember {
   company_name?: string;
 }
 
-interface CountryStats {
-  code: string;
-  name: string;
-  flag: string;
-  userCount: number;
-  quotationCount: number;
-  invoiceCount: number;
-}
-
 interface Stats {
   totalUsers: number;
   totalQuotations: number;
@@ -120,7 +110,6 @@ const AdminDashboard = () => {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [siteMeasurements, setSiteMeasurements] = useState<SiteMeasurement[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [countryStats, setCountryStats] = useState<CountryStats[]>([]);
   const [stats, setStats] = useState<Stats>({ 
     totalUsers: 0, 
     totalQuotations: 0, 
@@ -242,8 +231,7 @@ const AdminDashboard = () => {
         loadQuotations(), 
         loadInvoices(),
         loadSiteMeasurements(),
-        loadTeamMembers(),
-        loadCountryStats()
+        loadTeamMembers()
       ]);
     } catch (error) {
       console.error('Admin check error:', error);
@@ -383,62 +371,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const loadCountryStats = async () => {
-    try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, country_code');
-
-      if (error) throw error;
-
-      // Get quotation and invoice counts per user
-      const userIds = profiles?.map(p => p.id) || [];
-      
-      const [quotationsData, invoicesData] = await Promise.all([
-        supabase.from('quotations').select('user_id'),
-        supabase.from('invoices').select('user_id'),
-      ]);
-
-      // Aggregate by country
-      const countryMap = new Map<string, { userCount: number; quotationCount: number; invoiceCount: number }>();
-      
-      profiles?.forEach(profile => {
-        const code = profile.country_code || 'unknown';
-        if (!countryMap.has(code)) {
-          countryMap.set(code, { userCount: 0, quotationCount: 0, invoiceCount: 0 });
-        }
-        const entry = countryMap.get(code)!;
-        entry.userCount++;
-        
-        // Count quotations for this user
-        const userQuotations = quotationsData.data?.filter(q => q.user_id === profile.id).length || 0;
-        entry.quotationCount += userQuotations;
-        
-        // Count invoices for this user
-        const userInvoices = invoicesData.data?.filter(i => i.user_id === profile.id).length || 0;
-        entry.invoiceCount += userInvoices;
-      });
-
-      // Convert to array with country info
-      const statsArray: CountryStats[] = [];
-      countryMap.forEach((value, code) => {
-        const countryInfo = COUNTRIES.find(c => c.code === code);
-        statsArray.push({
-          code,
-          name: countryInfo?.name || (code === 'unknown' ? 'Not Selected' : code),
-          flag: countryInfo?.flag || '🌍',
-          ...value,
-        });
-      });
-
-      // Sort by user count descending
-      statsArray.sort((a, b) => b.userCount - a.userCount);
-      setCountryStats(statsArray);
-    } catch (error) {
-      console.error('Error loading country stats:', error);
-    }
-  };
-
   const loadFeedback = async () => {
     try {
       const { data, error } = await supabase
@@ -568,8 +500,7 @@ const AdminDashboard = () => {
       loadQuotations(), 
       loadInvoices(),
       loadSiteMeasurements(),
-      loadTeamMembers(),
-      loadCountryStats()
+      loadTeamMembers()
     ]);
     toast.success("Data refreshed");
   };
@@ -818,7 +749,6 @@ const AdminDashboard = () => {
             <TabsList className="inline-flex h-auto gap-1 p-1 w-max">
               <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3">Users</TabsTrigger>
               <TabsTrigger value="companies" className="text-xs sm:text-sm px-2 sm:px-3">Companies</TabsTrigger>
-              <TabsTrigger value="countries" className="text-xs sm:text-sm px-2 sm:px-3">Countries</TabsTrigger>
               <TabsTrigger value="billing" className="text-xs sm:text-sm px-2 sm:px-3">Billing</TabsTrigger>
               <TabsTrigger value="feedback" className="text-xs sm:text-sm px-2 sm:px-3">Feedback</TabsTrigger>
               <TabsTrigger value="quotations" className="text-xs sm:text-sm px-2 sm:px-3">Quotes</TabsTrigger>
@@ -919,55 +849,6 @@ const AdminDashboard = () => {
                             <TableCell className="text-center tabular-nums">{user.invoice_count}</TableCell>
                             <TableCell className="text-center tabular-nums">{user.team_count}</TableCell>
                             <TableCell>{format(new Date(user.created_at), 'dd MMM yyyy')}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="countries" className="space-y-4">
-            <Card>
-              <CardHeader className="p-3 sm:p-6">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                  <Globe className="h-4 w-4 text-blue-500" />
-                  Country Distribution
-                </CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  Users by country and their activity
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 sm:p-6 sm:pt-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Country</TableHead>
-                        <TableHead className="text-xs text-center">Users</TableHead>
-                        <TableHead className="text-xs text-center">Quotations</TableHead>
-                        <TableHead className="text-xs text-center">Invoices</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {countryStats.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8 text-sm">
-                            No country data found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        countryStats.map((country) => (
-                          <TableRow key={country.code}>
-                            <TableCell className="text-xs font-medium">
-                              <span className="mr-2">{country.flag}</span>
-                              {country.name}
-                            </TableCell>
-                            <TableCell className="text-xs text-center tabular-nums">{country.userCount}</TableCell>
-                            <TableCell className="text-xs text-center tabular-nums">{country.quotationCount}</TableCell>
-                            <TableCell className="text-xs text-center tabular-nums">{country.invoiceCount}</TableCell>
                           </TableRow>
                         ))
                       )}

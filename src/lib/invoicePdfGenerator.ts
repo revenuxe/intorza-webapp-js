@@ -42,26 +42,10 @@ interface InvoiceData {
   };
   editorSettings?: PDFEditorSettings;
   invoiceSettings?: InvoiceSettings;
-  // Localization settings
-  localization?: {
-    currencySymbol: string;
-    currencyCode: string;
-    taxLabel: string;
-    dateFormat: string;
-    numberFormat: 'indian' | 'international';
-  };
 }
 
-const createCurrencyFormatter = (localization?: InvoiceData['localization']) => {
-  const symbol = localization?.currencySymbol || '₹';
-  const format = localization?.numberFormat || 'indian';
-  
-  return (amount: number): string => {
-    if (format === 'indian') {
-      return symbol + ' ' + Math.round(amount).toLocaleString('en-IN');
-    }
-    return symbol + ' ' + Math.round(amount).toLocaleString('en-US');
-  };
+const formatCurrency = (amount: number): string => {
+  return 'INR ' + Math.round(amount).toLocaleString('en-IN');
 };
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
@@ -142,43 +126,10 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     ...data.invoiceSettings
   };
 
-  // Create localized currency formatter
-  const formatCurrency = createCurrencyFormatter(data.localization);
-  const taxLabel = data.localization?.taxLabel || 'GST';
-
   // Get theme
   const theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
   const logoPlacement = editorSettings?.logoPlacement || 'left';
   const highlightAmounts = editorSettings?.highlightAmounts ?? true;
-  
-  // Apply font size settings
-  const fontSizes = {
-    small: { heading: 8, body: 6, label: 5, table: 6 },
-    medium: { heading: 10, body: 7, label: 6, table: 7 },
-    large: { heading: 12, body: 8, label: 7, table: 8 },
-  };
-  const currentFontSize = fontSizes[editorSettings?.fontSize || 'medium'];
-  
-  // Apply page margins
-  const pageMargins = {
-    narrow: 10,
-    normal: 15,
-    wide: 20,
-  };
-  const margin = pageMargins[editorSettings?.pageMargins || 'normal'];
-  
-  // Table style settings
-  const tableStyle = editorSettings?.tableStyle || 'bordered';
-  const getTableTheme = (): 'plain' | 'grid' | 'striped' => {
-    switch (tableStyle) {
-      case 'minimal': return 'plain';
-      case 'striped': return 'striped';
-      case 'grid': return 'grid';
-      case 'bordered': return 'grid';
-      default: return 'grid';
-    }
-  };
-  const showTableBorders = tableStyle !== 'minimal';
 
   const getHighlightColor = (): [number, number, number] => {
     if (editorSettings?.customColors?.highlight) {
@@ -201,8 +152,9 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 15;
   const contentWidth = pageWidth - (margin * 2);
-  let yPosition = margin;
+  let yPosition = 15;
 
   // --- 1. Header Section ---
   let compressedLogo: string | null = null;
@@ -371,7 +323,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
 
   // --- 3. Payment Summary ---
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(currentFontSize.heading);
+  doc.setFontSize(10);
   doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
   doc.text("PAYMENT SUMMARY", margin, yPosition);
   yPosition += 6;
@@ -382,31 +334,19 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     ['Remaining Amount', formatCurrency(data.remainingAmount)],
   ];
 
-  // Apply summary style
-  const summaryStyle = editorSettings?.summaryStyle || 'right';
-  let summaryMarginLeft = margin;
-  let summaryMarginRight = margin;
-  
-  if (summaryStyle === 'right') {
-    summaryMarginLeft = pageWidth / 2;
-  } else if (summaryStyle === 'center') {
-    summaryMarginLeft = margin + 30;
-    summaryMarginRight = margin + 30;
-  }
-
   autoTable(doc, {
     startY: yPosition,
     body: summaryData,
-    theme: getTableTheme(),
+    theme: 'grid',
     styles: {
-      lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
-      lineWidth: showTableBorders ? 0.1 : 0,
-      cellPadding: editorSettings?.compactMode ? 3 : 5,
-      fontSize: currentFontSize.body
+      lineColor: COLORS.BORDER,
+      lineWidth: 0.1,
+      cellPadding: 5,
+      fontSize: 8
     },
     columnStyles: {
-      0: { cellWidth: summaryStyle === 'full-width' ? 120 : 80, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: currentFontSize.body },
-      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: currentFontSize.body }
+      0: { cellWidth: 120, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
+      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8 }
     },
     willDrawCell: (cellData) => {
       if (highlightAmounts && cellData.column.index === 1 && cellData.section === 'body') {
@@ -414,7 +354,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         doc.setTextColor(0, 0, 0);
       }
     },
-    margin: { left: summaryMarginLeft, right: summaryMarginRight }
+    margin: { left: margin, right: margin }
   });
 
   yPosition = (doc as any).lastAutoTable.finalY + 10;
@@ -465,31 +405,28 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       startY: yPosition,
       head: [['#', 'Date', 'Method', 'Amount', 'Notes']],
       body: paymentRows,
-      theme: getTableTheme(),
+      theme: 'grid',
       styles: {
-        lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
-        lineWidth: showTableBorders ? 0.1 : 0,
+        lineColor: COLORS.BORDER,
+        lineWidth: 0.1,
         textColor: COLORS.TEXT_SECONDARY,
-        fontSize: currentFontSize.table,
-        cellPadding: editorSettings?.compactMode ? 2 : 3
+        fontSize: 7,
+        cellPadding: 3
       },
       headStyles: {
-        fillColor: tableStyle === 'striped' ? COLORS.BG_CARD : [255, 255, 255],
+        fillColor: COLORS.BG_CARD,
         textColor: COLORS.TEXT_PRIMARY,
         fontStyle: 'bold',
-        lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
-        lineWidth: showTableBorders ? 0.1 : 0,
-        fontSize: currentFontSize.table
+        lineColor: COLORS.BORDER,
+        lineWidth: 0.1,
+        fontSize: 7
       },
-      alternateRowStyles: tableStyle === 'striped' ? {
-        fillColor: COLORS.BG_CARD
-      } : undefined,
       columnStyles: {
-        0: { cellWidth: 12, halign: 'center', fontSize: currentFontSize.table },
-        1: { cellWidth: 30, fontSize: currentFontSize.table },
-        2: { cellWidth: 25, halign: 'center', fontSize: currentFontSize.table },
-        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: currentFontSize.table },
-        4: { cellWidth: 'auto', fontSize: currentFontSize.label }
+        0: { cellWidth: 12, halign: 'center', fontSize: 7 },
+        1: { cellWidth: 30, fontSize: 7 },
+        2: { cellWidth: 25, halign: 'center', fontSize: 7 },
+        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: 7 },
+        4: { cellWidth: 'auto', fontSize: 6 }
       },
       willDrawCell: (cellData) => {
         if (highlightAmounts && cellData.column.index === 3 && cellData.section === 'body') {

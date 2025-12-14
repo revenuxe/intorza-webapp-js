@@ -101,28 +101,12 @@ interface QuotationData {
   };
   settings?: QuotationPdfSettings;
   editorSettings?: PDFEditorSettings;
-  // Localization settings
-  localization?: {
-    currencySymbol: string;
-    currencyCode: string;
-    taxLabel: string;
-    dateFormat: string;
-    numberFormat: 'indian' | 'international';
-  };
 }
 
 // --- Helpers ---
 
-const createCurrencyFormatter = (localization?: QuotationData['localization']) => {
-  const symbol = localization?.currencySymbol || '₹';
-  const format = localization?.numberFormat || 'indian';
-  
-  return (amount: number): string => {
-    if (format === 'indian') {
-      return symbol + ' ' + Math.round(amount).toLocaleString('en-IN');
-    }
-    return symbol + ' ' + Math.round(amount).toLocaleString('en-US');
-  };
+const formatCurrency = (amount: number): string => {
+  return 'INR ' + Math.round(amount).toLocaleString('en-IN');
 };
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
@@ -226,49 +210,17 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     ...data.settings
   };
 
-  // Create localized currency formatter
-  const formatCurrency = createCurrencyFormatter(data.localization);
-  const taxLabel = data.localization?.taxLabel || 'GST';
-
   // Get theme from editor settings
   const editorSettings = data.editorSettings;
   const theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
   const logoPlacement = editorSettings?.logoPlacement || 'left';
   const highlightAmounts = editorSettings?.highlightAmounts ?? true;
-  
-  // Apply font size settings
-  const fontSizes = {
-    small: { heading: 8, body: 6, label: 5, table: 6 },
-    medium: { heading: 10, body: 7, label: 6, table: 7 },
-    large: { heading: 12, body: 8, label: 7, table: 8 },
-  };
-  const currentFontSize = fontSizes[editorSettings?.fontSize || 'medium'];
-  
-  // Apply page margins
-  const pageMargins = {
-    narrow: 10,
-    normal: 15,
-    wide: 20,
-  };
-  const margin = pageMargins[editorSettings?.pageMargins || 'normal'];
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 15;
   const contentWidth = pageWidth - (margin * 2);
-  let yPosition = margin;
-
-  // Table style settings
-  const tableStyle = editorSettings?.tableStyle || 'bordered';
-  const getTableTheme = (): 'plain' | 'grid' | 'striped' => {
-    switch (tableStyle) {
-      case 'minimal': return 'plain';
-      case 'striped': return 'striped';
-      case 'grid': return 'grid';
-      case 'bordered': return 'grid';
-      default: return 'grid';
-    }
-  };
-  const showTableBorders = tableStyle !== 'minimal';
+  let yPosition = 15;
 
   // --- Design System Colors (from theme) ---
   const getHighlightColor = (): [number, number, number] => {
@@ -500,33 +452,30 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         startY: yPosition,
         head: [['Product', 'Description', 'Qty', 'Rate', 'Amount']],
         body: tableBody,
-        theme: getTableTheme(),
+        theme: 'grid',
         styles: {
           font: 'helvetica',
-          fontSize: currentFontSize.table,
+          fontSize: 7,
           textColor: COLORS.TEXT_SECONDARY,
-          lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
-          lineWidth: showTableBorders ? 0.1 : 0,
-          cellPadding: editorSettings?.compactMode ? 2 : 3,
+          lineColor: COLORS.BORDER,
+          lineWidth: 0.1,
+          cellPadding: 3,
         },
         headStyles: {
-          fillColor: tableStyle === 'striped' ? COLORS.BG_CARD : [255, 255, 255],
+          fillColor: [255, 255, 255],
           textColor: COLORS.TEXT_PRIMARY,
           fontStyle: 'bold',
-          fontSize: currentFontSize.table,
-          lineWidth: showTableBorders ? 0.1 : 0,
-          lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
+          fontSize: 7,
+          lineWidth: 0.1,
+          lineColor: COLORS.BORDER,
           halign: 'left'
         },
-        alternateRowStyles: tableStyle === 'striped' ? {
-          fillColor: COLORS.BG_CARD
-        } : undefined,
         columnStyles: {
-          0: { cellWidth: 35, fontStyle: 'bold', fontSize: currentFontSize.table },
-          1: { cellWidth: 'auto', fontSize: currentFontSize.label },
-          2: { cellWidth: 20, halign: 'center', fontSize: currentFontSize.table },
-          3: { cellWidth: 28, halign: 'right', fontStyle: 'bold', fontSize: currentFontSize.table },
-          4: { cellWidth: 30, halign: 'right', fontStyle: 'bold', fontSize: currentFontSize.table }
+          0: { cellWidth: 35, fontStyle: 'bold', fontSize: 7 },
+          1: { cellWidth: 'auto', fontSize: 6 },
+          2: { cellWidth: 20, halign: 'center', fontSize: 7 },
+          3: { cellWidth: 28, halign: 'right', fontStyle: 'bold', fontSize: 7 },
+          4: { cellWidth: 30, halign: 'right', fontStyle: 'bold', fontSize: 7 }
         },
         margin: { left: margin, right: margin },
         didDrawPage: (d) => {
@@ -584,27 +533,24 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         startY: yPosition,
         head: tableHead,
         body: tableBody,
-        theme: getTableTheme(),
+        theme: 'grid',
         styles: {
           font: 'helvetica',
-          fontSize: currentFontSize.table,
+          fontSize: 7,
           textColor: COLORS.TEXT_SECONDARY,
-          lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
-          lineWidth: showTableBorders ? 0.1 : 0,
-          cellPadding: editorSettings?.compactMode ? 2 : 3,
+          lineColor: COLORS.BORDER,
+          lineWidth: 0.1,
+          cellPadding: 3,
         },
         headStyles: {
-          fillColor: tableStyle === 'striped' ? COLORS.BG_CARD : [255, 255, 255],
+          fillColor: [255, 255, 255],
           textColor: COLORS.TEXT_PRIMARY,
           fontStyle: 'bold',
-          fontSize: currentFontSize.table,
-          lineWidth: showTableBorders ? 0.1 : 0,
-          lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
+          fontSize: 7,
+          lineWidth: 0.1,
+          lineColor: COLORS.BORDER,
           halign: 'left'
         },
-        alternateRowStyles: tableStyle === 'striped' ? {
-          fillColor: COLORS.BG_CARD
-        } : undefined,
         columnStyles: columnStyles as any,
         margin: { left: margin, right: margin },
         didDrawPage: (d) => {
@@ -663,7 +609,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // Render Summary as a Table but with custom styling
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(currentFontSize.heading);
+  doc.setFontSize(10);
   doc.text("PAYMENT SUMMARY", margin, yPosition);
   yPosition += 6;
 
@@ -684,46 +630,34 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   if (settings.showTaxGst && data.gstEnabled) {
     summaryData.push(['Net Taxable Amount', formatCurrency(taxableAmount)]);
-    summaryData.push([`${taxLabel} @ ${gstRate}%`, formatCurrency(gstAmount)]);
+    summaryData.push([`GST @ ${gstRate}%`, formatCurrency(gstAmount)]);
   }
 
   if (settings.showGrandTotal) {
     summaryData.push(['GRAND TOTAL', formatCurrency(finalTotal)]);
   }
 
-  // Apply summary style
-  const summaryStyle = editorSettings?.summaryStyle || 'right';
-  let summaryMarginLeft = margin;
-  let summaryMarginRight = margin;
-  
-  if (summaryStyle === 'right') {
-    summaryMarginLeft = pageWidth / 2;
-  } else if (summaryStyle === 'center') {
-    summaryMarginLeft = margin + 30;
-    summaryMarginRight = margin + 30;
-  }
-
   autoTable(doc, {
     startY: yPosition,
     body: summaryData,
-    theme: getTableTheme(),
+    theme: 'grid',
     styles: {
-      lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
-      lineWidth: showTableBorders ? 0.1 : 0,
-      cellPadding: editorSettings?.compactMode ? 3 : 5,
-      fontSize: currentFontSize.body
+      lineColor: COLORS.BORDER,
+      lineWidth: 0.1,
+      cellPadding: 5,
+      fontSize: 8
     },
     columnStyles: {
-      0: { cellWidth: summaryStyle === 'full-width' ? 120 : 80, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: currentFontSize.body },
-      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: currentFontSize.body }
+      0: { cellWidth: 120, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
+      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8 }
     },
     willDrawCell: (cellData) => {
-      if (highlightAmounts && cellData.column.index === 1 && cellData.section === 'body') {
+      if (cellData.column.index === 1 && cellData.section === 'body') {
         doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
         doc.setTextColor(0, 0, 0);
       }
     },
-    margin: { left: summaryMarginLeft, right: summaryMarginRight }
+    margin: { left: margin, right: margin }
   });
 
   yPosition = (doc as any).lastAutoTable.finalY + 15;
@@ -731,7 +665,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // --- 5. Stagewise Payment Option ---
   if (settings.showPaymentStages) {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(currentFontSize.heading);
+    doc.setFontSize(10);
     doc.text("STAGEWISE PAYMENT OPTION", margin, yPosition);
     yPosition += 6;
 
@@ -755,36 +689,27 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       startY: yPosition,
       head: [['#', 'Stage / Milestone', 'Payment %', 'Amount']],
       body: paymentStages,
-      theme: getTableTheme(),
+      theme: 'grid',
       styles: {
-          lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
-          lineWidth: showTableBorders ? 0.1 : 0,
+          lineColor: COLORS.BORDER,
+          lineWidth: 0.1,
           textColor: COLORS.TEXT_SECONDARY,
-          fontSize: currentFontSize.table,
-          cellPadding: editorSettings?.compactMode ? 2 : 3
+          fontSize: 7,
+          cellPadding: 3
       },
       headStyles: {
-        fillColor: tableStyle === 'striped' ? COLORS.BG_CARD : [255, 255, 255],
+        fillColor: COLORS.BG_CARD,
         textColor: COLORS.TEXT_PRIMARY,
         fontStyle: 'bold',
-        lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
-        lineWidth: showTableBorders ? 0.1 : 0,
-        fontSize: currentFontSize.table
+        lineColor: COLORS.BORDER,
+        lineWidth: 0.1,
+        fontSize: 7
       },
-      alternateRowStyles: tableStyle === 'striped' ? {
-        fillColor: COLORS.BG_CARD
-      } : undefined,
       columnStyles: {
-        0: { cellWidth: 12, halign: 'center', fontSize: currentFontSize.table },
-        1: { cellWidth: 'auto', fontSize: currentFontSize.table },
-        2: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fontSize: currentFontSize.table },
-        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: currentFontSize.table }
-      },
-      willDrawCell: (cellData) => {
-        if (highlightAmounts && cellData.column.index === 3 && cellData.section === 'body') {
-          doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
-          doc.setTextColor(0, 0, 0);
-        }
+        0: { cellWidth: 12, halign: 'center', fontSize: 7 },
+        1: { cellWidth: 'auto', fontSize: 7 },
+        2: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fontSize: 7 },
+        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: 7 }
       },
       margin: { left: margin, right: margin }
     });

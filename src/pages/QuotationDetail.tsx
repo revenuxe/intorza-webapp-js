@@ -118,54 +118,6 @@ const QuotationDetail = () => {
         .eq('quotation_id', quotation.id)
         .order('sort_order');
 
-      // Fetch library templates
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Get default terms template from library
-      const { data: termsTemplates } = await supabase
-        .from('terms_templates')
-        .select('*')
-        .eq('user_id', user?.id)
-        .eq('template_type', 'quotation')
-        .eq('is_default', true)
-        .limit(1);
-
-      // Get default payment template from library
-      const { data: paymentTemplates } = await supabase
-        .from('payment_templates')
-        .select('*')
-        .eq('user_id', user?.id)
-        .eq('is_default', true)
-        .limit(1);
-
-      // Get default bank details template from library
-      const { data: bankTemplates } = await supabase
-        .from('bank_detail_templates')
-        .select('*')
-        .eq('user_id', user?.id)
-        .eq('is_default', true)
-        .limit(1);
-
-      // Use library templates or fall back to profile data
-      const termsToUse = termsTemplates?.[0]?.content || profile?.terms_conditions;
-      const paymentStagesToUse = paymentTemplates?.[0]?.stages || profile?.payment_stages;
-      const bankTemplate = bankTemplates?.[0];
-      const bankDetailsToUse = bankTemplate ? {
-        bankName: bankTemplate.bank_name,
-        accountNumber: bankTemplate.account_number,
-        ifscCode: bankTemplate.ifsc_code,
-        accountHolder: bankTemplate.account_holder_name,
-        upiId: bankTemplate.upi_id,
-        qrCodeUrl: bankTemplate.qr_code_url,
-      } : {
-        bankName: profile?.bank_name,
-        accountNumber: profile?.bank_account_number,
-        ifscCode: profile?.bank_ifsc_code,
-        accountHolder: profile?.bank_account_holder,
-        upiId: profile?.upi_id,
-        qrCodeUrl: profile?.payment_qr_url,
-      };
-
       await generateQuotationPDF({
         quotationTitle: quotation.quotation_title || quotation.project_name,
         dateOfProposal: quotation.date_of_proposal,
@@ -201,16 +153,8 @@ const QuotationDetail = () => {
         gstin: profile?.gstin,
         professionalAdvantages: profile?.professional_advantages,
         signatureUrl: profile?.signature_url,
-        paymentStages: (paymentStagesToUse as any) || undefined,
-        termsConditions: (termsToUse as any) || undefined,
-        bankDetails: bankDetailsToUse,
-        localization: {
-          currencySymbol: profile?.currency_symbol || '₹',
-          currencyCode: profile?.currency_code || 'INR',
-          taxLabel: profile?.tax_label || 'GST',
-          dateFormat: profile?.date_format || 'DD/MM/YYYY',
-          numberFormat: (profile?.number_format as 'indian' | 'international') || 'indian',
-        },
+        paymentStages: (profile?.payment_stages as any) || undefined,
+        termsConditions: (profile?.terms_conditions as any) || undefined,
       });
 
       toast({

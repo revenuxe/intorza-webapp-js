@@ -62,17 +62,17 @@ export const CountrySelectionDialog: React.FC<CountrySelectionDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={isOnboarding ? undefined : onOpenChange}>
       <DialogContent 
-        className="max-w-[calc(100vw-2rem)] sm:max-w-md max-h-[80vh] sm:max-h-[90vh] flex flex-col p-4 sm:p-6"
+        className="sm:max-w-md max-h-[90vh] flex flex-col"
         onPointerDownOutside={isOnboarding ? (e) => e.preventDefault() : undefined}
         onEscapeKeyDown={isOnboarding ? (e) => e.preventDefault() : undefined}
       >
-        <DialogHeader className="text-center pb-1 sm:pb-2">
-          <div className="mx-auto mb-2 sm:mb-3 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Globe className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+        <DialogHeader className="text-center pb-2">
+          <div className="mx-auto mb-3 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <Globe className="h-6 w-6 text-primary" />
           </div>
-          <DialogTitle className="text-lg sm:text-xl">Select Your Country</DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">
-            This will set your currency, tax format, and preferences.
+          <DialogTitle className="text-xl">Select Your Country</DialogTitle>
+          <DialogDescription>
+            This will set your currency, tax format, and measurement preferences.
           </DialogDescription>
         </DialogHeader>
 
@@ -87,26 +87,26 @@ export const CountrySelectionDialog: React.FC<CountrySelectionDialogProps> = ({
         </div>
 
         {!searchQuery && (
-          <div className="space-y-1.5 sm:space-y-2">
+          <div className="space-y-2">
             <p className="text-xs text-muted-foreground font-medium">Popular</p>
-            <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {popularCountries.map((country) => (
                 <button
                   key={country.code}
                   onClick={() => setSelectedCountry(country)}
-                  className={`flex items-center gap-1.5 sm:gap-2 p-2 sm:p-3 rounded-lg border text-left transition-colors ${
+                  className={`flex items-center gap-2 p-3 rounded-lg border text-left transition-colors ${
                     selectedCountry?.code === country.code
                       ? 'border-primary bg-primary/5'
                       : 'border-border hover:border-primary/50 hover:bg-muted/50'
                   }`}
                 >
-                  <span className="text-lg sm:text-xl">{country.flag}</span>
+                  <span className="text-xl">{country.flag}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs sm:text-sm font-medium truncate">{country.name}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">{country.currencySymbol} {country.currencyCode}</p>
+                    <p className="text-sm font-medium truncate">{country.name}</p>
+                    <p className="text-xs text-muted-foreground">{country.currencySymbol} {country.currencyCode}</p>
                   </div>
                   {selectedCountry?.code === country.code && (
-                    <Check className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+                    <Check className="h-4 w-4 text-primary flex-shrink-0" />
                   )}
                 </button>
               ))}
@@ -114,28 +114,28 @@ export const CountrySelectionDialog: React.FC<CountrySelectionDialogProps> = ({
           </div>
         )}
 
-        <ScrollArea className="flex-1 max-h-[150px] sm:max-h-[200px]">
-          <div className="space-y-0.5 sm:space-y-1">
-            {!searchQuery && <p className="text-xs text-muted-foreground font-medium mb-1.5 sm:mb-2">All Countries</p>}
+        <ScrollArea className="flex-1 max-h-[200px]">
+          <div className="space-y-1">
+            {!searchQuery && <p className="text-xs text-muted-foreground font-medium mb-2">All Countries</p>}
             {filteredCountries.map((country) => (
               <button
                 key={country.code}
                 onClick={() => setSelectedCountry(country)}
-                className={`w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 rounded-lg text-left transition-colors ${
+                className={`w-full flex items-center gap-3 p-2.5 rounded-lg text-left transition-colors ${
                   selectedCountry?.code === country.code
                     ? 'bg-primary/10'
                     : 'hover:bg-muted'
                 }`}
               >
-                <span className="text-base sm:text-lg">{country.flag}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-medium truncate">{country.name}</p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">
+                <span className="text-lg">{country.flag}</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{country.name}</p>
+                  <p className="text-xs text-muted-foreground">
                     {country.currencySymbol} {country.currencyCode} • {country.taxLabel}
                   </p>
                 </div>
                 {selectedCountry?.code === country.code && (
-                  <Check className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                  <Check className="h-4 w-4 text-primary" />
                 )}
               </button>
             ))}
@@ -145,7 +145,7 @@ export const CountrySelectionDialog: React.FC<CountrySelectionDialogProps> = ({
         <Button
           onClick={handleContinue}
           disabled={!selectedCountry || isSubmitting}
-          className="w-full h-9 sm:h-10 text-sm"
+          className="w-full"
         >
           {isSubmitting ? 'Saving...' : 'Continue'}
         </Button>
