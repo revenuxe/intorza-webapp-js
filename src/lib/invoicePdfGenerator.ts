@@ -42,10 +42,26 @@ interface InvoiceData {
   };
   editorSettings?: PDFEditorSettings;
   invoiceSettings?: InvoiceSettings;
+  // Localization settings
+  localization?: {
+    currencySymbol: string;
+    currencyCode: string;
+    taxLabel: string;
+    dateFormat: string;
+    numberFormat: 'indian' | 'international';
+  };
 }
 
-const formatCurrency = (amount: number): string => {
-  return 'INR ' + Math.round(amount).toLocaleString('en-IN');
+const createCurrencyFormatter = (localization?: InvoiceData['localization']) => {
+  const symbol = localization?.currencySymbol || '₹';
+  const format = localization?.numberFormat || 'indian';
+  
+  return (amount: number): string => {
+    if (format === 'indian') {
+      return symbol + ' ' + Math.round(amount).toLocaleString('en-IN');
+    }
+    return symbol + ' ' + Math.round(amount).toLocaleString('en-US');
+  };
 };
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
@@ -125,6 +141,10 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     showNextPaymentDue: true,
     ...data.invoiceSettings
   };
+
+  // Create localized currency formatter
+  const formatCurrency = createCurrencyFormatter(data.localization);
+  const taxLabel = data.localization?.taxLabel || 'GST';
 
   // Get theme
   const theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
