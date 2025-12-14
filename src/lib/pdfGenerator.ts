@@ -101,12 +101,28 @@ interface QuotationData {
   };
   settings?: QuotationPdfSettings;
   editorSettings?: PDFEditorSettings;
+  // Localization settings
+  localization?: {
+    currencySymbol: string;
+    currencyCode: string;
+    taxLabel: string;
+    dateFormat: string;
+    numberFormat: 'indian' | 'international';
+  };
 }
 
 // --- Helpers ---
 
-const formatCurrency = (amount: number): string => {
-  return 'INR ' + Math.round(amount).toLocaleString('en-IN');
+const createCurrencyFormatter = (localization?: QuotationData['localization']) => {
+  const symbol = localization?.currencySymbol || '₹';
+  const format = localization?.numberFormat || 'indian';
+  
+  return (amount: number): string => {
+    if (format === 'indian') {
+      return symbol + ' ' + Math.round(amount).toLocaleString('en-IN');
+    }
+    return symbol + ' ' + Math.round(amount).toLocaleString('en-US');
+  };
 };
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
@@ -209,6 +225,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     showQuotationNumber: true,
     ...data.settings
   };
+
+  // Create localized currency formatter
+  const formatCurrency = createCurrencyFormatter(data.localization);
+  const taxLabel = data.localization?.taxLabel || 'GST';
 
   // Get theme from editor settings
   const editorSettings = data.editorSettings;
@@ -664,7 +684,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   if (settings.showTaxGst && data.gstEnabled) {
     summaryData.push(['Net Taxable Amount', formatCurrency(taxableAmount)]);
-    summaryData.push([`GST @ ${gstRate}%`, formatCurrency(gstAmount)]);
+    summaryData.push([`${taxLabel} @ ${gstRate}%`, formatCurrency(gstAmount)]);
   }
 
   if (settings.showGrandTotal) {

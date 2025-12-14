@@ -373,7 +373,14 @@ const InvoiceDetail = () => {
         })),
         profile: profile || {},
         editorSettings: editorSettings || getEditorSettings(),
-        invoiceSettings: invoiceSettings || getInvoiceSettings()
+        invoiceSettings: invoiceSettings || getInvoiceSettings(),
+        localization: {
+          currencySymbol: profile?.currency_symbol || '₹',
+          currencyCode: profile?.currency_code || 'INR',
+          taxLabel: profile?.tax_label || 'GST',
+          dateFormat: profile?.date_format || 'DD/MM/YYYY',
+          numberFormat: (profile?.number_format as 'indian' | 'international') || 'indian',
+        },
       });
 
       toast({
@@ -414,7 +421,14 @@ const InvoiceDetail = () => {
         }],
         profile: profile || {},
         editorSettings: getEditorSettings(),
-        invoiceSettings: getInvoiceSettings()
+        invoiceSettings: getInvoiceSettings(),
+        localization: {
+          currencySymbol: profile?.currency_symbol || '₹',
+          currencyCode: profile?.currency_code || 'INR',
+          taxLabel: profile?.tax_label || 'GST',
+          dateFormat: profile?.date_format || 'DD/MM/YYYY',
+          numberFormat: (profile?.number_format as 'indian' | 'international') || 'indian',
+        },
       });
 
       toast({
