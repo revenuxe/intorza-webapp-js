@@ -215,12 +215,40 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   const theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
   const logoPlacement = editorSettings?.logoPlacement || 'left';
   const highlightAmounts = editorSettings?.highlightAmounts ?? true;
+  
+  // Apply font size settings
+  const fontSizes = {
+    small: { heading: 8, body: 6, label: 5, table: 6 },
+    medium: { heading: 10, body: 7, label: 6, table: 7 },
+    large: { heading: 12, body: 8, label: 7, table: 8 },
+  };
+  const currentFontSize = fontSizes[editorSettings?.fontSize || 'medium'];
+  
+  // Apply page margins
+  const pageMargins = {
+    narrow: 10,
+    normal: 15,
+    wide: 20,
+  };
+  const margin = pageMargins[editorSettings?.pageMargins || 'normal'];
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
   const contentWidth = pageWidth - (margin * 2);
-  let yPosition = 15;
+  let yPosition = margin;
+
+  // Table style settings
+  const tableStyle = editorSettings?.tableStyle || 'bordered';
+  const getTableTheme = (): 'plain' | 'grid' | 'striped' => {
+    switch (tableStyle) {
+      case 'minimal': return 'plain';
+      case 'striped': return 'striped';
+      case 'grid': return 'grid';
+      case 'bordered': return 'grid';
+      default: return 'grid';
+    }
+  };
+  const showTableBorders = tableStyle !== 'minimal';
 
   // --- Design System Colors (from theme) ---
   const getHighlightColor = (): [number, number, number] => {
@@ -452,30 +480,33 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         startY: yPosition,
         head: [['Product', 'Description', 'Qty', 'Rate', 'Amount']],
         body: tableBody,
-        theme: 'grid',
+        theme: getTableTheme(),
         styles: {
           font: 'helvetica',
-          fontSize: 7,
+          fontSize: currentFontSize.table,
           textColor: COLORS.TEXT_SECONDARY,
-          lineColor: COLORS.BORDER,
-          lineWidth: 0.1,
-          cellPadding: 3,
+          lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
+          lineWidth: showTableBorders ? 0.1 : 0,
+          cellPadding: editorSettings?.compactMode ? 2 : 3,
         },
         headStyles: {
-          fillColor: [255, 255, 255],
+          fillColor: tableStyle === 'striped' ? COLORS.BG_CARD : [255, 255, 255],
           textColor: COLORS.TEXT_PRIMARY,
           fontStyle: 'bold',
-          fontSize: 7,
-          lineWidth: 0.1,
-          lineColor: COLORS.BORDER,
+          fontSize: currentFontSize.table,
+          lineWidth: showTableBorders ? 0.1 : 0,
+          lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
           halign: 'left'
         },
+        alternateRowStyles: tableStyle === 'striped' ? {
+          fillColor: COLORS.BG_CARD
+        } : undefined,
         columnStyles: {
-          0: { cellWidth: 35, fontStyle: 'bold', fontSize: 7 },
-          1: { cellWidth: 'auto', fontSize: 6 },
-          2: { cellWidth: 20, halign: 'center', fontSize: 7 },
-          3: { cellWidth: 28, halign: 'right', fontStyle: 'bold', fontSize: 7 },
-          4: { cellWidth: 30, halign: 'right', fontStyle: 'bold', fontSize: 7 }
+          0: { cellWidth: 35, fontStyle: 'bold', fontSize: currentFontSize.table },
+          1: { cellWidth: 'auto', fontSize: currentFontSize.label },
+          2: { cellWidth: 20, halign: 'center', fontSize: currentFontSize.table },
+          3: { cellWidth: 28, halign: 'right', fontStyle: 'bold', fontSize: currentFontSize.table },
+          4: { cellWidth: 30, halign: 'right', fontStyle: 'bold', fontSize: currentFontSize.table }
         },
         margin: { left: margin, right: margin },
         didDrawPage: (d) => {
@@ -533,24 +564,27 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         startY: yPosition,
         head: tableHead,
         body: tableBody,
-        theme: 'grid',
+        theme: getTableTheme(),
         styles: {
           font: 'helvetica',
-          fontSize: 7,
+          fontSize: currentFontSize.table,
           textColor: COLORS.TEXT_SECONDARY,
-          lineColor: COLORS.BORDER,
-          lineWidth: 0.1,
-          cellPadding: 3,
+          lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
+          lineWidth: showTableBorders ? 0.1 : 0,
+          cellPadding: editorSettings?.compactMode ? 2 : 3,
         },
         headStyles: {
-          fillColor: [255, 255, 255],
+          fillColor: tableStyle === 'striped' ? COLORS.BG_CARD : [255, 255, 255],
           textColor: COLORS.TEXT_PRIMARY,
           fontStyle: 'bold',
-          fontSize: 7,
-          lineWidth: 0.1,
-          lineColor: COLORS.BORDER,
+          fontSize: currentFontSize.table,
+          lineWidth: showTableBorders ? 0.1 : 0,
+          lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
           halign: 'left'
         },
+        alternateRowStyles: tableStyle === 'striped' ? {
+          fillColor: COLORS.BG_CARD
+        } : undefined,
         columnStyles: columnStyles as any,
         margin: { left: margin, right: margin },
         didDrawPage: (d) => {
@@ -609,7 +643,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // Render Summary as a Table but with custom styling
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
+  doc.setFontSize(currentFontSize.heading);
   doc.text("PAYMENT SUMMARY", margin, yPosition);
   yPosition += 6;
 
@@ -637,27 +671,39 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     summaryData.push(['GRAND TOTAL', formatCurrency(finalTotal)]);
   }
 
+  // Apply summary style
+  const summaryStyle = editorSettings?.summaryStyle || 'right';
+  let summaryMarginLeft = margin;
+  let summaryMarginRight = margin;
+  
+  if (summaryStyle === 'right') {
+    summaryMarginLeft = pageWidth / 2;
+  } else if (summaryStyle === 'center') {
+    summaryMarginLeft = margin + 30;
+    summaryMarginRight = margin + 30;
+  }
+
   autoTable(doc, {
     startY: yPosition,
     body: summaryData,
-    theme: 'grid',
+    theme: getTableTheme(),
     styles: {
-      lineColor: COLORS.BORDER,
-      lineWidth: 0.1,
-      cellPadding: 5,
-      fontSize: 8
+      lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
+      lineWidth: showTableBorders ? 0.1 : 0,
+      cellPadding: editorSettings?.compactMode ? 3 : 5,
+      fontSize: currentFontSize.body
     },
     columnStyles: {
-      0: { cellWidth: 120, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
-      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8 }
+      0: { cellWidth: summaryStyle === 'full-width' ? 120 : 80, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: currentFontSize.body },
+      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: currentFontSize.body }
     },
     willDrawCell: (cellData) => {
-      if (cellData.column.index === 1 && cellData.section === 'body') {
+      if (highlightAmounts && cellData.column.index === 1 && cellData.section === 'body') {
         doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
         doc.setTextColor(0, 0, 0);
       }
     },
-    margin: { left: margin, right: margin }
+    margin: { left: summaryMarginLeft, right: summaryMarginRight }
   });
 
   yPosition = (doc as any).lastAutoTable.finalY + 15;
@@ -665,7 +711,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // --- 5. Stagewise Payment Option ---
   if (settings.showPaymentStages) {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(currentFontSize.heading);
     doc.text("STAGEWISE PAYMENT OPTION", margin, yPosition);
     yPosition += 6;
 
@@ -689,27 +735,36 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       startY: yPosition,
       head: [['#', 'Stage / Milestone', 'Payment %', 'Amount']],
       body: paymentStages,
-      theme: 'grid',
+      theme: getTableTheme(),
       styles: {
-          lineColor: COLORS.BORDER,
-          lineWidth: 0.1,
+          lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
+          lineWidth: showTableBorders ? 0.1 : 0,
           textColor: COLORS.TEXT_SECONDARY,
-          fontSize: 7,
-          cellPadding: 3
+          fontSize: currentFontSize.table,
+          cellPadding: editorSettings?.compactMode ? 2 : 3
       },
       headStyles: {
-        fillColor: COLORS.BG_CARD,
+        fillColor: tableStyle === 'striped' ? COLORS.BG_CARD : [255, 255, 255],
         textColor: COLORS.TEXT_PRIMARY,
         fontStyle: 'bold',
-        lineColor: COLORS.BORDER,
-        lineWidth: 0.1,
-        fontSize: 7
+        lineColor: showTableBorders ? COLORS.BORDER : [255, 255, 255],
+        lineWidth: showTableBorders ? 0.1 : 0,
+        fontSize: currentFontSize.table
       },
+      alternateRowStyles: tableStyle === 'striped' ? {
+        fillColor: COLORS.BG_CARD
+      } : undefined,
       columnStyles: {
-        0: { cellWidth: 12, halign: 'center', fontSize: 7 },
-        1: { cellWidth: 'auto', fontSize: 7 },
-        2: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fontSize: 7 },
-        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: 7 }
+        0: { cellWidth: 12, halign: 'center', fontSize: currentFontSize.table },
+        1: { cellWidth: 'auto', fontSize: currentFontSize.table },
+        2: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fontSize: currentFontSize.table },
+        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: currentFontSize.table }
+      },
+      willDrawCell: (cellData) => {
+        if (highlightAmounts && cellData.column.index === 3 && cellData.section === 'body') {
+          doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
+          doc.setTextColor(0, 0, 0);
+        }
       },
       margin: { left: margin, right: margin }
     });
