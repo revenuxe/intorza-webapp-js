@@ -35,6 +35,7 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import CancellationRefundPolicy from "./pages/CancellationRefundPolicy";
 import PaymentProcessing from "./pages/PaymentProcessing";
+import QuotationResponse from "./pages/QuotationResponse";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/payment-processing" element={<PaymentProcessing />} />
+            <Route path="/quotation-response" element={<QuotationResponse />} />
             
             {/* Admin routes */}
             <Route path="/admin/login" element={<AdminLogin />} />
