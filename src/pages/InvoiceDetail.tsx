@@ -453,13 +453,13 @@ const InvoiceDetail = () => {
             <Eye className="h-4 w-4 mr-2" />
             Preview
           </Button>
-          <Button variant="outline" onClick={() => handleDownloadPDF()} disabled={pdfLoading} className="flex-1 sm:flex-none">
-            <Download className="h-4 w-4 mr-2" />
-            {pdfLoading ? '...' : 'PDF'}
-          </Button>
           <Button variant="outline" onClick={handleShareInvoice} className="flex-1 sm:flex-none">
             <Share2 className="h-4 w-4 mr-2" />
             Share
+          </Button>
+          <Button variant="outline" onClick={() => handleDownloadPDF()} disabled={pdfLoading} className="flex-1 sm:flex-none">
+            <Download className="h-4 w-4 mr-2" />
+            {pdfLoading ? '...' : 'PDF'}
           </Button>
           <AlertDialog>
             <AlertDialogTrigger asChild>
