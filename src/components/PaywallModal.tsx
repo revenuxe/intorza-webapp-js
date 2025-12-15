@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -88,12 +90,13 @@ export const PaywallModal: React.FC = () => {
         return;
       }
 
+      // Always use order-based flow (all payment methods)
       const options = {
         key: data.keyId,
+        name: 'Intorza',
+        description: 'Pro Activation • 30 Days Free',
         amount: data.amount,
         currency: data.currency,
-        name: 'Intorza',
-        description: 'Pro Monthly - ₹49/month',
         order_id: data.orderId,
         prefill: data.prefill,
         notes: data.notes,
@@ -112,6 +115,7 @@ export const PaywallModal: React.FC = () => {
                 body: {
                   razorpay_order_id: response.razorpay_order_id,
                   razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_subscription_id: response.razorpay_subscription_id,
                   razorpay_signature: response.razorpay_signature,
                   plan: 'monthly',
                 },
@@ -155,21 +159,25 @@ export const PaywallModal: React.FC = () => {
   return (
     <Dialog open={paywallOpen} onOpenChange={(open) => setPaywallOpen(open)}>
       <DialogContent className="max-w-[260px] sm:max-w-[280px] p-0 gap-0 overflow-hidden rounded-xl">
+        <DialogTitle className="sr-only">Upgrade to Intorza Pro</DialogTitle>
+        <DialogDescription className="sr-only">
+          Start your free trial of Intorza Pro to unlock all premium features.
+        </DialogDescription>
         {/* Header */}
-        <div className="bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 p-3 sm:p-4 text-center text-white">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 mx-auto mb-2 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-            <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
+        <div className="bg-gradient-to-br from-primary to-secondary p-3 sm:p-4 text-center text-primary-foreground">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 mx-auto mb-2 bg-primary/15 rounded-full flex items-center justify-center backdrop-blur-sm">
+            <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
           </div>
           <h2 className="text-base sm:text-lg font-bold mb-0.5">Try Pro FREE</h2>
           <div className="flex items-center justify-center gap-1.5">
             <span className="text-lg sm:text-xl font-bold">{TRIAL_DAYS} Days Free</span>
           </div>
-          <div className="text-white/80 text-[10px] sm:text-xs mt-1">
+          <div className="text-primary-foreground/90 text-[10px] sm:text-xs mt-1">
             Then <span className="line-through">₹1,999</span> <span className="font-semibold">₹49/month</span>
           </div>
-          <div className="inline-flex items-center gap-1 mt-1.5 text-[9px] sm:text-[10px] bg-white/20 px-2 py-0.5 rounded-full">
+          <div className="inline-flex items-center gap-1 mt-1.5 text-[9px] sm:text-[10px] bg-primary-foreground/15 px-2 py-0.5 rounded-full">
             <Sparkles className="w-2.5 h-2.5" />
-            No payment today
+            Just ₹0.50 to activate • All payment methods
           </div>
         </div>
 
@@ -177,7 +185,7 @@ export const PaywallModal: React.FC = () => {
         <div className="p-2.5 sm:p-3 space-y-1">
           {PRO_FEATURES.map((feature, index) => (
             <div key={index} className="flex items-center gap-2">
-              <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+              <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Check className="w-2 h-2" style={{ color: 'hsl(var(--chart-2))' }} />
               </div>
               <span className="text-[11px] sm:text-xs text-foreground">{feature}</span>
@@ -190,7 +198,7 @@ export const PaywallModal: React.FC = () => {
           <Button
             onClick={handleUpgrade}
             disabled={loading}
-            className="w-full h-8 sm:h-9 text-xs sm:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg shadow-amber-500/25"
+            className="w-full h-8 sm:h-9 text-xs sm:text-sm bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-primary-foreground font-semibold rounded-lg shadow-lg shadow-primary/25"
           >
             {loading ? 'Processing...' : 'Start Free Trial'}
           </Button>

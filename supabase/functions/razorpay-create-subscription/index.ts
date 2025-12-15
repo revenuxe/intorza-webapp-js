@@ -11,16 +11,13 @@ const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-// Plan configuration - First month free, then ₹49/month autopay
+// Plan configuration - 30 days Pro for ₹0.50 token payment
 const PLAN_CONFIG = {
   monthly: {
-    amount: 4900, // ₹49 in paise
+    amount: 50, // 50 paise (₹0.50) token amount
     currency: 'INR',
-    period: 'monthly',
-    interval: 1,
-    name: 'Intorza Pro Monthly',
-    description: 'First month FREE, then ₹49/month',
-    trialDays: 30, // 1 month free trial
+    name: 'Intorza Pro',
+    trialDays: 30,
   }
 };
 
@@ -125,142 +122,9 @@ serve(async (req) => {
         .eq('id', user.id);
     }
 
-    // Create or get Razorpay Plan for subscription
-    // First, try to find existing plan or create one
-    let planId = Deno.env.get('RAZORPAY_PLAN_ID');
-    
-    if (!planId) {
-      console.log('Creating Razorpay plan');
-      const planResponse = await fetch('https://api.razorpay.com/v1/plans', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${razorpayAuth}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          period: planConfig.period,
-          interval: planConfig.interval,
-          item: {
-            name: planConfig.name,
-            amount: planConfig.amount,
-            currency: planConfig.currency,
-            description: planConfig.description,
-          }
-        }),
-      });
-
-      const planData = await planResponse.json();
-      console.log('Plan creation response:', planData);
-      
-      if (!planResponse.ok) {
-        // If plan exists, we'll use orders instead
-        console.log('Plan creation failed, using orders instead');
-      } else {
-        planId = planData.id;
-      }
-    }
-
-    // Create Razorpay Subscription with trial period
-    if (planId) {
-      console.log('Creating Razorpay subscription with trial');
-      const subscriptionResponse = await fetch('https://api.razorpay.com/v1/subscriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${razorpayAuth}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          plan_id: planId,
-          customer_id: customerId,
-          total_count: 120, // 10 years max
-          quantity: 1,
-          customer_notify: 1,
-          start_at: Math.floor(Date.now() / 1000) + (planConfig.trialDays * 24 * 60 * 60), // Start charging after trial
-          notes: {
-            user_id: user.id,
-            plan: plan,
-            trial: 'true',
-          }
-        }),
-      });
-
-      const subscriptionData = await subscriptionResponse.json();
-      console.log('Subscription creation response:', subscriptionData);
-
-      if (subscriptionResponse.ok && subscriptionData.id) {
-        // Save subscription ID
-        await supabase
-          .from('profiles')
-          .update({ 
-            provider_subscription_id: subscriptionData.id,
-            payment_status: 'trial',
-          })
-          .eq('id', user.id);
-
-        // Log subscription event
-        await supabase
-          .from('subscription_events')
-          .insert({
-            user_id: user.id,
-            event: 'trial_started',
-            notes: `Plan: ${plan}, Subscription ID: ${subscriptionData.id}, Trial: ${planConfig.trialDays} days`,
-            actor: 'system',
-          });
-
-        return new Response(JSON.stringify({
-          subscriptionId: subscriptionData.id,
-          customerId: customerId,
-          keyId: RAZORPAY_KEY_ID,
-          plan: plan,
-          trial: true,
-          trialDays: planConfig.trialDays,
-          prefill: {
-            name: profile.full_name || profile.company_name || '',
-            email: profile.email || user.email || '',
-            contact: profile.phone || '',
-          },
-          notes: {
-            user_id: user.id,
-            plan: plan,
-          }
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-    }
-
-    // Fallback to order-based flow (first month free, manual subscription setup)
-    console.log('Using order-based flow with trial activation');
-    
-    // For trial, we create a zero-amount order or directly activate trial
-    // Activate trial immediately without payment
-    const trialExpiryDate = new Date();
-    trialExpiryDate.setDate(trialExpiryDate.getDate() + PLAN_CONFIG.monthly.trialDays);
-    
-    // Update profile to trial status
-    await supabase
-      .from('profiles')
-      .update({
-        is_pro: true,
-        pro_plan: 'monthly',
-        pro_since: new Date().toISOString(),
-        pro_expiry: trialExpiryDate.toISOString(),
-        payment_provider: 'razorpay',
-        payment_status: 'trial',
-      })
-      .eq('id', user.id);
-
-    // Log trial start event
-    await supabase
-      .from('subscription_events')
-      .insert({
-        user_id: user.id,
-        event: 'trial_started',
-        notes: `Plan: ${plan}, Trial ends: ${trialExpiryDate.toISOString()}`,
-        actor: 'system',
-      });
-
-    // Now create an order for autopay setup (₹0 auth or ₹49 for next month)
+    // Create simple one-time order for ₹0.50 (50 paise)
+    // This enables ALL payment methods (UPI, cards, netbanking, wallets)
+    console.log('Creating simple order for Pro activation');
     const orderResponse = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -268,40 +132,22 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: planConfig.amount, // ₹49 - will be charged after trial
+        amount: planConfig.amount, // 50 paise
         currency: planConfig.currency,
-        receipt: `trial_${user.id.substring(0, 8)}_${Date.now().toString(36)}`,
+        receipt: `pro_${user.id.substring(0, 8)}_${Date.now().toString(36)}`,
         notes: {
           user_id: user.id,
           plan: plan,
-          type: 'subscription_setup',
-          trial: 'true',
+          type: 'pro_activation',
         }
       }),
     });
 
     const orderData = await orderResponse.json();
-    console.log('Order creation response for autopay:', orderData);
+    console.log('Order creation response:', orderData);
     
     if (!orderResponse.ok) {
-      // Trial already activated, just return success
-      return new Response(JSON.stringify({
-        trial: true,
-        trialActivated: true,
-        trialDays: planConfig.trialDays,
-        trialExpiry: trialExpiryDate.toISOString(),
-        message: 'Trial activated! Set up autopay to continue after trial.',
-        customerId: customerId,
-        keyId: RAZORPAY_KEY_ID,
-        plan: plan,
-        prefill: {
-          name: profile.full_name || profile.company_name || '',
-          email: profile.email || user.email || '',
-          contact: profile.phone || '',
-        },
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      throw new Error(`Failed to create order: ${JSON.stringify(orderData)}`);
     }
 
     return new Response(JSON.stringify({
@@ -312,9 +158,7 @@ serve(async (req) => {
       keyId: RAZORPAY_KEY_ID,
       plan: plan,
       trial: true,
-      trialActivated: true,
       trialDays: planConfig.trialDays,
-      trialExpiry: trialExpiryDate.toISOString(),
       prefill: {
         name: profile.full_name || profile.company_name || '',
         email: profile.email || user.email || '',
@@ -329,7 +173,7 @@ serve(async (req) => {
     });
 
   } catch (error: unknown) {
-    console.error('Error creating subscription:', error);
+    console.error('Error creating order:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,

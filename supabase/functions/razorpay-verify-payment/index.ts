@@ -38,30 +38,51 @@ serve(async (req) => {
       });
     }
 
-    const { 
-      razorpay_order_id, 
-      razorpay_payment_id, 
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_subscription_id,
       razorpay_signature,
-      plan = 'monthly'
+      plan = 'monthly',
     } = await req.json();
 
-    console.log('Verifying payment:', { razorpay_order_id, razorpay_payment_id, user_id: user.id });
+    console.log('Verifying payment:', {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_subscription_id,
+      user_id: user.id,
+    });
+
+    // Determine signature payload based on flow (order vs subscription)
+    let signaturePayload = '';
+    if (razorpay_order_id && razorpay_payment_id) {
+      // Order-based payment: order_id|payment_id
+      signaturePayload = `${razorpay_order_id}|${razorpay_payment_id}`;
+    } else if (razorpay_subscription_id && razorpay_payment_id) {
+      // Subscription-based payment: payment_id|subscription_id
+      signaturePayload = `${razorpay_payment_id}|${razorpay_subscription_id}`;
+    } else {
+      console.error('Invalid payment details, missing IDs');
+      return new Response(JSON.stringify({ error: 'Invalid payment details' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Verify signature using Web Crypto API
-    const body = razorpay_order_id + "|" + razorpay_payment_id;
     const encoder = new TextEncoder();
     const keyData = encoder.encode(RAZORPAY_KEY_SECRET!);
-    const messageData = encoder.encode(body);
-    
+    const messageData = encoder.encode(signaturePayload);
+
     const cryptoKey = await crypto.subtle.importKey(
-      "raw",
+      'raw',
       keyData,
-      { name: "HMAC", hash: "SHA-256" },
+      { name: 'HMAC', hash: 'SHA-256' },
       false,
-      ["sign"]
+      ['sign'],
     );
-    
-    const signature = await crypto.subtle.sign("HMAC", cryptoKey, messageData);
+
+    const signature = await crypto.subtle.sign('HMAC', cryptoKey, messageData);
     const expectedSignature = new TextDecoder().decode(hexEncode(new Uint8Array(signature)));
 
     if (expectedSignature !== razorpay_signature) {
@@ -73,7 +94,6 @@ serve(async (req) => {
     }
 
     console.log('Signature verified successfully');
-
     // Check for idempotency
     const { data: existingLog } = await supabase
       .from('payment_logs')
@@ -113,7 +133,6 @@ serve(async (req) => {
         pro_plan: plan,
         pro_expiry: proExpiry.toISOString(),
         payment_status: 'active',
-        provider_subscription_id: razorpay_payment_id,
       })
       .eq('id', user.id);
 
@@ -124,21 +143,23 @@ serve(async (req) => {
 
     console.log('Profile updated to Pro for user:', user.id);
 
-    // Log the payment
+    // Log the payment (₹0.50 token)
     await supabase
       .from('payment_logs')
       .insert({
         user_id: user.id,
         provider: 'razorpay',
-        event_type: 'payment.captured',
+        event_type: 'pro_activation',
         provider_event_id: razorpay_payment_id,
-        amount: 4900, // ₹49 in paise
+        amount: 50, // 50 paise token amount
         currency: 'INR',
         status: 'captured',
         raw_payload: {
           order_id: razorpay_order_id,
+          subscription_id: razorpay_subscription_id,
           payment_id: razorpay_payment_id,
           plan: plan,
+          type: 'pro_activation',
         },
       });
 
@@ -147,8 +168,8 @@ serve(async (req) => {
       .from('subscription_events')
       .insert({
         user_id: user.id,
-        event: 'subscription_activated',
-        notes: `Plan: ${plan}, Payment ID: ${razorpay_payment_id}`,
+        event: 'pro_activated',
+        notes: `Plan: ${plan}, Payment ID: ${razorpay_payment_id}, Amount: ₹0.50`,
         actor: 'system',
       });
 

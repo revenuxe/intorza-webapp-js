@@ -79,7 +79,7 @@ export default function PaymentProcessing() {
   if (status === 'processing') {
     return (
       <div className="min-h-screen bg-background">
-        <GlobalLoader message={`Processing your payment... (${attempts}/${maxAttempts})`} />
+        <GlobalLoader message="Processing your payment..." />
       </div>
     );
   }
