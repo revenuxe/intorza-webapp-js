@@ -177,7 +177,7 @@ export const PaywallModal: React.FC = () => {
           </div>
           <div className="inline-flex items-center gap-1 mt-1.5 text-[9px] sm:text-[10px] bg-primary-foreground/15 px-2 py-0.5 rounded-full">
             <Sparkles className="w-2.5 h-2.5" />
-            Just ₹0.50 to activate • All payment methods
+Just ₹1 to activate • All payment methods
           </div>
         </div>
 
