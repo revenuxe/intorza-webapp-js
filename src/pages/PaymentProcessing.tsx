@@ -26,30 +26,33 @@ export default function PaymentProcessing() {
       return;
     }
 
-    const checkStatus = async () => {
-      if (!session?.access_token) {
-        return;
-      }
+    if (!session?.access_token) {
+      return;
+    }
 
-      setAttempts(prev => prev + 1);
+    let attemptsCount = 0;
+    const interval = setInterval(async () => {
+      // Increment attempts and cap at maxAttempts for display
+      attemptsCount += 1;
+      setAttempts(Math.min(attemptsCount, maxAttempts));
+
       await refreshSubscription();
-    };
 
-    // Start polling
-    const interval = setInterval(() => {
-      if (attempts >= maxAttempts) {
+      if (attemptsCount >= maxAttempts) {
         clearInterval(interval);
         setStatus('timeout');
-        return;
       }
-      checkStatus();
     }, pollInterval);
 
-    // Initial check
-    checkStatus();
+    // Initial immediate check
+    (async () => {
+      attemptsCount = 1;
+      setAttempts(1);
+      await refreshSubscription();
+    })();
 
     return () => clearInterval(interval);
-  }, [session?.access_token, attempts, refreshSubscription, isPro]);
+  }, [session?.access_token, refreshSubscription, isPro]);
 
   // Update status when isPro changes
   useEffect(() => {
