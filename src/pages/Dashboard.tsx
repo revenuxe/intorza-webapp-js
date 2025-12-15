@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { DashboardSkeleton } from "@/components/ui/skeleton";
 import { 
   FileText, 
   Receipt, 
@@ -29,7 +30,7 @@ import {
   CreditCard,
   Building2
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, subMonths, differenceInDays } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 
 interface DashboardStats {
   totalQuotations: number;
@@ -344,11 +345,7 @@ export default function Dashboard() {
   const profitMargin = stats.totalRevenue > 0 ? Math.round((stats.paidAmount / stats.totalRevenue) * 100) : 0;
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (

@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { ListSkeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Quotation {
@@ -243,9 +244,7 @@ const Quotations = () => {
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading quotations...</p>
-          </div>
+          <ListSkeleton count={4} />
         ) : quotations.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
