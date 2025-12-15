@@ -18,7 +18,7 @@ import { PDFPreviewEditor } from "@/components/PDFPreviewEditor";
 import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
 import { ClientSelector } from "@/components/quotation/ClientSelector";
 import { ProductNameInput } from "@/components/quotation/ProductNameInput";
-
+import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
 interface LineItem {
   id: string;
   side: string;
@@ -869,9 +869,7 @@ const CreateQuotation = () => {
             <p className="text-sm text-muted-foreground mt-1">Fill in the details to create a new quotation</p>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
-            <Button variant="outline" size="sm" className="flex-1 sm:flex-none">
-              Templates
-            </Button>
+            <QuotationTemplates onSelectTemplate={(newSections) => setSections(newSections)} />
             <CustomizeFieldsDrawer type="quotation" settings={customizeSettings} onSettingsChange={s => setCustomizeSettings(s as QuotationSettings)} />
           </div>
         </div>
