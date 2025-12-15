@@ -89,32 +89,79 @@ export const BillingSection = () => {
     }
   };
 
-  const downloadReceipt = (log: PaymentLog) => {
-    const receiptContent = `
-INTORZA PRO - PAYMENT RECEIPT
-=============================
-
-Transaction ID: ${log.provider_event_id || log.id}
-Date: ${formatDate(log.created_at)}
-Amount: ₹${(log.amount / 100).toFixed(2)}
-Status: ${log.status?.toUpperCase() || 'SUCCESS'}
-Payment Type: ${log.event_type?.replace(/_/g, ' ').replace(/\./g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-
-=============================
-Thank you for your subscription!
-support@intorza.com
-    `.trim();
-
-    const blob = new Blob([receiptContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `intorza-receipt-${log.id.substring(0, 8)}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success('Receipt downloaded');
+  const downloadReceipt = async (log: PaymentLog) => {
+    try {
+      // Import jsPDF dynamically
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+      
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = 20;
+      
+      // Header background
+      doc.setFillColor(27, 46, 79); // #1b2e4f
+      doc.rect(0, 0, pageWidth, 50, 'F');
+      
+      // Company name
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(24);
+      doc.setFont('helvetica', 'bold');
+      doc.text('INTORZA', pageWidth / 2, y + 10, { align: 'center' });
+      
+      // Receipt title
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text('PAYMENT RECEIPT', pageWidth / 2, y + 22, { align: 'center' });
+      
+      y = 65;
+      
+      // Receipt details
+      doc.setTextColor(30, 30, 30);
+      doc.setFontSize(11);
+      
+      const details = [
+        ['Transaction ID:', log.provider_event_id || log.id],
+        ['Date:', formatDate(log.created_at)],
+        ['Amount:', `₹${(log.amount / 100).toFixed(2)}`],
+        ['Status:', log.status?.toUpperCase() || 'SUCCESS'],
+        ['Payment Type:', log.event_type?.replace(/_/g, ' ').replace(/\./g, ' ').replace(/\b\w/g, l => l.toUpperCase())],
+        ['Plan:', 'Intorza Pro'],
+      ];
+      
+      details.forEach(([label, value]) => {
+        doc.setFont('helvetica', 'bold');
+        doc.text(label, 20, y);
+        doc.setFont('helvetica', 'normal');
+        doc.text(String(value), 80, y);
+        y += 10;
+      });
+      
+      // Divider
+      y += 10;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(20, y, pageWidth - 20, y);
+      y += 15;
+      
+      // Thank you message
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Thank you for your subscription!', pageWidth / 2, y, { align: 'center' });
+      y += 8;
+      doc.text('For support, contact: intorza.com@gmail.com', pageWidth / 2, y, { align: 'center' });
+      
+      // Footer
+      const footerY = doc.internal.pageSize.getHeight() - 20;
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text('www.intorza.com', pageWidth / 2, footerY, { align: 'center' });
+      
+      // Save PDF
+      doc.save(`intorza-receipt-${log.id.substring(0, 8)}.pdf`);
+      toast.success('Receipt downloaded');
+    } catch (error) {
+      console.error('Error generating PDF receipt:', error);
+      toast.error('Failed to generate receipt');
+    }
   };
 
   const handleCancelSubscription = async () => {
