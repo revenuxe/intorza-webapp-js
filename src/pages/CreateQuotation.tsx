@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Upload, Eye, Share2 } from "lucide-react";
+import { Plus, Trash2, Upload, Eye, Share2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -143,6 +143,7 @@ const CreateQuotation = () => {
   const [formRestored, setFormRestored] = useState(false);
   const [customizeSettings, setCustomizeSettings] = useState<QuotationSettings>(getQuotationSettings());
   const [showPreview, setShowPreview] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Restore form data from sessionStorage after login
   useEffect(() => {
@@ -325,8 +326,8 @@ const CreateQuotation = () => {
       } = await supabase.from('quotations').select('*').eq('id', id).single();
       if (quotationError) throw quotationError;
 
-      // Pre-fill form fields
-      setProjectTitle(quotation.quotation_title || "");
+      // Pre-fill form fields - use quotation_title or project_name as fallback
+      setProjectTitle(quotation.quotation_title || quotation.project_name || "");
       setClientName(quotation.client_name || "");
       setClientAddress(quotation.client_address || "");
       setDateOfProposal(quotation.date_of_proposal || "");
@@ -339,9 +340,11 @@ const CreateQuotation = () => {
       setGstRate(quotation.gst_percentage?.toString() || "18");
 
       // Calculate discount percentage from discount amount
-      if (quotation.discount_amount && quotation.subtotal) {
-        const discountPercent = quotation.discount_amount / quotation.subtotal * 100;
+      if (quotation.discount_amount && quotation.subtotal && quotation.subtotal > 0) {
+        const discountPercent = (quotation.discount_amount / quotation.subtotal) * 100;
         setDiscountPercentage(discountPercent);
+      } else {
+        setDiscountPercentage(0);
       }
 
       // Load sections
@@ -750,6 +753,7 @@ const CreateQuotation = () => {
   };
 
   const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, overrideQuotationId?: string, overrideProfile?: typeof profile) => {
+    setIsDownloading(true);
     try {
       if (!clientName || !clientAddress) {
         toast({
@@ -757,6 +761,7 @@ const CreateQuotation = () => {
           description: "Please fill in client name and address before downloading PDF",
           variant: "destructive"
         });
+        setIsDownloading(false);
         return;
       }
       
@@ -830,6 +835,8 @@ const CreateQuotation = () => {
         description: "Failed to generate PDF. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsDownloading(false);
     }
   };
   const getQuotationPreviewData = () => ({
@@ -843,7 +850,17 @@ const CreateQuotation = () => {
     companyName: profile.company_name,
     companyLogo: profile.logo_url
   });
-  return <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8">
+  return <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8 relative">
+      {/* Download Loader Overlay */}
+      {isDownloading && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3 p-6 bg-card rounded-lg shadow-lg border">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-lg font-medium">Downloading...</p>
+            <p className="text-sm text-muted-foreground">Generating your PDF</p>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col gap-6">
         {/* Header Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
