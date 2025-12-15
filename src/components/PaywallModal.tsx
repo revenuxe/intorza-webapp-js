@@ -95,7 +95,7 @@ export const PaywallModal: React.FC = () => {
       const options = {
         key: data.keyId,
         name: 'Intorza',
-        description: data.trial ? '₹1 authorization (refundable) • Autopay ₹49/month after trial' : 'Pro Monthly - ₹49/month',
+        description: data.trial ? 'Pro Activation • 30 Days Free Trial' : 'Pro Monthly - ₹49/month',
         ...(isSubscriptionFlow
           ? {
               subscription_id: data.subscriptionId,
@@ -182,9 +182,9 @@ export const PaywallModal: React.FC = () => {
           <div className="text-primary-foreground/90 text-[10px] sm:text-xs mt-1">
             Then <span className="line-through">₹1,999</span> <span className="font-semibold">₹49/month</span>
           </div>
-          <div className="inline-flex items-center gap-1 mt-1.5 text-[9px] sm:text-[10px] bg-primary/15 px-2 py-0.5 rounded-full">
-            <Sparkles className="w-2.5 h-2.5 text-primary" />
-            ₹1 refundable to verify • Autopay ₹49/month
+          <div className="inline-flex items-center gap-1 mt-1.5 text-[9px] sm:text-[10px] bg-primary-foreground/15 px-2 py-0.5 rounded-full">
+            <Sparkles className="w-2.5 h-2.5" />
+            Just ₹0.50 to activate • All payment methods
           </div>
         </div>
 

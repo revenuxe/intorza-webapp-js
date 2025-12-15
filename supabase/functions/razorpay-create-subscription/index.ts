@@ -260,8 +260,7 @@ serve(async (req) => {
         actor: 'system',
       });
 
-    // Create an order for ₹1 authorization (refundable) to verify payment method
-    // Autopay of ₹49/month will start after trial ends
+    // Create an order for ₹0.50 (50 paise) - token amount for verification
     const orderResponse = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -269,15 +268,13 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: 100, // ₹1 in paise - refundable authorization
+        amount: 50, // 50 paise (₹0.50) - minimum token amount
         currency: planConfig.currency,
-        receipt: `auth_${user.id.substring(0, 8)}_${Date.now().toString(36)}`,
+        receipt: `pro_${user.id.substring(0, 8)}_${Date.now().toString(36)}`,
         notes: {
           user_id: user.id,
           plan: plan,
-          type: 'authorization',
-          trial: 'true',
-          autopay_amount: planConfig.amount, // ₹49 will be charged after trial
+          type: 'pro_activation',
         }
       }),
     });
@@ -309,7 +306,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       orderId: orderData.id,
       customerId: customerId,
-      amount: 100, // ₹1 authorization amount
+      amount: 50, // 50 paise token amount
       currency: planConfig.currency,
       keyId: RAZORPAY_KEY_ID,
       plan: plan,
