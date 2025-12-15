@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import intorzaLogo from "@/assets/intorza-logo.webp";
 import { z } from "zod";
 import { OnboardingDialog } from "@/components/OnboardingDialog";
+import { GlobalLoader } from "@/components/GlobalLoader";
 
 // Validation schemas
 const loginSchema = z.object({
@@ -63,6 +64,7 @@ const GoogleButton = ({ onClick, loading, disabled }: { onClick: () => void; loa
 const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
@@ -90,73 +92,112 @@ const Auth = () => {
     }
   };
 
-  // Check if user needs onboarding (first-time user)
-  const checkOnboarding = async (userId: string) => {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('company_name, phone')
-      .eq('id', userId)
-      .single();
-
-    // If no company name and no phone, show onboarding
-    if (!profile?.company_name && !profile?.phone) {
-      setOnboardingUserId(userId);
-      setShowOnboarding(true);
-      return true;
-    }
-    return false;
-  };
-
-  const handleOnboardingComplete = () => {
-    setShowOnboarding(false);
-    const returnPath = getReturnPath();
-    sessionStorage.removeItem('returnPath');
-    navigate(returnPath);
-  };
-
-  // Check if already logged in
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Check if team member - redirect to team dashboard
-        const { data: teamMember } = await supabase
-          .from('team_members')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        
-        if (teamMember) {
-          navigate('/team/dashboard');
-          return;
-        }
-        
-        // Check if admin - redirect to admin dashboard
-        const { data: isAdmin } = await supabase.rpc('is_admin');
-        if (isAdmin) {
-          navigate('/admin/dashboard');
-          return;
-        }
-        
-        // Check if needs onboarding
-        const needsOnboarding = await checkOnboarding(user.id);
-        if (!needsOnboarding) {
-          // Regular user - go to home
-          navigate('/');
-        }
-      }
-    };
-    checkAuth();
-  }, [navigate]);
-
-  const getReturnPath = () => {
+  const getReturnPath = useCallback(() => {
     const returnPath = sessionStorage.getItem('returnPath');
     const pendingAction = sessionStorage.getItem('pendingAction');
     if (returnPath && pendingAction) {
       return `${returnPath}${returnPath.includes('?') ? '&' : '?'}continueAction=${pendingAction}`;
     }
     return "/";
-  };
+  }, []);
+
+  // Check if user needs onboarding (first-time user)
+  const checkOnboarding = useCallback(async (userId: string): Promise<boolean> => {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_name, phone')
+        .eq('id', userId)
+        .single();
+
+      // If no company name and no phone, show onboarding
+      if (!profile?.company_name && !profile?.phone) {
+        setOnboardingUserId(userId);
+        setShowOnboarding(true);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const handleOnboardingComplete = useCallback(() => {
+    setShowOnboarding(false);
+    const returnPath = getReturnPath();
+    sessionStorage.removeItem('returnPath');
+    sessionStorage.removeItem('pendingAction');
+    navigate(returnPath);
+  }, [getReturnPath, navigate]);
+
+  // Robust auth check with listener
+  useEffect(() => {
+    let mounted = true;
+
+    const handleAuthRedirect = async (userId: string) => {
+      if (!mounted) return;
+      
+      // Check if team member
+      const { data: teamMember } = await supabase
+        .from('team_members')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      if (teamMember) {
+        navigate('/team/dashboard', { replace: true });
+        return;
+      }
+      
+      // Check if admin
+      const { data: isAdmin } = await supabase.rpc('is_admin');
+      if (isAdmin) {
+        navigate('/admin/dashboard', { replace: true });
+        return;
+      }
+      
+      // Check if needs onboarding
+      const needsOnboarding = await checkOnboarding(userId);
+      if (!needsOnboarding && mounted) {
+        const returnPath = getReturnPath();
+        sessionStorage.removeItem('returnPath');
+        sessionStorage.removeItem('pendingAction');
+        navigate(returnPath, { replace: true });
+      }
+    };
+
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return;
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          // Use setTimeout to avoid Supabase deadlock
+          setTimeout(() => {
+            if (mounted) handleAuthRedirect(session.user.id);
+          }, 0);
+        }
+        
+        setInitialLoading(false);
+      }
+    );
+
+    // Then check for existing session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
+      
+      if (session?.user) {
+        await handleAuthRedirect(session.user.id);
+      }
+      
+      setInitialLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [navigate, checkOnboarding, getReturnPath]);
 
   const clearErrors = () => setErrors({});
 
@@ -309,6 +350,11 @@ const Auth = () => {
       setLoading(false);
     }
   };
+
+  // Show loader while checking auth
+  if (initialLoading) {
+    return <GlobalLoader message="Checking authentication..." />;
+  }
 
   return (
     <>

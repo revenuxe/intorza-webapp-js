@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Loader2, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAuth } from '@/hooks/useAuth';
-import logo from '@/assets/intorza-logo.webp';
+import { GlobalLoader } from '@/components/GlobalLoader';
 
 type PaymentStatus = 'processing' | 'success' | 'failed' | 'timeout';
 
@@ -73,28 +73,18 @@ export default function PaymentProcessing() {
     navigate('/');
   };
 
+  if (status === 'processing') {
+    return (
+      <div className="min-h-screen bg-background">
+        <GlobalLoader message={`Processing your payment... (${attempts}/${maxAttempts})`} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardContent className="pt-6 text-center space-y-4">
-          <img src={logo} alt="Intorza" className="h-8 mx-auto mb-4" />
-
-          {status === 'processing' && (
-            <>
-              <div className="w-16 h-16 mx-auto rounded-full bg-amber-500/10 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 text-amber-500 animate-spin" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold">Processing your payment...</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Please do not close this screen
-                </p>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Checking status... ({attempts}/{maxAttempts})
-              </div>
-            </>
-          )}
 
           {status === 'success' && (
             <>
