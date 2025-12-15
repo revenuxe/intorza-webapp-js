@@ -211,12 +211,13 @@ const CreateQuotation = () => {
         });
 
         // Fetch fresh profile data before executing pending action
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        const freshProfile = await fetchFreshProfile();
+        if (freshProfile) {
+          setProfile(freshProfile);
           
-          if (profileData) {
-            // Get default templates from My Library
+          // Fetch payment stages separately
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
             const { data: paymentTemplate } = await supabase
               .from('payment_templates')
               .select('stages')
@@ -224,62 +225,27 @@ const CreateQuotation = () => {
               .eq('is_default', true)
               .single();
 
-            const { data: termsTemplate } = await supabase
-              .from('terms_templates')
-              .select('content')
-              .eq('user_id', user.id)
-              .eq('is_default', true)
-              .eq('template_type', 'quotation')
-              .single();
+            const { data: profileData } = await supabase.from('profiles').select('payment_stages').eq('id', user.id).single();
 
-            const { data: bankTemplate } = await supabase
-              .from('bank_detail_templates')
-              .select('*')
-              .eq('user_id', user.id)
-              .eq('is_default', true)
-              .single();
-
-            // Update profile state with fresh data
-            setProfile({
-              company_name: profileData.company_name || "",
-              logo_url: profileData.logo_url || "",
-              address: profileData.address || "",
-              phone: profileData.phone || "",
-              email: profileData.email || "",
-              gstin: profileData.gstin || "",
-              professional_advantages: profileData.professional_advantages || "",
-              signature_url: profileData.signature_url || "",
-              terms_conditions: (termsTemplate?.content as any) || profileData.terms_conditions as any || [],
-              bank_name: bankTemplate?.bank_name || (profileData as any).bank_name || "",
-              bank_account_number: bankTemplate?.account_number || (profileData as any).bank_account_number || "",
-              bank_ifsc_code: bankTemplate?.ifsc_code || (profileData as any).bank_ifsc_code || "",
-              bank_account_holder: bankTemplate?.account_holder_name || (profileData as any).bank_account_holder || "",
-              upi_id: bankTemplate?.upi_id || (profileData as any).upi_id || "",
-              payment_qr_url: bankTemplate?.qr_code_url || (profileData as any).payment_qr_url || ""
-            });
-
-            // Load payment stages - prefer template over profile
             if (paymentTemplate?.stages) {
               setPaymentStages(paymentTemplate.stages as any);
-            } else if (profileData.payment_stages) {
+            } else if (profileData?.payment_stages) {
               setPaymentStages(profileData.payment_stages as any);
             }
           }
-        }
 
-        // Small delay to ensure state is fully updated after profile fetch
-        setTimeout(async () => {
+          // Execute the pending action with the fresh profile data
           if (continueAction === 'saveDraft') {
             await handleSaveQuotation('draft');
           } else if (continueAction === 'downloadPdf') {
             const savedId = await handleSaveQuotation('pending');
             if (savedId) {
-              await handleDownloadPDF(undefined, savedId);
+              await handleDownloadPDF(undefined, savedId, freshProfile);
             }
           } else if (continueAction === 'saveAndSend') {
             await handleSaveQuotation('pending', true);
           }
-        }, 100);
+        }
       }
     };
     executePendingAction();
@@ -696,8 +662,9 @@ const CreateQuotation = () => {
       // Reset form only for Save & Send flow (pending status with share)
       if (status === 'pending' && showShare) {
         if (savedQuotationId) {
-          // Generate PDF with the saved quotation ID for Accept/Reject buttons
-          await handleDownloadPDF(undefined, savedQuotationId);
+          // Fetch fresh profile and generate PDF with the saved quotation ID for Accept/Reject buttons
+          const freshProfile = await fetchFreshProfile();
+          await handleDownloadPDF(undefined, savedQuotationId, freshProfile || undefined);
         }
         
         setClientName("");
@@ -739,7 +706,50 @@ const CreateQuotation = () => {
       return null;
     }
   };
-  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, overrideQuotationId?: string) => {
+  
+  // Helper function to fetch fresh profile data
+  const fetchFreshProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    if (!profileData) return null;
+
+    const { data: termsTemplate } = await supabase
+      .from('terms_templates')
+      .select('content')
+      .eq('user_id', user.id)
+      .eq('is_default', true)
+      .eq('template_type', 'quotation')
+      .single();
+
+    const { data: bankTemplate } = await supabase
+      .from('bank_detail_templates')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_default', true)
+      .single();
+
+    return {
+      company_name: profileData.company_name || "",
+      logo_url: profileData.logo_url || "",
+      address: profileData.address || "",
+      phone: profileData.phone || "",
+      email: profileData.email || "",
+      gstin: profileData.gstin || "",
+      professional_advantages: profileData.professional_advantages || "",
+      signature_url: profileData.signature_url || "",
+      terms_conditions: (termsTemplate?.content as any) || profileData.terms_conditions as any || [],
+      bank_name: bankTemplate?.bank_name || (profileData as any).bank_name || "",
+      bank_account_number: bankTemplate?.account_number || (profileData as any).bank_account_number || "",
+      bank_ifsc_code: bankTemplate?.ifsc_code || (profileData as any).bank_ifsc_code || "",
+      bank_account_holder: bankTemplate?.account_holder_name || (profileData as any).bank_account_holder || "",
+      upi_id: bankTemplate?.upi_id || (profileData as any).upi_id || "",
+      payment_qr_url: bankTemplate?.qr_code_url || (profileData as any).payment_qr_url || ""
+    };
+  };
+
+  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, overrideQuotationId?: string, overrideProfile?: typeof profile) => {
     try {
       if (!clientName || !clientAddress) {
         toast({
@@ -749,6 +759,18 @@ const CreateQuotation = () => {
         });
         return;
       }
+      
+      // Use override profile if provided, otherwise use state profile
+      // If state profile is empty, fetch fresh data
+      let profileToUse = overrideProfile || profile;
+      if (!profileToUse.company_name && !profileToUse.logo_url) {
+        const freshProfile = await fetchFreshProfile();
+        if (freshProfile) {
+          profileToUse = freshProfile;
+          setProfile(freshProfile); // Update state for future use
+        }
+      }
+      
       await generateQuotationPDF({
         quotationId: overrideQuotationId || quotationId || undefined,
         quotationTitle: projectTitle,
@@ -770,14 +792,14 @@ const CreateQuotation = () => {
         gstAmount,
         discount: discountAmount,
         grandTotal,
-        companyLogo: profile.logo_url,
-        companyName: profile.company_name,
-        companyAddress: profile.address,
-        companyPhone: profile.phone,
-        companyEmail: profile.email,
-        gstin: profile.gstin,
-        professionalAdvantages: profile.professional_advantages,
-        signatureUrl: profile.signature_url,
+        companyLogo: profileToUse.logo_url,
+        companyName: profileToUse.company_name,
+        companyAddress: profileToUse.address,
+        companyPhone: profileToUse.phone,
+        companyEmail: profileToUse.email,
+        gstin: profileToUse.gstin,
+        professionalAdvantages: profileToUse.professional_advantages,
+        signatureUrl: profileToUse.signature_url,
         enableSocialMediaDiscount,
         socialMediaDiscountRate,
         paymentStages: paymentStages.map(s => ({
@@ -785,14 +807,14 @@ const CreateQuotation = () => {
           milestone: s.milestone,
           percentage: s.percentage
         })),
-        termsConditions: profile.terms_conditions,
+        termsConditions: profileToUse.terms_conditions,
         bankDetails: {
-          bankName: profile.bank_name,
-          accountNumber: profile.bank_account_number,
-          ifscCode: profile.bank_ifsc_code,
-          accountHolder: profile.bank_account_holder,
-          upiId: profile.upi_id,
-          qrCodeUrl: profile.payment_qr_url
+          bankName: profileToUse.bank_name,
+          accountNumber: profileToUse.bank_account_number,
+          ifscCode: profileToUse.bank_ifsc_code,
+          accountHolder: profileToUse.bank_account_holder,
+          upiId: profileToUse.upi_id,
+          qrCodeUrl: profileToUse.payment_qr_url
         },
         settings: customizeSettings,
         editorSettings: editorSettings || getEditorSettings()
@@ -1160,13 +1182,15 @@ const CreateQuotation = () => {
                 onClick={() =>
                   requireAuth(
                     async () => {
+                      // Fetch fresh profile for PDF generation
+                      const freshProfile = await fetchFreshProfile();
                       if (!quotationId) {
                         const savedId = await handleSaveQuotation("pending");
                         if (savedId) {
-                          await handleDownloadPDF(undefined, savedId);
+                          await handleDownloadPDF(undefined, savedId, freshProfile || undefined);
                         }
                       } else {
-                        await handleDownloadPDF();
+                        await handleDownloadPDF(undefined, undefined, freshProfile || undefined);
                       }
                     },
                     "downloadPdf",
