@@ -11,7 +11,7 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Check, Crown, Sparkles } from 'lucide-react';
+import { Check, Crown } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -26,8 +26,6 @@ const PRO_FEATURES = [
   'Site measurement tools',
   'Add team members',
 ];
-
-const TRIAL_DAYS = 30;
 
 export const PaywallModal: React.FC = () => {
   const navigate = useNavigate();
@@ -164,21 +162,17 @@ export const PaywallModal: React.FC = () => {
           Start your free trial of Intorza Pro to unlock all premium features.
         </DialogDescription>
         {/* Header */}
-        <div className="bg-gradient-to-br from-primary to-secondary p-3 sm:p-4 text-center text-primary-foreground">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 mx-auto mb-2 bg-primary/15 rounded-full flex items-center justify-center backdrop-blur-sm">
-            <Crown className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+        <div className="bg-gradient-to-br from-primary to-secondary p-4 sm:p-5 text-center text-primary-foreground">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 bg-primary-foreground/15 rounded-full flex items-center justify-center backdrop-blur-sm">
+            <Crown className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <h2 className="text-base sm:text-lg font-bold mb-0.5">Try Pro FREE</h2>
-          <div className="flex items-center justify-center gap-1.5">
-            <span className="text-lg sm:text-xl font-bold">{TRIAL_DAYS} Days Free</span>
+          <h2 className="text-lg sm:text-xl font-bold mb-1">1 Month FREE</h2>
+          <div className="text-3xl sm:text-4xl font-bold my-2">
+            Just ₹1
           </div>
-          <div className="text-primary-foreground/90 text-[10px] sm:text-xs mt-1">
-            Then <span className="line-through">₹1,999</span> <span className="font-semibold">₹49/month</span>
-          </div>
-          <div className="inline-flex items-center gap-1 mt-1.5 text-[9px] sm:text-[10px] bg-primary-foreground/15 px-2 py-0.5 rounded-full">
-            <Sparkles className="w-2.5 h-2.5" />
-Get 1 month free trial just in ₹1
-          </div>
+          <p className="text-primary-foreground/80 text-xs sm:text-sm">
+            Unlock all Pro features
+          </p>
         </div>
 
         {/* Features */}
