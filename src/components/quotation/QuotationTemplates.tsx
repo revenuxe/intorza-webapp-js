@@ -1357,145 +1357,164 @@ export const QuotationTemplates = ({ onSelectTemplate, currentSections }: Quotat
           Templates
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[85vh] p-0 overflow-hidden">
-        <DialogHeader className="px-4 pt-4 pb-2">
-          <DialogTitle className="text-lg">Quotation Templates</DialogTitle>
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-2 border-b">
+          <DialogTitle className="text-base font-semibold">Quotation Templates</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1">
-          <div className="px-4 border-b">
-            <TabsList className="grid w-full max-w-[300px] grid-cols-2">
-              <TabsTrigger value="system" className="text-xs">
-                <FileText className="h-3.5 w-3.5 mr-1.5" />
-                System Templates
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
+          <div className="px-3 py-2 border-b bg-muted/30">
+            <TabsList className="grid w-full grid-cols-2 h-9">
+              <TabsTrigger value="system" className="text-xs gap-1.5">
+                <FileText className="h-3.5 w-3.5" />
+                System
               </TabsTrigger>
-              <TabsTrigger value="saved" className="text-xs">
-                <Star className="h-3.5 w-3.5 mr-1.5" />
+              <TabsTrigger value="saved" className="text-xs gap-1.5">
+                <Star className="h-3.5 w-3.5" />
                 My Templates
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <TabsContent value="system" className="mt-0 flex-1">
-            <div className="flex h-[60vh]">
-              {/* Category Sidebar */}
-              <ScrollArea className="w-48 border-r bg-muted/30">
-                <div className="p-2 space-y-1">
+          <TabsContent value="system" className="mt-0 flex-1 flex flex-col overflow-hidden">
+            {/* Mobile: Horizontal scrollable categories */}
+            <div className="px-3 py-2 border-b bg-background">
+              <ScrollArea className="w-full">
+                <div className="flex gap-2 pb-1">
                   {categories.map((category) => {
                     const Icon = categoryIcons[category] || FileText;
                     const count = groupedTemplates[category]?.length || 0;
+                    const isSelected = selectedCategory === category;
                     return (
                       <button
                         key={category}
-                        onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs rounded-lg transition-colors ${
-                          selectedCategory === category
-                            ? 'bg-primary text-primary-foreground'
-                            : 'hover:bg-muted'
+                        onClick={() => setSelectedCategory(isSelected ? null : category)}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                          isSelected
+                            ? 'bg-primary text-primary-foreground shadow-sm'
+                            : 'bg-muted hover:bg-muted/80 text-foreground'
                         }`}
                       >
-                        <Icon className="h-4 w-4 flex-shrink-0" />
-                        <span className="flex-1 truncate">{category}</span>
-                        <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                        <Icon className="h-3.5 w-3.5" />
+                        <span>{category}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                          isSelected ? 'bg-primary-foreground/20' : 'bg-background'
+                        }`}>
                           {count}
-                        </Badge>
+                        </span>
                       </button>
                     );
                   })}
                 </div>
               </ScrollArea>
+            </div>
 
-              {/* Templates Grid */}
-              <ScrollArea className="flex-1">
-                <div className="p-4">
-                  {!selectedCategory ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Layers className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p className="text-sm font-medium">Select a category</p>
-                      <p className="text-xs mt-1">Choose from {QUOTATION_TEMPLATES.length} templates</p>
+            {/* Templates Grid */}
+            <ScrollArea className="flex-1">
+              <div className="p-3">
+                {!selectedCategory ? (
+                  <div className="text-center py-16 text-muted-foreground">
+                    <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                      <Layers className="h-8 w-8 opacity-50" />
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
+                    <p className="text-sm font-medium">Select a category above</p>
+                    <p className="text-xs mt-1 text-muted-foreground/70">
+                      {QUOTATION_TEMPLATES.length} templates available
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-medium flex items-center gap-2">
+                        {(() => {
+                          const Icon = categoryIcons[selectedCategory] || FileText;
+                          return <Icon className="h-4 w-4 text-primary" />;
+                        })()}
+                        {selectedCategory}
+                      </h3>
+                      <Badge variant="secondary" className="text-[10px]">
+                        {groupedTemplates[selectedCategory]?.length} templates
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {groupedTemplates[selectedCategory]?.map((template) => {
                         const Icon = template.icon;
                         const totalItems = template.sections.reduce((acc, s) => acc + s.items.length, 0);
                         return (
                           <Card
                             key={template.id}
-                            className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
+                            className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group active:scale-[0.98]"
                             onClick={() => handleSelectTemplate(template)}
                           >
-                            <CardHeader className="p-3 pb-2">
-                              <div className="flex items-start gap-2">
-                                <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                                  <Icon className="h-4 w-4 text-primary" />
+                            <CardContent className="p-3">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                  <Icon className="h-5 w-5 text-primary" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <CardTitle className="text-sm font-medium truncate">
+                                  <h4 className="text-sm font-medium truncate">
                                     {template.name}
-                                  </CardTitle>
-                                  <CardDescription className="text-[10px] line-clamp-1 mt-0.5">
+                                  </h4>
+                                  <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
                                     {template.description}
-                                  </CardDescription>
+                                  </p>
+                                  <div className="flex items-center gap-1.5 mt-2">
+                                    <Badge variant="secondary" className="text-[10px] h-5 px-2 font-normal">
+                                      {template.sections.length} sections
+                                    </Badge>
+                                    <Badge variant="outline" className="text-[10px] h-5 px-2 font-normal">
+                                      {totalItems} items
+                                    </Badge>
+                                  </div>
                                 </div>
-                              </div>
-                            </CardHeader>
-                            <CardContent className="p-3 pt-0">
-                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                                  {template.sections.length} sections
-                                </Badge>
-                                <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                                  {totalItems} items
-                                </Badge>
                               </div>
                             </CardContent>
                           </Card>
                         );
                       })}
                     </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
           </TabsContent>
 
-          <TabsContent value="saved" className="mt-0 flex-1">
-            <ScrollArea className="h-[60vh]">
-              <div className="p-4">
+          <TabsContent value="saved" className="mt-0 flex-1 overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="p-3">
                 {/* Save Current Template Button */}
                 {currentSections && currentSections.length > 0 && (
-                  <Card className="mb-4 border-dashed">
-                    <CardContent className="p-4">
+                  <Card className="mb-3 border-dashed border-primary/30 bg-primary/5">
+                    <CardContent className="p-3">
                       {showSaveDialog ? (
                         <div className="space-y-3">
                           <div>
-                            <Label className="text-xs">Template Name</Label>
+                            <Label className="text-xs font-medium">Template Name</Label>
                             <Input
                               value={newTemplateName}
                               onChange={(e) => setNewTemplateName(e.target.value)}
                               placeholder="e.g., My Kitchen Template"
-                              className="mt-1 h-9"
+                              className="mt-1.5 h-10"
                             />
                           </div>
                           <div>
-                            <Label className="text-xs">Category</Label>
+                            <Label className="text-xs font-medium">Category</Label>
                             <select
                               value={newTemplateCategory}
                               onChange={(e) => setNewTemplateCategory(e.target.value)}
-                              className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
+                              className="w-full mt-1.5 h-10 rounded-md border border-input bg-background px-3 text-sm"
                             >
                               {categories.map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                               ))}
                             </select>
                           </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" onClick={handleSaveAsTemplate} className="flex-1">
+                          <div className="flex gap-2 pt-1">
+                            <Button size="sm" onClick={handleSaveAsTemplate} className="flex-1 h-9">
                               <Save className="h-3.5 w-3.5 mr-1.5" />
-                              Save Template
+                              Save
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => setShowSaveDialog(false)}>
+                            <Button size="sm" variant="outline" onClick={() => setShowSaveDialog(false)} className="h-9">
                               Cancel
                             </Button>
                           </div>
@@ -1503,11 +1522,11 @@ export const QuotationTemplates = ({ onSelectTemplate, currentSections }: Quotat
                       ) : (
                         <Button
                           variant="outline"
-                          className="w-full border-dashed"
+                          className="w-full border-dashed border-primary/50 hover:bg-primary/10 h-11"
                           onClick={() => setShowSaveDialog(true)}
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Save Current Quotation as Template
+                          Save Current as Template
                         </Button>
                       )}
                     </CardContent>
@@ -1516,61 +1535,62 @@ export const QuotationTemplates = ({ onSelectTemplate, currentSections }: Quotat
 
                 {/* User Templates */}
                 {loading ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-3" />
-                    <p className="text-xs">Loading templates...</p>
+                  <div className="text-center py-16 text-muted-foreground">
+                    <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-3" />
+                    <p className="text-xs">Loading your templates...</p>
                   </div>
                 ) : userTemplates.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Star className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p className="text-sm font-medium">No saved templates</p>
-                    <p className="text-xs mt-1">Save your quotations as templates for reuse</p>
+                  <div className="text-center py-16 text-muted-foreground">
+                    <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
+                      <Star className="h-8 w-8 text-amber-500 opacity-50" />
+                    </div>
+                    <p className="text-sm font-medium">No saved templates yet</p>
+                    <p className="text-xs mt-1 text-muted-foreground/70">
+                      Create a quotation and save it as a template
+                    </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {userTemplates.map((template) => {
                       const totalItems = template.sections.reduce((acc, s) => acc + s.items.length, 0);
                       return (
                         <Card
                           key={template.id}
-                          className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group relative"
+                          className="cursor-pointer hover:border-amber-500/50 hover:shadow-md transition-all group relative active:scale-[0.98]"
+                          onClick={() => handleSelectTemplate(template)}
                         >
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteTemplate(template.id);
                             }}
-                            className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity bg-destructive/10 hover:bg-destructive/20 text-destructive"
+                            className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity bg-destructive/10 hover:bg-destructive/20 text-destructive z-10"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                          <div onClick={() => handleSelectTemplate(template)}>
-                            <CardHeader className="p-3 pb-2">
-                              <div className="flex items-start gap-2">
-                                <div className="p-2 rounded-lg bg-amber-500/10">
-                                  <Star className="h-4 w-4 text-amber-600" />
-                                </div>
-                                <div className="flex-1 min-w-0 pr-6">
-                                  <CardTitle className="text-sm font-medium truncate">
-                                    {template.name}
-                                  </CardTitle>
-                                  <CardDescription className="text-[10px] line-clamp-1 mt-0.5">
-                                    {template.category}
-                                  </CardDescription>
+                          <CardContent className="p-3">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2.5 rounded-xl bg-amber-500/10">
+                                <Star className="h-5 w-5 text-amber-600" />
+                              </div>
+                              <div className="flex-1 min-w-0 pr-6">
+                                <h4 className="text-sm font-medium truncate">
+                                  {template.name}
+                                </h4>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  {template.category}
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-2">
+                                  <Badge variant="secondary" className="text-[10px] h-5 px-2 font-normal">
+                                    {template.sections.length} sections
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px] h-5 px-2 font-normal">
+                                    {totalItems} items
+                                  </Badge>
                                 </div>
                               </div>
-                            </CardHeader>
-                            <CardContent className="p-3 pt-0">
-                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                                  {template.sections.length} sections
-                                </Badge>
-                                <Badge variant="outline" className="text-[10px] h-4 px-1.5">
-                                  {totalItems} items
-                                </Badge>
-                              </div>
-                            </CardContent>
-                          </div>
+                            </div>
+                          </CardContent>
                         </Card>
                       );
                     })}
