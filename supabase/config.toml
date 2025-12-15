@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.subscription-status]
 verify_jwt = false
+
+[functions.razorpay-cancel-subscription]
+verify_jwt = false

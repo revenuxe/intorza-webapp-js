@@ -4,8 +4,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Crown, CreditCard, Calendar, CheckCircle, AlertCircle, Loader2, Download } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { Crown, CreditCard, Calendar, CheckCircle, AlertCircle, Loader2, Download, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface PaymentLog {
   id: string;
@@ -18,9 +30,11 @@ interface PaymentLog {
 }
 
 export const BillingSection = () => {
-  const { isPro, plan, expiry, status, setPaywallOpen, loading: subLoading } = useSubscription();
+  const { isPro, plan, expiry, status, setPaywallOpen, loading: subLoading, refreshSubscription } = useSubscription();
+  const { session } = useAuth();
   const [paymentLogs, setPaymentLogs] = useState<PaymentLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     loadPaymentLogs();
@@ -66,6 +80,10 @@ export const BillingSection = () => {
         return <Badge className="bg-red-500/10 text-red-700 text-[10px]">Failed</Badge>;
       case 'refunded':
         return <Badge className="bg-orange-500/10 text-orange-700 text-[10px]">Refunded</Badge>;
+      case 'trial':
+        return <Badge className="bg-blue-500/10 text-blue-700 text-[10px]">Trial</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-gray-500/10 text-gray-700 text-[10px]">Cancelled</Badge>;
       default:
         return <Badge variant="outline" className="text-[10px]">{eventStatus}</Badge>;
     }
@@ -99,6 +117,35 @@ support@intorza.com
     toast.success('Receipt downloaded');
   };
 
+  const handleCancelSubscription = async () => {
+    if (!session?.access_token) {
+      toast.error('Please login to cancel subscription');
+      return;
+    }
+
+    setCancelling(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('razorpay-cancel-subscription', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Failed to cancel subscription');
+      }
+
+      toast.success(data.message || 'Subscription cancelled successfully');
+      await refreshSubscription();
+    } catch (error: any) {
+      console.error('Cancel subscription error:', error);
+      toast.error(error.message || 'Failed to cancel subscription');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (subLoading) {
     return (
       <Card>
@@ -130,17 +177,25 @@ support@intorza.com
                   <div>
                     <p className="font-semibold text-sm text-foreground">Intorza Pro</p>
                     <p className="text-xs text-muted-foreground">
-                      {plan === 'monthly' ? 'Monthly' : plan}
+                      {status === 'trial' ? 'Free Trial' : plan === 'monthly' ? '₹49/month' : plan}
                     </p>
                   </div>
                 </div>
-                <Badge className="bg-green-500/10 text-green-700 border-green-500/20 text-[10px]">Active</Badge>
+                {status === 'trial' ? (
+                  <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/20 text-[10px]">Trial</Badge>
+                ) : status === 'cancelled' ? (
+                  <Badge className="bg-gray-500/10 text-gray-700 border-gray-500/20 text-[10px]">Cancelled</Badge>
+                ) : (
+                  <Badge className="bg-green-500/10 text-green-700 border-green-500/20 text-[10px]">Active</Badge>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div className="flex items-center gap-1.5">
                   <Calendar className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-muted-foreground">Renews:</span>
+                  <span className="text-muted-foreground">
+                    {status === 'cancelled' ? 'Access until:' : status === 'trial' ? 'Trial ends:' : 'Renews:'}
+                  </span>
                 </div>
                 <span className="font-medium text-right">
                   {expiry ? new Date(expiry).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
@@ -152,6 +207,59 @@ support@intorza.com
                 </div>
                 <span className="font-medium capitalize text-right">{status || 'Active'}</span>
               </div>
+
+              {/* Cancel Subscription Button */}
+              {status !== 'cancelled' && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-2 text-destructive hover:text-destructive hover:bg-destructive/10 text-xs h-8"
+                    >
+                      <XCircle className="h-3 w-3 mr-1" />
+                      Cancel Subscription
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="max-w-[300px]">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="text-base">Cancel Subscription?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-xs">
+                        {status === 'trial' 
+                          ? 'Your trial will end immediately and you will lose Pro features.'
+                          : `You will retain Pro access until ${expiry ? new Date(expiry).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'the end of your billing period'}. No further charges will be made.`
+                        }
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="text-xs h-8">Keep Subscription</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleCancelSubscription}
+                        disabled={cancelling}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs h-8"
+                      >
+                        {cancelling ? 'Cancelling...' : 'Yes, Cancel'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
+              {status === 'cancelled' && (
+                <div className="text-center pt-2">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Want to continue with Pro?
+                  </p>
+                  <Button 
+                    onClick={() => setPaywallOpen(true, 'Resubscribe')}
+                    size="sm"
+                    className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs h-8"
+                  >
+                    <Crown className="h-3 w-3 mr-1" />
+                    Resubscribe
+                  </Button>
+                </div>
+              )}
             </>
           ) : (
             <div className="text-center py-4">
@@ -160,7 +268,7 @@ support@intorza.com
               </div>
               <h3 className="font-semibold text-sm mb-1">Free Plan</h3>
               <p className="text-xs text-muted-foreground mb-3">
-                Upgrade to unlock all features
+                Try Pro FREE for 1 month!
               </p>
               <Button 
                 onClick={() => setPaywallOpen(true, 'Upgrade')}
@@ -168,7 +276,7 @@ support@intorza.com
                 className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs h-8"
               >
                 <Crown className="h-3 w-3 mr-1" />
-                Upgrade ₹49/mo
+                Start Free Trial
               </Button>
             </div>
           )}

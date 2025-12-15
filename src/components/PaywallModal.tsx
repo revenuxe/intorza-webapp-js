@@ -25,6 +25,8 @@ const PRO_FEATURES = [
   'Add team members',
 ];
 
+const TRIAL_DAYS = 30;
+
 export const PaywallModal: React.FC = () => {
   const navigate = useNavigate();
   const { paywallOpen, setPaywallOpen, refreshSubscription } = useSubscription();
@@ -73,6 +75,16 @@ export const PaywallModal: React.FC = () => {
       if (data.isPro) {
         toast.success('You already have Pro access!');
         setPaywallOpen(false);
+        return;
+      }
+
+      // If trial was activated without payment, just refresh and close
+      if (data.trialActivated && !data.orderId) {
+        toast.success('Free trial activated! Enjoy Pro for 30 days.');
+        window.dispatchEvent(new Event('subscription-payment-success'));
+        await refreshSubscription();
+        setPaywallOpen(false);
+        navigate('/dashboard');
         return;
       }
 
@@ -148,15 +160,16 @@ export const PaywallModal: React.FC = () => {
           <div className="w-9 h-9 sm:w-10 sm:h-10 mx-auto mb-2 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
             <Crown className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <h2 className="text-base sm:text-lg font-bold mb-0.5">Upgrade to Pro</h2>
+          <h2 className="text-base sm:text-lg font-bold mb-0.5">Try Pro FREE</h2>
           <div className="flex items-center justify-center gap-1.5">
-            <span className="text-white/70 line-through text-[10px] sm:text-xs">₹1,999</span>
-            <span className="text-lg sm:text-xl font-bold">₹49</span>
-            <span className="text-white/80 text-[10px] sm:text-xs">/month</span>
+            <span className="text-lg sm:text-xl font-bold">{TRIAL_DAYS} Days Free</span>
+          </div>
+          <div className="text-white/80 text-[10px] sm:text-xs mt-1">
+            Then <span className="line-through">₹1,999</span> <span className="font-semibold">₹49/month</span>
           </div>
           <div className="inline-flex items-center gap-1 mt-1.5 text-[9px] sm:text-[10px] bg-white/20 px-2 py-0.5 rounded-full">
             <Sparkles className="w-2.5 h-2.5" />
-            Limited Offer
+            No payment today
           </div>
         </div>
 
@@ -179,7 +192,7 @@ export const PaywallModal: React.FC = () => {
             disabled={loading}
             className="w-full h-8 sm:h-9 text-xs sm:text-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-lg shadow-lg shadow-amber-500/25"
           >
-            {loading ? 'Processing...' : 'Upgrade Now'}
+            {loading ? 'Processing...' : 'Start Free Trial'}
           </Button>
           <Button
             variant="ghost"
@@ -191,7 +204,7 @@ export const PaywallModal: React.FC = () => {
         </div>
 
         <p className="text-[8px] sm:text-[9px] text-center text-muted-foreground pb-2.5 sm:pb-3 px-3">
-          Secure payment via Razorpay • Cancel anytime
+          Cancel anytime • No charge until trial ends
         </p>
       </DialogContent>
     </Dialog>
