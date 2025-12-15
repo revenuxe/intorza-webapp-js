@@ -90,21 +90,14 @@ export const PaywallModal: React.FC = () => {
         return;
       }
 
-      const isSubscriptionFlow = !!data.subscriptionId && !data.orderId;
-
+      // Always use order-based flow (all payment methods)
       const options = {
         key: data.keyId,
         name: 'Intorza',
-        description: data.trial ? 'Pro Activation • 30 Days Free Trial' : 'Pro Monthly - ₹49/month',
-        ...(isSubscriptionFlow
-          ? {
-              subscription_id: data.subscriptionId,
-            }
-          : {
-              amount: data.amount,
-              currency: data.currency,
-              order_id: data.orderId,
-            }),
+        description: 'Pro Activation • 30 Days Free',
+        amount: data.amount,
+        currency: data.currency,
+        order_id: data.orderId,
         prefill: data.prefill,
         notes: data.notes,
         theme: {
