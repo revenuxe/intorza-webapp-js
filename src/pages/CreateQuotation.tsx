@@ -633,9 +633,9 @@ const CreateQuotation = () => {
       );
       trackItemUsage(allItems);
 
-      // Reset form if saved as pending
-      if (status === 'pending') {
-        if (showShare && savedQuotationId) {
+      // Reset form only for Save & Send flow (pending status with share)
+      if (status === 'pending' && showShare) {
+        if (savedQuotationId) {
           // Generate PDF with the saved quotation ID for Accept/Reject buttons
           await handleDownloadPDF(undefined, savedQuotationId);
         }
@@ -1094,7 +1094,26 @@ const CreateQuotation = () => {
                 <Eye className="h-4 w-4 mr-2" />
                 Preview
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => requireAuth(async () => { await handleDownloadPDF(); }, 'downloadPdf', getFormData())}>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() =>
+                  requireAuth(
+                    async () => {
+                      if (!quotationId) {
+                        const savedId = await handleSaveQuotation("pending");
+                        if (savedId) {
+                          await handleDownloadPDF(undefined, savedId);
+                        }
+                      } else {
+                        await handleDownloadPDF();
+                      }
+                    },
+                    "downloadPdf",
+                    getFormData()
+                  )
+                }
+              >
                 Download PDF
               </Button>
               <Button className="w-full" onClick={() => requireAuth(async () => { await handleSaveQuotation('pending', true); }, 'saveAndSend', getFormData())}>
