@@ -380,11 +380,6 @@ const InvoiceDetail = () => {
         editorSettings: getEditorSettings(),
         invoiceSettings: getInvoiceSettings()
       });
-
-      toast({
-        title: "Receipt Generated",
-        description: "Payment receipt has been downloaded",
-      });
     } catch (error) {
       console.error('Error generating receipt:', error);
       toast({
@@ -393,6 +388,10 @@ const InvoiceDetail = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const handleSharePaymentReceipt = async (payment: Payment) => {
+    await handleDownloadPaymentReceipt(payment);
   };
 
   const handleShareInvoice = async () => {
@@ -582,14 +581,24 @@ const InvoiceDetail = () => {
                         </p>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleDownloadPaymentReceipt(payment)}
-                      className="h-8 px-2"
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleSharePaymentReceipt(payment)}
+                        className="h-8 px-2"
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => handleDownloadPaymentReceipt(payment)}
+                        className="h-8 px-2"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

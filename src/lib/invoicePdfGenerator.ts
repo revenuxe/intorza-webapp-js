@@ -620,21 +620,24 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   const fileName = `Invoice_${data.invoiceNumber}.pdf`;
   const pdfBlob = doc.output('blob');
   
-  // Try Web Share API first
-  if (navigator.share && navigator.canShare) {
-    const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-    const shareData = { files: [file], title: `Invoice ${data.invoiceNumber}` };
-    
-    if (navigator.canShare(shareData)) {
-      try {
+  // Try Web Share API first (primarily works on mobile)
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    try {
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+      const shareData = { files: [file], title: `Invoice ${data.invoiceNumber}` };
+      
+      // Check if file sharing is supported
+      if (navigator.canShare && navigator.canShare(shareData)) {
         await navigator.share(shareData);
         return; // Successfully shared
-      } catch (err) {
-        // User cancelled or share failed, fall back to download
-        if ((err as Error).name !== 'AbortError') {
-          console.log('Share failed, downloading instead');
-        }
       }
+    } catch (err) {
+      // User cancelled or share failed, fall back to download
+      const error = err as Error;
+      if (error.name === 'AbortError') {
+        return; // User cancelled, don't download
+      }
+      console.log('Share failed, downloading instead:', error.message);
     }
   }
   
