@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Bed, ChefHat, Sofa, Tv, Bath, Package, DoorOpen, Plus, Star, Save, Trash2, BookOpen, Armchair, UtensilsCrossed, Flower2, BookMarked } from "lucide-react";
+import { FileText, Bed, ChefHat, Sofa, Tv, Bath, Package, DoorOpen, Plus, Star, Save, Trash2, BookOpen, Armchair, UtensilsCrossed, Flower2, BookMarked, Warehouse, Car, Baby, Coffee, Shirt, Wine, Home, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -48,7 +48,7 @@ interface QuotationTemplate {
 // Helper to generate unique IDs
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-// Create item helper
+// Create item helper with standard dimensions
 const createItem = (productName: string, productDetails: string, widthFt: number = 0, heightFt: number = 0, ratePerSft: number = 0): LineItem => ({
   id: generateId(),
   side: "",
@@ -61,9 +61,9 @@ const createItem = (productName: string, productDetails: string, widthFt: number
   amount: widthFt * heightFt * ratePerSft,
 });
 
-// Predefined Templates - Extended with more categories
+// Predefined Templates - Extended with standard dimensions
 const QUOTATION_TEMPLATES: QuotationTemplate[] = [
-  // Kitchen Templates
+  // =================== KITCHEN TEMPLATES ===================
   {
     id: "modular-kitchen-basic",
     name: "Modular Kitchen - Basic",
@@ -75,28 +75,28 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Kitchen Base Units",
         items: [
-          createItem("Base Cabinet", "Marine plywood with laminate finish, soft-close hinges", 0, 0, 850),
-          createItem("Corner Unit", "L-shape corner with carousel, marine plywood", 0, 0, 950),
-          createItem("Sink Cabinet", "Waterproof marine plywood with SS sink cutout", 0, 0, 900),
-          createItem("Drawer Unit", "3-drawer tandem box system, soft-close", 0, 0, 1100),
+          createItem("Base Cabinet", "Marine plywood with laminate finish, soft-close hinges", 2, 2.5, 850),
+          createItem("Corner Unit", "L-shape corner with carousel, marine plywood", 2.5, 2.5, 950),
+          createItem("Sink Cabinet", "Waterproof marine plywood with SS sink cutout", 3, 2.5, 900),
+          createItem("Drawer Unit", "3-drawer tandem box system, soft-close", 2, 2.5, 1100),
         ],
       },
       {
         id: generateId(),
         title: "Kitchen Wall Units",
         items: [
-          createItem("Wall Cabinet", "Marine plywood with laminate finish, lift-up mechanism", 0, 0, 750),
-          createItem("Open Shelf Unit", "Marine plywood with laminate, adjustable shelves", 0, 0, 650),
-          createItem("Corner Wall Unit", "Corner cabinet with revolving shelf", 0, 0, 850),
+          createItem("Wall Cabinet", "Marine plywood with laminate finish, lift-up mechanism", 2, 1.5, 750),
+          createItem("Open Shelf Unit", "Marine plywood with laminate, adjustable shelves", 3, 1, 650),
+          createItem("Corner Wall Unit", "Corner cabinet with revolving shelf", 2, 1.5, 850),
         ],
       },
       {
         id: generateId(),
         title: "Kitchen Accessories",
         items: [
-          createItem("Countertop", "Granite/Quartz countertop with waterfall edge", 0, 0, 450),
-          createItem("Backsplash", "Dado tiles installation", 0, 0, 350),
-          createItem("Skirting", "SS skirting with adjustable legs", 0, 0, 250),
+          createItem("Countertop", "Granite/Quartz countertop with waterfall edge", 10, 2, 450),
+          createItem("Backsplash", "Dado tiles installation", 10, 2, 350),
+          createItem("Skirting", "SS skirting with adjustable legs", 10, 0.5, 250),
         ],
       },
     ],
@@ -112,29 +112,29 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Premium Base Units",
         items: [
-          createItem("Base Cabinet - Handleless", "DERA plywood with PU finish, handleless profile", 0, 0, 1250),
-          createItem("Magic Corner", "Premium magic corner with soft-close mechanism", 0, 0, 1400),
-          createItem("Sink Cabinet", "DERA plywood with undermount sink support", 0, 0, 1200),
-          createItem("Tall Unit", "Full height pull-out pantry system", 0, 0, 1500),
-          createItem("Tandem Drawer Unit", "Grass/Blum tandem box with internal organizers", 0, 0, 1350),
+          createItem("Base Cabinet - Handleless", "DERA plywood with PU finish, handleless profile", 3, 2.5, 1250),
+          createItem("Magic Corner", "Premium magic corner with soft-close mechanism", 3, 2.5, 1400),
+          createItem("Sink Cabinet", "DERA plywood with undermount sink support", 3.5, 2.5, 1200),
+          createItem("Tall Unit", "Full height pull-out pantry system", 2, 7, 1500),
+          createItem("Tandem Drawer Unit", "Grass/Blum tandem box with internal organizers", 2, 2.5, 1350),
         ],
       },
       {
         id: generateId(),
         title: "Premium Wall Units",
         items: [
-          createItem("Wall Cabinet - Lift Up", "DERA plywood with servo-drive lift mechanism", 0, 0, 1100),
-          createItem("Glass Display Unit", "Profile shutter with LED strip lighting", 0, 0, 1200),
-          createItem("Hood Cabinet", "Chimney cover with integrated lighting", 0, 0, 950),
+          createItem("Wall Cabinet - Lift Up", "DERA plywood with servo-drive lift mechanism", 3, 2, 1100),
+          createItem("Glass Display Unit", "Profile shutter with LED strip lighting", 2, 2, 1200),
+          createItem("Hood Cabinet", "Chimney cover with integrated lighting", 3, 1.5, 950),
         ],
       },
       {
         id: generateId(),
         title: "Premium Accessories",
         items: [
-          createItem("Quartz Countertop", "Imported quartz with waterfall edge", 0, 0, 750),
-          createItem("Glass Backsplash", "Toughened printed glass backsplash", 0, 0, 550),
-          createItem("Island Counter", "Island with breakfast bar and storage", 0, 0, 1100),
+          createItem("Quartz Countertop", "Imported quartz with waterfall edge", 12, 2, 750),
+          createItem("Glass Backsplash", "Toughened printed glass backsplash", 12, 2, 550),
+          createItem("Island Counter", "Island with breakfast bar and storage", 5, 3, 1100),
         ],
       },
     ],
@@ -150,24 +150,78 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "L-Shape Base Units",
         items: [
-          createItem("Base Cabinet - Long Arm", "Marine plywood laminate finish, 5 units", 0, 0, 850),
-          createItem("Base Cabinet - Short Arm", "Marine plywood laminate finish, 3 units", 0, 0, 850),
-          createItem("Corner Base Unit", "Lazy susan corner mechanism", 0, 0, 1100),
-          createItem("Sink Unit", "Integrated sink cabinet with water stopper", 0, 0, 950),
+          createItem("Base Cabinet - Long Arm", "Marine plywood laminate finish, 5 units", 10, 2.5, 850),
+          createItem("Base Cabinet - Short Arm", "Marine plywood laminate finish, 3 units", 6, 2.5, 850),
+          createItem("Corner Base Unit", "Lazy susan corner mechanism", 3, 2.5, 1100),
+          createItem("Sink Unit", "Integrated sink cabinet with water stopper", 3, 2.5, 950),
         ],
       },
       {
         id: generateId(),
         title: "Wall Units",
         items: [
-          createItem("Wall Cabinets - Long Wall", "Matching wall units with lift-up", 0, 0, 750),
-          createItem("Wall Cabinets - Short Wall", "Corner optimized units", 0, 0, 750),
+          createItem("Wall Cabinets - Long Wall", "Matching wall units with lift-up", 10, 1.5, 750),
+          createItem("Wall Cabinets - Short Wall", "Corner optimized units", 6, 1.5, 750),
+        ],
+      },
+    ],
+  },
+  {
+    id: "modular-kitchen-u-shape",
+    name: "U-Shape Kitchen",
+    description: "U-shaped modular kitchen with maximum storage",
+    icon: ChefHat,
+    category: "Kitchen",
+    sections: [
+      {
+        id: generateId(),
+        title: "U-Shape Base Units",
+        items: [
+          createItem("Base Cabinet - Left Arm", "Marine plywood with soft-close", 8, 2.5, 850),
+          createItem("Base Cabinet - Center", "Main work area with sink", 10, 2.5, 900),
+          createItem("Base Cabinet - Right Arm", "Cooking zone with hob unit", 8, 2.5, 850),
+          createItem("Corner Units (2)", "Magic corner with pull-out trays", 3, 2.5, 1200),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Wall Units",
+        items: [
+          createItem("Wall Cabinets - All Sides", "Continuous wall storage", 26, 1.5, 750),
+          createItem("Chimney Unit", "Designer chimney enclosure", 3, 2, 950),
+        ],
+      },
+    ],
+  },
+  {
+    id: "parallel-kitchen",
+    name: "Parallel Kitchen",
+    description: "Two parallel counters facing each other",
+    icon: ChefHat,
+    category: "Kitchen",
+    sections: [
+      {
+        id: generateId(),
+        title: "Counter 1 - Cooking Side",
+        items: [
+          createItem("Hob Cabinet", "Gas/induction hob unit with storage", 3, 2.5, 950),
+          createItem("Base Cabinets", "Standard base units", 6, 2.5, 850),
+          createItem("Chimney Unit", "Kitchen chimney enclosure", 3, 2, 950),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Counter 2 - Prep Side",
+        items: [
+          createItem("Sink Cabinet", "Prep sink with drainboard", 4, 2.5, 900),
+          createItem("Base Cabinets", "Storage and prep area", 5, 2.5, 850),
+          createItem("Tall Unit - Fridge", "Refrigerator enclosure", 3, 7, 750),
         ],
       },
     ],
   },
 
-  // Wardrobe Templates
+  // =================== WARDROBE TEMPLATES ===================
   {
     id: "wardrobe-sliding",
     name: "Sliding Wardrobe",
@@ -179,19 +233,19 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Wardrobe Structure",
         items: [
-          createItem("Wardrobe Carcass", "BWP plywood with laminate finish, floor to ceiling", 0, 0, 950),
-          createItem("Sliding Door System", "Aluminium profile sliding door with soft-close", 0, 0, 1100),
-          createItem("Internal Shelves", "Adjustable shelves with laminate finish", 0, 0, 650),
+          createItem("Wardrobe Carcass", "BWP plywood with laminate finish, floor to ceiling", 8, 8, 950),
+          createItem("Sliding Door System", "Aluminium profile sliding door with soft-close", 8, 8, 1100),
+          createItem("Internal Shelves", "Adjustable shelves with laminate finish", 8, 1, 650),
         ],
       },
       {
         id: generateId(),
         title: "Internal Fittings",
         items: [
-          createItem("Hanging Rod Section", "SS hanging rod with tie/belt pull-out", 0, 0, 450),
-          createItem("Drawer Section", "Tandem box drawers with velvet liner", 0, 0, 850),
-          createItem("Shoe Rack Section", "Pull-out shoe rack with angled shelves", 0, 0, 550),
-          createItem("Accessory Tray", "Pull-out accessory tray with compartments", 0, 0, 650),
+          createItem("Hanging Rod Section", "SS hanging rod with tie/belt pull-out", 4, 4, 450),
+          createItem("Drawer Section", "Tandem box drawers with velvet liner", 2, 2, 850),
+          createItem("Shoe Rack Section", "Pull-out shoe rack with angled shelves", 2, 3, 550),
+          createItem("Accessory Tray", "Pull-out accessory tray with compartments", 1.5, 1, 650),
         ],
       },
     ],
@@ -207,19 +261,19 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Wardrobe Structure",
         items: [
-          createItem("Wardrobe Carcass", "BWP plywood with veneer finish", 0, 0, 1050),
-          createItem("Hinged Doors", "Soft-close hinged doors with handles", 0, 0, 850),
-          createItem("Full Mirror Door", "Beveled edge mirror on door panel", 0, 0, 750),
+          createItem("Wardrobe Carcass", "BWP plywood with veneer finish", 8, 8, 1050),
+          createItem("Hinged Doors", "Soft-close hinged doors with handles", 8, 7, 850),
+          createItem("Full Mirror Door", "Beveled edge mirror on door panel", 2, 6, 750),
         ],
       },
       {
         id: generateId(),
         title: "Internal Organization",
         items: [
-          createItem("Loft Storage", "Top loft section with separate doors", 0, 0, 550),
-          createItem("Hanging Space", "Double hanging rod for short/long garments", 0, 0, 400),
-          createItem("Drawer Unit", "Internal drawer stack with soft-close", 0, 0, 800),
-          createItem("Shelf Section", "Fixed and adjustable shelves", 0, 0, 500),
+          createItem("Loft Storage", "Top loft section with separate doors", 8, 1.5, 550),
+          createItem("Hanging Space", "Double hanging rod for short/long garments", 4, 5, 400),
+          createItem("Drawer Unit", "Internal drawer stack with soft-close", 2, 2.5, 800),
+          createItem("Shelf Section", "Fixed and adjustable shelves", 2, 5, 500),
         ],
       },
     ],
@@ -235,25 +289,52 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Closet Structure",
         items: [
-          createItem("Wall Units - Left", "Floor to ceiling storage units", 0, 0, 1100),
-          createItem("Wall Units - Right", "Matching units with display area", 0, 0, 1100),
-          createItem("Island Dresser", "Central island with drawers and mirror", 0, 0, 1400),
+          createItem("Wall Units - Left", "Floor to ceiling storage units", 10, 8, 1100),
+          createItem("Wall Units - Right", "Matching units with display area", 10, 8, 1100),
+          createItem("Island Dresser", "Central island with drawers and mirror", 4, 3, 1400),
         ],
       },
       {
         id: generateId(),
         title: "Specialty Storage",
         items: [
-          createItem("Bag Display", "Illuminated bag display shelves", 0, 0, 850),
-          createItem("Shoe Wall", "Full wall shoe display system", 0, 0, 950),
-          createItem("Jewelry Cabinet", "Lockable jewelry organization", 0, 0, 1200),
-          createItem("Vanity Section", "Built-in vanity with LED mirror", 0, 0, 1000),
+          createItem("Bag Display", "Illuminated bag display shelves", 3, 4, 850),
+          createItem("Shoe Wall", "Full wall shoe display system", 6, 6, 950),
+          createItem("Jewelry Cabinet", "Lockable jewelry organization", 2, 3, 1200),
+          createItem("Vanity Section", "Built-in vanity with LED mirror", 4, 6, 1000),
+        ],
+      },
+    ],
+  },
+  {
+    id: "wardrobe-compact",
+    name: "Compact Wardrobe",
+    description: "Space-saving wardrobe for small rooms",
+    icon: DoorOpen,
+    category: "Wardrobe",
+    sections: [
+      {
+        id: generateId(),
+        title: "Compact Structure",
+        items: [
+          createItem("Wardrobe Carcass", "Marine plywood compact design", 5, 7, 900),
+          createItem("Bi-fold Doors", "Space-saving bi-fold mechanism", 5, 6.5, 950),
+          createItem("Loft Section", "Top storage with lift-up door", 5, 1.5, 550),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Internal Fittings",
+        items: [
+          createItem("Hanging Section", "Single hanging rod", 2.5, 4, 400),
+          createItem("Shelves", "Adjustable shelves", 2.5, 4, 500),
+          createItem("Drawers", "3-drawer unit", 2, 2, 750),
         ],
       },
     ],
   },
 
-  // Bedroom Templates
+  // =================== BEDROOM TEMPLATES ===================
   {
     id: "master-bedroom",
     name: "Master Bedroom Set",
@@ -265,18 +346,18 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Bed & Headboard",
         items: [
-          createItem("King Size Bed", "Upholstered bed with hydraulic storage", 0, 0, 1200),
-          createItem("Headboard Panel", "Padded headboard with fabric finish", 0, 0, 850),
-          createItem("Side Tables", "Matching bedside tables with drawers (pair)", 0, 0, 650),
+          createItem("King Size Bed", "Upholstered bed with hydraulic storage", 6.5, 6.5, 1200),
+          createItem("Headboard Panel", "Padded headboard with fabric finish", 8, 4, 850),
+          createItem("Side Tables", "Matching bedside tables with drawers (pair)", 1.5, 2, 650),
         ],
       },
       {
         id: generateId(),
         title: "Storage Units",
         items: [
-          createItem("Dresser Unit", "Dresser with mirror and storage drawers", 0, 0, 950),
-          createItem("Chest of Drawers", "5-drawer chest with soft-close mechanism", 0, 0, 750),
-          createItem("Vanity Counter", "Wall-mounted vanity with LED mirror", 0, 0, 850),
+          createItem("Dresser Unit", "Dresser with mirror and storage drawers", 5, 6, 950),
+          createItem("Chest of Drawers", "5-drawer chest with soft-close mechanism", 2.5, 4, 750),
+          createItem("Vanity Counter", "Wall-mounted vanity with LED mirror", 4, 5, 850),
         ],
       },
     ],
@@ -292,24 +373,22 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Bed & Storage",
         items: [
-          createItem("Single Bed with Trundle", "Bed with pull-out trundle and storage", 0, 0, 950),
-          createItem("Bunk Bed", "Twin bunk bed with safety rails and ladder", 0, 0, 1100),
-          createItem("Under-bed Storage", "Pull-out drawers under bed", 0, 0, 550),
+          createItem("Single Bed with Trundle", "Bed with pull-out trundle and storage", 3.5, 6.5, 950),
+          createItem("Bunk Bed", "Twin bunk bed with safety rails and ladder", 3.5, 6.5, 1100),
+          createItem("Under-bed Storage", "Pull-out drawers under bed", 3, 6, 550),
         ],
       },
       {
         id: generateId(),
         title: "Study Area",
         items: [
-          createItem("Study Table", "L-shape study desk with cable management", 0, 0, 750),
-          createItem("Bookshelf Unit", "Open and closed storage combination", 0, 0, 650),
-          createItem("Wall Shelves", "Floating shelves with colorful backpanel", 0, 0, 450),
+          createItem("Study Table", "L-shape study desk with cable management", 4, 2, 750),
+          createItem("Bookshelf Unit", "Open and closed storage combination", 3, 5, 650),
+          createItem("Wall Shelves", "Floating shelves with colorful backpanel", 4, 1, 450),
         ],
       },
     ],
   },
-
-  // NEW: Guest Bedroom
   {
     id: "guest-bedroom",
     name: "Guest Bedroom",
@@ -321,18 +400,18 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Sleeping Area",
         items: [
-          createItem("Queen Size Bed", "Upholstered bed with storage", 0, 0, 1000),
-          createItem("Headboard Panel", "Simple upholstered headboard", 0, 0, 550),
-          createItem("Bedside Table", "Compact bedside with drawer", 0, 0, 450),
+          createItem("Queen Size Bed", "Upholstered bed with storage", 5.5, 6.5, 1000),
+          createItem("Headboard Panel", "Simple upholstered headboard", 6, 3, 550),
+          createItem("Bedside Table", "Compact bedside with drawer", 1.5, 2, 450),
         ],
       },
       {
         id: generateId(),
         title: "Storage",
         items: [
-          createItem("2-Door Wardrobe", "Compact wardrobe with mirror", 0, 0, 850),
-          createItem("Luggage Bench", "Bench with storage for guest luggage", 0, 0, 400),
-          createItem("Wall Shelf", "Floating shelf for personal items", 0, 0, 300),
+          createItem("2-Door Wardrobe", "Compact wardrobe with mirror", 4, 7, 850),
+          createItem("Luggage Bench", "Bench with storage for guest luggage", 3, 1.5, 400),
+          createItem("Wall Shelf", "Floating shelf for personal items", 3, 0.5, 300),
         ],
       },
     ],
@@ -348,25 +427,25 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Sleeping & Comfort",
         items: [
-          createItem("King Size Bed", "Premium bed with memory foam support", 0, 0, 1100),
-          createItem("Extended Headboard", "Wall-to-wall padded headboard", 0, 0, 750),
-          createItem("Side Tables (Pair)", "Matching bedside units", 0, 0, 600),
-          createItem("Reading Nook", "Built-in reading chair with light", 0, 0, 550),
+          createItem("King Size Bed", "Premium bed with memory foam support", 6.5, 6.5, 1100),
+          createItem("Extended Headboard", "Wall-to-wall padded headboard", 10, 4, 750),
+          createItem("Side Tables (Pair)", "Matching bedside units", 1.5, 2, 600),
+          createItem("Reading Nook", "Built-in reading chair with light", 3, 3, 550),
         ],
       },
       {
         id: generateId(),
         title: "Work & Storage",
         items: [
-          createItem("Compact Desk", "Wall-mounted work desk", 0, 0, 650),
-          createItem("Wardrobe", "Full-height guest wardrobe", 0, 0, 950),
-          createItem("TV Unit", "Compact TV panel with storage", 0, 0, 550),
+          createItem("Compact Desk", "Wall-mounted work desk", 4, 2, 650),
+          createItem("Wardrobe", "Full-height guest wardrobe", 6, 8, 950),
+          createItem("TV Unit", "Compact TV panel with storage", 5, 4, 550),
         ],
       },
     ],
   },
 
-  // Living Room Templates
+  // =================== LIVING ROOM TEMPLATES ===================
   {
     id: "living-room-modern",
     name: "Modern Living Room",
@@ -378,18 +457,18 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Seating",
         items: [
-          createItem("Sofa Set", "L-shape sofa with premium fabric upholstery", 0, 0, 1200),
-          createItem("Accent Chair", "Single seater accent chair", 0, 0, 650),
-          createItem("Ottoman", "Matching ottoman with storage", 0, 0, 450),
+          createItem("Sofa Set", "L-shape sofa with premium fabric upholstery", 9, 6, 1200),
+          createItem("Accent Chair", "Single seater accent chair", 2.5, 3, 650),
+          createItem("Ottoman", "Matching ottoman with storage", 2, 2, 450),
         ],
       },
       {
         id: generateId(),
         title: "Storage & Display",
         items: [
-          createItem("Console Unit", "Wall-mounted console with drawers", 0, 0, 850),
-          createItem("Display Shelves", "Floating display shelves with LED", 0, 0, 550),
-          createItem("Crockery Unit", "Glass door crockery display unit", 0, 0, 950),
+          createItem("Console Unit", "Wall-mounted console with drawers", 6, 3, 850),
+          createItem("Display Shelves", "Floating display shelves with LED", 6, 1, 550),
+          createItem("Crockery Unit", "Glass door crockery display unit", 4, 6, 950),
         ],
       },
     ],
@@ -405,24 +484,50 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Seating Arrangement",
         items: [
-          createItem("3-Seater Sofa", "Wooden frame with cushion upholstery", 0, 0, 1000),
-          createItem("2-Seater Sofa", "Matching loveseat", 0, 0, 800),
-          createItem("Single Seaters", "Pair of armchairs", 0, 0, 650),
-          createItem("Center Table", "Carved wooden center table with glass", 0, 0, 550),
+          createItem("3-Seater Sofa", "Wooden frame with cushion upholstery", 7, 3, 1000),
+          createItem("2-Seater Sofa", "Matching loveseat", 5, 3, 800),
+          createItem("Single Seaters", "Pair of armchairs", 3, 3, 650),
+          createItem("Center Table", "Carved wooden center table with glass", 4, 2.5, 550),
         ],
       },
       {
         id: generateId(),
         title: "Display & Storage",
         items: [
-          createItem("Showcase", "Glass front wooden showcase", 0, 0, 1100),
-          createItem("Corner Unit", "Traditional corner display unit", 0, 0, 750),
+          createItem("Showcase", "Glass front wooden showcase", 4, 6, 1100),
+          createItem("Corner Unit", "Traditional corner display unit", 2.5, 5, 750),
+        ],
+      },
+    ],
+  },
+  {
+    id: "living-room-minimal",
+    name: "Minimalist Living Room",
+    description: "Clean lines and essential pieces only",
+    icon: Sofa,
+    category: "Living Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Essential Furniture",
+        items: [
+          createItem("Modular Sofa", "3-seater clean-line sofa", 8, 3, 1100),
+          createItem("Coffee Table", "Low-profile center table", 4, 2, 450),
+          createItem("Floor Lamp", "Designer floor lamp stand", 1, 5, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage",
+        items: [
+          createItem("Floating Console", "Wall-mounted minimal console", 6, 1.5, 650),
+          createItem("Hidden Storage", "Concealed wall storage", 8, 3, 850),
         ],
       },
     ],
   },
 
-  // NEW: Dining Room
+  // =================== DINING ROOM TEMPLATES ===================
   {
     id: "dining-room-basic",
     name: "Dining Room - Basic",
@@ -434,17 +539,17 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Dining Set",
         items: [
-          createItem("Dining Table - 6 Seater", "Solid wood table with glass top", 0, 0, 850),
-          createItem("Dining Chairs (6)", "Upholstered dining chairs set", 0, 0, 450),
-          createItem("Table Runner", "Decorative table protection", 0, 0, 150),
+          createItem("Dining Table - 6 Seater", "Solid wood table with glass top", 5, 3.5, 850),
+          createItem("Dining Chairs (6)", "Upholstered dining chairs set", 1.5, 3, 450),
+          createItem("Table Runner", "Decorative table protection", 4, 1, 150),
         ],
       },
       {
         id: generateId(),
         title: "Storage",
         items: [
-          createItem("Crockery Unit", "2-door crockery cabinet with glass", 0, 0, 950),
-          createItem("Sideboard", "Serving sideboard with drawers", 0, 0, 750),
+          createItem("Crockery Unit", "2-door crockery cabinet with glass", 4, 6, 950),
+          createItem("Sideboard", "Serving sideboard with drawers", 5, 3, 750),
         ],
       },
     ],
@@ -460,24 +565,42 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Premium Dining Set",
         items: [
-          createItem("Dining Table - 8 Seater", "Marble top with metal base", 0, 0, 1400),
-          createItem("Dining Chairs (8)", "Italian leather chairs", 0, 0, 650),
-          createItem("Bar Cabinet", "Rotating bar with glass holders", 0, 0, 1200),
+          createItem("Dining Table - 8 Seater", "Marble top with metal base", 7, 4, 1400),
+          createItem("Dining Chairs (8)", "Italian leather chairs", 1.5, 3.5, 650),
+          createItem("Bar Cabinet", "Rotating bar with glass holders", 3, 5, 1200),
         ],
       },
       {
         id: generateId(),
         title: "Display & Lighting",
         items: [
-          createItem("Display Unit", "Full wall crockery display with LED", 0, 0, 1100),
-          createItem("Console Table", "Marble console for serving", 0, 0, 850),
-          createItem("Mirror Panel", "Decorative dining mirror", 0, 0, 550),
+          createItem("Display Unit", "Full wall crockery display with LED", 8, 7, 1100),
+          createItem("Console Table", "Marble console for serving", 5, 2.5, 850),
+          createItem("Mirror Panel", "Decorative dining mirror", 4, 4, 550),
+        ],
+      },
+    ],
+  },
+  {
+    id: "dining-room-compact",
+    name: "Compact Dining",
+    description: "Space-efficient dining solution",
+    icon: UtensilsCrossed,
+    category: "Dining Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Compact Set",
+        items: [
+          createItem("Dining Table - 4 Seater", "Foldable/extendable table", 3.5, 3, 650),
+          createItem("Dining Chairs (4)", "Stackable chairs", 1.5, 3, 400),
+          createItem("Wall Cabinet", "Wall-mounted crockery storage", 4, 3, 750),
         ],
       },
     ],
   },
 
-  // TV Unit Templates
+  // =================== TV UNIT TEMPLATES ===================
   {
     id: "tv-unit-modern",
     name: "Modern TV Unit",
@@ -489,10 +612,10 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "TV Unit Components",
         items: [
-          createItem("TV Panel", "Back panel with PU/Laminate finish, cable concealment", 0, 0, 750),
-          createItem("Base Unit", "Floor unit with drawers and open shelves", 0, 0, 850),
-          createItem("Wall Mounted Shelf", "Floating shelves above TV", 0, 0, 550),
-          createItem("LED Strip", "Ambient LED strip lighting", 0, 0, 350),
+          createItem("TV Panel", "Back panel with PU/Laminate finish, cable concealment", 8, 6, 750),
+          createItem("Base Unit", "Floor unit with drawers and open shelves", 6, 1.5, 850),
+          createItem("Wall Mounted Shelf", "Floating shelves above TV", 6, 1, 550),
+          createItem("LED Strip", "Ambient LED strip lighting", 8, 0.5, 350),
         ],
       },
     ],
@@ -508,16 +631,34 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Entertainment Wall",
         items: [
-          createItem("Full Wall Panel", "Wall-to-wall TV panel with textured finish", 0, 0, 950),
-          createItem("Base Console", "Long base unit with multiple compartments", 0, 0, 950),
-          createItem("Side Towers", "Tall storage units on both sides", 0, 0, 850),
-          createItem("Display Niches", "Backlit display niches for artifacts", 0, 0, 650),
+          createItem("Full Wall Panel", "Wall-to-wall TV panel with textured finish", 12, 8, 950),
+          createItem("Base Console", "Long base unit with multiple compartments", 10, 1.5, 950),
+          createItem("Side Towers", "Tall storage units on both sides", 2, 6, 850),
+          createItem("Display Niches", "Backlit display niches for artifacts", 2, 2, 650),
+        ],
+      },
+    ],
+  },
+  {
+    id: "tv-unit-compact",
+    name: "Compact TV Unit",
+    description: "Space-saving TV solution",
+    icon: Tv,
+    category: "TV Unit",
+    sections: [
+      {
+        id: generateId(),
+        title: "Compact Unit",
+        items: [
+          createItem("Floating TV Unit", "Wall-mounted compact unit", 5, 1.5, 650),
+          createItem("TV Bracket", "Swivel TV mounting bracket", 2, 2, 350),
+          createItem("Cable Management", "Hidden cable tray", 4, 0.5, 250),
         ],
       },
     ],
   },
 
-  // NEW: Modular Storage
+  // =================== MODULAR STORAGE TEMPLATES ===================
   {
     id: "modular-storage-basic",
     name: "Modular Storage - Basic",
@@ -529,19 +670,19 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Storage Modules",
         items: [
-          createItem("Base Module", "Floor-standing base unit with doors", 0, 0, 650),
-          createItem("Stack Module", "Stackable storage cube", 0, 0, 450),
-          createItem("Open Shelf Module", "Display shelf module", 0, 0, 350),
-          createItem("Drawer Module", "2-drawer storage module", 0, 0, 550),
+          createItem("Base Module", "Floor-standing base unit with doors", 2, 2, 650),
+          createItem("Stack Module", "Stackable storage cube", 2, 2, 450),
+          createItem("Open Shelf Module", "Display shelf module", 2, 1.5, 350),
+          createItem("Drawer Module", "2-drawer storage module", 2, 1.5, 550),
         ],
       },
       {
         id: generateId(),
         title: "Accessories",
         items: [
-          createItem("Door Panels", "Interchangeable door panels", 0, 0, 250),
-          createItem("Basket Inserts", "Wire basket organization", 0, 0, 200),
-          createItem("Dividers", "Internal divider set", 0, 0, 150),
+          createItem("Door Panels", "Interchangeable door panels", 2, 2, 250),
+          createItem("Basket Inserts", "Wire basket organization", 2, 1, 200),
+          createItem("Dividers", "Internal divider set", 2, 1, 150),
         ],
       },
     ],
@@ -557,25 +698,25 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Wall System",
         items: [
-          createItem("Base Units (4)", "Floor units with varied doors", 0, 0, 750),
-          createItem("Wall Units (4)", "Matching wall-mounted modules", 0, 0, 650),
-          createItem("Open Display Units", "Glass-front display modules", 0, 0, 550),
-          createItem("Corner Unit", "Corner optimization module", 0, 0, 700),
+          createItem("Base Units (4)", "Floor units with varied doors", 8, 2.5, 750),
+          createItem("Wall Units (4)", "Matching wall-mounted modules", 8, 2, 650),
+          createItem("Open Display Units", "Glass-front display modules", 4, 3, 550),
+          createItem("Corner Unit", "Corner optimization module", 2, 5, 700),
         ],
       },
       {
         id: generateId(),
         title: "Specialty Modules",
         items: [
-          createItem("Media Module", "AV equipment housing with ventilation", 0, 0, 600),
-          createItem("File Module", "Document filing system", 0, 0, 500),
-          createItem("Safe Module", "Hidden safe compartment", 0, 0, 850),
+          createItem("Media Module", "AV equipment housing with ventilation", 3, 2, 600),
+          createItem("File Module", "Document filing system", 2, 3, 500),
+          createItem("Safe Module", "Hidden safe compartment", 1.5, 2, 850),
         ],
       },
     ],
   },
 
-  // NEW: Balcony Furniture
+  // =================== BALCONY TEMPLATES ===================
   {
     id: "balcony-basic",
     name: "Balcony Setup - Basic",
@@ -587,17 +728,17 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Seating",
         items: [
-          createItem("Balcony Chair Set", "Weather-resistant chairs (2)", 0, 0, 450),
-          createItem("Small Table", "Compact outdoor table", 0, 0, 350),
-          createItem("Floor Cushions", "Outdoor cushion set", 0, 0, 200),
+          createItem("Balcony Chair Set", "Weather-resistant chairs (2)", 2, 3, 450),
+          createItem("Small Table", "Compact outdoor table", 2, 2, 350),
+          createItem("Floor Cushions", "Outdoor cushion set", 2, 2, 200),
         ],
       },
       {
         id: generateId(),
         title: "Garden & Storage",
         items: [
-          createItem("Planter Boxes", "Railing planters set", 0, 0, 300),
-          createItem("Storage Bench", "Weather-proof storage seat", 0, 0, 450),
+          createItem("Planter Boxes", "Railing planters set", 3, 1, 300),
+          createItem("Storage Bench", "Weather-proof storage seat", 4, 1.5, 450),
         ],
       },
     ],
@@ -613,26 +754,26 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Lounge Furniture",
         items: [
-          createItem("Outdoor Sofa", "2-seater weatherproof sofa", 0, 0, 850),
-          createItem("Lounge Chair", "Reclining outdoor lounger", 0, 0, 650),
-          createItem("Coffee Table", "Weather-resistant center table", 0, 0, 450),
-          createItem("Side Tables", "Compact side tables (2)", 0, 0, 350),
+          createItem("Outdoor Sofa", "2-seater weatherproof sofa", 5, 2.5, 850),
+          createItem("Lounge Chair", "Reclining outdoor lounger", 2.5, 6, 650),
+          createItem("Coffee Table", "Weather-resistant center table", 3, 2, 450),
+          createItem("Side Tables", "Compact side tables (2)", 1.5, 1.5, 350),
         ],
       },
       {
         id: generateId(),
         title: "Ambiance",
         items: [
-          createItem("Vertical Garden", "Wall-mounted green panel", 0, 0, 750),
-          createItem("Floor Planters", "Large decorative planters (3)", 0, 0, 500),
-          createItem("String Lights", "Outdoor fairy light setup", 0, 0, 250),
-          createItem("Privacy Screen", "Bamboo/fabric partition", 0, 0, 400),
+          createItem("Vertical Garden", "Wall-mounted green panel", 4, 6, 750),
+          createItem("Floor Planters", "Large decorative planters (3)", 2, 3, 500),
+          createItem("String Lights", "Outdoor fairy light setup", 10, 0.5, 250),
+          createItem("Privacy Screen", "Bamboo/fabric partition", 6, 6, 400),
         ],
       },
     ],
   },
 
-  // Bathroom Vanity Templates
+  // =================== BATHROOM TEMPLATES ===================
   {
     id: "bathroom-vanity",
     name: "Bathroom Vanity",
@@ -644,9 +785,9 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Vanity Unit",
         items: [
-          createItem("Vanity Cabinet", "Marine plywood with PU finish, basin cutout", 0, 0, 1100),
-          createItem("Mirror Unit", "LED mirror with defogger", 0, 0, 750),
-          createItem("Side Cabinet", "Tall unit for toiletries storage", 0, 0, 650),
+          createItem("Vanity Cabinet", "Marine plywood with PU finish, basin cutout", 4, 2.5, 1100),
+          createItem("Mirror Unit", "LED mirror with defogger", 3, 3, 750),
+          createItem("Side Cabinet", "Tall unit for toiletries storage", 1.5, 5, 650),
         ],
       },
     ],
@@ -662,16 +803,16 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Vanity & Storage",
         items: [
-          createItem("Double Vanity", "Twin basin vanity unit", 0, 0, 1400),
-          createItem("Smart Mirror", "Touch LED mirror with clock", 0, 0, 950),
-          createItem("Storage Tower", "Full height linen storage", 0, 0, 850),
-          createItem("Medicine Cabinet", "Recessed medicine storage", 0, 0, 550),
+          createItem("Double Vanity", "Twin basin vanity unit", 6, 2.5, 1400),
+          createItem("Smart Mirror", "Touch LED mirror with clock", 5, 3, 950),
+          createItem("Storage Tower", "Full height linen storage", 2, 7, 850),
+          createItem("Medicine Cabinet", "Recessed medicine storage", 2, 2, 550),
         ],
       },
     ],
   },
 
-  // Study/Office Templates
+  // =================== STUDY/OFFICE TEMPLATES ===================
   {
     id: "home-office",
     name: "Home Office Setup",
@@ -683,18 +824,18 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Work Station",
         items: [
-          createItem("Executive Desk", "L-shape desk with cable management", 0, 0, 950),
-          createItem("Storage Pedestal", "Mobile pedestal with lock", 0, 0, 550),
-          createItem("Monitor Stand", "Adjustable monitor riser with storage", 0, 0, 350),
+          createItem("Executive Desk", "L-shape desk with cable management", 6, 3, 950),
+          createItem("Storage Pedestal", "Mobile pedestal with lock", 1.5, 2, 550),
+          createItem("Monitor Stand", "Adjustable monitor riser with storage", 2, 1, 350),
         ],
       },
       {
         id: generateId(),
         title: "Storage",
         items: [
-          createItem("File Cabinet", "4-drawer filing cabinet with lock", 0, 0, 750),
-          createItem("Bookcase", "Open bookcase with adjustable shelves", 0, 0, 650),
-          createItem("Wall Organizer", "Wall-mounted organizer with pinboard", 0, 0, 450),
+          createItem("File Cabinet", "4-drawer filing cabinet with lock", 1.5, 4, 750),
+          createItem("Bookcase", "Open bookcase with adjustable shelves", 3, 6, 650),
+          createItem("Wall Organizer", "Wall-mounted organizer with pinboard", 4, 3, 450),
         ],
       },
     ],
@@ -710,24 +851,24 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Study Furniture",
         items: [
-          createItem("Study Desk", "Wall-mounted folding desk", 0, 0, 650),
-          createItem("Wall Bookshelf", "Full wall book storage", 0, 0, 850),
-          createItem("Reading Nook", "Built-in window seat with storage", 0, 0, 750),
+          createItem("Study Desk", "Wall-mounted folding desk", 4, 2, 650),
+          createItem("Wall Bookshelf", "Full wall book storage", 8, 7, 850),
+          createItem("Reading Nook", "Built-in window seat with storage", 5, 3, 750),
         ],
       },
       {
         id: generateId(),
         title: "Organization",
         items: [
-          createItem("Desk Organizer", "Desktop stationery organizer", 0, 0, 300),
-          createItem("Wall Grid", "Metal grid for notes and photos", 0, 0, 250),
-          createItem("Magazine Rack", "Wall-mounted magazine holder", 0, 0, 200),
+          createItem("Desk Organizer", "Desktop stationery organizer", 2, 1, 300),
+          createItem("Wall Grid", "Metal grid for notes and photos", 3, 3, 250),
+          createItem("Magazine Rack", "Wall-mounted magazine holder", 1.5, 2, 200),
         ],
       },
     ],
   },
 
-  // Pooja Room Template
+  // =================== POOJA ROOM TEMPLATES ===================
   {
     id: "pooja-unit",
     name: "Pooja Unit",
@@ -739,10 +880,10 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Pooja Unit",
         items: [
-          createItem("Pooja Cabinet", "Teak veneer finish with carved doors", 0, 0, 1200),
-          createItem("Bell Hanging", "Brass bell with chain fixture", 0, 0, 250),
-          createItem("Storage Base", "Base cabinet for pooja items storage", 0, 0, 650),
-          createItem("LED Lighting", "Warm LED strips for ambiance", 0, 0, 350),
+          createItem("Pooja Cabinet", "Teak veneer finish with carved doors", 3, 5, 1200),
+          createItem("Bell Hanging", "Brass bell with chain fixture", 0.5, 1, 250),
+          createItem("Storage Base", "Base cabinet for pooja items storage", 3, 1.5, 650),
+          createItem("LED Lighting", "Warm LED strips for ambiance", 3, 0.5, 350),
         ],
       },
     ],
@@ -758,24 +899,24 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Main Unit",
         items: [
-          createItem("Wall Mounted Mandir", "Carved wooden mandir with jaali", 0, 0, 1500),
-          createItem("Brass Work", "Traditional brass embellishments", 0, 0, 450),
-          createItem("Ceiling Pendant", "Decorative hanging lamp", 0, 0, 550),
+          createItem("Wall Mounted Mandir", "Carved wooden mandir with jaali", 4, 5, 1500),
+          createItem("Brass Work", "Traditional brass embellishments", 2, 3, 450),
+          createItem("Ceiling Pendant", "Decorative hanging lamp", 1.5, 2, 550),
         ],
       },
       {
         id: generateId(),
         title: "Seating & Storage",
         items: [
-          createItem("Floor Seating", "Padded floor cushions (4)", 0, 0, 350),
-          createItem("Side Storage", "Small cabinets for items", 0, 0, 550),
-          createItem("Rug/Mat", "Traditional pooja mat", 0, 0, 200),
+          createItem("Floor Seating", "Padded floor cushions (4)", 4, 4, 350),
+          createItem("Side Storage", "Small cabinets for items", 2, 3, 550),
+          createItem("Rug/Mat", "Traditional pooja mat", 4, 4, 200),
         ],
       },
     ],
   },
 
-  // Foyer/Entrance Template
+  // =================== FOYER TEMPLATES ===================
   {
     id: "foyer-unit",
     name: "Foyer Unit",
@@ -787,10 +928,10 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Foyer Elements",
         items: [
-          createItem("Shoe Cabinet", "Tip-out shoe rack with mirror back", 0, 0, 850),
-          createItem("Console Table", "Slim console with drawer", 0, 0, 650),
-          createItem("Wall Mirror", "Full length decorative mirror", 0, 0, 550),
-          createItem("Key Holder", "Wall mounted key organizer", 0, 0, 250),
+          createItem("Shoe Cabinet", "Tip-out shoe rack with mirror back", 4, 4, 850),
+          createItem("Console Table", "Slim console with drawer", 4, 2.5, 650),
+          createItem("Wall Mirror", "Full length decorative mirror", 2, 6, 550),
+          createItem("Key Holder", "Wall mounted key organizer", 1, 0.5, 250),
         ],
       },
     ],
@@ -806,24 +947,218 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
         id: generateId(),
         title: "Statement Pieces",
         items: [
-          createItem("Designer Console", "Designer console with art piece", 0, 0, 1100),
-          createItem("Statement Mirror", "Oversized decorative mirror", 0, 0, 850),
-          createItem("Seating Bench", "Upholstered entry bench", 0, 0, 650),
+          createItem("Designer Console", "Designer console with art piece", 5, 3, 1100),
+          createItem("Statement Mirror", "Oversized decorative mirror", 4, 6, 850),
+          createItem("Seating Bench", "Upholstered entry bench", 4, 1.5, 650),
         ],
       },
       {
         id: generateId(),
         title: "Storage & Organization",
         items: [
-          createItem("Hidden Shoe Storage", "Pull-out shoe cabinet", 0, 0, 950),
-          createItem("Coat Closet", "Concealed coat storage", 0, 0, 750),
-          createItem("Umbrella Stand", "Designer umbrella holder", 0, 0, 350),
+          createItem("Hidden Shoe Storage", "Pull-out shoe cabinet", 5, 4, 950),
+          createItem("Coat Closet", "Concealed coat storage", 3, 6, 750),
+          createItem("Umbrella Stand", "Designer umbrella holder", 1, 2, 350),
         ],
       },
     ],
   },
 
-  // Custom/Blank Template
+  // =================== UTILITY ROOM TEMPLATES ===================
+  {
+    id: "utility-room",
+    name: "Utility Room",
+    description: "Laundry and utility space organization",
+    icon: Warehouse,
+    category: "Utility Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Laundry Area",
+        items: [
+          createItem("Washer/Dryer Cabinet", "Stacked unit housing", 2.5, 6, 750),
+          createItem("Folding Counter", "Pull-out folding surface", 4, 2, 550),
+          createItem("Ironing Station", "Wall-mounted ironing board cabinet", 2, 4, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage",
+        items: [
+          createItem("Overhead Cabinets", "Wall storage for supplies", 6, 2, 650),
+          createItem("Sink Unit", "Utility sink with cabinet", 3, 3, 850),
+          createItem("Broom Closet", "Tall storage for cleaning tools", 2, 6, 550),
+        ],
+      },
+    ],
+  },
+
+  // =================== BAR AREA TEMPLATES ===================
+  {
+    id: "home-bar",
+    name: "Home Bar",
+    description: "Stylish home bar setup",
+    icon: Wine,
+    category: "Bar Area",
+    sections: [
+      {
+        id: generateId(),
+        title: "Bar Counter",
+        items: [
+          createItem("Bar Counter", "Stone top bar counter with footrest", 5, 3.5, 1200),
+          createItem("Bar Stools (3)", "High stools with back support", 1.5, 3, 550),
+          createItem("Back Bar", "Display shelving with LED", 5, 5, 950),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage & Display",
+        items: [
+          createItem("Wine Rack", "Custom wine bottle storage", 2, 4, 650),
+          createItem("Glass Holder", "Hanging glass rack", 3, 1, 350),
+          createItem("Mini Fridge Cabinet", "Beverage cooler housing", 2, 3, 550),
+        ],
+      },
+    ],
+  },
+
+  // =================== DRESSING ROOM TEMPLATES ===================
+  {
+    id: "dressing-room",
+    name: "Dressing Room",
+    description: "Complete dressing and makeup area",
+    icon: Shirt,
+    category: "Dressing Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Vanity Area",
+        items: [
+          createItem("Vanity Desk", "Makeup table with storage", 4, 2.5, 850),
+          createItem("LED Mirror", "Hollywood-style LED mirror", 4, 4, 750),
+          createItem("Vanity Chair", "Upholstered vanity stool", 2, 2, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage",
+        items: [
+          createItem("Accessory Cabinets", "Display cabinets for accessories", 3, 5, 850),
+          createItem("Jewelry Organizer", "Wall-mounted jewelry display", 2, 3, 550),
+          createItem("Full Length Mirror", "Illuminated dressing mirror", 2, 6, 650),
+        ],
+      },
+    ],
+  },
+
+  // =================== KIDS PLAY AREA TEMPLATES ===================
+  {
+    id: "kids-play-area",
+    name: "Kids Play Area",
+    description: "Fun and organized play space",
+    icon: Baby,
+    category: "Kids Play Area",
+    sections: [
+      {
+        id: generateId(),
+        title: "Play Zone",
+        items: [
+          createItem("Play Mat Area", "Soft foam play flooring", 8, 8, 350),
+          createItem("Toy Storage", "Open cubby toy organizer", 6, 4, 650),
+          createItem("Activity Table", "Kids activity table with chairs", 4, 3, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Creative Corner",
+        items: [
+          createItem("Art Station", "Easel and art supplies storage", 3, 4, 550),
+          createItem("Reading Nook", "Cozy reading corner with cushions", 4, 4, 500),
+          createItem("Wall Display", "Kids artwork display rail", 6, 1, 250),
+        ],
+      },
+    ],
+  },
+
+  // =================== COFFEE BAR TEMPLATES ===================
+  {
+    id: "coffee-bar",
+    name: "Coffee/Tea Station",
+    description: "Dedicated beverage station",
+    icon: Coffee,
+    category: "Coffee Bar",
+    sections: [
+      {
+        id: generateId(),
+        title: "Coffee Station",
+        items: [
+          createItem("Counter Unit", "Compact counter with storage", 4, 3, 750),
+          createItem("Overhead Cabinet", "Cup and ingredient storage", 4, 2, 550),
+          createItem("Appliance Shelf", "Machine and kettle space", 3, 1.5, 350),
+        ],
+      },
+    ],
+  },
+
+  // =================== GARAGE/PARKING TEMPLATES ===================
+  {
+    id: "garage-storage",
+    name: "Garage Storage",
+    description: "Organized garage storage system",
+    icon: Car,
+    category: "Garage",
+    sections: [
+      {
+        id: generateId(),
+        title: "Wall Storage",
+        items: [
+          createItem("Tool Board", "Pegboard tool organization", 6, 4, 450),
+          createItem("Wall Cabinets", "Metal storage cabinets", 8, 3, 650),
+          createItem("Shelf Rack", "Heavy-duty shelf system", 6, 6, 550),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Work Area",
+        items: [
+          createItem("Workbench", "Steel workbench with vice", 6, 3, 750),
+          createItem("Tool Cabinet", "Rolling tool chest", 2.5, 4, 650),
+          createItem("Pegboard Extensions", "Additional tool hanging", 4, 3, 350),
+        ],
+      },
+    ],
+  },
+
+  // =================== OUTDOOR LIVING TEMPLATES ===================
+  {
+    id: "outdoor-living",
+    name: "Outdoor Living",
+    description: "Terrace/patio furniture setup",
+    icon: Flower2,
+    category: "Outdoor Living",
+    sections: [
+      {
+        id: generateId(),
+        title: "Seating Area",
+        items: [
+          createItem("Outdoor Sofa Set", "Weather-resistant modular seating", 8, 6, 950),
+          createItem("Outdoor Dining", "6-seater outdoor dining set", 6, 4, 850),
+          createItem("Umbrella/Pergola", "Shade structure", 8, 8, 650),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Features",
+        items: [
+          createItem("Planter Boxes", "Built-in planters", 6, 2, 450),
+          createItem("BBQ Station", "Outdoor cooking area", 5, 3, 1100),
+          createItem("Fire Pit Area", "Seating around fire feature", 6, 6, 750),
+        ],
+      },
+    ],
+  },
+
+  // =================== CUSTOM/BLANK TEMPLATE ===================
   {
     id: "blank-template",
     name: "Blank Template",
@@ -857,6 +1192,13 @@ const categoryIcons: Record<string, typeof FileText> = {
   "Study/Office": BookMarked,
   "Pooja Room": Package,
   "Foyer": DoorOpen,
+  "Utility Room": Warehouse,
+  "Bar Area": Wine,
+  "Dressing Room": Shirt,
+  "Kids Play Area": Baby,
+  "Coffee Bar": Coffee,
+  "Garage": Car,
+  "Outdoor Living": Flower2,
   "Custom": FileText,
   "My Templates": Star,
 };
@@ -1005,265 +1347,240 @@ export const QuotationTemplates = ({ onSelectTemplate, currentSections }: Quotat
     return acc;
   }, {} as Record<string, QuotationTemplate[]>);
 
-  const groupedUserTemplates = userTemplates.reduce((acc, template) => {
-    if (!acc[template.category]) {
-      acc[template.category] = [];
-    }
-    acc[template.category].push(template);
-    return acc;
-  }, {} as Record<string, QuotationTemplate[]>);
-
-  const systemCategories = Object.keys(groupedTemplates);
-  const userCategories = Object.keys(groupedUserTemplates);
-
-  const renderCategoryGrid = (categories: string[], templates: Record<string, QuotationTemplate[]>, isUserTemplates = false) => (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      {categories.map((category) => {
-        const categoryTemplates = templates[category];
-        const Icon = categoryIcons[category] || FileText;
-        return (
-          <Card 
-            key={category}
-            className="cursor-pointer hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 group"
-            onClick={() => setSelectedCategory(category)}
-          >
-            <CardContent className="flex flex-col items-center justify-center p-4 md:p-6 gap-2 md:gap-3">
-              <div className="p-2 md:p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                <Icon className="h-6 w-6 md:h-8 md:w-8 text-primary" />
-              </div>
-              <div className="text-center">
-                <p className="font-medium text-sm md:text-base">{category}</p>
-                <p className="text-[10px] md:text-xs text-muted-foreground">
-                  {categoryTemplates.length} {categoryTemplates.length === 1 ? 'template' : 'templates'}
-                </p>
-              </div>
-              {isUserTemplates && (
-                <Badge variant="secondary" className="text-[10px]">
-                  <Star className="h-2 w-2 mr-1" />
-                  Saved
-                </Badge>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
-
-  const renderTemplateList = (templates: QuotationTemplate[], isUserTemplates = false) => (
-    <div className="space-y-3">
-      {templates.map((template) => {
-        const Icon = template.icon;
-        return (
-          <Card 
-            key={template.id}
-            className="cursor-pointer hover:bg-primary/5 hover:border-primary/30 transition-all duration-200 group"
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div 
-                  className="flex items-center gap-3 flex-1"
-                  onClick={() => handleSelectTemplate(template)}
-                >
-                  <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                    <Icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base group-hover:text-primary transition-colors">
-                      {template.name}
-                    </CardTitle>
-                    <CardDescription className="text-xs">{template.description}</CardDescription>
-                  </div>
-                </div>
-                {isUserTemplates && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteTemplate(template.id);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0" onClick={() => handleSelectTemplate(template)}>
-              <div className="flex flex-wrap gap-1">
-                {template.sections.slice(0, 3).map((section, idx) => (
-                  <Badge 
-                    key={idx} 
-                    variant="outline"
-                    className="text-[10px] bg-muted/50"
-                  >
-                    {section.title} ({section.items.length})
-                  </Badge>
-                ))}
-                {template.sections.length > 3 && (
-                  <Badge variant="outline" className="text-[10px]">
-                    +{template.sections.length - 3} more
-                  </Badge>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
-  );
+  const categories = Object.keys(groupedTemplates);
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="flex-1 sm:flex-none gap-2">
-            <BookOpen className="h-4 w-4" />
-            Templates
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-3xl max-h-[85vh] p-0">
-          <DialogHeader className="p-4 pb-0">
-            <DialogTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Quotation Templates
-            </DialogTitle>
-          </DialogHeader>
-          
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "system" | "saved")} className="w-full">
-            <div className="px-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="system" className="gap-2">
-                  <Package className="h-4 w-4" />
-                  System Templates
-                </TabsTrigger>
-                <TabsTrigger value="saved" className="gap-2">
-                  <Star className="h-4 w-4" />
-                  My Templates
-                  {userTemplates.length > 0 && (
-                    <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 text-[10px] justify-center">
-                      {userTemplates.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-            </div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5">
+          <Layers className="h-4 w-4" />
+          Templates
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[85vh] p-0 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-2">
+          <DialogTitle className="text-lg">Quotation Templates</DialogTitle>
+        </DialogHeader>
 
-            <ScrollArea className="h-[60vh] px-4">
-              <TabsContent value="system" className="mt-4 mb-4">
-                {!selectedCategory ? (
-                  renderCategoryGrid(systemCategories, groupedTemplates)
-                ) : (
-                  <div className="space-y-4">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setSelectedCategory(null)}
-                      className="mb-2"
-                    >
-                      ← Back to Categories
-                    </Button>
-                    {renderTemplateList(groupedTemplates[selectedCategory] || [])}
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="saved" className="mt-4 mb-4">
-                {loading ? (
-                  <div className="text-center py-8 text-muted-foreground">Loading your templates...</div>
-                ) : userTemplates.length === 0 ? (
-                  <div className="text-center py-12 space-y-4">
-                    <div className="p-4 rounded-full bg-muted/50 w-fit mx-auto">
-                      <Star className="h-8 w-8 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="font-medium">No saved templates yet</p>
-                      <p className="text-sm text-muted-foreground">
-                        Create a quotation and save it as a template for reuse
-                      </p>
-                    </div>
-                  </div>
-                ) : !selectedCategory || !groupedUserTemplates[selectedCategory] ? (
-                  renderCategoryGrid(userCategories, groupedUserTemplates, true)
-                ) : (
-                  <div className="space-y-4">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setSelectedCategory(null)}
-                      className="mb-2"
-                    >
-                      ← Back to Categories
-                    </Button>
-                    {renderTemplateList(groupedUserTemplates[selectedCategory] || [], true)}
-                  </div>
-                )}
-              </TabsContent>
-            </ScrollArea>
-          </Tabs>
-
-          {/* Save as Template Button */}
-          {currentSections && currentSections.length > 0 && currentSections[0].items[0]?.productName && (
-            <div className="p-4 pt-0 border-t">
-              <Button 
-                variant="outline" 
-                className="w-full gap-2"
-                onClick={() => setShowSaveDialog(true)}
-              >
-                <Save className="h-4 w-4" />
-                Save Current Quotation as Template
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Save Template Dialog */}
-      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Save className="h-5 w-5" />
-              Save as Template
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Template Name</Label>
-              <Input
-                placeholder="e.g., My Kitchen Setup"
-                value={newTemplateName}
-                onChange={(e) => setNewTemplateName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <select
-                className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
-                value={newTemplateCategory}
-                onChange={(e) => setNewTemplateCategory(e.target.value)}
-              >
-                {Object.keys(categoryIcons).map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              This will save {currentSections?.length || 0} sections with all items as a reusable template.
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveAsTemplate}>
-                <Save className="h-4 w-4 mr-2" />
-                Save Template
-              </Button>
-            </div>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1">
+          <div className="px-4 border-b">
+            <TabsList className="grid w-full max-w-[300px] grid-cols-2">
+              <TabsTrigger value="system" className="text-xs">
+                <FileText className="h-3.5 w-3.5 mr-1.5" />
+                System Templates
+              </TabsTrigger>
+              <TabsTrigger value="saved" className="text-xs">
+                <Star className="h-3.5 w-3.5 mr-1.5" />
+                My Templates
+              </TabsTrigger>
+            </TabsList>
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+
+          <TabsContent value="system" className="mt-0 flex-1">
+            <div className="flex h-[60vh]">
+              {/* Category Sidebar */}
+              <ScrollArea className="w-48 border-r bg-muted/30">
+                <div className="p-2 space-y-1">
+                  {categories.map((category) => {
+                    const Icon = categoryIcons[category] || FileText;
+                    const count = groupedTemplates[category]?.length || 0;
+                    return (
+                      <button
+                        key={category}
+                        onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs rounded-lg transition-colors ${
+                          selectedCategory === category
+                            ? 'bg-primary text-primary-foreground'
+                            : 'hover:bg-muted'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4 flex-shrink-0" />
+                        <span className="flex-1 truncate">{category}</span>
+                        <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                          {count}
+                        </Badge>
+                      </button>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+
+              {/* Templates Grid */}
+              <ScrollArea className="flex-1">
+                <div className="p-4">
+                  {!selectedCategory ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Layers className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-sm font-medium">Select a category</p>
+                      <p className="text-xs mt-1">Choose from {QUOTATION_TEMPLATES.length} templates</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {groupedTemplates[selectedCategory]?.map((template) => {
+                        const Icon = template.icon;
+                        const totalItems = template.sections.reduce((acc, s) => acc + s.items.length, 0);
+                        return (
+                          <Card
+                            key={template.id}
+                            className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
+                            onClick={() => handleSelectTemplate(template)}
+                          >
+                            <CardHeader className="p-3 pb-2">
+                              <div className="flex items-start gap-2">
+                                <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                                  <Icon className="h-4 w-4 text-primary" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <CardTitle className="text-sm font-medium truncate">
+                                    {template.name}
+                                  </CardTitle>
+                                  <CardDescription className="text-[10px] line-clamp-1 mt-0.5">
+                                    {template.description}
+                                  </CardDescription>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="p-3 pt-0">
+                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                                  {template.sections.length} sections
+                                </Badge>
+                                <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                                  {totalItems} items
+                                </Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="saved" className="mt-0 flex-1">
+            <ScrollArea className="h-[60vh]">
+              <div className="p-4">
+                {/* Save Current Template Button */}
+                {currentSections && currentSections.length > 0 && (
+                  <Card className="mb-4 border-dashed">
+                    <CardContent className="p-4">
+                      {showSaveDialog ? (
+                        <div className="space-y-3">
+                          <div>
+                            <Label className="text-xs">Template Name</Label>
+                            <Input
+                              value={newTemplateName}
+                              onChange={(e) => setNewTemplateName(e.target.value)}
+                              placeholder="e.g., My Kitchen Template"
+                              className="mt-1 h-9"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Category</Label>
+                            <select
+                              value={newTemplateCategory}
+                              onChange={(e) => setNewTemplateCategory(e.target.value)}
+                              className="w-full mt-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                              {categories.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={handleSaveAsTemplate} className="flex-1">
+                              <Save className="h-3.5 w-3.5 mr-1.5" />
+                              Save Template
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setShowSaveDialog(false)}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          className="w-full border-dashed"
+                          onClick={() => setShowSaveDialog(true)}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Save Current Quotation as Template
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* User Templates */}
+                {loading ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-3" />
+                    <p className="text-xs">Loading templates...</p>
+                  </div>
+                ) : userTemplates.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Star className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p className="text-sm font-medium">No saved templates</p>
+                    <p className="text-xs mt-1">Save your quotations as templates for reuse</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {userTemplates.map((template) => {
+                      const totalItems = template.sections.reduce((acc, s) => acc + s.items.length, 0);
+                      return (
+                        <Card
+                          key={template.id}
+                          className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group relative"
+                        >
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTemplate(template.id);
+                            }}
+                            className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity bg-destructive/10 hover:bg-destructive/20 text-destructive"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                          <div onClick={() => handleSelectTemplate(template)}>
+                            <CardHeader className="p-3 pb-2">
+                              <div className="flex items-start gap-2">
+                                <div className="p-2 rounded-lg bg-amber-500/10">
+                                  <Star className="h-4 w-4 text-amber-600" />
+                                </div>
+                                <div className="flex-1 min-w-0 pr-6">
+                                  <CardTitle className="text-sm font-medium truncate">
+                                    {template.name}
+                                  </CardTitle>
+                                  <CardDescription className="text-[10px] line-clamp-1 mt-0.5">
+                                    {template.category}
+                                  </CardDescription>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="p-3 pt-0">
+                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                                <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                                  {template.sections.length} sections
+                                </Badge>
+                                <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                                  {totalItems} items
+                                </Badge>
+                              </div>
+                            </CardContent>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 };
