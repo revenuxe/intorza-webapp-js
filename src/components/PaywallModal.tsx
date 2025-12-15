@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
-  DialogTitle,
-  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -90,21 +88,13 @@ export const PaywallModal: React.FC = () => {
         return;
       }
 
-      const isSubscriptionFlow = !!data.subscriptionId && !data.orderId;
-
       const options = {
         key: data.keyId,
+        amount: data.amount,
+        currency: data.currency,
         name: 'Intorza',
         description: 'Pro Monthly - ₹49/month',
-        ...(isSubscriptionFlow
-          ? {
-              subscription_id: data.subscriptionId,
-            }
-          : {
-              amount: data.amount,
-              currency: data.currency,
-              order_id: data.orderId,
-            }),
+        order_id: data.orderId,
         prefill: data.prefill,
         notes: data.notes,
         theme: {
@@ -122,7 +112,6 @@ export const PaywallModal: React.FC = () => {
                 body: {
                   razorpay_order_id: response.razorpay_order_id,
                   razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_subscription_id: response.razorpay_subscription_id,
                   razorpay_signature: response.razorpay_signature,
                   plan: 'monthly',
                 },
@@ -166,10 +155,6 @@ export const PaywallModal: React.FC = () => {
   return (
     <Dialog open={paywallOpen} onOpenChange={(open) => setPaywallOpen(open)}>
       <DialogContent className="max-w-[260px] sm:max-w-[280px] p-0 gap-0 overflow-hidden rounded-xl">
-        <DialogTitle className="sr-only">Upgrade to Intorza Pro</DialogTitle>
-        <DialogDescription className="sr-only">
-          Start your free trial of Intorza Pro to unlock all premium features.
-        </DialogDescription>
         {/* Header */}
         <div className="bg-gradient-to-br from-amber-400 via-amber-500 to-orange-500 p-3 sm:p-4 text-center text-white">
           <div className="w-9 h-9 sm:w-10 sm:h-10 mx-auto mb-2 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
