@@ -196,7 +196,7 @@ const CreateQuotation = () => {
     }
   }, [quotationId]);
 
-  // Handle continuing actions after login (wait for form to be restored)
+  // Handle continuing actions after login (wait for form to be restored and profile to be loaded)
   useEffect(() => {
     const executePendingAction = async () => {
       if (continueAction && formRestored && !actionExecuted) {
@@ -210,16 +210,76 @@ const CreateQuotation = () => {
           replace: true
         });
 
-        // Small delay to ensure state is fully updated
+        // Fetch fresh profile data before executing pending action
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+          
+          if (profileData) {
+            // Get default templates from My Library
+            const { data: paymentTemplate } = await supabase
+              .from('payment_templates')
+              .select('stages')
+              .eq('user_id', user.id)
+              .eq('is_default', true)
+              .single();
+
+            const { data: termsTemplate } = await supabase
+              .from('terms_templates')
+              .select('content')
+              .eq('user_id', user.id)
+              .eq('is_default', true)
+              .eq('template_type', 'quotation')
+              .single();
+
+            const { data: bankTemplate } = await supabase
+              .from('bank_detail_templates')
+              .select('*')
+              .eq('user_id', user.id)
+              .eq('is_default', true)
+              .single();
+
+            // Update profile state with fresh data
+            setProfile({
+              company_name: profileData.company_name || "",
+              logo_url: profileData.logo_url || "",
+              address: profileData.address || "",
+              phone: profileData.phone || "",
+              email: profileData.email || "",
+              gstin: profileData.gstin || "",
+              professional_advantages: profileData.professional_advantages || "",
+              signature_url: profileData.signature_url || "",
+              terms_conditions: (termsTemplate?.content as any) || profileData.terms_conditions as any || [],
+              bank_name: bankTemplate?.bank_name || (profileData as any).bank_name || "",
+              bank_account_number: bankTemplate?.account_number || (profileData as any).bank_account_number || "",
+              bank_ifsc_code: bankTemplate?.ifsc_code || (profileData as any).bank_ifsc_code || "",
+              bank_account_holder: bankTemplate?.account_holder_name || (profileData as any).bank_account_holder || "",
+              upi_id: bankTemplate?.upi_id || (profileData as any).upi_id || "",
+              payment_qr_url: bankTemplate?.qr_code_url || (profileData as any).payment_qr_url || ""
+            });
+
+            // Load payment stages - prefer template over profile
+            if (paymentTemplate?.stages) {
+              setPaymentStages(paymentTemplate.stages as any);
+            } else if (profileData.payment_stages) {
+              setPaymentStages(profileData.payment_stages as any);
+            }
+          }
+        }
+
+        // Small delay to ensure state is fully updated after profile fetch
         setTimeout(async () => {
           if (continueAction === 'saveDraft') {
             await handleSaveQuotation('draft');
           } else if (continueAction === 'downloadPdf') {
-            await handleDownloadPDF();
+            const savedId = await handleSaveQuotation('pending');
+            if (savedId) {
+              await handleDownloadPDF(undefined, savedId);
+            }
           } else if (continueAction === 'saveAndSend') {
-            await handleSaveQuotation('pending');
+            await handleSaveQuotation('pending', true);
           }
-        }, 800);
+        }, 100);
       }
     };
     executePendingAction();
