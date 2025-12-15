@@ -397,10 +397,6 @@ const InvoiceDetail = () => {
 
   const handleShareInvoice = async () => {
     await handleDownloadPDF();
-    toast({
-      title: "Invoice PDF Downloaded",
-      description: "Share the downloaded PDF via WhatsApp, Email or any app",
-    });
   };
 
   const isFullyPaid = invoice && (invoice.remaining_amount || 0) <= 0;

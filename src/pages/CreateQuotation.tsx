@@ -626,14 +626,8 @@ const CreateQuotation = () => {
       // Reset form if saved as pending
       if (status === 'pending') {
         if (showShare) {
-          // Generate PDF and trigger share
+          // Generate PDF and trigger share dialog
           await handleDownloadPDF();
-          
-          // Show toast with share instructions
-          toast({
-            title: "Quotation Saved & Downloaded",
-            description: "PDF downloaded! Share it via WhatsApp, Email or any app",
-          });
         }
         
         setClientName("");
