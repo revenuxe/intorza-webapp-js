@@ -425,6 +425,7 @@ export type Database = {
           bank_account_number: string | null
           bank_ifsc_code: string | null
           bank_name: string | null
+          brand_colors: Json | null
           company_name: string | null
           country_code: string | null
           country_name: string | null
@@ -469,6 +470,7 @@ export type Database = {
           bank_account_number?: string | null
           bank_ifsc_code?: string | null
           bank_name?: string | null
+          brand_colors?: Json | null
           company_name?: string | null
           country_code?: string | null
           country_name?: string | null
@@ -513,6 +515,7 @@ export type Database = {
           bank_account_number?: string | null
           bank_ifsc_code?: string | null
           bank_name?: string | null
+          brand_colors?: Json | null
           company_name?: string | null
           country_code?: string | null
           country_name?: string | null
@@ -722,6 +725,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      quotation_templates: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean | null
+          sections: Json
+          template_name: string
+          updated_at: string
+          usage_count: number | null
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          sections?: Json
+          template_name: string
+          updated_at?: string
+          usage_count?: number | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          sections?: Json
+          template_name?: string
+          updated_at?: string
+          usage_count?: number | null
+          user_id?: string
+        }
+        Relationships: []
       }
       quotations: {
         Row: {
