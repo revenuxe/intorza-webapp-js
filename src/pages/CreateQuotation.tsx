@@ -461,7 +461,7 @@ const CreateQuotation = () => {
     enableSocialMediaDiscount,
     socialMediaDiscountRate
   });
-  const handleSaveQuotation = async (status: string, showShare: boolean = false) => {
+  const handleSaveQuotation = async (status: string, showShare: boolean = false): Promise<string | null> => {
     try {
       if (!clientName || !projectTitle) {
         toast({
@@ -469,7 +469,7 @@ const CreateQuotation = () => {
           description: "Please fill in client name and project title",
           variant: "destructive"
         });
-        return;
+        return null;
       }
       const {
         data: {
@@ -477,6 +477,9 @@ const CreateQuotation = () => {
         }
       } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
+      
+      let savedQuotationId: string | null = null;
+      
       if (quotationId) {
         // Update existing quotation
         const {
@@ -540,6 +543,9 @@ const CreateQuotation = () => {
           title: "Quotation updated",
           description: "Quotation has been updated successfully"
         });
+        
+        // Return existing quotation ID for PDF generation
+        savedQuotationId = quotationId;
       } else {
         // Create new quotation
         const quotationNumber = `QT-${Date.now()}`;
@@ -568,6 +574,10 @@ const CreateQuotation = () => {
           grand_total: grandTotal
         }).select().single();
         if (quotationError) throw quotationError;
+        
+        // Store the new quotation ID
+        savedQuotationId = quotationData.id;
+        
         for (const section of sections) {
           const {
             data: sectionData,
@@ -625,9 +635,9 @@ const CreateQuotation = () => {
 
       // Reset form if saved as pending
       if (status === 'pending') {
-        if (showShare) {
-          // Generate PDF and trigger share dialog
-          await handleDownloadPDF();
+        if (showShare && savedQuotationId) {
+          // Generate PDF with the saved quotation ID for Accept/Reject buttons
+          await handleDownloadPDF(undefined, savedQuotationId);
         }
         
         setClientName("");
@@ -657,6 +667,8 @@ const CreateQuotation = () => {
         setDateOfProposal(defaults.dateOfProposal);
         setQuotationValidTill(defaults.quotationValidTill);
       }
+      
+      return savedQuotationId;
     } catch (error) {
       console.error('Error saving quotation:', error);
       toast({
@@ -664,9 +676,10 @@ const CreateQuotation = () => {
         description: "Failed to save quotation. Please try again.",
         variant: "destructive"
       });
+      return null;
     }
   };
-  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings) => {
+  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, overrideQuotationId?: string) => {
     try {
       if (!clientName || !clientAddress) {
         toast({
@@ -677,7 +690,7 @@ const CreateQuotation = () => {
         return;
       }
       await generateQuotationPDF({
-        quotationId: quotationId || undefined,
+        quotationId: overrideQuotationId || quotationId || undefined,
         quotationTitle: projectTitle,
         clientName,
         clientAddress,
@@ -1074,17 +1087,17 @@ const CreateQuotation = () => {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-4">
-              <Button variant="outline" className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('draft'), 'saveDraft', getFormData())}>
+              <Button variant="outline" className="w-full" onClick={() => requireAuth(async () => { await handleSaveQuotation('draft'); }, 'saveDraft', getFormData())}>
                 Save as Draft
               </Button>
               <Button variant="outline" className="w-full" onClick={() => setShowPreview(true)}>
                 <Eye className="h-4 w-4 mr-2" />
                 Preview
               </Button>
-              <Button variant="outline" className="w-full" onClick={() => requireAuth(() => handleDownloadPDF(), 'downloadPdf', getFormData())}>
+              <Button variant="outline" className="w-full" onClick={() => requireAuth(async () => { await handleDownloadPDF(); }, 'downloadPdf', getFormData())}>
                 Download PDF
               </Button>
-              <Button className="w-full" onClick={() => requireAuth(() => handleSaveQuotation('pending', true), 'saveAndSend', getFormData())}>
+              <Button className="w-full" onClick={() => requireAuth(async () => { await handleSaveQuotation('pending', true); }, 'saveAndSend', getFormData())}>
                 <Share2 className="h-4 w-4 mr-2" />
                 Save & Send
               </Button>
