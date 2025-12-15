@@ -11,10 +11,10 @@ const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-// Plan configuration - 30 days Pro for ₹0.50 token payment
+// Plan configuration - 30 days Pro for ₹1 token payment (Razorpay minimum is ₹1)
 const PLAN_CONFIG = {
   monthly: {
-    amount: 50, // 50 paise (₹0.50) token amount
+    amount: 100, // 100 paise (₹1) - Razorpay minimum order amount
     currency: 'INR',
     name: 'Intorza Pro',
     trialDays: 30,
