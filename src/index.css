@@ -129,3 +129,23 @@ All colors MUST be HSL.
     font-feature-settings: "tnum";
   }
 }
+
+/* Custom loader animations */
+@keyframes loader-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+}
+
+@keyframes loader-ring {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { opacity: 0.3; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+.animate-loader-pulse {
+  animation: loader-pulse 1.5s ease-in-out infinite;
+}
+
+.animate-loader-ring {
+  animation: loader-ring 1.5s ease-out infinite;
+}

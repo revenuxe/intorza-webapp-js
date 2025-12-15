@@ -997,11 +997,14 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
   doc.text("This quotation is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
 
-  // Return blob for sharing or save directly
+  // Generate PDF and handle sharing + download
   const fileName = `Quotation_${data.clientName.replace(/\s+/g, '_')}.pdf`;
   const pdfBlob = doc.output('blob');
   
-  // Try Web Share API first (primarily works on mobile)
+  // Always save the file first
+  doc.save(fileName);
+  
+  // Then try Web Share API (primarily works on mobile)
   if (typeof navigator !== 'undefined' && navigator.share) {
     try {
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
@@ -1010,18 +1013,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       // Check if file sharing is supported
       if (navigator.canShare && navigator.canShare(shareData)) {
         await navigator.share(shareData);
-        return; // Successfully shared
       }
     } catch (err) {
-      // User cancelled or share failed, fall back to download
+      // User cancelled or share failed - file already downloaded
       const error = err as Error;
-      if (error.name === 'AbortError') {
-        return; // User cancelled, don't download
+      if (error.name !== 'AbortError') {
+        console.log('Share failed:', error.message);
       }
-      console.log('Share failed, downloading instead:', error.message);
     }
   }
-  
-  // Fallback: download the file
-  doc.save(fileName);
 };
