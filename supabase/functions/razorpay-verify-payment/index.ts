@@ -143,21 +143,23 @@ serve(async (req) => {
 
     console.log('Profile updated to Pro for user:', user.id);
 
-    // Log the payment
+    // Log the payment (₹1 authorization)
     await supabase
       .from('payment_logs')
       .insert({
         user_id: user.id,
         provider: 'razorpay',
-        event_type: 'payment.captured',
+        event_type: 'authorization',
         provider_event_id: razorpay_payment_id,
-        amount: 4900, // ₹49 in paise
+        amount: 100, // ₹1 in paise (authorization amount)
         currency: 'INR',
         status: 'captured',
         raw_payload: {
           order_id: razorpay_order_id,
+          subscription_id: razorpay_subscription_id,
           payment_id: razorpay_payment_id,
           plan: plan,
+          type: 'authorization_refundable',
         },
       });
 
@@ -166,8 +168,8 @@ serve(async (req) => {
       .from('subscription_events')
       .insert({
         user_id: user.id,
-        event: 'subscription_activated',
-        notes: `Plan: ${plan}, Payment ID: ${razorpay_payment_id}`,
+        event: 'trial_started',
+        notes: `Plan: ${plan}, Payment ID: ${razorpay_payment_id}, Authorization: ₹1 (refundable), Autopay: ₹49/month after trial`,
         actor: 'system',
       });
 
