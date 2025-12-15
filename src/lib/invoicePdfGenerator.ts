@@ -616,6 +616,28 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
   doc.text("This invoice is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
 
-  // Save
-  doc.save(`Invoice_${data.invoiceNumber}.pdf`);
+  // Return blob for sharing or save directly
+  const fileName = `Invoice_${data.invoiceNumber}.pdf`;
+  const pdfBlob = doc.output('blob');
+  
+  // Try Web Share API first
+  if (navigator.share && navigator.canShare) {
+    const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+    const shareData = { files: [file], title: `Invoice ${data.invoiceNumber}` };
+    
+    if (navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+        return; // Successfully shared
+      } catch (err) {
+        // User cancelled or share failed, fall back to download
+        if ((err as Error).name !== 'AbortError') {
+          console.log('Share failed, downloading instead');
+        }
+      }
+    }
+  }
+  
+  // Fallback: download the file
+  doc.save(fileName);
 };
