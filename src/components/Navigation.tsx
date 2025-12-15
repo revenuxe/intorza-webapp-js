@@ -96,7 +96,7 @@ export const Navigation = ({ mobile }: NavigationProps) => {
           <Crown className="h-5 w-5" />
           <div className="flex-1 text-left">
             <span className="block font-semibold">Upgrade to Pro</span>
-            <span className="text-xs opacity-80">₹49/month</span>
+            <span className="text-xs opacity-80">₹0 for first month</span>
           </div>
         </button>
       )}
