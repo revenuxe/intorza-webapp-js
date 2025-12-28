@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Download, Smartphone } from 'lucide-react';
+import { X, Download, Smartphone, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -11,6 +11,8 @@ export const PWAInstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showBanner, setShowBanner] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
     // Check if already installed
@@ -48,11 +50,19 @@ export const PWAInstallPrompt = () => {
   const handleInstall = async () => {
     if (!deferredPrompt) return;
 
+    setIsInstalling(true);
+    
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     
+    setIsInstalling(false);
+    
     if (outcome === 'accepted') {
-      setShowBanner(false);
+      setIsInstalled(true);
+      // Auto-hide after showing success message
+      setTimeout(() => {
+        setShowBanner(false);
+      }, 2500);
     }
     setDeferredPrompt(null);
   };
@@ -77,29 +87,53 @@ export const PWAInstallPrompt = () => {
 
         <div className="flex items-start gap-3">
           <div className="flex-shrink-0 w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-            <Smartphone className="h-6 w-6 text-primary" />
+            {isInstalled ? (
+              <CheckCircle className="h-6 w-6 text-green-500" />
+            ) : isInstalling ? (
+              <Loader2 className="h-6 w-6 text-primary animate-spin" />
+            ) : (
+              <Smartphone className="h-6 w-6 text-primary" />
+            )}
           </div>
           
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-foreground text-sm">
-              Install INTORZA App
+              {isInstalled 
+                ? "App Installed!" 
+                : isInstalling 
+                  ? "Installing App..." 
+                  : "Install INTORZA App"}
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {isIOS 
-                ? "Tap the share button and 'Add to Home Screen'" 
-                : "Get quick access from your home screen"}
+              {isInstalled 
+                ? "INTORZA is now on your home screen" 
+                : isInstalling 
+                  ? "Please wait..." 
+                  : isIOS 
+                    ? "Tap the share button and 'Add to Home Screen'" 
+                    : "Get quick access from your home screen"}
             </p>
           </div>
         </div>
 
-        {!isIOS && deferredPrompt && (
+        {!isIOS && deferredPrompt && !isInstalled && (
           <Button
             onClick={handleInstall}
             size="sm"
             className="w-full mt-3 gap-2"
+            disabled={isInstalling}
           >
-            <Download className="h-4 w-4" />
-            Install Now
+            {isInstalling ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Installing...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Install Now
+              </>
+            )}
           </Button>
         )}
 
