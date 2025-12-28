@@ -8,6 +8,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { FeedbackProvider } from "./components/FeedbackProvider";
 import { SubscriptionProvider } from "./contexts/SubscriptionContext";
 import { PaywallModal } from "./components/PaywallModal";
+import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
+import { OfflineIndicator } from "./components/OfflineIndicator";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import SiteMeasurement from "./pages/SiteMeasurement";
@@ -48,6 +50,8 @@ const App = () => (
         <SubscriptionProvider>
           <FeedbackProvider>
             <PaywallModal />
+            <PWAInstallPrompt />
+            <OfflineIndicator />
           <Routes>
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />

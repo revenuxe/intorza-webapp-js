@@ -1,5 +1,16 @@
 {
+  "redirects": [
+    {
+      "source": "/favicon.ico",
+      "destination": "/custom-favicon.ico",
+      "permanent": true
+    }
+  ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
+    { "source": "/favicon.ico", "destination": "/custom-favicon.ico" },
+    {
+      "source": "/((?!favicon\\.ico|robots\\.txt|sitemap\\.xml|.*\\.(png|jpg|jpeg|gif|svg|webp|ico)).*)",
+      "destination": "/"
+    }
   ]
 }
