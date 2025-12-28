@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["custom-favicon.ico", "icons/*.webp"],
+      includeAssets: ["favicon.ico", "icons/*.webp"],
       manifest: false, // Using existing manifest.json in public folder
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff,woff2}"],
