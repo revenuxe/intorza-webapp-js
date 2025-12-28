@@ -1,12 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WifiOff } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 export const OfflineIndicator = () => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const wasOfflineRef = useRef(false);
 
   useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
+    const handleOnline = () => {
+      setIsOffline(false);
+      // Only show toast if user was previously offline
+      if (wasOfflineRef.current) {
+        toast({
+          title: "Back online",
+          description: "Your internet connection has been restored.",
+          variant: "default",
+        });
+      }
+      wasOfflineRef.current = false;
+    };
+    
+    const handleOffline = () => {
+      setIsOffline(true);
+      wasOfflineRef.current = true;
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
