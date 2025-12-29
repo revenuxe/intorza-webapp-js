@@ -83,9 +83,14 @@ const Auth = () => {
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
       if (error) throw error;
+      // Don't reset googleLoading here - user will be redirected
     } catch (error: any) {
       toast.error(error.message || "Google login failed");
       setGoogleLoading(false);
@@ -133,43 +138,61 @@ const Auth = () => {
   // Robust auth check with listener
   useEffect(() => {
     let mounted = true;
+    let redirectInProgress = false;
 
     const handleAuthRedirect = async (userId: string) => {
-      if (!mounted) return;
+      if (!mounted || redirectInProgress) return;
+      redirectInProgress = true;
       
-      // Check if team member
-      const { data: teamMember } = await supabase
-        .from('team_members')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
-      
-      if (teamMember) {
-        navigate('/team/dashboard', { replace: true });
-        return;
-      }
-      
-      // Check if admin
-      const { data: isAdmin } = await supabase.rpc('is_admin');
-      if (isAdmin) {
-        navigate('/admin/dashboard', { replace: true });
-        return;
-      }
-      
-      // Check if needs onboarding
-      const needsOnboarding = await checkOnboarding(userId);
-      if (!needsOnboarding && mounted) {
-        const returnPath = getReturnPath();
-        sessionStorage.removeItem('returnPath');
-        sessionStorage.removeItem('pendingAction');
-        navigate(returnPath, { replace: true });
+      try {
+        // Check if team member
+        const { data: teamMember } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (!mounted) return;
+        
+        if (teamMember) {
+          navigate('/team/dashboard', { replace: true });
+          return;
+        }
+        
+        // Check if admin
+        const { data: isAdmin } = await supabase.rpc('is_admin');
+        if (!mounted) return;
+        
+        if (isAdmin) {
+          navigate('/admin/dashboard', { replace: true });
+          return;
+        }
+        
+        // Check if needs onboarding
+        const needsOnboarding = await checkOnboarding(userId);
+        if (!needsOnboarding && mounted) {
+          const returnPath = getReturnPath();
+          sessionStorage.removeItem('returnPath');
+          sessionStorage.removeItem('pendingAction');
+          navigate(returnPath, { replace: true });
+        }
+      } catch (error) {
+        console.error('Auth redirect error:', error);
+        // On error, just go to home
+        if (mounted) {
+          navigate('/', { replace: true });
+        }
       }
     };
 
-    // Set up auth state listener FIRST
+    // Set up auth state listener FIRST - keep it synchronous
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!mounted) return;
+        
+        // Reset loading states on any auth event
+        setGoogleLoading(false);
+        setLoading(false);
         
         if (event === 'SIGNED_IN' && session?.user) {
           // Use setTimeout to avoid Supabase deadlock
@@ -182,7 +205,14 @@ const Auth = () => {
       }
     );
 
-    // Then check for existing session
+    // Then check for existing session with timeout
+    const sessionCheckTimeout = setTimeout(() => {
+      if (mounted && initialLoading) {
+        setInitialLoading(false);
+        setGoogleLoading(false);
+      }
+    }, 3000); // 3 second max wait
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
       
@@ -191,10 +221,17 @@ const Auth = () => {
       }
       
       setInitialLoading(false);
+      setGoogleLoading(false);
+    }).catch(() => {
+      if (mounted) {
+        setInitialLoading(false);
+        setGoogleLoading(false);
+      }
     });
 
     return () => {
       mounted = false;
+      clearTimeout(sessionCheckTimeout);
       subscription.unsubscribe();
     };
   }, [navigate, checkOnboarding, getReturnPath]);
