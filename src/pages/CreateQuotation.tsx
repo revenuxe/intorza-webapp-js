@@ -869,7 +869,7 @@ const CreateQuotation = () => {
             <p className="text-sm text-muted-foreground mt-1">Fill in the details to create a new quotation</p>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
-            <QuotationTemplates onSelectTemplate={(newSections) => setSections(newSections)} currentSections={sections} />
+            <QuotationTemplates onSelectTemplate={(newSections) => setSections(newSections)} currentSections={sections} onSetQuotationTitle={(title) => setProjectTitle(title)} />
             <CustomizeFieldsDrawer type="quotation" settings={customizeSettings} onSettingsChange={s => setCustomizeSettings(s as QuotationSettings)} />
           </div>
         </div>
