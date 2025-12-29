@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Type, Grid } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
@@ -16,7 +16,9 @@ import {
   saveEditorSettings, 
   defaultEditorSettings,
   getThemeById,
+  getThemesByCategory,
   rgbToHex,
+  PDFTheme,
 } from "@/lib/pdfThemes";
 import { QuotationSettings } from "./CustomizeFieldsDrawer";
 
@@ -38,6 +40,18 @@ interface PDFPreviewEditorProps {
   customizeSettings: QuotationSettings;
 }
 
+type ThemeCategory = 'all' | 'minimal' | 'professional' | 'luxury' | 'floral' | 'abstract' | 'decoration';
+
+const CATEGORY_CONFIG: { value: ThemeCategory; label: string; icon: React.ElementType }[] = [
+  { value: 'all', label: 'All', icon: Palette },
+  { value: 'minimal', label: 'Minimal', icon: FileText },
+  { value: 'professional', label: 'Professional', icon: FileText },
+  { value: 'luxury', label: 'Luxury', icon: Crown },
+  { value: 'floral', label: 'Floral', icon: Flower2 },
+  { value: 'abstract', label: 'Abstract', icon: Shapes },
+  { value: 'decoration', label: 'Decoration', icon: Frame },
+];
+
 export const PDFPreviewEditor = ({
   open,
   onClose,
@@ -48,12 +62,13 @@ export const PDFPreviewEditor = ({
   const [editorSettings, setEditorSettings] = useState<PDFEditorSettings>(getEditorSettings());
   const [activeTab, setActiveTab] = useState("themes");
   const [showEditor, setShowEditor] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<ThemeCategory>('all');
   const previewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
       setEditorSettings(getEditorSettings());
-      setShowEditor(false); // Reset to preview view on open
+      setShowEditor(false);
     }
   }, [open]);
 
@@ -74,6 +89,14 @@ export const PDFPreviewEditor = ({
   };
 
   const currentTheme = getThemeById(editorSettings.theme);
+
+  // Get filtered themes based on category
+  const getFilteredThemes = (): PDFTheme[] => {
+    if (selectedCategory === 'all') {
+      return PDF_THEMES;
+    }
+    return getThemesByCategory(selectedCategory);
+  };
 
   // Preview rendering helpers
   const getPreviewStyles = () => {
@@ -104,14 +127,29 @@ export const PDFPreviewEditor = ({
     borderColor: editorSettings.showBorders ? `rgb(${currentTheme.colors.border.join(',')})` : 'transparent',
   });
 
+  // Get decoration color for preview
+  const getDecorationColor = () => {
+    const decorColor = currentTheme.colors.decorationPrimary || currentTheme.colors.accent;
+    return `rgb(${decorColor.join(',')})`;
+  };
+
+  // Check if current theme has decorations
+  const hasDecorations = currentTheme.decorations.showPageBorder || 
+                         currentTheme.decorations.showCornerOrnaments || 
+                         currentTheme.decorations.showSectionDividers;
+
   // Editor Panel Component
   const EditorPanel = () => (
     <div className="flex flex-col h-full overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid grid-cols-3 m-4 flex-shrink-0">
+        <TabsList className="grid grid-cols-4 m-4 flex-shrink-0">
           <TabsTrigger value="themes" className="text-xs">
             <Palette className="h-3 w-3 mr-1" />
             Themes
+          </TabsTrigger>
+          <TabsTrigger value="decor" className="text-xs">
+            <Sparkles className="h-3 w-3 mr-1" />
+            Decor
           </TabsTrigger>
           <TabsTrigger value="layout" className="text-xs">
             <Layout className="h-3 w-3 mr-1" />
@@ -124,15 +162,41 @@ export const PDFPreviewEditor = ({
         </TabsList>
 
         <div className="flex-1 min-h-0 overflow-auto px-4">
+          {/* THEMES TAB */}
           <TabsContent value="themes" className="mt-0 space-y-4">
+            {/* Category Filter Tabs */}
             <div className="space-y-3">
-              <Label className="text-sm font-semibold">Select Theme</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {PDF_THEMES.map((theme) => (
+              <Label className="text-sm font-semibold">Category</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {CATEGORY_CONFIG.map((cat) => (
+                  <button
+                    key={cat.value}
+                    onClick={() => setSelectedCategory(cat.value)}
+                    className={`px-2.5 py-1.5 rounded-full text-[10px] font-medium transition-all flex items-center gap-1 ${
+                      selectedCategory === cat.value
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                    }`}
+                  >
+                    <cat.icon className="h-3 w-3" />
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Themes Grid */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-semibold">Select Theme</Label>
+                <span className="text-xs text-muted-foreground">{getFilteredThemes().length} themes</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1">
+                {getFilteredThemes().map((theme) => (
                   <button
                     key={theme.id}
                     onClick={() => updateSettings({ theme: theme.id })}
-                    className={`relative p-3 rounded-lg border-2 transition-all text-left ${
+                    className={`relative p-2.5 rounded-lg border-2 transition-all text-left ${
                       editorSettings.theme === theme.id 
                         ? 'border-primary ring-2 ring-primary/20' 
                         : 'border-border hover:border-primary/50'
@@ -143,17 +207,42 @@ export const PDFPreviewEditor = ({
                         <Check className="h-3 w-3 text-primary-foreground" />
                       </div>
                     )}
-                    <div 
-                      className="w-full h-8 rounded mb-2 flex overflow-hidden"
-                      style={{ backgroundColor: `rgb(${theme.colors.headerBg.join(',')})` }}
+                    {/* Theme preview with decoration indicator */}
+                    <div className="relative w-full h-10 rounded mb-1.5 overflow-hidden border"
+                      style={{ 
+                        backgroundColor: `rgb(${theme.colors.background.join(',')})`,
+                        borderColor: theme.decorations.showPageBorder 
+                          ? `rgb(${(theme.colors.decorationPrimary || theme.colors.accent).join(',')})` 
+                          : `rgb(${theme.colors.border.join(',')})`
+                      }}
                     >
+                      {/* Header bar */}
                       <div 
-                        className="w-1/3 h-full"
+                        className="h-3 w-full"
+                        style={{ backgroundColor: `rgb(${theme.colors.headerBg.join(',')})` }}
+                      />
+                      {/* Highlight swatch */}
+                      <div 
+                        className="absolute bottom-1 right-1 w-4 h-2 rounded-sm"
                         style={{ backgroundColor: `rgb(${theme.colors.highlight.join(',')})` }}
                       />
+                      {/* Corner ornament indicator */}
+                      {theme.decorations.showCornerOrnaments && (
+                        <div 
+                          className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 rounded-tl"
+                          style={{ borderColor: `rgb(${(theme.colors.decorationPrimary || theme.colors.accent).join(',')})` }}
+                        />
+                      )}
                     </div>
-                    <p className="text-xs font-medium truncate">{theme.name}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{theme.description}</p>
+                    <p className="text-[10px] font-medium truncate">{theme.name}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-[8px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
+                        {theme.category}
+                      </span>
+                      {theme.decorations.showPageBorder && (
+                        <Frame className="h-2.5 w-2.5 text-muted-foreground" />
+                      )}
+                    </div>
                   </button>
                 ))}
               </div>
@@ -189,6 +278,120 @@ export const PDFPreviewEditor = ({
             </div>
           </TabsContent>
 
+          {/* DECORATIONS TAB */}
+          <TabsContent value="decor" className="mt-0 space-y-4 pb-4">
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Decoration Settings</Label>
+              <p className="text-xs text-muted-foreground">
+                Enable decorative elements for a more elegant PDF design.
+              </p>
+            </div>
+
+            {/* Master toggle */}
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div>
+                <Label className="text-sm font-medium">Enable Decorations</Label>
+                <p className="text-xs text-muted-foreground">
+                  Show borders, ornaments & dividers
+                </p>
+              </div>
+              <Switch
+                checked={editorSettings.showDecorations}
+                onCheckedChange={(v) => updateSettings({ showDecorations: v })}
+              />
+            </div>
+
+            {editorSettings.showDecorations && (
+              <>
+                {/* Decoration intensity */}
+                <div className="space-y-3 pt-2">
+                  <Label className="text-sm font-semibold">Decoration Intensity</Label>
+                  <Select 
+                    value={editorSettings.decorationIntensity} 
+                    onValueChange={(v) => updateSettings({ decorationIntensity: v as 'subtle' | 'medium' | 'bold' })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="subtle">Subtle - Light decorations</SelectItem>
+                      <SelectItem value="medium">Medium - Balanced look</SelectItem>
+                      <SelectItem value="bold">Bold - Heavy decorations</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Individual toggles */}
+                <div className="space-y-4 pt-4 border-t">
+                  <Label className="text-sm font-semibold">Decoration Elements</Label>
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Page Border</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Decorative border around pages
+                      </p>
+                    </div>
+                    <Switch
+                      checked={editorSettings.showPageBorder}
+                      onCheckedChange={(v) => updateSettings({ showPageBorder: v })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Corner Ornaments</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Decorative corners based on theme
+                      </p>
+                    </div>
+                    <Switch
+                      checked={editorSettings.showCornerOrnaments}
+                      onCheckedChange={(v) => updateSettings({ showCornerOrnaments: v })}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Section Dividers</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Decorative lines between sections
+                      </p>
+                    </div>
+                    <Switch
+                      checked={editorSettings.showSectionDividers}
+                      onCheckedChange={(v) => updateSettings({ showSectionDividers: v })}
+                    />
+                  </div>
+                </div>
+
+                {/* Theme decoration info */}
+                <div className="pt-4 border-t">
+                  <Label className="text-sm font-semibold mb-2 block">Current Theme Decorations</Label>
+                  <div className="p-3 rounded-lg bg-muted/50 space-y-1.5">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">Border Style:</span>
+                      <span className="font-medium capitalize">{currentTheme.decorations.borderStyle}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">Corner Style:</span>
+                      <span className="font-medium capitalize">{currentTheme.decorations.cornerStyle}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">Divider Style:</span>
+                      <span className="font-medium capitalize">{currentTheme.decorations.dividerStyle}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">Header:</span>
+                      <span className="font-medium capitalize">{currentTheme.decorations.headerDecoration}</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </TabsContent>
+
+          {/* LAYOUT TAB */}
           <TabsContent value="layout" className="mt-0 space-y-4">
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Logo Placement</Label>
@@ -235,6 +438,7 @@ export const PDFPreviewEditor = ({
             </div>
           </TabsContent>
 
+          {/* STYLE TAB */}
           <TabsContent value="style" className="mt-0 space-y-4 pb-4">
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Visual Options</Label>
@@ -354,9 +558,68 @@ export const PDFPreviewEditor = ({
     <div className="flex-1 min-h-0 bg-muted/30 overflow-y-auto p-4 md:p-6">
       <div 
         ref={previewRef}
-        className="bg-white shadow-lg mx-auto max-w-[595px] min-h-[600px] md:min-h-[842px] p-6 md:p-8 text-sm"
-        style={getPreviewStyles()}
+        className="bg-white shadow-lg mx-auto max-w-[595px] min-h-[600px] md:min-h-[842px] p-6 md:p-8 text-sm relative"
+        style={{
+          ...getPreviewStyles(),
+          ...(editorSettings.showDecorations && editorSettings.showPageBorder ? {
+            border: `${currentTheme.decorations.borderWidth * 2}px ${currentTheme.decorations.borderStyle === 'double' ? 'double' : currentTheme.decorations.borderStyle === 'dashed' ? 'dashed' : 'solid'} ${getDecorationColor()}`,
+          } : {})
+        }}
       >
+        {/* Corner Ornaments (Preview) */}
+        {editorSettings.showDecorations && editorSettings.showCornerOrnaments && currentTheme.decorations.showCornerOrnaments && (
+          <>
+            {/* Top-left corner */}
+            <div 
+              className="absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2"
+              style={{ 
+                borderColor: getDecorationColor(),
+                borderRadius: currentTheme.decorations.cornerStyle === 'rounded' ? '4px 0 0 0' : '0',
+              }}
+            >
+              {currentTheme.decorations.cornerStyle === 'floral' && (
+                <Flower2 className="h-3 w-3 absolute -top-1.5 -left-1.5" style={{ color: getDecorationColor() }} />
+              )}
+            </div>
+            {/* Top-right corner */}
+            <div 
+              className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2"
+              style={{ 
+                borderColor: getDecorationColor(),
+                borderRadius: currentTheme.decorations.cornerStyle === 'rounded' ? '0 4px 0 0' : '0',
+              }}
+            >
+              {currentTheme.decorations.cornerStyle === 'floral' && (
+                <Flower2 className="h-3 w-3 absolute -top-1.5 -right-1.5" style={{ color: getDecorationColor() }} />
+              )}
+            </div>
+            {/* Bottom-left corner */}
+            <div 
+              className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2"
+              style={{ 
+                borderColor: getDecorationColor(),
+                borderRadius: currentTheme.decorations.cornerStyle === 'rounded' ? '0 0 0 4px' : '0',
+              }}
+            >
+              {currentTheme.decorations.cornerStyle === 'floral' && (
+                <Flower2 className="h-3 w-3 absolute -bottom-1.5 -left-1.5" style={{ color: getDecorationColor() }} />
+              )}
+            </div>
+            {/* Bottom-right corner */}
+            <div 
+              className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2"
+              style={{ 
+                borderColor: getDecorationColor(),
+                borderRadius: currentTheme.decorations.cornerStyle === 'rounded' ? '0 0 4px 0' : '0',
+              }}
+            >
+              {currentTheme.decorations.cornerStyle === 'floral' && (
+                <Flower2 className="h-3 w-3 absolute -bottom-1.5 -right-1.5" style={{ color: getDecorationColor() }} />
+              )}
+            </div>
+          </>
+        )}
+
         {/* Preview Header */}
         <div 
           className={`flex items-center mb-6 pb-4 ${
@@ -365,7 +628,6 @@ export const PDFPreviewEditor = ({
           }`}
           style={{ borderBottom: editorSettings.showBorders ? `2px solid rgb(${currentTheme.colors.border.join(',')})` : 'none' }}
         >
-          {/* Logo placeholder */}
           {customizeSettings.showCompanyLogo && (
             <div 
               className={`w-14 h-14 md:w-16 md:h-16 rounded flex items-center justify-center text-white text-xs font-bold ${
@@ -419,6 +681,26 @@ export const PDFPreviewEditor = ({
                 <p>Project: {quotationData.quotationTitle || 'Project Name'}</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Section Divider (Preview) */}
+        {editorSettings.showDecorations && editorSettings.showSectionDividers && (
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex-1 h-px" style={{ backgroundColor: getDecorationColor(), opacity: 0.5 }} />
+            {currentTheme.decorations.dividerStyle === 'diamonds' && (
+              <div className="w-2 h-2 rotate-45" style={{ backgroundColor: getDecorationColor() }} />
+            )}
+            {currentTheme.decorations.dividerStyle === 'hearts' && (
+              <span style={{ color: getDecorationColor() }}>♥</span>
+            )}
+            {currentTheme.decorations.dividerStyle === 'stars' && (
+              <span style={{ color: getDecorationColor() }}>★</span>
+            )}
+            {currentTheme.decorations.dividerStyle === 'leaves' && (
+              <span style={{ color: getDecorationColor() }}>🌿</span>
+            )}
+            <div className="flex-1 h-px" style={{ backgroundColor: getDecorationColor(), opacity: 0.5 }} />
           </div>
         )}
 
@@ -517,7 +799,6 @@ export const PDFPreviewEditor = ({
         <SheetHeader className="px-4 py-3 border-b shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {/* Mobile: Back button when in editor mode */}
               {showEditor && (
                 <Button variant="ghost" size="icon" className="md:hidden h-8 w-8" onClick={() => setShowEditor(false)}>
                   <ArrowLeft className="h-4 w-4" />
@@ -528,7 +809,6 @@ export const PDFPreviewEditor = ({
               </SheetTitle>
             </div>
             <div className="flex items-center gap-2">
-              {/* Mobile: Editor/Reset button */}
               {!showEditor ? (
                 <Button variant="outline" size="sm" onClick={() => setShowEditor(true)} className="md:hidden">
                   <Settings2 className="h-4 w-4 mr-1" />
@@ -539,7 +819,6 @@ export const PDFPreviewEditor = ({
                   <RotateCcw className="h-4 w-4" />
                 </Button>
               )}
-              {/* Desktop: Always show reset */}
               <Button variant="outline" size="sm" onClick={handleReset} className="hidden md:flex">
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Reset
@@ -556,16 +835,12 @@ export const PDFPreviewEditor = ({
           </div>
         </SheetHeader>
 
-        {/* Mobile View: Show either preview or editor */}
+        {/* Mobile View */}
         <div className="flex-1 min-h-0 overflow-hidden md:hidden flex flex-col">
-          {showEditor ? (
-            <EditorPanel />
-          ) : (
-            <PreviewPanel />
-          )}
+          {showEditor ? <EditorPanel /> : <PreviewPanel />}
         </div>
 
-        {/* Desktop View: Side by side */}
+        {/* Desktop View */}
         <div className="hidden md:flex flex-1 overflow-hidden">
           <div className="w-80 border-r flex flex-col">
             <EditorPanel />
