@@ -1,9 +1,9 @@
 // PDF Theme Configuration
-export type BorderStyle = 'solid' | 'dashed' | 'dotted' | 'double' | 'ornate';
-export type CornerStyle = 'none' | 'simple' | 'rounded' | 'flourish' | 'decorative' | 'floral';
-export type DividerStyle = 'line' | 'dots' | 'wave' | 'arrows' | 'diamonds' | 'hearts' | 'leaves' | 'stars';
-export type HeaderDecoration = 'none' | 'underline' | 'box' | 'banner' | 'ribbon' | 'ornamental';
-export type WatermarkStyle = 'none' | 'subtle' | 'pattern' | 'logo';
+export type BorderStyle = 'solid' | 'dashed' | 'dotted' | 'double' | 'ornate' | 'triple' | 'elegant' | 'chain' | 'zigzag' | 'rope';
+export type CornerStyle = 'none' | 'simple' | 'rounded' | 'flourish' | 'decorative' | 'floral' | 'art-deco' | 'celtic' | 'indian' | 'baroque' | 'leaf' | 'scroll';
+export type DividerStyle = 'line' | 'dots' | 'wave' | 'arrows' | 'diamonds' | 'hearts' | 'leaves' | 'stars' | 'paisley' | 'lotus' | 'geometric' | 'swirl' | 'chain' | 'fleur-de-lis';
+export type HeaderDecoration = 'none' | 'underline' | 'box' | 'banner' | 'ribbon' | 'ornamental' | 'gradient-bar' | 'double-line' | 'bracket' | 'scroll';
+export type WatermarkStyle = 'none' | 'subtle' | 'pattern' | 'logo' | 'mandala' | 'geometric' | 'floral-pattern' | 'damask';
 
 export interface ThemeDecorations {
   borderStyle: BorderStyle;
