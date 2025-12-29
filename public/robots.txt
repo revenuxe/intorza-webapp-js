@@ -1,14 +1,31 @@
-# INTORZA Robots.txt - SEO Optimized
+# robots.txt for INTORZA - Interior Design Quotation Software
+# https://intorza.com
+# Last updated: 2024-12-29
 
-# Allow all major search engines
+# ===== GOOGLE CRAWLERS (Priority) =====
 User-agent: Googlebot
 Allow: /
-Crawl-delay: 1
+Crawl-delay: 0
 
+User-agent: Googlebot-Image
+Allow: /
+Disallow: /admin/
+
+User-agent: Googlebot-Mobile
+Allow: /
+
+User-agent: Googlebot-News
+Allow: /
+
+# ===== BING =====
 User-agent: Bingbot
 Allow: /
 Crawl-delay: 1
 
+User-agent: MSNBot
+Allow: /
+
+# ===== OTHER SEARCH ENGINES =====
 User-agent: Slurp
 Allow: /
 
@@ -21,11 +38,11 @@ Allow: /
 User-agent: YandexBot
 Allow: /
 
-# Social Media Crawlers
-User-agent: Twitterbot
+# ===== SOCIAL MEDIA CRAWLERS =====
+User-agent: facebookexternalhit
 Allow: /
 
-User-agent: facebookexternalhit
+User-agent: Twitterbot
 Allow: /
 
 User-agent: LinkedInBot
@@ -37,19 +54,74 @@ Allow: /
 User-agent: WhatsApp
 Allow: /
 
-# Allow all other crawlers
+User-agent: Slackbot
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+# ===== AI CRAWLERS (for AI training/indexing) =====
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Anthropic-AI
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# ===== GENERAL CRAWLERS =====
 User-agent: *
 Allow: /
 Crawl-delay: 2
 
-# Disallow admin and private routes
+# ===== DISALLOW PRIVATE/NON-ESSENTIAL =====
+Disallow: /api/
 Disallow: /admin/
+Disallow: /admin/login
+Disallow: /admin/dashboard
 Disallow: /team/login
 Disallow: /team/dashboard
 Disallow: /payment-processing
+Disallow: /*?*
 
-# Sitemap location
+# ===== ALLOW IMPORTANT PUBLIC PAGES =====
+Allow: /
+Allow: /auth
+Allow: /quotations
+Allow: /create-quotation
+Allow: /invoices
+Allow: /site-measurement
+Allow: /clients
+Allow: /my-projects
+Allow: /library
+Allow: /team
+Allow: /dashboard
+Allow: /settings
+Allow: /terms-and-conditions
+Allow: /privacy-policy
+Allow: /cancellation-refund-policy
+Allow: /manifest.json
+Allow: /sitemap.xml
+Allow: /robots.txt
+
+# ===== SITEMAP =====
 Sitemap: https://intorza.com/sitemap.xml
 
-# Host directive
+# ===== HOST =====
 Host: https://intorza.com
