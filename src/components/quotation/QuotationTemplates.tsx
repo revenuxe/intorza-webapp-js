@@ -1158,6 +1158,772 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
     ],
   },
 
+  // =================== HOME THEATER TEMPLATES ===================
+  {
+    id: "home-theater",
+    name: "Home Theater",
+    description: "Complete home theater with acoustic treatment",
+    icon: Tv,
+    category: "Home Theater",
+    sections: [
+      {
+        id: generateId(),
+        title: "Seating & Screen",
+        items: [
+          createItem("Recliner Sofa Set", "Motorized recliners with cup holders (3-seater)", 9, 4, 1500),
+          createItem("Screen Wall", "Acoustic wall with projector screen mount", 12, 8, 950),
+          createItem("Riser Platform", "Elevated seating platform for rear row", 10, 4, 650),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Equipment & Acoustics",
+        items: [
+          createItem("AV Cabinet", "Ventilated equipment cabinet", 4, 4, 850),
+          createItem("Acoustic Panels", "Side wall acoustic treatment panels", 16, 6, 550),
+          createItem("Ceiling Treatment", "Acoustic ceiling panels with star lights", 12, 10, 750),
+          createItem("Soundproofing Door", "Acoustic door with seals", 3, 7, 1200),
+        ],
+      },
+    ],
+  },
+  {
+    id: "home-theater-compact",
+    name: "Compact Media Room",
+    description: "Small space theater setup",
+    icon: Tv,
+    category: "Home Theater",
+    sections: [
+      {
+        id: generateId(),
+        title: "Media Room",
+        items: [
+          createItem("Media Sofa", "Reclining sectional sofa", 7, 3.5, 1100),
+          createItem("TV Wall Panel", "Soundbar integrated TV panel", 8, 6, 850),
+          createItem("Equipment Rack", "Wall-mounted AV rack", 2, 4, 550),
+          createItem("Ambient Lighting", "LED strip with dimmer control", 10, 0.5, 350),
+        ],
+      },
+    ],
+  },
+
+  // =================== HOME GYM TEMPLATES ===================
+  {
+    id: "home-gym",
+    name: "Home Gym",
+    description: "Complete home fitness area",
+    icon: Package,
+    category: "Home Gym",
+    sections: [
+      {
+        id: generateId(),
+        title: "Flooring & Mirrors",
+        items: [
+          createItem("Rubber Flooring", "Interlocking rubber gym tiles", 12, 12, 350),
+          createItem("Wall Mirrors", "Full wall gym mirrors", 12, 6, 650),
+          createItem("Ballet Bar", "Wall-mounted exercise bar", 8, 0.5, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage & Equipment",
+        items: [
+          createItem("Weight Rack", "Dumbbell and plate storage", 4, 5, 550),
+          createItem("Equipment Cabinet", "Yoga mats and accessory storage", 3, 6, 650),
+          createItem("TV Mount", "Swivel TV mount for workouts", 2, 2, 350),
+          createItem("Water Station", "Compact water cooler cabinet", 2, 3, 450),
+        ],
+      },
+    ],
+  },
+
+  // =================== LIBRARY/READING ROOM TEMPLATES ===================
+  {
+    id: "home-library",
+    name: "Home Library",
+    description: "Traditional library with reading area",
+    icon: BookOpen,
+    category: "Library",
+    sections: [
+      {
+        id: generateId(),
+        title: "Book Storage",
+        items: [
+          createItem("Floor-to-Ceiling Bookcase", "Classic wooden bookcases with ladder", 16, 9, 1100),
+          createItem("Rolling Ladder", "Library ladder with rail system", 1, 8, 850),
+          createItem("Display Cabinet", "Glass-front rare book display", 4, 6, 950),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Reading Area",
+        items: [
+          createItem("Reading Armchair", "Wing chair with ottoman (pair)", 3, 3.5, 750),
+          createItem("Side Table", "Classic round side table", 2, 2.5, 450),
+          createItem("Reading Lamp", "Adjustable floor lamp", 1, 5, 350),
+          createItem("Library Desk", "Writing desk with leather top", 5, 3, 950),
+        ],
+      },
+    ],
+  },
+
+  // =================== MUSIC ROOM TEMPLATES ===================
+  {
+    id: "music-room",
+    name: "Music Room",
+    description: "Practice room with acoustic treatment",
+    icon: Package,
+    category: "Music Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Acoustic Treatment",
+        items: [
+          createItem("Acoustic Panels", "Wall-mounted sound absorption panels", 20, 6, 550),
+          createItem("Bass Traps", "Corner bass trap installation", 4, 6, 450),
+          createItem("Floating Floor", "Decoupled floor system", 12, 10, 650),
+          createItem("Acoustic Door", "Soundproof door with seals", 3, 7, 1100),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Furniture",
+        items: [
+          createItem("Piano Platform", "Custom piano platform/stand", 6, 5, 750),
+          createItem("Instrument Storage", "Guitar/instrument wall mounts", 6, 4, 550),
+          createItem("Sheet Music Cabinet", "Music storage with organizers", 3, 5, 650),
+          createItem("Recording Booth", "Portable vocal booth", 3, 4, 850),
+        ],
+      },
+    ],
+  },
+
+  // =================== ART STUDIO TEMPLATES ===================
+  {
+    id: "art-studio",
+    name: "Art Studio",
+    description: "Creative workspace for artists",
+    icon: Package,
+    category: "Art Studio",
+    sections: [
+      {
+        id: generateId(),
+        title: "Work Area",
+        items: [
+          createItem("Art Table", "Adjustable tilting drafting table", 5, 4, 750),
+          createItem("Easel Storage Wall", "Multiple easel display and storage", 8, 6, 650),
+          createItem("Supply Cabinet", "Paint and material storage", 4, 6, 750),
+          createItem("Sink Station", "Utility sink with splash back", 3, 3, 850),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Display & Storage",
+        items: [
+          createItem("Canvas Rack", "Vertical canvas storage system", 6, 6, 550),
+          createItem("Display Wall", "Gallery hanging system", 10, 6, 450),
+          createItem("Tool Organizer", "Wall-mounted brush/tool storage", 4, 3, 350),
+          createItem("Drying Rack", "Artwork drying station", 4, 6, 450),
+        ],
+      },
+    ],
+  },
+
+  // =================== NURSERY TEMPLATES ===================
+  {
+    id: "nursery-room",
+    name: "Baby Nursery",
+    description: "Safe and cozy nursery setup",
+    icon: Baby,
+    category: "Nursery",
+    sections: [
+      {
+        id: generateId(),
+        title: "Sleep & Care",
+        items: [
+          createItem("Baby Crib", "Convertible crib with storage drawer", 4, 4.5, 850),
+          createItem("Changing Station", "Wall-mounted changing table with storage", 3, 3.5, 750),
+          createItem("Nursing Chair", "Glider rocking chair with ottoman", 2.5, 3.5, 650),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage",
+        items: [
+          createItem("Wardrobe", "Baby clothes wardrobe with drawers", 4, 6, 850),
+          createItem("Toy Storage", "Open cubby toy organizer", 4, 3, 550),
+          createItem("Wall Shelf", "Decorative display shelves", 4, 1, 350),
+          createItem("Diaper Caddy", "Wall-mounted diaper organization", 2, 2, 250),
+        ],
+      },
+    ],
+  },
+
+  // =================== TEEN ROOM TEMPLATES ===================
+  {
+    id: "teen-bedroom",
+    name: "Teen Bedroom",
+    description: "Modern teen room with study and gaming",
+    icon: Bed,
+    category: "Teen Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Sleep & Lounge",
+        items: [
+          createItem("Loft Bed", "Elevated bed with desk underneath", 4, 8, 1100),
+          createItem("Sofa Bed", "Convertible sofa for sleepovers", 6, 3, 750),
+          createItem("Bean Bag Zone", "Large bean bags for gaming (3)", 4, 4, 400),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Study & Gaming",
+        items: [
+          createItem("Gaming Desk", "L-shape desk with cable management", 5, 3, 850),
+          createItem("Pegboard Wall", "Customizable organization wall", 6, 4, 450),
+          createItem("Open Shelving", "Display shelves for collectibles", 6, 5, 550),
+          createItem("Wardrobe", "Sliding door wardrobe", 6, 7, 950),
+        ],
+      },
+    ],
+  },
+
+  // =================== SENIOR ROOM TEMPLATES ===================
+  {
+    id: "senior-bedroom",
+    name: "Senior-Friendly Bedroom",
+    description: "Accessible bedroom for elderly",
+    icon: Bed,
+    category: "Senior Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Accessible Furniture",
+        items: [
+          createItem("Adjustable Bed", "Electric adjustable bed with rails", 5.5, 6.5, 1400),
+          createItem("Bedside Table", "Height-adjustable overbed table", 2, 2.5, 550),
+          createItem("Grab Rails", "Wall-mounted support rails", 4, 0.5, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage & Comfort",
+        items: [
+          createItem("Low Wardrobe", "Easy-reach wardrobe with drawers", 6, 5, 850),
+          createItem("Reading Chair", "Motorized lift recliner", 3, 3.5, 950),
+          createItem("Medicine Cabinet", "Lockable medicine storage", 2, 3, 450),
+          createItem("Emergency Panel", "Call button and light switch panel", 1, 1, 250),
+        ],
+      },
+    ],
+  },
+
+  // =================== SERVANT QUARTER TEMPLATES ===================
+  {
+    id: "servant-room",
+    name: "Staff Quarter",
+    description: "Compact staff accommodation",
+    icon: Bed,
+    category: "Staff Quarter",
+    sections: [
+      {
+        id: generateId(),
+        title: "Basic Furniture",
+        items: [
+          createItem("Single Bed", "Steel bed with storage", 3.5, 6.5, 550),
+          createItem("Wardrobe", "Compact 2-door wardrobe", 3, 6, 650),
+          createItem("Study Table", "Simple desk with drawer", 3, 2, 450),
+          createItem("Wall Shelf", "Storage shelf", 3, 1, 250),
+        ],
+      },
+    ],
+  },
+
+  // =================== PET AREA TEMPLATES ===================
+  {
+    id: "pet-area",
+    name: "Pet Corner",
+    description: "Dedicated pet area with storage",
+    icon: Home,
+    category: "Pet Area",
+    sections: [
+      {
+        id: generateId(),
+        title: "Pet Furniture",
+        items: [
+          createItem("Built-in Pet House", "Integrated pet bed/house under stairs or niche", 3, 3, 650),
+          createItem("Feeding Station", "Built-in food and water bowl station", 2, 1, 350),
+          createItem("Pet Storage Cabinet", "Supplies and toy storage", 3, 4, 550),
+          createItem("Cat Climbing Wall", "Wall-mounted cat shelves and perches", 4, 6, 450),
+        ],
+      },
+    ],
+  },
+
+  // =================== COMMERCIAL - OFFICE TEMPLATES ===================
+  {
+    id: "office-reception",
+    name: "Office Reception",
+    description: "Professional reception area",
+    icon: Layers,
+    category: "Commercial Office",
+    sections: [
+      {
+        id: generateId(),
+        title: "Reception Desk",
+        items: [
+          createItem("Reception Counter", "Curved reception desk with storage", 8, 3.5, 1100),
+          createItem("Back Panel", "Logo wall with lighting", 8, 6, 850),
+          createItem("Waiting Sofa", "3+1+1 sofa set for visitors", 8, 4, 950),
+          createItem("Coffee Table", "Center table with magazines", 4, 2.5, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Display & Storage",
+        items: [
+          createItem("Display Shelves", "Product/achievement display", 6, 5, 750),
+          createItem("Coat Closet", "Visitor coat storage", 3, 6, 550),
+          createItem("Planter Dividers", "Green dividers for waiting area", 6, 4, 450),
+        ],
+      },
+    ],
+  },
+  {
+    id: "office-cabin",
+    name: "Executive Cabin",
+    description: "Executive office cabin furniture",
+    icon: Layers,
+    category: "Commercial Office",
+    sections: [
+      {
+        id: generateId(),
+        title: "Desk Area",
+        items: [
+          createItem("Executive Desk", "L-shape executive desk with drawers", 7, 3.5, 1200),
+          createItem("Executive Chair", "Leather executive chair", 2.5, 3.5, 850),
+          createItem("Visitor Chairs", "Guest chairs (pair)", 2, 3, 550),
+          createItem("Credenza", "Storage credenza behind desk", 6, 2.5, 750),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Meeting & Storage",
+        items: [
+          createItem("Meeting Table", "4-seater round meeting table", 4, 4, 750),
+          createItem("Bookcase", "Display bookcase with doors", 4, 6, 850),
+          createItem("Sofa Set", "Small sofa for informal meetings", 5, 3, 750),
+        ],
+      },
+    ],
+  },
+  {
+    id: "conference-room",
+    name: "Conference Room",
+    description: "Meeting room setup",
+    icon: Layers,
+    category: "Commercial Office",
+    sections: [
+      {
+        id: generateId(),
+        title: "Conference Table",
+        items: [
+          createItem("Conference Table", "12-seater boardroom table with power", 12, 4.5, 1100),
+          createItem("Conference Chairs (12)", "Ergonomic conference chairs", 1.5, 3, 550),
+          createItem("Presentation Wall", "TV/projector wall with whiteboard", 10, 6, 850),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Amenities",
+        items: [
+          createItem("Credenza", "Refreshment and storage credenza", 6, 2.5, 650),
+          createItem("AV Cabinet", "Video conferencing equipment cabinet", 3, 4, 550),
+          createItem("Acoustic Panels", "Wall acoustic treatment", 12, 6, 450),
+        ],
+      },
+    ],
+  },
+  {
+    id: "open-office",
+    name: "Open Office Workstations",
+    description: "Modular workstation system",
+    icon: Layers,
+    category: "Commercial Office",
+    sections: [
+      {
+        id: generateId(),
+        title: "Workstations (6 Cluster)",
+        items: [
+          createItem("Workstation Desks (6)", "Modular desks with partitions", 12, 6, 750),
+          createItem("Task Chairs (6)", "Ergonomic office chairs", 1.5, 3, 450),
+          createItem("Pedestals (6)", "Mobile storage pedestals", 1.5, 2, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Common Area",
+        items: [
+          createItem("Filing Cabinets", "Shared filing storage", 6, 4, 550),
+          createItem("Printer Station", "Printer and supply station", 4, 3, 450),
+          createItem("Locker Unit", "Personal locker storage", 6, 6, 650),
+        ],
+      },
+    ],
+  },
+
+  // =================== COMMERCIAL - RETAIL TEMPLATES ===================
+  {
+    id: "retail-store",
+    name: "Retail Store",
+    description: "Retail shop interior",
+    icon: Layers,
+    category: "Commercial Retail",
+    sections: [
+      {
+        id: generateId(),
+        title: "Display & Shelving",
+        items: [
+          createItem("Wall Display Units", "Slatwall display system", 20, 8, 650),
+          createItem("Gondola Shelving", "Center floor display units", 8, 5, 550),
+          createItem("Display Tables", "Feature product tables", 4, 3, 450),
+          createItem("Window Display", "Window showcase platform", 8, 4, 550),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Checkout & Storage",
+        items: [
+          createItem("Checkout Counter", "POS counter with storage", 6, 3.5, 950),
+          createItem("Back Storage", "Backroom storage shelving", 10, 8, 550),
+          createItem("Security Cabinet", "Lockable valuable storage", 3, 5, 750),
+        ],
+      },
+    ],
+  },
+  {
+    id: "boutique-store",
+    name: "Fashion Boutique",
+    description: "Clothing store interior",
+    icon: Shirt,
+    category: "Commercial Retail",
+    sections: [
+      {
+        id: generateId(),
+        title: "Display",
+        items: [
+          createItem("Clothing Racks", "Display racks with shelves", 12, 5, 550),
+          createItem("Mannequin Platforms", "Display pedestals", 4, 2, 350),
+          createItem("Accessory Display", "Glass display cases", 6, 4, 750),
+          createItem("Mirror Stations", "Full-length try-on mirrors", 6, 6, 550),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Fitting & Checkout",
+        items: [
+          createItem("Fitting Rooms (3)", "Private changing rooms with seating", 4, 4, 850),
+          createItem("Checkout Counter", "Boutique style checkout", 5, 3.5, 850),
+          createItem("Seating Area", "Customer waiting sofa", 5, 3, 550),
+        ],
+      },
+    ],
+  },
+
+  // =================== COMMERCIAL - RESTAURANT TEMPLATES ===================
+  {
+    id: "restaurant-dining",
+    name: "Restaurant Dining Area",
+    description: "Restaurant seating and display",
+    icon: UtensilsCrossed,
+    category: "Commercial Restaurant",
+    sections: [
+      {
+        id: generateId(),
+        title: "Seating",
+        items: [
+          createItem("Dining Tables (10)", "4-seater restaurant tables", 3, 3, 550),
+          createItem("Dining Chairs (40)", "Restaurant chairs", 1.5, 3, 350),
+          createItem("Booth Seating", "Upholstered booth seating for 12", 10, 4, 950),
+          createItem("Bar Counter", "Bar area with stools", 8, 3.5, 1100),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Service Area",
+        items: [
+          createItem("Service Station", "Waiter station with POS", 4, 3, 650),
+          createItem("Display Counter", "Cake/dessert display", 4, 4, 850),
+          createItem("Host Stand", "Entry host podium", 2, 3, 450),
+        ],
+      },
+    ],
+  },
+  {
+    id: "cafe-interior",
+    name: "Café Interior",
+    description: "Coffee shop furniture",
+    icon: Coffee,
+    category: "Commercial Restaurant",
+    sections: [
+      {
+        id: generateId(),
+        title: "Seating Mix",
+        items: [
+          createItem("Café Tables (8)", "2-seater round tables", 2.5, 2.5, 450),
+          createItem("Chairs (16)", "Café chairs", 1.5, 3, 350),
+          createItem("Sofa Seating", "Lounge sofa area", 8, 3, 750),
+          createItem("Bar Stools (6)", "Counter seating", 1.5, 3, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Service",
+        items: [
+          createItem("Coffee Bar Counter", "Barista counter with display", 8, 3.5, 1100),
+          createItem("Bakery Display", "Pastry display case", 4, 4, 850),
+          createItem("Menu Board", "Wall-mounted menu display", 6, 4, 350),
+        ],
+      },
+    ],
+  },
+
+  // =================== COMMERCIAL - SALON/SPA TEMPLATES ===================
+  {
+    id: "salon-interior",
+    name: "Beauty Salon",
+    description: "Hair and beauty salon setup",
+    icon: Shirt,
+    category: "Commercial Salon",
+    sections: [
+      {
+        id: generateId(),
+        title: "Styling Stations",
+        items: [
+          createItem("Styling Stations (6)", "Mirror units with storage", 2.5, 6, 850),
+          createItem("Styling Chairs (6)", "Hydraulic salon chairs", 2, 3.5, 650),
+          createItem("Wash Basins (3)", "Shampoo stations with chairs", 3, 4, 950),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Support Areas",
+        items: [
+          createItem("Reception Desk", "Salon reception counter", 5, 3.5, 750),
+          createItem("Waiting Area", "Waiting sofa and magazines", 6, 3, 550),
+          createItem("Product Display", "Retail product shelves", 4, 6, 550),
+          createItem("Storage Room", "Backroom storage cabinets", 6, 6, 650),
+        ],
+      },
+    ],
+  },
+  {
+    id: "spa-treatment",
+    name: "Spa Treatment Room",
+    description: "Wellness spa interior",
+    icon: Bath,
+    category: "Commercial Salon",
+    sections: [
+      {
+        id: generateId(),
+        title: "Treatment Area",
+        items: [
+          createItem("Massage Bed Cabinet", "Built-in treatment bed with storage", 6, 4, 950),
+          createItem("Product Trolley", "Portable supply cart", 2, 3, 450),
+          createItem("Ambient Lighting", "Dimmable mood lighting", 6, 6, 350),
+          createItem("Water Feature", "Relaxation water element", 3, 4, 550),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Support",
+        items: [
+          createItem("Robe Storage", "Guest robe and locker", 4, 5, 550),
+          createItem("Relaxation Seating", "Post-treatment seating", 4, 3, 450),
+          createItem("Tea Station", "Herbal tea service area", 3, 3, 350),
+        ],
+      },
+    ],
+  },
+
+  // =================== COMMERCIAL - CLINIC TEMPLATES ===================
+  {
+    id: "clinic-reception",
+    name: "Clinic Reception",
+    description: "Medical clinic waiting area",
+    icon: Layers,
+    category: "Commercial Clinic",
+    sections: [
+      {
+        id: generateId(),
+        title: "Reception",
+        items: [
+          createItem("Reception Counter", "Medical reception desk", 8, 3.5, 950),
+          createItem("Waiting Chairs (12)", "Comfortable waiting chairs", 1.5, 2.5, 350),
+          createItem("Magazine Table", "Center tables for waiting", 3, 2, 350),
+          createItem("Signage Panel", "Clinic branding wall", 6, 4, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage & Display",
+        items: [
+          createItem("Filing Cabinets", "Patient record storage", 6, 5, 650),
+          createItem("Health Display", "Information display boards", 4, 5, 350),
+          createItem("Hand Sanitizer Station", "Hygiene station", 1, 4, 250),
+        ],
+      },
+    ],
+  },
+  {
+    id: "doctor-cabin",
+    name: "Doctor's Cabin",
+    description: "Consultation room furniture",
+    icon: Layers,
+    category: "Commercial Clinic",
+    sections: [
+      {
+        id: generateId(),
+        title: "Consultation Area",
+        items: [
+          createItem("Doctor's Desk", "Medical consultation desk", 5, 3, 850),
+          createItem("Doctor's Chair", "Ergonomic doctor chair", 2, 3, 550),
+          createItem("Patient Chairs", "Visitor chairs (2)", 2, 2.5, 400),
+          createItem("Examination Couch", "Medical examination bed cabinet", 6, 4, 750),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage",
+        items: [
+          createItem("Medicine Cabinet", "Lockable medicine storage", 3, 5, 650),
+          createItem("File Cabinet", "Patient file storage", 2, 4, 450),
+          createItem("Wash Basin Unit", "Hand wash station", 2, 3, 550),
+        ],
+      },
+    ],
+  },
+
+  // =================== COMMERCIAL - HOTEL TEMPLATES ===================
+  {
+    id: "hotel-room-standard",
+    name: "Hotel Room - Standard",
+    description: "Standard hotel room furniture",
+    icon: Bed,
+    category: "Commercial Hotel",
+    sections: [
+      {
+        id: generateId(),
+        title: "Sleep Area",
+        items: [
+          createItem("Hotel Bed", "King bed with headboard", 6.5, 6.5, 950),
+          createItem("Side Tables", "Integrated bedside units", 1.5, 2, 450),
+          createItem("Headboard Panel", "Full wall headboard with lighting", 8, 4, 650),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Work & Storage",
+        items: [
+          createItem("Luggage Rack", "Folding luggage stand", 2.5, 2, 250),
+          createItem("Work Desk", "Hotel desk with minibar", 4, 3, 650),
+          createItem("Wardrobe", "Open closet with hangers", 4, 6, 750),
+          createItem("TV Unit", "Wall-mounted TV panel", 5, 4, 550),
+        ],
+      },
+    ],
+  },
+  {
+    id: "hotel-room-suite",
+    name: "Hotel Suite",
+    description: "Luxury hotel suite furniture",
+    icon: Bed,
+    category: "Commercial Hotel",
+    sections: [
+      {
+        id: generateId(),
+        title: "Bedroom",
+        items: [
+          createItem("King Bed Premium", "Luxury upholstered bed", 7, 7, 1400),
+          createItem("Headboard Feature", "Designer headboard wall", 10, 5, 950),
+          createItem("Side Tables", "Premium bedside tables (pair)", 2, 2.5, 650),
+          createItem("Bench", "End of bed upholstered bench", 5, 1.5, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Living Area",
+        items: [
+          createItem("Sofa Set", "Suite living room sofa", 7, 3, 950),
+          createItem("Coffee Table", "Designer center table", 4, 2.5, 550),
+          createItem("Dining Table", "In-room dining for 4", 4, 3.5, 650),
+          createItem("Entertainment Unit", "Full wall TV and bar", 8, 6, 950),
+        ],
+      },
+    ],
+  },
+
+  // =================== POOLSIDE TEMPLATES ===================
+  {
+    id: "poolside-furniture",
+    name: "Poolside Furniture",
+    description: "Pool area seating and storage",
+    icon: Flower2,
+    category: "Poolside",
+    sections: [
+      {
+        id: generateId(),
+        title: "Lounging",
+        items: [
+          createItem("Sun Loungers (4)", "Adjustable pool loungers", 2.5, 6.5, 650),
+          createItem("Side Tables (4)", "Poolside drink tables", 1.5, 1.5, 250),
+          createItem("Umbrellas (2)", "Large pool umbrellas", 8, 8, 450),
+          createItem("Daybed", "Double daybed with canopy", 6, 6, 950),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Support",
+        items: [
+          createItem("Pool Bar", "Outdoor bar counter", 6, 3.5, 1100),
+          createItem("Towel Storage", "Outdoor towel cabinet", 3, 4, 450),
+          createItem("Shower Area", "Outdoor shower enclosure", 3, 7, 650),
+        ],
+      },
+    ],
+  },
+
+  // =================== GARDEN FURNITURE TEMPLATES ===================
+  {
+    id: "garden-seating",
+    name: "Garden Seating",
+    description: "Outdoor garden furniture",
+    icon: Flower2,
+    category: "Garden",
+    sections: [
+      {
+        id: generateId(),
+        title: "Seating Area",
+        items: [
+          createItem("Garden Bench Set", "Wooden garden benches (3)", 5, 2, 550),
+          createItem("Swing Seat", "Garden swing with canopy", 5, 6, 750),
+          createItem("Gazebo Seating", "Gazebo with built-in seating", 10, 10, 1200),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Features",
+        items: [
+          createItem("Fountain/Water Feature", "Garden water feature", 4, 4, 850),
+          createItem("Planter Walls", "Built-in garden planters", 10, 2, 450),
+          createItem("Garden Storage", "Tool and cushion storage", 4, 5, 550),
+          createItem("Pathway Lighting", "Garden path lights system", 20, 0.5, 350),
+        ],
+      },
+    ],
+  },
+
   // =================== CUSTOM/BLANK TEMPLATE ===================
   {
     id: "blank-template",
@@ -1183,6 +1949,8 @@ const categoryIcons: Record<string, typeof FileText> = {
   "Wardrobe": DoorOpen,
   "Bedroom": Bed,
   "Guest Bedroom": Bed,
+  "Teen Room": Bed,
+  "Senior Room": Bed,
   "Living Room": Sofa,
   "Dining Room": UtensilsCrossed,
   "TV Unit": Tv,
@@ -1199,6 +1967,22 @@ const categoryIcons: Record<string, typeof FileText> = {
   "Coffee Bar": Coffee,
   "Garage": Car,
   "Outdoor Living": Flower2,
+  "Home Theater": Tv,
+  "Home Gym": Package,
+  "Library": BookOpen,
+  "Music Room": Package,
+  "Art Studio": Package,
+  "Nursery": Baby,
+  "Staff Quarter": Bed,
+  "Pet Area": Home,
+  "Commercial Office": Layers,
+  "Commercial Retail": Layers,
+  "Commercial Restaurant": UtensilsCrossed,
+  "Commercial Salon": Shirt,
+  "Commercial Clinic": Layers,
+  "Commercial Hotel": Bed,
+  "Poolside": Flower2,
+  "Garden": Flower2,
   "Custom": FileText,
   "My Templates": Star,
 };
