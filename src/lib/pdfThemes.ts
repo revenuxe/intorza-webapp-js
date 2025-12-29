@@ -996,15 +996,41 @@ export const saveEditorSettings = (settings: PDFEditorSettings) => {
   localStorage.setItem('pdfEditorSettings', JSON.stringify(settings));
 };
 
-export const getThemeById = (themeId: string): PDFTheme => {
-  return PDF_THEMES.find(t => t.id === themeId) || PDF_THEMES[0];
+// Get custom themes from localStorage
+const getStoredCustomThemes = (): PDFTheme[] => {
+  try {
+    const stored = localStorage.getItem('customPdfThemes');
+    if (!stored) return [];
+    const customThemes = JSON.parse(stored);
+    return customThemes.map((ct: any) => ({
+      id: ct.id,
+      name: ct.name,
+      description: 'Custom theme',
+      category: 'decoration' as const,
+      colors: {
+        primary: hexToRgb(ct.colors.primary),
+        secondary: hexToRgb(ct.colors.secondary),
+        accent: hexToRgb(ct.colors.accent),
+        background: hexToRgb(ct.colors.background),
+        cardBackground: hexToRgb(ct.colors.background),
+        text: hexToRgb(ct.colors.text),
+        textSecondary: hexToRgb(ct.colors.text),
+        border: hexToRgb(ct.colors.primary),
+        highlight: hexToRgb(ct.colors.highlight),
+        headerBg: hexToRgb(ct.colors.headerBg),
+        headerText: hexToRgb(ct.colors.headerText),
+        decorationPrimary: hexToRgb(ct.colors.decorationPrimary),
+        decorationSecondary: hexToRgb(ct.colors.accent),
+      },
+      fonts: { heading: 'helvetica', body: 'helvetica' },
+      decorations: ct.decorations,
+    }));
+  } catch {
+    return [];
+  }
 };
 
-export const getThemesByCategory = (category: PDFTheme['category']): PDFTheme[] => {
-  return PDF_THEMES.filter(t => t.category === category);
-};
-
-// Convert hex to RGB
+// Convert hex to RGB (defined before use)
 export const hexToRgb = (hex: string): [number, number, number] => {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result 
@@ -1015,4 +1041,27 @@ export const hexToRgb = (hex: string): [number, number, number] => {
 // Convert RGB to hex
 export const rgbToHex = (r: number, g: number, b: number): string => {
   return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+};
+
+// Get all themes including custom
+export const getAllThemes = (): PDFTheme[] => {
+  return [...PDF_THEMES, ...getStoredCustomThemes()];
+};
+
+export const getThemeById = (themeId: string): PDFTheme => {
+  // First check built-in themes
+  const builtIn = PDF_THEMES.find(t => t.id === themeId);
+  if (builtIn) return builtIn;
+  
+  // Then check custom themes
+  const customThemes = getStoredCustomThemes();
+  const custom = customThemes.find(t => t.id === themeId);
+  if (custom) return custom;
+  
+  return PDF_THEMES[0];
+};
+
+export const getThemesByCategory = (category: PDFTheme['category']): PDFTheme[] => {
+  const allThemes = getAllThemes();
+  return allThemes.filter(t => t.category === category);
 };

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -17,10 +17,12 @@ import {
   defaultEditorSettings,
   getThemeById,
   getThemesByCategory,
+  getAllThemes,
   rgbToHex,
   PDFTheme,
 } from "@/lib/pdfThemes";
 import { QuotationSettings } from "./CustomizeFieldsDrawer";
+import { CustomThemeBuilder } from "./CustomThemeBuilder";
 
 interface PDFPreviewEditorProps {
   open: boolean;
@@ -63,6 +65,7 @@ export const PDFPreviewEditor = ({
   const [activeTab, setActiveTab] = useState("themes");
   const [showEditor, setShowEditor] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<ThemeCategory>('all');
+  const [showThemeBuilder, setShowThemeBuilder] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,10 +93,10 @@ export const PDFPreviewEditor = ({
 
   const currentTheme = getThemeById(editorSettings.theme);
 
-  // Get filtered themes based on category
+  // Get filtered themes based on category (including custom themes)
   const getFilteredThemes = (): PDFTheme[] => {
     if (selectedCategory === 'all') {
-      return PDF_THEMES;
+      return getAllThemes();
     }
     return getThemesByCategory(selectedCategory);
   };
@@ -184,6 +187,17 @@ export const PDFPreviewEditor = ({
                 ))}
               </div>
             </div>
+
+            {/* Custom Theme Builder Button */}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full mb-3"
+              onClick={() => setShowThemeBuilder(true)}
+            >
+              <Wand2 className="h-4 w-4 mr-2" />
+              Create Custom Theme
+            </Button>
 
             {/* Themes Grid */}
             <div className="space-y-3">
@@ -848,6 +862,14 @@ export const PDFPreviewEditor = ({
           <PreviewPanel />
         </div>
       </SheetContent>
+
+      {/* Custom Theme Builder Modal */}
+      <CustomThemeBuilder
+        open={showThemeBuilder}
+        onClose={() => setShowThemeBuilder(false)}
+        onSelectTheme={(themeId) => updateSettings({ theme: themeId })}
+        currentThemeId={editorSettings.theme}
+      />
     </Sheet>
   );
 };
