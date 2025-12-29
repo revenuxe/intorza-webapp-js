@@ -241,6 +241,17 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     return theme.colors.highlight;
   };
 
+  // Calculate contrasting text color for highlighted backgrounds
+  const getContrastingTextColor = (bgColor: [number, number, number]): [number, number, number] => {
+    // Calculate relative luminance using sRGB formula
+    const luminance = (0.299 * bgColor[0] + 0.587 * bgColor[1] + 0.114 * bgColor[2]) / 255;
+    // Use white text for dark backgrounds, dark text for light backgrounds
+    return luminance > 0.5 ? [20, 20, 20] : [255, 255, 255];
+  };
+
+  const highlightColor = getHighlightColor();
+  const highlightTextColor = getContrastingTextColor(highlightColor);
+
   const COLORS = {
     TEXT_PRIMARY: theme.colors.text,
     TEXT_SECONDARY: theme.colors.textSecondary,
@@ -248,7 +259,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     BG_CARD: theme.colors.cardBackground,
     BORDER: theme.colors.border,
     ACCENT: theme.colors.accent,
-    HIGHLIGHT: getHighlightColor(),
+    HIGHLIGHT: highlightColor,
+    HIGHLIGHT_TEXT: highlightTextColor,
     HEADER_BG: theme.colors.headerBg,
     HEADER_TEXT: theme.colors.headerText,
   };
@@ -588,7 +600,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
     doc.rect(highlightX, highlightY, textWidth + (highlightPadding * 2), highlightHeight, 'F');
     
-    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+    // Use contrasting text color for highlighted section totals
+    doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
     doc.text(totalText, pageWidth - margin, yPosition + 6, { align: 'right' });
     
     yPosition += 15;
@@ -662,12 +675,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       0: { cellWidth: 120, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
       1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8 }
     },
-    willDrawCell: (cellData) => {
-      if (cellData.column.index === 1 && cellData.section === 'body') {
-        doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
-        doc.setTextColor(0, 0, 0);
-      }
-    },
+        willDrawCell: (cellData) => {
+          if (cellData.column.index === 1 && cellData.section === 'body') {
+            doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
+            // Use contrasting text color for highlighted cells
+            doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
+          }
+        },
     margin: { left: margin, right: margin }
   });
 
