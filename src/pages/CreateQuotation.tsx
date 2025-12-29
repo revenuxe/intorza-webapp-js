@@ -662,6 +662,60 @@ const CreateQuotation = () => {
       );
       trackItemUsage(allItems);
 
+      // Auto-save quotation as template (silently)
+      try {
+        const templateName = projectTitle;
+        const templateSections = sections.map(section => ({
+          id: section.id,
+          title: section.title,
+          items: section.items.map(item => ({
+            id: item.id,
+            side: item.side,
+            productName: item.productName,
+            productDetails: item.productDetails,
+            widthFt: item.widthFt,
+            heightFt: item.heightFt,
+            sftArea: item.sftArea,
+            ratePerSft: item.ratePerSft,
+            amount: item.amount,
+          })),
+        }));
+
+        // Check if template already exists
+        const { data: existingTemplate } = await supabase
+          .from('quotation_templates')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('template_name', templateName)
+          .maybeSingle();
+
+        if (existingTemplate) {
+          // Update existing template
+          await supabase
+            .from('quotation_templates')
+            .update({
+              sections: templateSections as any,
+              description: `Auto-saved from quotation: ${clientName}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingTemplate.id);
+        } else {
+          // Create new template
+          await supabase
+            .from('quotation_templates')
+            .insert({
+              user_id: user.id,
+              template_name: templateName,
+              category: 'Custom',
+              description: `Auto-saved from quotation: ${clientName}`,
+              sections: templateSections as any,
+            });
+        }
+      } catch (templateError) {
+        // Silently fail - template saving is optional
+        console.error('Error auto-saving template:', templateError);
+      }
+
       // Reset form only for Save & Send flow (pending status with share)
       if (status === 'pending' && showShare) {
         if (savedQuotationId) {
