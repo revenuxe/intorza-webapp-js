@@ -220,6 +220,197 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
       },
     ],
   },
+  {
+    id: "island-kitchen",
+    name: "Island Kitchen",
+    description: "Kitchen with central island counter",
+    icon: ChefHat,
+    category: "Kitchen",
+    sections: [
+      {
+        id: generateId(),
+        title: "Main Counter",
+        items: [
+          createItem("Base Cabinets", "Marine plywood with laminate, continuous run", 12, 2.5, 850),
+          createItem("Wall Cabinets", "Matching wall units with lift-up", 12, 1.5, 750),
+          createItem("Tall Unit - Pantry", "Full height pantry pull-out", 2, 7, 1200),
+          createItem("Tall Unit - Appliance", "Oven and microwave housing", 2, 7, 1100),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Island Counter",
+        items: [
+          createItem("Island Base", "Island with storage on both sides", 6, 3, 1100),
+          createItem("Island Countertop", "Quartz/granite island top with overhang", 7, 3.5, 650),
+          createItem("Island Seating", "Bar stool space with footrest rail", 4, 1, 350),
+          createItem("Island Sink/Hob", "Prep sink or hob installation", 2, 2, 550),
+        ],
+      },
+    ],
+  },
+  {
+    id: "straight-kitchen",
+    name: "Straight/Single Wall Kitchen",
+    description: "Linear kitchen for compact spaces",
+    icon: ChefHat,
+    category: "Kitchen",
+    sections: [
+      {
+        id: generateId(),
+        title: "Base Units",
+        items: [
+          createItem("Sink Cabinet", "Under-sink storage with water stopper", 3, 2.5, 900),
+          createItem("Hob Cabinet", "Gas/induction hob base unit", 2, 2.5, 900),
+          createItem("Base Cabinets", "Storage cabinets with shelves", 4, 2.5, 850),
+          createItem("Drawer Unit", "3-drawer soft-close unit", 2, 2.5, 1050),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Wall & Tall Units",
+        items: [
+          createItem("Wall Cabinets", "Full length wall storage", 10, 1.5, 750),
+          createItem("Chimney Cover", "Designer chimney enclosure", 2, 2, 550),
+          createItem("Open Shelves", "Display shelves for jars/spices", 2, 1, 450),
+        ],
+      },
+    ],
+  },
+  {
+    id: "g-shape-kitchen",
+    name: "G-Shape Kitchen",
+    description: "G-shaped kitchen with peninsula",
+    icon: ChefHat,
+    category: "Kitchen",
+    sections: [
+      {
+        id: generateId(),
+        title: "Main G-Shape",
+        items: [
+          createItem("Base Cabinets - Main Run", "3 sides continuous base units", 18, 2.5, 850),
+          createItem("Peninsula Counter", "Extended counter with seating", 5, 2.5, 950),
+          createItem("Corner Units (2)", "Blind corner with pull-out", 3, 2.5, 1100),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Wall & Storage",
+        items: [
+          createItem("Wall Cabinets", "Full perimeter wall storage", 20, 1.5, 750),
+          createItem("Tall Pantry", "Floor to ceiling pantry", 2, 7, 1200),
+        ],
+      },
+    ],
+  },
+  {
+    id: "modular-kitchen-acrylic",
+    name: "Acrylic Finish Kitchen",
+    description: "High-gloss acrylic modular kitchen",
+    icon: ChefHat,
+    category: "Kitchen",
+    sections: [
+      {
+        id: generateId(),
+        title: "Acrylic Base Units",
+        items: [
+          createItem("Base Cabinets - Acrylic", "High-gloss acrylic finish shutters", 10, 2.5, 1350),
+          createItem("Drawer Unit - Premium", "Blum tandem with acrylic front", 2, 2.5, 1450),
+          createItem("Corner Unit - Magic", "Le-mans corner system", 3, 2.5, 1500),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Acrylic Wall Units",
+        items: [
+          createItem("Wall Cabinets - Acrylic", "Matching acrylic wall units", 10, 2, 1200),
+          createItem("Glass Display", "Aluminium frame glass shutters", 3, 2, 1100),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Premium Accessories",
+        items: [
+          createItem("Corian Countertop", "Seamless Corian solid surface", 12, 2, 950),
+          createItem("Profile Handles", "Integrated aluminium profiles", 12, 0.5, 350),
+        ],
+      },
+    ],
+  },
+  {
+    id: "modular-kitchen-membrane",
+    name: "Membrane Finish Kitchen",
+    description: "Budget-friendly membrane kitchen",
+    icon: ChefHat,
+    category: "Kitchen",
+    sections: [
+      {
+        id: generateId(),
+        title: "Membrane Base Units",
+        items: [
+          createItem("Base Cabinets", "MDF with membrane finish", 10, 2.5, 650),
+          createItem("Sink Cabinet", "Water-resistant MDF base", 3, 2.5, 700),
+          createItem("Drawer Unit", "Standard telescopic drawers", 2, 2.5, 800),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Membrane Wall Units",
+        items: [
+          createItem("Wall Cabinets", "MDF membrane wall units", 10, 1.5, 550),
+          createItem("Corner Unit", "Simple corner cabinet", 2, 1.5, 600),
+        ],
+      },
+    ],
+  },
+  {
+    id: "wet-dry-kitchen",
+    name: "Wet & Dry Kitchen",
+    description: "Separate wet and dry cooking areas",
+    icon: ChefHat,
+    category: "Kitchen",
+    sections: [
+      {
+        id: generateId(),
+        title: "Dry Kitchen (Show Kitchen)",
+        items: [
+          createItem("Base Cabinets", "Premium laminate finish", 8, 2.5, 950),
+          createItem("Wall Cabinets", "Glass front display units", 8, 2, 850),
+          createItem("Island Counter", "Breakfast bar with storage", 5, 3, 1100),
+          createItem("Coffee Station", "Appliance garage for small appliances", 2, 2, 650),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Wet Kitchen (Cooking)",
+        items: [
+          createItem("Base Cabinets", "Marine plywood heavy-duty", 8, 2.5, 850),
+          createItem("Sink Cabinet - Large", "Double bowl sink unit", 4, 2.5, 950),
+          createItem("Hob Cabinet", "Gas/induction cooking zone", 3, 2.5, 900),
+          createItem("Exhaust System", "Industrial chimney setup", 3, 2, 1050),
+        ],
+      },
+    ],
+  },
+  {
+    id: "pantry-storage",
+    name: "Kitchen Pantry",
+    description: "Dedicated pantry storage unit",
+    icon: ChefHat,
+    category: "Kitchen",
+    sections: [
+      {
+        id: generateId(),
+        title: "Pantry Units",
+        items: [
+          createItem("Tall Pantry - Pull Out", "Full height pull-out pantry", 2, 8, 1400),
+          createItem("Tall Pantry - Swing", "Hinged door pantry with baskets", 3, 8, 1200),
+          createItem("Counter Pantry", "Base level dry storage", 4, 2.5, 850),
+          createItem("Overhead Storage", "Wall pantry cabinets", 6, 2, 750),
+        ],
+      },
+    ],
+  },
 
   // =================== WARDROBE TEMPLATES ===================
   {
@@ -329,6 +520,171 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
           createItem("Hanging Section", "Single hanging rod", 2.5, 4, 400),
           createItem("Shelves", "Adjustable shelves", 2.5, 4, 500),
           createItem("Drawers", "3-drawer unit", 2, 2, 750),
+        ],
+      },
+    ],
+  },
+  {
+    id: "wardrobe-lacquer",
+    name: "Lacquer Finish Wardrobe",
+    description: "Premium lacquered wardrobe with high-gloss finish",
+    icon: DoorOpen,
+    category: "Wardrobe",
+    sections: [
+      {
+        id: generateId(),
+        title: "Lacquer Structure",
+        items: [
+          createItem("Wardrobe Carcass", "BWP plywood with PU lacquer finish", 10, 9, 1400),
+          createItem("Lacquer Doors", "High-gloss PU lacquer shutters", 10, 8, 1350),
+          createItem("Profile Handles", "Integrated aluminium J-profile", 10, 0.5, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Premium Internals",
+        items: [
+          createItem("Pull-out Trouser Rack", "Aluminium trouser pull-out", 2, 2, 650),
+          createItem("Tie & Belt Organizer", "Motorized tie rack", 1, 2, 550),
+          createItem("LED Lighting", "Motion sensor LED strips", 10, 0.5, 450),
+          createItem("Velvet Drawers", "Jewelry drawers with velvet lining", 2, 1.5, 750),
+        ],
+      },
+    ],
+  },
+  {
+    id: "wardrobe-glass-door",
+    name: "Glass Door Wardrobe",
+    description: "Modern wardrobe with glass/mirror doors",
+    icon: DoorOpen,
+    category: "Wardrobe",
+    sections: [
+      {
+        id: generateId(),
+        title: "Glass Door Structure",
+        items: [
+          createItem("Wardrobe Carcass", "Marine plywood with laminate", 8, 8, 950),
+          createItem("Tinted Glass Doors", "Aluminium frame with tinted glass", 8, 7.5, 1250),
+          createItem("Full Mirror Panels", "Beveled edge mirror on center doors", 4, 7.5, 850),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Internal Organization",
+        items: [
+          createItem("Open Shelving", "Display shelves visible through glass", 4, 5, 550),
+          createItem("Drawer Stack", "Concealed drawer section", 2, 3, 800),
+          createItem("Hanging Section", "Double rod hanging area", 4, 4, 450),
+        ],
+      },
+    ],
+  },
+  {
+    id: "wardrobe-open-system",
+    name: "Open Wardrobe System",
+    description: "Minimalist open wardrobe without doors",
+    icon: DoorOpen,
+    category: "Wardrobe",
+    sections: [
+      {
+        id: generateId(),
+        title: "Open Frame",
+        items: [
+          createItem("Metal Frame Structure", "Powder-coated metal frame system", 8, 8, 750),
+          createItem("Wooden Shelves", "Solid wood or plywood shelves", 8, 1, 450),
+          createItem("Hanging Rods", "Multiple level hanging rods", 6, 0.5, 300),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Accessories",
+        items: [
+          createItem("Fabric Baskets", "Canvas storage baskets", 2, 1.5, 250),
+          createItem("Shoe Rack", "Open shoe display rack", 4, 2, 350),
+          createItem("Drawer Inserts", "Modular drawer units", 2, 2, 550),
+        ],
+      },
+    ],
+  },
+  {
+    id: "wardrobe-corner",
+    name: "Corner Wardrobe",
+    description: "L-shaped corner wardrobe solution",
+    icon: DoorOpen,
+    category: "Wardrobe",
+    sections: [
+      {
+        id: generateId(),
+        title: "Corner Structure",
+        items: [
+          createItem("Corner Unit", "90-degree corner wardrobe", 4, 8, 1100),
+          createItem("Left Wing", "Extended left side wardrobe", 5, 8, 950),
+          createItem("Right Wing", "Extended right side wardrobe", 5, 8, 950),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Corner Internals",
+        items: [
+          createItem("Carousel System", "Rotating corner carousel", 3, 5, 850),
+          createItem("Pull-out Baskets", "Wire basket system", 2, 3, 450),
+          createItem("Corner Shelves", "Curved corner shelves", 2, 4, 400),
+        ],
+      },
+    ],
+  },
+  {
+    id: "wardrobe-kids",
+    name: "Kids Wardrobe",
+    description: "Child-friendly wardrobe design",
+    icon: DoorOpen,
+    category: "Wardrobe",
+    sections: [
+      {
+        id: generateId(),
+        title: "Kids Structure",
+        items: [
+          createItem("Wardrobe Carcass", "Colorful laminate finish", 5, 6, 850),
+          createItem("Low Hanging Rod", "Child-height accessible rod", 3, 3, 300),
+          createItem("Soft-Close Doors", "Safe soft-close hinged doors", 5, 5.5, 750),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Kid-Friendly Features",
+        items: [
+          createItem("Lower Drawers", "Easy-access lower drawers", 3, 1.5, 550),
+          createItem("Display Shelves", "Open toy/book display", 2, 3, 400),
+          createItem("Loft Storage", "Parent-access top storage", 5, 1.5, 450),
+        ],
+      },
+    ],
+  },
+  {
+    id: "wardrobe-his-hers",
+    name: "His & Hers Wardrobe",
+    description: "Dual section wardrobe for couples",
+    icon: DoorOpen,
+    category: "Wardrobe",
+    sections: [
+      {
+        id: generateId(),
+        title: "His Section",
+        items: [
+          createItem("Main Wardrobe - His", "6ft wide section with doors", 6, 8, 950),
+          createItem("Trouser Rack", "Pull-out trouser organizer", 2, 2, 550),
+          createItem("Tie/Belt Holder", "Accessory organizer", 1, 2, 350),
+          createItem("Shirt Shelves", "Folded shirt storage", 2, 4, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Hers Section",
+        items: [
+          createItem("Main Wardrobe - Hers", "6ft wide section with doors", 6, 8, 950),
+          createItem("Saree/Dress Hanging", "Full length hanging section", 3, 6, 450),
+          createItem("Jewelry Drawers", "Velvet-lined jewelry drawers", 2, 1.5, 650),
+          createItem("Bag Storage", "Bag display shelves", 2, 3, 450),
         ],
       },
     ],
@@ -444,6 +800,231 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
       },
     ],
   },
+  {
+    id: "master-bedroom-luxury",
+    name: "Luxury Master Suite",
+    description: "High-end master bedroom with all amenities",
+    icon: Bed,
+    category: "Bedroom",
+    sections: [
+      {
+        id: generateId(),
+        title: "Bed Setup",
+        items: [
+          createItem("Designer Bed", "Custom upholstered platform bed", 7, 7, 1500),
+          createItem("Feature Headboard", "Full wall padded/wooden headboard", 12, 5, 1100),
+          createItem("Floating Side Tables", "Wall-mounted nightstands", 2, 1.5, 550),
+          createItem("Bench", "End of bed upholstered bench", 5, 1.5, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Seating Area",
+        items: [
+          createItem("Chaise Lounge", "Bedroom chaise with side table", 5, 2.5, 850),
+          createItem("Reading Chair", "Accent chair with ottoman", 3, 3, 650),
+          createItem("Floor Lamp", "Designer floor lamp", 1, 5, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage & Display",
+        items: [
+          createItem("Walk-in Closet Entry", "Closet doorway with dressing", 4, 8, 750),
+          createItem("TV Wall Panel", "Concealed TV with artwork", 6, 5, 950),
+          createItem("Display Niches", "Backlit display shelves", 2, 4, 550),
+        ],
+      },
+    ],
+  },
+  {
+    id: "bedroom-minimal",
+    name: "Minimalist Bedroom",
+    description: "Clean, simple bedroom design",
+    icon: Bed,
+    category: "Bedroom",
+    sections: [
+      {
+        id: generateId(),
+        title: "Essential Furniture",
+        items: [
+          createItem("Platform Bed", "Low platform bed no headboard", 6.5, 6.5, 950),
+          createItem("Simple Headboard", "Wooden slat headboard", 6.5, 3, 450),
+          createItem("Cube Side Tables", "Simple cube nightstands", 1.5, 1.5, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage",
+        items: [
+          createItem("Built-in Wardrobe", "Handle-less flush wardrobe", 8, 8, 1050),
+          createItem("Floating Shelves", "Minimal wall shelves", 4, 0.5, 300),
+        ],
+      },
+    ],
+  },
+  {
+    id: "bedroom-indian-traditional",
+    name: "Indian Traditional Bedroom",
+    description: "Traditional Indian style bedroom",
+    icon: Bed,
+    category: "Bedroom",
+    sections: [
+      {
+        id: generateId(),
+        title: "Traditional Bed",
+        items: [
+          createItem("Carved Wooden Bed", "Sheesham/teak carved bed frame", 7, 6.5, 1400),
+          createItem("Carved Headboard", "Traditional carved wooden headboard", 7, 4, 950),
+          createItem("Bedside Tables", "Matching carved side tables", 2, 2.5, 650),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Traditional Storage",
+        items: [
+          createItem("Wooden Almirah", "Traditional wooden wardrobe", 6, 7, 1100),
+          createItem("Dressing Table", "Carved dressing table with mirror", 4, 5, 850),
+          createItem("Trunk Chest", "Decorative storage trunk", 3, 2, 550),
+        ],
+      },
+    ],
+  },
+  {
+    id: "bedroom-contemporary",
+    name: "Contemporary Bedroom",
+    description: "Modern contemporary bedroom design",
+    icon: Bed,
+    category: "Bedroom",
+    sections: [
+      {
+        id: generateId(),
+        title: "Bed Area",
+        items: [
+          createItem("Floating Bed", "Wall-mounted floating bed frame", 6.5, 6.5, 1200),
+          createItem("LED Headboard", "Headboard with integrated lighting", 8, 4, 950),
+          createItem("Pendant Lights", "Hanging bedside pendant lights", 1, 3, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Features",
+        items: [
+          createItem("Feature Wall", "Textured/wooden accent wall", 12, 9, 750),
+          createItem("TV Unit", "Integrated TV and display wall", 8, 5, 850),
+          createItem("Study Nook", "Built-in study corner", 4, 6, 750),
+        ],
+      },
+    ],
+  },
+  {
+    id: "bedroom-scandinavian",
+    name: "Scandinavian Bedroom",
+    description: "Light, airy Nordic-inspired bedroom",
+    icon: Bed,
+    category: "Bedroom",
+    sections: [
+      {
+        id: generateId(),
+        title: "Light Furniture",
+        items: [
+          createItem("Oak Bed Frame", "Light oak wood bed frame", 6, 6.5, 1100),
+          createItem("Simple Headboard", "Rounded oak headboard", 6, 3, 550),
+          createItem("Wooden Side Tables", "Natural wood nightstands", 1.5, 2, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage & Decor",
+        items: [
+          createItem("White Wardrobe", "Clean white hinged wardrobe", 6, 8, 950),
+          createItem("Open Shelving", "Wooden bracket shelves", 4, 4, 400),
+          createItem("Woven Basket Storage", "Natural fiber storage baskets", 2, 1.5, 250),
+        ],
+      },
+    ],
+  },
+  {
+    id: "bedroom-industrial",
+    name: "Industrial Bedroom",
+    description: "Raw industrial style bedroom",
+    icon: Bed,
+    category: "Bedroom",
+    sections: [
+      {
+        id: generateId(),
+        title: "Industrial Furniture",
+        items: [
+          createItem("Metal Frame Bed", "Black metal bed frame", 6.5, 6.5, 850),
+          createItem("Reclaimed Wood Headboard", "Rustic wood headboard", 7, 3.5, 650),
+          createItem("Pipe Side Tables", "Industrial pipe nightstands", 1.5, 2, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Industrial Features",
+        items: [
+          createItem("Metal Wardrobe", "Locker-style metal wardrobe", 4, 7, 750),
+          createItem("Pipe Shelving", "Industrial pipe wall shelves", 6, 4, 550),
+          createItem("Edison Lighting", "Exposed bulb light fixtures", 3, 0.5, 350),
+        ],
+      },
+    ],
+  },
+  {
+    id: "bedroom-bohemian",
+    name: "Bohemian Bedroom",
+    description: "Eclectic boho-style bedroom",
+    icon: Bed,
+    category: "Bedroom",
+    sections: [
+      {
+        id: generateId(),
+        title: "Boho Furniture",
+        items: [
+          createItem("Low Platform Bed", "Cushioned low bed frame", 6.5, 6.5, 950),
+          createItem("Macrame Headboard", "Woven macrame wall hanging", 6, 4, 450),
+          createItem("Rattan Side Tables", "Natural rattan nightstands", 1.5, 2, 400),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Boho Features",
+        items: [
+          createItem("Carved Cabinet", "Antique-style storage cabinet", 4, 5, 750),
+          createItem("Hanging Chair", "Macrame swing chair", 3, 4, 550),
+          createItem("Floor Cushions", "Large floor seating cushions", 3, 3, 300),
+        ],
+      },
+    ],
+  },
+  {
+    id: "twin-bedroom",
+    name: "Twin Bed Bedroom",
+    description: "Shared bedroom with two beds",
+    icon: Bed,
+    category: "Bedroom",
+    sections: [
+      {
+        id: generateId(),
+        title: "Twin Beds",
+        items: [
+          createItem("Single Beds (2)", "Matching single beds with storage", 3.5, 6.5, 850),
+          createItem("Shared Headboard", "Full wall headboard for both beds", 10, 3.5, 750),
+          createItem("Central Side Table", "Shared bedside table", 2, 2, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Shared Space",
+        items: [
+          createItem("Shared Wardrobe", "Double section wardrobe", 8, 8, 1050),
+          createItem("Shared Desk", "Long study desk for two", 6, 2, 750),
+          createItem("Bookshelf Divider", "Open shelf room divider", 3, 5, 550),
+        ],
+      },
+    ],
+  },
 
   // =================== LIVING ROOM TEMPLATES ===================
   {
@@ -526,6 +1107,150 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
       },
     ],
   },
+  {
+    id: "living-room-indian",
+    name: "Indian Living Room",
+    description: "Traditional Indian living room setup",
+    icon: Sofa,
+    category: "Living Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Seating",
+        items: [
+          createItem("Diwan Set", "Traditional diwan with bolsters", 7, 3, 950),
+          createItem("Floor Seating", "Gadda with cushions", 6, 6, 450),
+          createItem("Wooden Chairs", "Traditional carved arm chairs (2)", 2, 3, 650),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Display",
+        items: [
+          createItem("Temple Area", "Built-in small mandir", 2, 4, 750),
+          createItem("Display Cabinet", "Brass artifacts showcase", 4, 6, 950),
+          createItem("Wall Art Panel", "Traditional carved wall panel", 6, 4, 650),
+        ],
+      },
+    ],
+  },
+  {
+    id: "living-room-luxury",
+    name: "Luxury Living Room",
+    description: "High-end luxury living space",
+    icon: Sofa,
+    category: "Living Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Premium Seating",
+        items: [
+          createItem("Designer Sofa", "Italian leather modular sofa", 12, 5, 1600),
+          createItem("Accent Chairs (2)", "Designer accent chairs", 3, 3, 850),
+          createItem("Chaise Lounge", "Premium chaise with side table", 5, 2.5, 750),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Tables & Accessories",
+        items: [
+          createItem("Marble Coffee Table", "Italian marble center table", 5, 3, 950),
+          createItem("Console Table", "Marble top console", 6, 2.5, 750),
+          createItem("Bar Cabinet", "Designer bar with LED", 4, 5, 1100),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Display Wall",
+        items: [
+          createItem("Feature Wall", "Textured/stone feature wall", 12, 10, 850),
+          createItem("Display Niches", "Backlit art display", 4, 5, 650),
+          createItem("Fireplace Unit", "Electric fireplace console", 5, 4, 950),
+        ],
+      },
+    ],
+  },
+  {
+    id: "living-room-open-plan",
+    name: "Open Plan Living",
+    description: "Living-dining combined space",
+    icon: Sofa,
+    category: "Living Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Living Zone",
+        items: [
+          createItem("Sectional Sofa", "Large sectional for open space", 10, 8, 1350),
+          createItem("Coffee Table Set", "Nesting coffee tables", 4, 2.5, 550),
+          createItem("TV Console", "Long TV unit divider", 8, 2, 850),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Dining Zone",
+        items: [
+          createItem("Dining Table", "8-seater table for open plan", 7, 4, 950),
+          createItem("Dining Chairs (8)", "Matching chairs", 1.5, 3, 450),
+          createItem("Partition Storage", "Open shelving divider", 4, 6, 750),
+        ],
+      },
+    ],
+  },
+  {
+    id: "living-room-compact",
+    name: "Compact Living Room",
+    description: "Space-efficient living room",
+    icon: Sofa,
+    category: "Living Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Compact Furniture",
+        items: [
+          createItem("2-Seater Sofa", "Compact sofa for small spaces", 5, 3, 850),
+          createItem("Sofa Cum Bed", "Convertible sofa bed", 6, 3, 1050),
+          createItem("Nesting Tables", "Stackable side tables", 2, 2, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Smart Storage",
+        items: [
+          createItem("Wall-Mounted Console", "Floating TV unit with storage", 5, 4, 750),
+          createItem("Corner Shelf", "Corner display unit", 2, 5, 450),
+          createItem("Ottoman Storage", "Storage ottoman as seating", 2, 2, 400),
+        ],
+      },
+    ],
+  },
+  {
+    id: "living-room-family",
+    name: "Family Living Room",
+    description: "Family-friendly living space",
+    icon: Sofa,
+    category: "Living Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Family Seating",
+        items: [
+          createItem("Large Sectional", "Oversized family sectional", 12, 8, 1400),
+          createItem("Bean Bags (2)", "Kid-friendly seating", 3, 3, 350),
+          createItem("Recliner", "Family recliner chair", 3, 3.5, 650),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Family Features",
+        items: [
+          createItem("Entertainment Unit", "Full wall TV and game storage", 10, 8, 1100),
+          createItem("Toy Storage", "Concealed toy/book storage", 4, 3, 550),
+          createItem("Activity Corner", "Kids activity nook", 4, 4, 450),
+        ],
+      },
+    ],
+  },
 
   // =================== DINING ROOM TEMPLATES ===================
   {
@@ -599,6 +1324,77 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
       },
     ],
   },
+  {
+    id: "dining-room-10-seater",
+    name: "Large Family Dining",
+    description: "10-12 seater dining for large families",
+    icon: UtensilsCrossed,
+    category: "Dining Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Large Dining Set",
+        items: [
+          createItem("Dining Table - 10 Seater", "Extendable solid wood table", 8, 4.5, 1200),
+          createItem("Dining Chairs (10)", "High-back upholstered chairs", 1.5, 3.5, 550),
+          createItem("Bench Seating (2)", "Matching benches", 4, 1.5, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Storage & Service",
+        items: [
+          createItem("Large Crockery Unit", "Full wall crockery display", 8, 7, 1100),
+          createItem("Buffet Table", "Long serving buffet", 7, 3, 850),
+          createItem("Corner Bar", "Wet bar setup", 3, 5, 950),
+        ],
+      },
+    ],
+  },
+  {
+    id: "dining-breakfast-nook",
+    name: "Breakfast Nook",
+    description: "Cozy breakfast corner setup",
+    icon: UtensilsCrossed,
+    category: "Dining Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Nook Setup",
+        items: [
+          createItem("Corner Bench Seating", "L-shape banquette with storage", 6, 6, 850),
+          createItem("Round Table", "Compact round table", 3.5, 3.5, 550),
+          createItem("Pendant Light", "Statement pendant fixture", 2, 2, 350),
+        ],
+      },
+    ],
+  },
+  {
+    id: "dining-room-indian",
+    name: "Indian Style Dining",
+    description: "Traditional Indian dining room",
+    icon: UtensilsCrossed,
+    category: "Dining Room",
+    sections: [
+      {
+        id: generateId(),
+        title: "Traditional Set",
+        items: [
+          createItem("Round Dining Table", "Wooden carved round table", 5, 5, 950),
+          createItem("Carved Chairs (6)", "Traditional carved chairs", 2, 3, 650),
+          createItem("Serving Center", "Lazy susan for center", 2, 2, 350),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Display",
+        items: [
+          createItem("Brass Display", "Brass items display cabinet", 4, 5, 950),
+          createItem("Wall Shelf", "Decorative wall display", 4, 3, 550),
+        ],
+      },
+    ],
+  },
 
   // =================== TV UNIT TEMPLATES ===================
   {
@@ -653,6 +1449,113 @@ const QUOTATION_TEMPLATES: QuotationTemplate[] = [
           createItem("Floating TV Unit", "Wall-mounted compact unit", 5, 1.5, 650),
           createItem("TV Bracket", "Swivel TV mounting bracket", 2, 2, 350),
           createItem("Cable Management", "Hidden cable tray", 4, 0.5, 250),
+        ],
+      },
+    ],
+  },
+  {
+    id: "tv-unit-corner",
+    name: "Corner TV Unit",
+    description: "Space-efficient corner TV setup",
+    icon: Tv,
+    category: "TV Unit",
+    sections: [
+      {
+        id: generateId(),
+        title: "Corner Setup",
+        items: [
+          createItem("Corner TV Cabinet", "Angled corner TV unit", 5, 5, 850),
+          createItem("Side Shelves", "Corner wall shelves", 2, 4, 450),
+          createItem("Base Storage", "Corner base cabinet", 4, 2, 650),
+        ],
+      },
+    ],
+  },
+  {
+    id: "tv-unit-concealed",
+    name: "Concealed TV Unit",
+    description: "Hidden TV with sliding/folding panel",
+    icon: Tv,
+    category: "TV Unit",
+    sections: [
+      {
+        id: generateId(),
+        title: "Concealed System",
+        items: [
+          createItem("TV Cavity", "Recessed TV mounting niche", 5, 4, 850),
+          createItem("Sliding Panel", "Motorized sliding art panel", 6, 5, 1200),
+          createItem("Remote Control System", "Smart home integration", 1, 1, 450),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Surrounding Storage",
+        items: [
+          createItem("Side Cabinets", "Flanking storage units", 4, 6, 750),
+          createItem("Base Drawer", "Media equipment drawer", 5, 1.5, 550),
+        ],
+      },
+    ],
+  },
+  {
+    id: "tv-unit-fireplace",
+    name: "TV with Fireplace Unit",
+    description: "Combined TV and fireplace wall",
+    icon: Tv,
+    category: "TV Unit",
+    sections: [
+      {
+        id: generateId(),
+        title: "Combined Unit",
+        items: [
+          createItem("Feature Wall Panel", "Stone/textured full wall", 12, 10, 950),
+          createItem("TV Section", "Recessed TV mounting area", 5, 3.5, 650),
+          createItem("Electric Fireplace", "Electric fireplace insert", 4, 2.5, 850),
+        ],
+      },
+      {
+        id: generateId(),
+        title: "Accessories",
+        items: [
+          createItem("Mantle Shelf", "Fireplace mantle display", 5, 0.5, 350),
+          createItem("Side Storage", "Built-in wood storage look", 2, 3, 450),
+          createItem("LED Ambiance", "Mood lighting system", 10, 0.5, 350),
+        ],
+      },
+    ],
+  },
+  {
+    id: "tv-unit-bedroom",
+    name: "Bedroom TV Unit",
+    description: "Compact TV unit for bedrooms",
+    icon: Tv,
+    category: "TV Unit",
+    sections: [
+      {
+        id: generateId(),
+        title: "Bedroom TV",
+        items: [
+          createItem("Wall Panel", "Bedroom TV backpanel", 6, 5, 650),
+          createItem("Floating Console", "Compact floating unit", 5, 1.5, 550),
+          createItem("Side Shelves", "Decorative side shelves", 1.5, 3, 350),
+        ],
+      },
+    ],
+  },
+  {
+    id: "tv-unit-partition",
+    name: "TV Partition Unit",
+    description: "TV unit as room divider",
+    icon: Tv,
+    category: "TV Unit",
+    sections: [
+      {
+        id: generateId(),
+        title: "Partition Unit",
+        items: [
+          createItem("Double-Sided Unit", "TV visible from living, storage from dining", 6, 7, 1100),
+          createItem("Rotating TV Mount", "360-degree rotating mount", 2, 3, 750),
+          createItem("Display Shelves", "Open shelves both sides", 4, 5, 550),
         ],
       },
     ],
