@@ -2,6 +2,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PDFEditorSettings, getThemeById, hexToRgb, PDFTheme } from './pdfThemes';
+import { drawAllDecorations, drawSectionDivider, drawFooterDecoration } from './pdfDecorations';
 
 // --- Settings Interface ---
 export interface QuotationPdfSettings {
@@ -222,6 +223,15 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   const margin = 15;
   const contentWidth = pageWidth - (margin * 2);
   let yPosition = 15;
+
+  // --- Draw Page Decorations (borders, corners, watermarks) ---
+  if (editorSettings) {
+    drawAllDecorations(doc, theme, editorSettings);
+    // Adjust starting position if page border is enabled
+    if (editorSettings.showDecorations && editorSettings.showPageBorder && theme.decorations.pageBorderInset > 0) {
+      yPosition = theme.decorations.pageBorderInset + 5;
+    }
+  }
 
   // --- Design System Colors (from theme) ---
   const getHighlightColor = (): [number, number, number] => {
