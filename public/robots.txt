@@ -1,6 +1,5 @@
 # robots.txt for INTORZA - Interior Design Quotation Software
-# https://intorza.com
-# Last updated: 2024-12-29
+# Last updated: 2024-12-30
 
 # ===== GOOGLE CRAWLERS (Priority) =====
 User-agent: Googlebot
@@ -119,9 +118,3 @@ Allow: /cancellation-refund-policy
 Allow: /manifest.json
 Allow: /sitemap.xml
 Allow: /robots.txt
-
-# ===== SITEMAP =====
-Sitemap: https://intorza.com/sitemap.xml
-
-# ===== HOST =====
-Host: https://intorza.com

@@ -1,124 +1,115 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
-        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
-        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd
-        http://www.google.com/schemas/sitemap-image/1.1
-        http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd">
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
   
   <!-- Homepage - Highest Priority -->
   <url>
-    <loc>https://intorza.com/</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <image:image>
-      <image:loc>https://storage.googleapis.com/gpt-engineer-file-uploads/bz9CrhjdCZRaDUl9RJnAIoqITfE3/social-images/social-1764689857950-Screenshot 2025-12-02 210716.png</image:loc>
-      <image:title>INTORZA - Interior Design Quotation Software Dashboard</image:title>
-      <image:caption>Professional quotation and invoice software for interior designers</image:caption>
-    </image:image>
   </url>
   
   <!-- Core Features - High Priority -->
   <url>
-    <loc>https://intorza.com/quotations</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/quotations</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
   </url>
   
   <url>
-    <loc>https://intorza.com/create-quotation</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/create-quotation</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
   </url>
   
   <url>
-    <loc>https://intorza.com/invoices</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/invoices</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.90</priority>
   </url>
   
   <url>
-    <loc>https://intorza.com/site-measurement</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/site-measurement</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
   </url>
   
   <!-- Management Features -->
   <url>
-    <loc>https://intorza.com/clients</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/clients</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
   
   <url>
-    <loc>https://intorza.com/my-projects</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/my-projects</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.80</priority>
   </url>
   
   <url>
-    <loc>https://intorza.com/library</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/library</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
   </url>
   
   <url>
-    <loc>https://intorza.com/team</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/team</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
   </url>
   
   <url>
-    <loc>https://intorza.com/dashboard</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/dashboard</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.70</priority>
   </url>
   
   <url>
-    <loc>https://intorza.com/settings</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/settings</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.60</priority>
   </url>
   
   <!-- Authentication -->
   <url>
-    <loc>https://intorza.com/auth</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/auth</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.65</priority>
   </url>
   
   <!-- Legal & Policy Pages -->
   <url>
-    <loc>https://intorza.com/terms-and-conditions</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/terms-and-conditions</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.40</priority>
   </url>
   
   <url>
-    <loc>https://intorza.com/privacy-policy</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/privacy-policy</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.40</priority>
   </url>
   
   <url>
-    <loc>https://intorza.com/cancellation-refund-policy</loc>
-    <lastmod>2024-12-29</lastmod>
+    <loc>/cancellation-refund-policy</loc>
+    <lastmod>2024-12-30</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.40</priority>
   </url>
