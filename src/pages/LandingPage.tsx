@@ -17,7 +17,9 @@ import {
   Zap,
   Shield,
   Clock,
-  IndianRupee
+  IndianRupee,
+  Play,
+  ChevronRight
 } from "lucide-react";
 import intorzaLogo from "@/assets/intorza-logo.webp";
 import dashboardImg from "@/assets/screenshots/dashboard.png";
@@ -35,101 +37,94 @@ const LandingPage = () => {
     {
       icon: LayoutDashboard,
       title: "Smart Dashboard",
-      description: "Get a complete overview of your business - quotations, revenue, pending amounts, and conversion rates all in one place.",
+      description: "Complete business overview with revenue tracking, quotation status, and conversion analytics.",
       image: dashboardImg,
       cta: "Explore Dashboard",
-      link: "/dashboard",
-      color: "from-blue-500/20 to-blue-600/10"
+      link: "/dashboard"
     },
     {
       icon: FileText,
       title: "Professional Quotations",
-      description: "Create beautiful, detailed quotations in minutes with templates, auto-calculations, and customizable sections.",
+      description: "Create stunning quotations with auto-calculations, templates, and instant PDF generation.",
       image: quotationImg,
       cta: "Create Quotation",
-      link: "/create-quotation",
-      color: "from-terracotta/20 to-orange-500/10"
+      link: "/create-quotation"
     },
     {
       icon: Ruler,
       title: "Site Measurement",
-      description: "Record site measurements on-the-go, add photos, assign team members, and convert directly to quotations.",
+      description: "Record measurements on-site, attach photos, and convert directly to quotations.",
       image: siteMeasurementImg,
       cta: "Start Measuring",
-      link: "/site-measurement",
-      color: "from-green-500/20 to-emerald-500/10"
+      link: "/site-measurement"
     },
     {
       icon: Receipt,
       title: "Invoice Management",
-      description: "Track payments, generate invoices from quotations, and never miss a pending amount with smart reminders.",
+      description: "Track payments, generate invoices, and monitor outstanding balances effortlessly.",
       image: invoiceImg,
       cta: "Manage Invoices",
-      link: "/invoices",
-      color: "from-purple-500/20 to-violet-500/10"
+      link: "/invoices"
     },
     {
       icon: FolderKanban,
       title: "Project Tracking",
-      description: "Convert accepted quotations to projects, track progress, manage team assignments, and monitor financials.",
+      description: "Convert quotations to projects, track progress, and manage team assignments.",
       image: projectsImg,
       cta: "View Projects",
-      link: "/my-projects",
-      color: "from-amber-500/20 to-yellow-500/10"
+      link: "/my-projects"
     },
     {
       icon: Users,
       title: "Team Management",
-      description: "Add team members, assign projects, track attendance, and manage your workforce efficiently.",
+      description: "Add members, assign projects, track attendance, and manage your workforce.",
       image: teamImg,
       cta: "Manage Team",
-      link: "/team",
-      color: "from-pink-500/20 to-rose-500/10"
-    },
-    {
-      icon: Library,
-      title: "My Library",
-      description: "Save items, sections, terms, and templates for quick reuse. Your pricing library learns from your patterns.",
-      image: libraryImg,
-      cta: "Open Library",
-      link: "/library",
-      color: "from-cyan-500/20 to-teal-500/10"
+      link: "/team"
     }
   ];
 
-  const benefits = [
-    { icon: Zap, title: "10x Faster", desc: "Create quotations in minutes, not hours" },
-    { icon: Shield, title: "Never Lose Data", desc: "Cloud sync keeps everything safe" },
-    { icon: Clock, title: "Save 5+ Hours/Week", desc: "Automate repetitive tasks" },
-    { icon: IndianRupee, title: "Get Paid Faster", desc: "Track payments & send reminders" }
+  const stats = [
+    { value: "500+", label: "Active Users" },
+    { value: "₹2Cr+", label: "Revenue Tracked" },
+    { value: "10K+", label: "Quotations Created" },
+    { value: "98%", label: "Customer Satisfaction" }
   ];
 
-  const testimonials = [
-    { name: "Rajesh Kumar", role: "Interior Designer, Bangalore", text: "Intorza transformed how I handle quotations. My clients love the professional PDFs!", rating: 5 },
-    { name: "Priya Sharma", role: "Contractor, Mumbai", text: "The site measurement feature is a game changer. I can quote on-site instantly.", rating: 5 },
-    { name: "Amit Patel", role: "Furniture Manufacturer, Ahmedabad", text: "Best investment for my business. Payment tracking alone saved me lakhs.", rating: 5 }
+  const proFeatures = [
+    "Unlimited Quotations & Invoices",
+    "Site Measurement with Photos",
+    "Project Management",
+    "Team Management & Attendance",
+    "My Library - Templates & Items",
+    "Client Analytics",
+    "Branded PDF Downloads",
+    "Cloud Sync & Backup",
+    "Priority Support"
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={intorzaLogo} alt="Intorza" className="h-8" />
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border/40">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Link to="/" className="flex items-center">
+            <img src={intorzaLogo} alt="Intorza" className="h-9" />
           </Link>
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-muted-foreground hover:text-foreground transition-colors">Features</a>
-            <a href="#pricing" className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
-            <a href="#testimonials" className="text-muted-foreground hover:text-foreground transition-colors">Reviews</a>
+          <div className="hidden md:flex items-center gap-10">
+            <a href="#features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Features</a>
+            <a href="#pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+            <a href="#reviews" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Reviews</a>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Link to="/auth">
-              <Button variant="ghost" className="hidden sm:inline-flex">Login</Button>
+              <Button variant="ghost" size="sm" className="hidden sm:inline-flex font-medium">
+                Login
+              </Button>
             </Link>
             <Link to="/create-quotation">
-              <Button className="bg-terracotta hover:bg-terracotta/90 text-white shadow-lg shadow-terracotta/25">
-                Get Started Free
+              <Button size="sm" className="bg-terracotta hover:bg-terracotta/90 text-white font-medium px-5">
+                Get Started
               </Button>
             </Link>
           </div>
@@ -137,228 +132,286 @@ const LandingPage = () => {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 relative overflow-hidden">
-        {/* Background Effects */}
-        <div className="absolute inset-0 bg-gradient-to-br from-terracotta/5 via-transparent to-navy/5" />
-        <div className="absolute top-20 left-10 w-72 h-72 bg-terracotta/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-navy/10 rounded-full blur-3xl" />
+      <section className="pt-28 pb-20 px-6 relative">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-terracotta/8 via-transparent to-transparent" />
         
-        <div className="container mx-auto relative z-10">
-          <div className="text-center max-w-4xl mx-auto">
-            <Badge className="mb-6 bg-terracotta/10 text-terracotta border-terracotta/20 px-4 py-2">
-              <Sparkles className="w-4 h-4 mr-2" />
-              Trusted by 500+ Interior Professionals
-            </Badge>
+        <div className="max-w-7xl mx-auto relative">
+          <div className="text-center max-w-4xl mx-auto mb-16">
+            <div className="inline-flex items-center gap-2 bg-terracotta/10 border border-terracotta/20 rounded-full px-4 py-2 mb-8">
+              <Sparkles className="w-4 h-4 text-terracotta" />
+              <span className="text-sm font-medium text-terracotta">For Interior Designers & Contractors</span>
+            </div>
             
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 leading-tight">
-              Create{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-terracotta to-orange-500">
-                Professional Quotations
-              </span>{" "}
-              in Minutes
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6">
+              <span className="text-foreground">Create Quotations</span>
+              <br />
+              <span className="bg-gradient-to-r from-terracotta via-orange-500 to-terracotta bg-clip-text text-transparent">
+                Like a Pro
+              </span>
             </h1>
             
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              The all-in-one business management app for interior designers, contractors & furniture makers. 
-              From site measurement to invoice collection.
+            <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto leading-relaxed">
+              The complete business management solution for interior professionals. 
+              From site measurement to payment collection — all in one place.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/create-quotation">
-                <Button size="lg" className="bg-terracotta hover:bg-terracotta/90 text-white shadow-xl shadow-terracotta/30 text-lg px-8 py-6 w-full sm:w-auto">
-                  Create Your First Quotation
+                <Button size="lg" className="bg-terracotta hover:bg-terracotta/90 text-white text-base px-8 h-14 shadow-lg shadow-terracotta/20 w-full sm:w-auto">
+                  Start Free — No Card Required
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
               <a href="#features">
-                <Button size="lg" variant="outline" className="text-lg px-8 py-6 w-full sm:w-auto border-2">
-                  See All Features
+                <Button size="lg" variant="outline" className="text-base px-8 h-14 border-2 w-full sm:w-auto">
+                  <Play className="mr-2 w-4 h-4" />
+                  See How It Works
                 </Button>
               </a>
             </div>
+          </div>
 
-            {/* Hero Image - Dashboard */}
-            <div className="relative mt-8">
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10 pointer-events-none" />
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-navy/20 border border-border/50">
+          {/* Hero Image */}
+          <div className="relative max-w-6xl mx-auto">
+            <div className="absolute -inset-4 bg-gradient-to-r from-terracotta/20 via-orange-500/10 to-terracotta/20 rounded-3xl blur-2xl opacity-60" />
+            <div className="relative bg-card rounded-2xl border border-border/60 shadow-2xl overflow-hidden">
+              <div className="aspect-[16/9] overflow-hidden">
                 <img 
                   src={dashboardImg} 
                   alt="Intorza Dashboard" 
-                  className="w-full h-auto"
+                  className="w-full h-full object-cover object-top"
                 />
-              </div>
-              {/* Floating Stats */}
-              <div className="absolute -left-4 md:left-8 top-1/4 bg-white dark:bg-card rounded-xl shadow-xl p-4 border border-border/50 animate-float">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Revenue Tracked</p>
-                    <p className="font-bold text-foreground">₹50L+</p>
-                  </div>
-                </div>
-              </div>
-              <div className="absolute -right-4 md:right-8 top-1/3 bg-white dark:bg-card rounded-xl shadow-xl p-4 border border-border/50 animate-float-delayed">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Quotations Created</p>
-                    <p className="font-bold text-foreground">2,500+</p>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Benefits Bar */}
-      <section className="py-12 bg-navy text-white">
-        <div className="container mx-auto px-4">
+      {/* Stats Section */}
+      <section className="py-16 px-6 bg-navy">
+        <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {benefits.map((benefit, i) => (
+            {stats.map((stat, i) => (
               <div key={i} className="text-center">
-                <benefit.icon className="w-8 h-8 mx-auto mb-3 text-gold" />
-                <h3 className="font-semibold mb-1">{benefit.title}</h3>
-                <p className="text-sm text-white/70">{benefit.desc}</p>
+                <div className="text-3xl md:text-4xl font-bold text-white mb-2">{stat.value}</div>
+                <div className="text-sm text-white/60">{stat.label}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-24 px-4">
-        <div className="container mx-auto">
+      {/* Features Grid */}
+      <section id="features" className="py-24 px-6">
+        <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
-            <Badge className="mb-4 bg-navy/10 text-navy border-navy/20">Features</Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">
-              Everything You Need to{" "}
-              <span className="text-terracotta">Run Your Business</span>
+            <Badge variant="outline" className="mb-4 border-navy/30 text-navy">
+              Powerful Features
+            </Badge>
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+              Everything You Need
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              From first client meeting to final payment, Intorza handles it all.
+              Streamline your entire workflow from client meeting to final payment
             </p>
           </div>
 
-          <div className="space-y-32">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature, index) => (
-              <div 
+              <Card 
                 key={index} 
-                className={`flex flex-col ${index % 2 === 0 ? 'lg:flex-row' : 'lg:flex-row-reverse'} gap-12 items-center`}
+                className="group border-border/50 hover:border-terracotta/30 hover:shadow-xl hover:shadow-terracotta/5 transition-all duration-300 overflow-hidden"
               >
-                {/* Content */}
-                <div className="flex-1 text-center lg:text-left">
-                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br ${feature.color} mb-6`}>
-                    <feature.icon className="w-8 h-8 text-terracotta" />
+                <div className="aspect-[4/3] overflow-hidden bg-muted/30">
+                  <img 
+                    src={feature.image} 
+                    alt={feature.title} 
+                    className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-terracotta/10 flex items-center justify-center">
+                      <feature.icon className="w-5 h-5 text-terracotta" />
+                    </div>
+                    <h3 className="text-lg font-semibold">{feature.title}</h3>
                   </div>
-                  <h3 className="text-2xl md:text-4xl font-bold mb-4">{feature.title}</h3>
-                  <p className="text-lg text-muted-foreground mb-6 max-w-md mx-auto lg:mx-0">
+                  <p className="text-muted-foreground text-sm mb-4 leading-relaxed">
                     {feature.description}
                   </p>
                   <Link to={feature.link}>
-                    <Button className="bg-terracotta hover:bg-terracotta/90 text-white shadow-lg">
+                    <Button variant="ghost" size="sm" className="text-terracotta hover:text-terracotta hover:bg-terracotta/10 p-0 h-auto font-medium">
                       {feature.cta}
-                      <ArrowRight className="ml-2 w-4 h-4" />
+                      <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
                   </Link>
-                </div>
-
-                {/* Image */}
-                <div className="flex-1 relative">
-                  <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} rounded-3xl blur-2xl opacity-50`} />
-                  <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-border/50 hover:shadow-3xl transition-shadow duration-500">
-                    <img 
-                      src={feature.image} 
-                      alt={feature.title} 
-                      className="w-full h-auto"
-                    />
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Quotation Detail Feature */}
-      <section className="py-24 px-4 bg-gradient-to-br from-warm-beige/30 to-background">
-        <div className="container mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="relative order-2 lg:order-1">
-              <div className="absolute inset-0 bg-gradient-to-br from-terracotta/20 to-orange-500/10 rounded-3xl blur-2xl opacity-50" />
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-border/50">
-                <img 
-                  src={quotationDetailImg} 
-                  alt="Quotation Details" 
-                  className="w-full h-auto"
-                />
-              </div>
-            </div>
-            <div className="order-1 lg:order-2 text-center lg:text-left">
-              <Badge className="mb-4 bg-terracotta/10 text-terracotta border-terracotta/20">Quotation Management</Badge>
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Track Every Quotation from{" "}
-                <span className="text-terracotta">Pending to Accepted</span>
+      {/* Library Feature Highlight */}
+      <section className="py-24 px-6 bg-gradient-to-b from-muted/30 to-background">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <Badge variant="outline" className="mb-4 border-terracotta/30 text-terracotta">
+                My Library
+              </Badge>
+              <h2 className="text-4xl font-bold mb-6">
+                Save Time with <span className="text-terracotta">Smart Templates</span>
               </h2>
-              <ul className="space-y-4 text-left max-w-md mx-auto lg:mx-0">
+              <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+                Build your personal library of items, sections, payment terms, and quotation templates. 
+                Intorza learns from your patterns and auto-suggests pricing.
+              </p>
+              
+              <ul className="space-y-4 mb-8">
                 {[
-                  "Mark quotations as Accepted or Rejected",
-                  "View complete client & project details",
-                  "Download professional PDFs anytime",
-                  "Convert accepted quotes to projects instantly"
+                  "Auto-learned items with smart pricing",
+                  "Reusable section templates",
+                  "Custom payment stage configurations",
+                  "Terms & warranty templates"
                 ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <li key={i} className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    </div>
                     <span className="text-muted-foreground">{item}</span>
                   </li>
                 ))}
               </ul>
-              <div className="mt-8">
-                <Link to="/quotations">
-                  <Button className="bg-terracotta hover:bg-terracotta/90 text-white shadow-lg">
-                    View My Quotations
-                    <ArrowRight className="ml-2 w-4 h-4" />
-                  </Button>
-                </Link>
+
+              <Link to="/library">
+                <Button className="bg-terracotta hover:bg-terracotta/90 text-white">
+                  Explore Library
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
+              </Link>
+            </div>
+
+            <div className="relative">
+              <div className="absolute -inset-4 bg-gradient-to-r from-terracotta/10 to-orange-500/10 rounded-3xl blur-xl" />
+              <div className="relative bg-card rounded-2xl border border-border/60 shadow-xl overflow-hidden">
+                <div className="aspect-[4/3] overflow-hidden">
+                  <img 
+                    src={libraryImg} 
+                    alt="My Library" 
+                    className="w-full h-full object-cover object-top"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Client Management */}
-      <section className="py-24 px-4">
-        <div className="container mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="text-center lg:text-left">
-              <Badge className="mb-4 bg-navy/10 text-navy border-navy/20">Client Management</Badge>
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Know Your Clients{" "}
-                <span className="text-terracotta">Inside Out</span>
+      {/* Client & Quotation Section */}
+      <section className="py-24 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="order-2 lg:order-1 relative">
+              <div className="absolute -inset-4 bg-gradient-to-r from-navy/10 to-blue-500/10 rounded-3xl blur-xl" />
+              <div className="relative bg-card rounded-2xl border border-border/60 shadow-xl overflow-hidden">
+                <div className="aspect-[4/3] overflow-hidden">
+                  <img 
+                    src={clientsImg} 
+                    alt="Client Management" 
+                    className="w-full h-full object-cover object-top"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="order-1 lg:order-2">
+              <Badge variant="outline" className="mb-4 border-navy/30 text-navy">
+                Client Management
+              </Badge>
+              <h2 className="text-4xl font-bold mb-6">
+                Know Your <span className="text-navy">Clients Better</span>
               </h2>
-              <p className="text-lg text-muted-foreground mb-6 max-w-md mx-auto lg:mx-0">
-                Track total billed amount, payments received, and outstanding balance for each client. 
-                Never miss a follow-up again.
+              <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+                Get a complete financial picture for each client — total billed, payments received, 
+                and outstanding amounts. Never miss a follow-up again.
               </p>
+              
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                {[
+                  { icon: Zap, label: "Instant Overview" },
+                  { icon: Shield, label: "Payment Tracking" },
+                  { icon: Clock, label: "Follow-up Reminders" },
+                  { icon: IndianRupee, label: "Revenue Analytics" }
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                    <item.icon className="w-5 h-5 text-navy" />
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+
               <Link to="/clients">
-                <Button className="bg-navy hover:bg-navy/90 text-white shadow-lg">
+                <Button className="bg-navy hover:bg-navy/90 text-white">
                   Manage Clients
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Quotation Detail Section */}
+      <section className="py-24 px-6 bg-gradient-to-b from-background to-muted/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <Badge variant="outline" className="mb-4 border-terracotta/30 text-terracotta">
+                Quotation Management
+              </Badge>
+              <h2 className="text-4xl font-bold mb-6">
+                Track Every <span className="text-terracotta">Quotation Status</span>
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+                From pending to accepted — manage the complete lifecycle of your quotations. 
+                Mark status, download PDFs, and convert to projects with one click.
+              </p>
+              
+              <ul className="space-y-4 mb-8">
+                {[
+                  "Mark as Accepted or Rejected",
+                  "Complete client & project details",
+                  "Professional PDF downloads",
+                  "One-click project conversion"
+                ].map((item, i) => (
+                  <li key={i} className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full bg-terracotta/10 flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 className="w-4 h-4 text-terracotta" />
+                    </div>
+                    <span className="text-muted-foreground">{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Link to="/quotations">
+                <Button className="bg-terracotta hover:bg-terracotta/90 text-white">
+                  View Quotations
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
+              </Link>
+            </div>
+
             <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-navy/20 to-blue-500/10 rounded-3xl blur-2xl opacity-50" />
-              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-border/50">
-                <img 
-                  src={clientsImg} 
-                  alt="Client Management" 
-                  className="w-full h-auto"
-                />
+              <div className="absolute -inset-4 bg-gradient-to-r from-terracotta/10 to-orange-500/10 rounded-3xl blur-xl" />
+              <div className="relative bg-card rounded-2xl border border-border/60 shadow-xl overflow-hidden">
+                <div className="aspect-[4/3] overflow-hidden">
+                  <img 
+                    src={quotationDetailImg} 
+                    alt="Quotation Details" 
+                    className="w-full h-full object-cover object-top"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -366,82 +419,66 @@ const LandingPage = () => {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-24 px-4 bg-gradient-to-br from-navy via-navy/95 to-navy text-white relative overflow-hidden">
+      <section id="pricing" className="py-24 px-6 bg-navy relative overflow-hidden">
         <div className="absolute inset-0">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-terracotta/20 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gold/20 rounded-full blur-3xl" />
+          <div className="absolute top-0 left-1/3 w-96 h-96 bg-terracotta/15 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-1/3 w-96 h-96 bg-gold/15 rounded-full blur-3xl" />
         </div>
         
-        <div className="container mx-auto relative z-10">
+        <div className="max-w-4xl mx-auto relative">
           <div className="text-center mb-12">
-            <Badge className="mb-4 bg-gold/20 text-gold border-gold/30">Limited Time Offer</Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">
-              Start Your Pro Journey at{" "}
-              <span className="text-gold">97% OFF</span>
+            <Badge className="mb-4 bg-gold/20 text-gold border-gold/30">
+              Limited Time Offer
+            </Badge>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              Upgrade to Pro at <span className="text-gold">97% OFF</span>
             </h2>
-            <p className="text-lg text-white/70 max-w-xl mx-auto">
-              Join 500+ professionals who upgraded their business with Intorza Pro
+            <p className="text-lg text-white/60">
+              Join 500+ professionals growing their business with Intorza
             </p>
           </div>
 
-          <div className="max-w-lg mx-auto">
-            <Card className="bg-white/10 backdrop-blur-xl border-white/20 text-white overflow-hidden relative">
-              <div className="absolute top-0 right-0 bg-gradient-to-l from-gold to-amber-500 text-navy font-bold px-6 py-2 text-sm">
-                BEST VALUE
-              </div>
-              <CardContent className="p-8 pt-12">
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold mb-2">Intorza Pro</h3>
-                  <p className="text-white/70 mb-6">Everything you need to grow</p>
-                  
-                  <div className="mb-8">
-                    <div className="flex items-center justify-center gap-3">
-                      <span className="text-2xl text-white/50 line-through">₹1,999</span>
-                      <Badge className="bg-red-500/20 text-red-300 border-red-500/30">97% OFF</Badge>
-                    </div>
-                    <div className="flex items-baseline justify-center mt-2">
-                      <span className="text-6xl font-bold text-gold">₹49</span>
-                      <span className="text-xl text-white/70 ml-2">/month</span>
-                    </div>
+          <Card className="bg-white/10 backdrop-blur-xl border-white/20 overflow-hidden">
+            <CardContent className="p-8 md:p-12">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-8">
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="text-2xl text-white/40 line-through">₹1,999</span>
+                    <Badge className="bg-red-500/80 text-white border-0">97% OFF</Badge>
                   </div>
-
-                  <ul className="space-y-4 text-left mb-8">
-                    {[
-                      "Unlimited Quotations & Invoices",
-                      "Site Measurement with Photos",
-                      "Project Management & Tracking",
-                      "Team Management & Attendance",
-                      "My Library - Templates & Items",
-                      "Client Management & Analytics",
-                      "PDF Downloads with Branding",
-                      "Cloud Sync & Backup",
-                      "Priority Support"
-                    ].map((item, i) => (
-                      <li key={i} className="flex items-center gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-gold flex-shrink-0" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-
+                  <div className="flex items-baseline gap-2 mb-6">
+                    <span className="text-6xl font-bold text-gold">₹49</span>
+                    <span className="text-xl text-white/60">/month</span>
+                  </div>
                   <Link to="/auth">
-                    <Button size="lg" className="w-full bg-gradient-to-r from-gold to-amber-500 hover:from-gold/90 hover:to-amber-500/90 text-navy font-bold text-lg py-6 shadow-xl shadow-gold/30">
-                      Upgrade to Pro Now
+                    <Button size="lg" className="w-full md:w-auto bg-gradient-to-r from-gold to-amber-500 hover:from-gold/90 hover:to-amber-500/90 text-navy font-bold text-lg h-14 px-10">
+                      Upgrade Now
                       <ArrowRight className="ml-2 w-5 h-5" />
                     </Button>
                   </Link>
-                  <p className="text-sm text-white/50 mt-4">Cancel anytime. No questions asked.</p>
+                  <p className="text-sm text-white/40 mt-3">Cancel anytime. No questions asked.</p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
 
-          {/* Free Features */}
-          <div className="mt-12 text-center">
-            <p className="text-white/70 mb-4">Or start with our Free Plan</p>
-            <div className="flex flex-wrap justify-center gap-4">
-              {["Create Quotations", "Download PDFs", "View Dashboard", "Basic Client Management"].map((item, i) => (
-                <Badge key={i} variant="outline" className="border-white/30 text-white/70 px-4 py-2">
+                <div className="flex-1 md:max-w-xs">
+                  <h4 className="text-white font-semibold mb-4">Everything in Pro:</h4>
+                  <ul className="space-y-3">
+                    {proFeatures.map((item, i) => (
+                      <li key={i} className="flex items-center gap-3 text-sm text-white/80">
+                        <CheckCircle2 className="w-4 h-4 text-gold flex-shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="text-center mt-8">
+            <p className="text-white/50 mb-3">Start with our Free Plan</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {["Create Quotations", "Download PDFs", "View Dashboard"].map((item, i) => (
+                <Badge key={i} variant="outline" className="border-white/20 text-white/60">
                   {item}
                 </Badge>
               ))}
@@ -450,34 +487,39 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <section id="testimonials" className="py-24 px-4 bg-gradient-to-br from-background to-warm-beige/20">
-        <div className="container mx-auto">
+      {/* Reviews Section */}
+      <section id="reviews" className="py-24 px-6">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <Badge className="mb-4 bg-terracotta/10 text-terracotta border-terracotta/20">Testimonials</Badge>
-            <h2 className="text-3xl md:text-5xl font-bold mb-4">
-              Loved by{" "}
-              <span className="text-terracotta">Professionals</span>
+            <Badge variant="outline" className="mb-4 border-terracotta/30 text-terracotta">
+              Customer Reviews
+            </Badge>
+            <h2 className="text-4xl font-bold mb-4">
+              Trusted by Professionals
             </h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, i) => (
-              <Card key={i} className="bg-card border-border/50 hover:shadow-xl transition-shadow duration-300">
+            {[
+              { name: "Rajesh Kumar", role: "Interior Designer, Bangalore", text: "Intorza transformed how I handle quotations. My clients are impressed with the professional PDFs!" },
+              { name: "Priya Sharma", role: "Contractor, Mumbai", text: "The site measurement feature is incredible. I can quote on-site and close deals faster." },
+              { name: "Amit Patel", role: "Furniture Manufacturer, Ahmedabad", text: "Best investment for my business. Payment tracking alone has saved me lakhs in missed follow-ups." }
+            ].map((review, i) => (
+              <Card key={i} className="border-border/50 hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex gap-1 mb-4">
-                    {Array(testimonial.rating).fill(0).map((_, j) => (
-                      <Star key={j} className="w-5 h-5 fill-gold text-gold" />
+                    {[...Array(5)].map((_, j) => (
+                      <Star key={j} className="w-4 h-4 fill-gold text-gold" />
                     ))}
                   </div>
-                  <p className="text-muted-foreground mb-6 italic">"{testimonial.text}"</p>
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-terracotta to-orange-500 flex items-center justify-center text-white font-bold">
-                      {testimonial.name[0]}
+                  <p className="text-muted-foreground mb-6 leading-relaxed">"{review.text}"</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-terracotta to-orange-500 flex items-center justify-center text-white font-semibold text-sm">
+                      {review.name.split(' ').map(n => n[0]).join('')}
                     </div>
                     <div>
-                      <p className="font-semibold">{testimonial.name}</p>
-                      <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                      <p className="font-medium text-sm">{review.name}</p>
+                      <p className="text-xs text-muted-foreground">{review.role}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -488,38 +530,36 @@ const LandingPage = () => {
       </section>
 
       {/* Final CTA */}
-      <section className="py-24 px-4 bg-gradient-to-r from-terracotta to-orange-500 text-white">
-        <div className="container mx-auto text-center">
-          <h2 className="text-3xl md:text-5xl font-bold mb-6">
-            Ready to Transform Your Business?
+      <section className="py-20 px-6 bg-gradient-to-r from-terracotta via-orange-500 to-terracotta">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+            Ready to Grow Your Business?
           </h2>
-          <p className="text-lg text-white/90 mb-8 max-w-xl mx-auto">
-            Join hundreds of interior professionals who save 5+ hours every week with Intorza.
+          <p className="text-lg text-white/90 mb-8">
+            Join hundreds of interior professionals saving 5+ hours every week
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/create-quotation">
-              <Button size="lg" className="bg-white text-terracotta hover:bg-white/90 font-bold text-lg px-8 py-6 shadow-xl">
-                Start Free - No Card Required
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-            </Link>
-          </div>
+          <Link to="/create-quotation">
+            <Button size="lg" className="bg-white text-terracotta hover:bg-white/90 font-semibold text-base h-14 px-10">
+              Start Free Today
+              <ArrowRight className="ml-2 w-5 h-5" />
+            </Button>
+          </Link>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-12 px-4 bg-navy text-white">
-        <div className="container mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
+      <footer className="py-16 px-6 bg-navy text-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-4 gap-12 mb-12">
+            <div className="md:col-span-1">
               <img src={intorzaLogo} alt="Intorza" className="h-8 mb-4 brightness-0 invert" />
-              <p className="text-white/70 text-sm">
+              <p className="text-white/60 text-sm leading-relaxed">
                 The all-in-one business management app for interior professionals.
               </p>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Features</h4>
-              <ul className="space-y-2 text-sm text-white/70">
+              <h4 className="font-semibold mb-4 text-sm">Features</h4>
+              <ul className="space-y-3 text-sm text-white/60">
                 <li><Link to="/dashboard" className="hover:text-white transition-colors">Dashboard</Link></li>
                 <li><Link to="/create-quotation" className="hover:text-white transition-colors">Create Quotation</Link></li>
                 <li><Link to="/site-measurement" className="hover:text-white transition-colors">Site Measurement</Link></li>
@@ -527,24 +567,24 @@ const LandingPage = () => {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-white/70">
+              <h4 className="font-semibold mb-4 text-sm">Legal</h4>
+              <ul className="space-y-3 text-sm text-white/60">
                 <li><Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
                 <li><Link to="/terms-and-conditions" className="hover:text-white transition-colors">Terms of Service</Link></li>
                 <li><Link to="/cancellation-refund-policy" className="hover:text-white transition-colors">Refund Policy</Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Get Started</h4>
+              <h4 className="font-semibold mb-4 text-sm">Get Started</h4>
               <Link to="/auth">
-                <Button className="bg-terracotta hover:bg-terracotta/90 text-white w-full">
+                <Button size="sm" className="bg-terracotta hover:bg-terracotta/90 text-white w-full">
                   Sign Up Free
                 </Button>
               </Link>
             </div>
           </div>
-          <div className="border-t border-white/20 pt-8 text-center text-sm text-white/50">
-            <p>© {new Date().getFullYear()} Intorza. All rights reserved.</p>
+          <div className="border-t border-white/10 pt-8 text-center text-sm text-white/40">
+            © {new Date().getFullYear()} Intorza. All rights reserved.
           </div>
         </div>
       </footer>
