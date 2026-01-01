@@ -12,6 +12,8 @@ import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
 import { SEOProvider } from "./components/SEOProvider";
 import { OfflineIndicator } from "./components/OfflineIndicator";
 import Index from "./pages/Index";
+import LandingPage from "./pages/LandingPage";
+import CreateQuotation from "./pages/CreateQuotation";
 import Dashboard from "./pages/Dashboard";
 import SiteMeasurement from "./pages/SiteMeasurement";
 import SiteMeasurementNew from "./pages/SiteMeasurementNew";
@@ -69,7 +71,8 @@ const App = () => (
                 <Route path="/team/dashboard" element={<TeamDashboard />} />
                 
                 {/* Public routes with Layout - auth triggered on actions */}
-                <Route path="/" element={<Layout><Index /></Layout>} />
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/create-quotation" element={<Layout><CreateQuotation /></Layout>} />
                 <Route path="/dashboard" element={<Layout><ProtectedRoute><Dashboard /></ProtectedRoute></Layout>} />
                 <Route path="/site-measurement" element={<Layout><ProtectedRoute><SiteMeasurement /></ProtectedRoute></Layout>} />
                 <Route path="/site-measurement/new" element={<Layout><ProtectedRoute><SiteMeasurementNew /></ProtectedRoute></Layout>} />
