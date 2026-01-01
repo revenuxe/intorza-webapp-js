@@ -1,120 +1,49 @@
-# robots.txt for INTORZA - Interior Design Quotation Software
-# Last updated: 2024-12-30
+# robots.txt for INTORZA - Block all search engine indexing
+# Last updated: 2026-01-01
 
-# ===== GOOGLE CRAWLERS (Priority) =====
+# Block all crawlers from indexing
+User-agent: *
+Disallow: /
+
+# Block Google specifically
 User-agent: Googlebot
-Allow: /
-Crawl-delay: 0
+Disallow: /
 
 User-agent: Googlebot-Image
-Allow: /
-Disallow: /admin/
+Disallow: /
 
 User-agent: Googlebot-Mobile
-Allow: /
+Disallow: /
 
-User-agent: Googlebot-News
-Allow: /
-
-# ===== BING =====
+# Block Bing
 User-agent: Bingbot
-Allow: /
-Crawl-delay: 1
+Disallow: /
 
-User-agent: MSNBot
-Allow: /
-
-# ===== OTHER SEARCH ENGINES =====
+# Block other search engines
 User-agent: Slurp
-Allow: /
+Disallow: /
 
 User-agent: DuckDuckBot
-Allow: /
+Disallow: /
 
 User-agent: Baiduspider
-Allow: /
+Disallow: /
 
 User-agent: YandexBot
-Allow: /
+Disallow: /
 
-# ===== SOCIAL MEDIA CRAWLERS =====
-User-agent: facebookexternalhit
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: LinkedInBot
-Allow: /
-
-User-agent: Pinterest
-Allow: /
-
-User-agent: WhatsApp
-Allow: /
-
-User-agent: Slackbot
-Allow: /
-
-User-agent: TelegramBot
-Allow: /
-
-# ===== AI CRAWLERS (for AI training/indexing) =====
+# Block AI crawlers
 User-agent: GPTBot
-Allow: /
+Disallow: /
 
 User-agent: ChatGPT-User
-Allow: /
-
-User-agent: Google-Extended
-Allow: /
-
-User-agent: Anthropic-AI
-Allow: /
-
-User-agent: PerplexityBot
-Allow: /
+Disallow: /
 
 User-agent: ClaudeBot
-Allow: /
+Disallow: /
 
-User-agent: Bytespider
-Allow: /
+User-agent: Anthropic-AI
+Disallow: /
 
-User-agent: CCBot
-Allow: /
-
-# ===== GENERAL CRAWLERS =====
-User-agent: *
-Allow: /
-Crawl-delay: 2
-
-# ===== DISALLOW PRIVATE/NON-ESSENTIAL =====
-Disallow: /api/
-Disallow: /admin/
-Disallow: /admin/login
-Disallow: /admin/dashboard
-Disallow: /team/login
-Disallow: /team/dashboard
-Disallow: /payment-processing
-Disallow: /*?*
-
-# ===== ALLOW IMPORTANT PUBLIC PAGES =====
-Allow: /
-Allow: /auth
-Allow: /quotations
-Allow: /create-quotation
-Allow: /invoices
-Allow: /site-measurement
-Allow: /clients
-Allow: /my-projects
-Allow: /library
-Allow: /team
-Allow: /dashboard
-Allow: /settings
-Allow: /terms-and-conditions
-Allow: /privacy-policy
-Allow: /cancellation-refund-policy
-Allow: /manifest.json
-Allow: /sitemap.xml
-Allow: /robots.txt
+# No sitemap - site should not be indexed
+# Sitemap: none
