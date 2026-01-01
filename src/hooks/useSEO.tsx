@@ -147,9 +147,10 @@ export const useSEO = (customConfig?: SEOConfig) => {
       updateMetaTag('keywords', config.keywords);
     }
 
-    // Set robots meta - Always noindex, nofollow for all pages
-    updateMetaTag('robots', 'noindex, nofollow');
-    updateMetaTag('googlebot', 'noindex, nofollow');
+    // Set robots meta - Complete noindex, nofollow, noarchive for all pages
+    updateMetaTag('robots', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+    updateMetaTag('googlebot', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+    updateMetaTag('bingbot', 'noindex, nofollow, noarchive');
 
     // Open Graph tags
     updateMetaTag('og:title', config.title || defaultSEO.title || 'INTORZA', true);
