@@ -1,49 +1,5 @@
-# robots.txt for INTORZA - Block all search engine indexing
-# Last updated: 2026-01-01
-
+# robots.txt for app.intorza.com
 # Block all crawlers from indexing
+
 User-agent: *
 Disallow: /
-
-# Block Google specifically
-User-agent: Googlebot
-Disallow: /
-
-User-agent: Googlebot-Image
-Disallow: /
-
-User-agent: Googlebot-Mobile
-Disallow: /
-
-# Block Bing
-User-agent: Bingbot
-Disallow: /
-
-# Block other search engines
-User-agent: Slurp
-Disallow: /
-
-User-agent: DuckDuckBot
-Disallow: /
-
-User-agent: Baiduspider
-Disallow: /
-
-User-agent: YandexBot
-Disallow: /
-
-# Block AI crawlers
-User-agent: GPTBot
-Disallow: /
-
-User-agent: ChatGPT-User
-Disallow: /
-
-User-agent: ClaudeBot
-Disallow: /
-
-User-agent: Anthropic-AI
-Disallow: /
-
-# No sitemap - site should not be indexed
-# Sitemap: none
