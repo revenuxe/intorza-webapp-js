@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,7 @@ const QuotationDetail = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { checkProFeature } = useSubscription();
+  const { formatCurrency, formatDateShort, settings } = useLocalization();
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [loading, setLoading] = useState(true);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
@@ -99,10 +101,10 @@ const QuotationDetail = () => {
     }
   };
 
+  // Use localized date formatting
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return formatDateShort(dateString);
   };
 
   const handleDownloadPdf = async () => {
@@ -478,22 +480,22 @@ const QuotationDetail = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
                   <span className="font-medium tabular-nums">
-                    ₹{quotation.subtotal?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                    {formatCurrency(quotation.subtotal || 0, true)}
                   </span>
                 </div>
                 {quotation.discount_amount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Discount</span>
                     <span className="font-medium text-green-600 tabular-nums">
-                      -₹{quotation.discount_amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      -{formatCurrency(quotation.discount_amount || 0, true)}
                     </span>
                   </div>
                 )}
                 {quotation.gst_amount > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">GST</span>
+                    <span className="text-muted-foreground">{settings.taxShortLabel}</span>
                     <span className="font-medium tabular-nums">
-                      ₹{quotation.gst_amount?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatCurrency(quotation.gst_amount || 0, true)}
                     </span>
                   </div>
                 )}
@@ -501,7 +503,7 @@ const QuotationDetail = () => {
                   <div className="flex justify-between">
                     <span className="font-semibold">Grand Total</span>
                     <span className="font-bold text-lg text-primary tabular-nums">
-                      ₹{quotation.grand_total?.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatCurrency(quotation.grand_total || 0, true)}
                     </span>
                   </div>
                 </div>
