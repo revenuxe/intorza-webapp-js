@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Package, TrendingUp, Trash2, Search, Plus, Tag, Filter, DollarSign } from "lucide-react";
+import { Package, TrendingUp, Trash2, Search, Plus, Tag } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { getCountryByCode } from "@/lib/countryConfig";
+import { useLocalization } from "@/hooks/useLocalization";
 
 const CATEGORIES = [
   "General",
@@ -38,14 +38,9 @@ interface ItemPattern {
   category: string;
 }
 
-interface UserLocalization {
-  currency_symbol: string;
-  area_unit_short: string;
-  country_code: string;
-}
-
 export const ItemsPricingTab = () => {
   const { toast } = useToast();
+  const { settings } = useLocalization();
   const [items, setItems] = useState<ItemPattern[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -53,42 +48,10 @@ export const ItemsPricingTab = () => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newItem, setNewItem] = useState({ name: "", details: "", rate: "", category: "General" });
   const [saving, setSaving] = useState(false);
-  const [localization, setLocalization] = useState<UserLocalization>({
-    currency_symbol: "₹",
-    area_unit_short: "SFT",
-    country_code: "IN"
-  });
 
   useEffect(() => {
     loadItems();
-    loadLocalization();
   }, []);
-
-  const loadLocalization = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('country_code, currency_symbol')
-        .eq('id', user.id)
-        .maybeSingle();
-      
-      if (profile?.country_code) {
-        const countryConfig = getCountryByCode(profile.country_code);
-        if (countryConfig) {
-          setLocalization({
-            currency_symbol: profile.currency_symbol || countryConfig.currency.symbol,
-            area_unit_short: countryConfig.measurement.areaUnitShort,
-            country_code: profile.country_code
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error loading localization:', error);
-    }
-  };
 
   const loadItems = async () => {
     try {
@@ -295,42 +258,42 @@ export const ItemsPricingTab = () => {
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Select
-                      value={item.category || 'General'}
-                      onValueChange={(val) => handleUpdateCategory(item.id, val)}
-                    >
-                      <SelectTrigger className="w-28 h-8">
-                        <Tag className="h-3 w-3 mr-1" />
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map(cat => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm text-muted-foreground">{localization.currency_symbol}</span>
-                      <Input
-                        type="number"
-                        value={item.preferred_rate || item.default_rate || ''}
-                        onChange={(e) => handleUpdateRate(item.id, parseFloat(e.target.value) || 0)}
-                        className="w-20 h-8 text-right"
-                        placeholder="Rate"
-                      />
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Select
+                        value={item.category || 'General'}
+                        onValueChange={(val) => handleUpdateCategory(item.id, val)}
+                      >
+                        <SelectTrigger className="w-28 h-8">
+                          <Tag className="h-3 w-3 mr-1" />
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map(cat => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm text-muted-foreground">{settings.currencySymbol}</span>
+                        <Input
+                          type="number"
+                          value={item.preferred_rate || item.default_rate || ''}
+                          onChange={(e) => handleUpdateRate(item.id, parseFloat(e.target.value) || 0)}
+                          className="w-20 h-8 text-right"
+                          placeholder="Rate"
+                        />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => handleDelete(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => handleDelete(item.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </CardContent>
@@ -373,7 +336,7 @@ export const ItemsPricingTab = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Default Rate ({localization.currency_symbol}/{localization.area_unit_short.toLowerCase()})</Label>
+              <Label>Default Rate ({settings.currencySymbol}/{settings.areaUnitShort.toLowerCase()})</Label>
               <Input
                 type="number"
                 value={newItem.rate}
