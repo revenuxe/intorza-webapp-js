@@ -27,6 +27,8 @@ import {
 } from "@/lib/pdfThemes";
 import { QuotationSettings } from "./CustomizeFieldsDrawer";
 import { CustomThemeBuilder } from "./CustomThemeBuilder";
+import { FontPreviewPanel } from "./FontPreviewPanel";
+import { useFontPreferences } from "@/hooks/useFontPreferences";
 
 interface PDFPreviewEditorProps {
   open: boolean;
@@ -71,18 +73,35 @@ export const PDFPreviewEditor = ({
   const [selectedCategory, setSelectedCategory] = useState<ThemeCategory>('all');
   const [showThemeBuilder, setShowThemeBuilder] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
+  
+  // Load font preferences from database
+  const { preferences: fontPreferences, updatePreferences: saveFontPreferences, loading: fontLoading } = useFontPreferences();
 
   useEffect(() => {
     if (open) {
-      setEditorSettings(getEditorSettings());
+      const savedSettings = getEditorSettings();
+      // Apply saved font preferences from database
+      setEditorSettings({
+        ...savedSettings,
+        headingFont: fontPreferences.headingFont || savedSettings.headingFont || 'times',
+        bodyFont: fontPreferences.bodyFont || savedSettings.bodyFont || 'helvetica',
+      });
       setShowEditor(false);
     }
-  }, [open]);
+  }, [open, fontPreferences]);
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
     const newSettings = { ...editorSettings, ...updates };
     setEditorSettings(newSettings);
     saveEditorSettings(newSettings);
+    
+    // Save font preferences to database if font changed
+    if (updates.headingFont || updates.bodyFont) {
+      saveFontPreferences({
+        headingFont: updates.headingFont || editorSettings.headingFont || 'times',
+        bodyFont: updates.bodyFont || editorSettings.bodyFont || 'helvetica',
+      });
+    }
   };
 
   const handleReset = () => {
@@ -526,6 +545,14 @@ export const PDFPreviewEditor = ({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Font Preview Panel */}
+            <div className="pt-4 border-t">
+              <FontPreviewPanel 
+                headingFont={editorSettings.headingFont || 'times'} 
+                bodyFont={editorSettings.bodyFont || 'helvetica'} 
+              />
             </div>
 
             <div className="space-y-3 pt-4 border-t">

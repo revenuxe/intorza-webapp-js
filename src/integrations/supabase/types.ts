@@ -448,6 +448,8 @@ export type Database = {
           payment_qr_url: string | null
           payment_stages: Json | null
           payment_status: string | null
+          pdf_body_font: string | null
+          pdf_heading_font: string | null
           phone: string | null
           pro_expiry: string | null
           pro_plan: string | null
@@ -493,6 +495,8 @@ export type Database = {
           payment_qr_url?: string | null
           payment_stages?: Json | null
           payment_status?: string | null
+          pdf_body_font?: string | null
+          pdf_heading_font?: string | null
           phone?: string | null
           pro_expiry?: string | null
           pro_plan?: string | null
@@ -538,6 +542,8 @@ export type Database = {
           payment_qr_url?: string | null
           payment_stages?: Json | null
           payment_status?: string | null
+          pdf_body_font?: string | null
+          pdf_heading_font?: string | null
           phone?: string | null
           pro_expiry?: string | null
           pro_plan?: string | null
