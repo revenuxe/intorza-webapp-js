@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -21,7 +21,9 @@ import {
   rgbToHex,
   PDFTheme,
   PDF_FONTS,
+  PDFFont,
   getFontById,
+  getFontsByCategory,
   getHeadingFonts,
   getBodyFonts,
   applyBrandColorsToTheme,
@@ -59,6 +61,7 @@ interface PDFPreviewEditorProps {
 }
 
 type ThemeCategory = 'all' | 'minimal' | 'professional' | 'luxury' | 'floral' | 'abstract' | 'decoration';
+type FontCategory = 'all' | 'serif' | 'sans-serif' | 'display' | 'monospace';
 
 const CATEGORY_CONFIG: { value: ThemeCategory; label: string; icon: React.ElementType }[] = [
   { value: 'all', label: 'All', icon: Palette },
@@ -68,6 +71,14 @@ const CATEGORY_CONFIG: { value: ThemeCategory; label: string; icon: React.Elemen
   { value: 'floral', label: 'Floral', icon: Flower2 },
   { value: 'abstract', label: 'Abstract', icon: Shapes },
   { value: 'decoration', label: 'Decoration', icon: Frame },
+];
+
+const FONT_CATEGORY_CONFIG: { value: FontCategory; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'sans-serif', label: 'Sans-Serif' },
+  { value: 'serif', label: 'Serif' },
+  { value: 'display', label: 'Display' },
+  { value: 'monospace', label: 'Monospace' },
 ];
 
 export const PDFPreviewEditor = ({
@@ -81,6 +92,8 @@ export const PDFPreviewEditor = ({
   const [activeTab, setActiveTab] = useState("themes");
   const [showEditor, setShowEditor] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<ThemeCategory>('all');
+  const [selectedFontCategory, setSelectedFontCategory] = useState<FontCategory>('all');
+  const [fontSearchQuery, setFontSearchQuery] = useState('');
   const [showThemeBuilder, setShowThemeBuilder] = useState(false);
   const [brandColors, setBrandColors] = useState<BrandColors | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -149,7 +162,12 @@ export const PDFPreviewEditor = ({
   };
 
   const handleDownload = () => {
-    onDownload(editorSettings);
+    // Ensure brand colors are included if enabled
+    const downloadSettings: PDFEditorSettings = {
+      ...editorSettings,
+      brandColors: editorSettings.useBrandColors && brandColors ? brandColors : editorSettings.brandColors,
+    };
+    onDownload(downloadSettings);
     onClose();
   };
 
@@ -603,48 +621,100 @@ export const PDFPreviewEditor = ({
               </div>
             </div>
 
-            {/* Heading Font Selection */}
-            <div className="space-y-3 pt-4 border-t">
-              <Label className="text-sm font-semibold">Heading Font</Label>
-              <Select value={editorSettings.headingFont || 'times'} onValueChange={(v) => updateSettings({ headingFont: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {getHeadingFonts().map((font) => (
-                    <SelectItem key={font.id} value={font.id}>
-                      <div className="flex flex-col">
-                        <span>{font.name}</span>
-                        <span className="text-xs text-muted-foreground">{font.description}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Font Selection Section */}
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <Type className="h-4 w-4 text-primary" />
+                <Label className="text-sm font-semibold">Font Selection</Label>
+              </div>
+              
+              {/* Font Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search fonts..."
+                  value={fontSearchQuery}
+                  onChange={(e) => setFontSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
 
-            {/* Body Font Selection */}
-            <div className="space-y-3 pt-4 border-t">
-              <Label className="text-sm font-semibold">Body Font</Label>
-              <Select value={editorSettings.bodyFont || 'helvetica'} onValueChange={(v) => updateSettings({ bodyFont: v })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {getBodyFonts().map((font) => (
-                    <SelectItem key={font.id} value={font.id}>
-                      <div className="flex flex-col">
-                        <span>{font.name}</span>
-                        <span className="text-xs text-muted-foreground">{font.description}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              {/* Font Category Filter */}
+              <div className="flex flex-wrap gap-1.5">
+                {FONT_CATEGORY_CONFIG.map((cat) => (
+                  <button
+                    key={cat.value}
+                    onClick={() => setSelectedFontCategory(cat.value)}
+                    className={`px-2.5 py-1.5 rounded-full text-[10px] font-medium transition-all ${
+                      selectedFontCategory === cat.value
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                    }`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
 
-            {/* Font Preview Panel */}
-            <div className="pt-4 border-t">
+              {/* Heading Font */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Heading Font</Label>
+                <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                  {PDF_FONTS
+                    .filter(f => f.recommended === 'heading' || f.recommended === 'both')
+                    .filter(f => selectedFontCategory === 'all' || f.category === selectedFontCategory)
+                    .filter(f => fontSearchQuery === '' || 
+                      f.name.toLowerCase().includes(fontSearchQuery.toLowerCase()) ||
+                      f.description.toLowerCase().includes(fontSearchQuery.toLowerCase())
+                    )
+                    .map((font) => (
+                      <button
+                        key={font.id}
+                        onClick={() => updateSettings({ headingFont: font.id })}
+                        className={`p-2 rounded-md border text-left transition-all ${
+                          editorSettings.headingFont === font.id
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <p className="text-xs font-medium truncate">{font.name}</p>
+                        <p className="text-[9px] text-muted-foreground truncate">{font.description}</p>
+                      </button>
+                    ))
+                  }
+                </div>
+              </div>
+
+              {/* Body Font */}
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Body Font</Label>
+                <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                  {PDF_FONTS
+                    .filter(f => f.recommended === 'body' || f.recommended === 'both')
+                    .filter(f => selectedFontCategory === 'all' || f.category === selectedFontCategory)
+                    .filter(f => fontSearchQuery === '' || 
+                      f.name.toLowerCase().includes(fontSearchQuery.toLowerCase()) ||
+                      f.description.toLowerCase().includes(fontSearchQuery.toLowerCase())
+                    )
+                    .map((font) => (
+                      <button
+                        key={font.id}
+                        onClick={() => updateSettings({ bodyFont: font.id })}
+                        className={`p-2 rounded-md border text-left transition-all ${
+                          editorSettings.bodyFont === font.id
+                            ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <p className="text-xs font-medium truncate">{font.name}</p>
+                        <p className="text-[9px] text-muted-foreground truncate">{font.description}</p>
+                      </button>
+                    ))
+                  }
+                </div>
+              </div>
+
+              {/* Font Preview */}
               <FontPreviewPanel 
                 headingFont={editorSettings.headingFont || 'times'} 
                 bodyFont={editorSettings.bodyFont || 'helvetica'} 
