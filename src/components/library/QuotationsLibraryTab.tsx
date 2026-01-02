@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FileText, Calendar, User, IndianRupee, ExternalLink, Save, Sparkles, Trash2, BookOpen, Check, Loader2 } from "lucide-react";
+import { FileText, Calendar, User, Coins, ExternalLink, Save, Sparkles, Trash2, BookOpen, Check, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { useLocalization } from "@/hooks/useLocalization";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,7 +54,7 @@ export const QuotationsLibraryTab = () => {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [learningId, setLearningId] = useState<string | null>(null);
   const [savedTemplateIds, setSavedTemplateIds] = useState<Set<string>>(new Set());
-
+  const { formatCurrency, formatDate } = useLocalization();
   useEffect(() => {
     loadQuotations();
     loadSavedTemplates();
@@ -366,11 +367,11 @@ export const QuotationsLibraryTab = () => {
                       </span>
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        {new Date(quotation.created_at).toLocaleDateString()}
+                        {formatDate(quotation.created_at)}
                       </span>
                       <span className="flex items-center gap-1 font-medium text-foreground">
-                        <IndianRupee className="h-3 w-3" />
-                        {quotation.grand_total?.toLocaleString('en-IN') || 0}
+                        <Coins className="h-3 w-3" />
+                        {formatCurrency(quotation.grand_total || 0)}
                       </span>
                     </div>
                   </div>
@@ -439,7 +440,7 @@ export const QuotationsLibraryTab = () => {
           )}
 
           <p className="text-xs text-muted-foreground text-center pt-4">
-            {quotations.length} quotations • ₹{quotations.reduce((sum, q) => sum + (q.grand_total || 0), 0).toLocaleString('en-IN')} total value
+            {quotations.length} quotations • {formatCurrency(quotations.reduce((sum, q) => sum + (q.grand_total || 0), 0))} total value
           </p>
         </CardContent>
       </Card>
