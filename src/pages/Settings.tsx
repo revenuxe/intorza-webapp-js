@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Settings as SettingsIcon, Upload, Loader2, Library } from "lucide-react";
+import { Settings as SettingsIcon, Upload, Loader2, Library, Globe, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,27 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { BillingSection } from "@/components/BillingSection";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { 
+  Collapsible, 
+  CollapsibleContent, 
+  CollapsibleTrigger 
+} from "@/components/ui/collapsible";
+import { 
+  COUNTRY_CONFIGS, 
+  getCountryGroups, 
+  getCountryByCode,
+  type CountryConfig 
+} from "@/lib/countryConfig";
 
 const Settings = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingSignature, setUploadingSignature] = useState(false);
+  const [showCountrySelector, setShowCountrySelector] = useState(false);
+  const [countrySearch, setCountrySearch] = useState("");
+  const [selectedCountry, setSelectedCountry] = useState<CountryConfig | null>(null);
   const [profile, setProfile] = useState({
     company_name: "",
     full_name: "",
@@ -25,6 +40,7 @@ const Settings = () => {
     logo_url: "",
     signature_url: "",
     professional_advantages: `You've imagined your ideal home and are determined to make it a reality. You can get numerous different quotations from different Interior Designers. But since you've chosen us, let's have a look at how we can make your idea a reality.`,
+    country_code: "",
   });
 
   useEffect(() => {
@@ -54,10 +70,61 @@ const Settings = () => {
           logo_url: data.logo_url || "",
           signature_url: data.signature_url || "",
           professional_advantages: data.professional_advantages || profile.professional_advantages,
+          country_code: data.country_code || "IN",
         });
+        
+        // Set selected country from profile
+        if (data.country_code) {
+          const country = getCountryByCode(data.country_code);
+          if (country) {
+            setSelectedCountry(country);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading profile:', error);
+    }
+  };
+
+  const handleCountryChange = async (country: CountryConfig) => {
+    setSelectedCountry(country);
+    setShowCountrySelector(false);
+    setCountrySearch("");
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          country_code: country.code,
+          country_name: country.name,
+          currency_code: country.currency.code,
+          currency_symbol: country.currency.symbol,
+          tax_label: country.tax.shortLabel,
+          measurement_system: country.measurement.system,
+          locale: country.currency.locale,
+          date_format: country.dateFormat,
+          number_format: JSON.stringify(country.numberFormat),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setProfile({ ...profile, country_code: country.code });
+      toast({
+        title: "Country updated",
+        description: `Settings updated for ${country.name}`,
+      });
+    } catch (error) {
+      console.error('Error updating country:', error);
+      toast({
+        title: "Update failed",
+        description: "Failed to update country settings",
+        variant: "destructive",
+      });
     }
   };
 
@@ -219,6 +286,18 @@ const Settings = () => {
     }
   };
 
+  const filteredCountries = countrySearch
+    ? COUNTRY_CONFIGS.filter(c =>
+        c.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+        c.code.toLowerCase().includes(countrySearch.toLowerCase())
+      )
+    : null;
+
+  const countryGroups = getCountryGroups();
+
+  // Get dynamic label for tax registration
+  const taxRegistrationLabel = selectedCountry?.tax.registrationLabel || 'GSTIN';
+
   return (
     <div className="container max-w-4xl mx-auto p-4 md:p-6 lg:p-8">
       <div className="flex flex-col gap-6">
@@ -228,6 +307,146 @@ const Settings = () => {
         </div>
 
         <BillingSection />
+
+        {/* Country/Region Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Country & Region
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select your country</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                This sets your currency, tax labels, and measurement units
+              </p>
+              
+              {/* Current Selection */}
+              <Button
+                variant="outline"
+                className="w-full justify-between h-auto py-3"
+                onClick={() => setShowCountrySelector(!showCountrySelector)}
+              >
+                {selectedCountry ? (
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{selectedCountry.flag}</span>
+                    <div className="text-left">
+                      <div className="font-medium">{selectedCountry.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedCountry.currency.symbol} • {selectedCountry.tax.shortLabel} • {selectedCountry.measurement.areaUnitShort}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Select a country</span>
+                )}
+                <ChevronDown className={`h-4 w-4 transition-transform ${showCountrySelector ? 'rotate-180' : ''}`} />
+              </Button>
+
+              {/* Country Selector Dropdown */}
+              {showCountrySelector && (
+                <div className="border rounded-lg mt-2 p-2 bg-background">
+                  <Input
+                    placeholder="Search countries..."
+                    value={countrySearch}
+                    onChange={(e) => setCountrySearch(e.target.value)}
+                    className="mb-2"
+                    autoFocus
+                  />
+                  <ScrollArea className="h-[300px]">
+                    {filteredCountries ? (
+                      <div className="space-y-1">
+                        {filteredCountries.map((country) => (
+                          <button
+                            key={country.code}
+                            onClick={() => handleCountryChange(country)}
+                            className={`w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors ${
+                              selectedCountry?.code === country.code
+                                ? 'bg-primary text-primary-foreground'
+                                : 'hover:bg-muted'
+                            }`}
+                          >
+                            <span className="text-xl">{country.flag}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{country.name}</div>
+                              <div className={`text-xs ${selectedCountry?.code === country.code ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                {country.currency.symbol} • {country.tax.shortLabel}
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                        {filteredCountries.length === 0 && (
+                          <div className="text-center py-4 text-muted-foreground">
+                            No countries found
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {countryGroups.map((group) => (
+                          <Collapsible key={group.region} defaultOpen={group.countries.some(c => c.code === selectedCountry?.code)}>
+                            <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-muted rounded-md">
+                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                {group.region}
+                              </span>
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <div className="space-y-1 pl-2">
+                                {group.countries.map((country) => (
+                                  <button
+                                    key={country.code}
+                                    onClick={() => handleCountryChange(country)}
+                                    className={`w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors ${
+                                      selectedCountry?.code === country.code
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'hover:bg-muted'
+                                    }`}
+                                  >
+                                    <span className="text-xl">{country.flag}</span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium truncate">{country.name}</div>
+                                      <div className={`text-xs ${selectedCountry?.code === country.code ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                        {country.currency.symbol} • {country.tax.shortLabel}
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+
+            {selectedCountry && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+                <div className="p-3 bg-muted/50 rounded-lg text-center">
+                  <div className="text-lg font-bold">{selectedCountry.currency.symbol}</div>
+                  <div className="text-xs text-muted-foreground">Currency</div>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg text-center">
+                  <div className="text-lg font-bold">{selectedCountry.tax.shortLabel}</div>
+                  <div className="text-xs text-muted-foreground">Tax Type</div>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg text-center">
+                  <div className="text-lg font-bold">{selectedCountry.tax.defaultRate}%</div>
+                  <div className="text-xs text-muted-foreground">Default Rate</div>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg text-center">
+                  <div className="text-lg font-bold">{selectedCountry.measurement.areaUnitShort}</div>
+                  <div className="text-xs text-muted-foreground">Area Unit</div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Library Link */}
         <Card className="border-primary/20 bg-primary/5">
@@ -361,16 +580,16 @@ const Settings = () => {
                   id="phone"
                   value={profile.phone}
                   onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                  placeholder="+91 1234567890"
+                  placeholder={selectedCountry ? `${selectedCountry.phoneCode} 1234567890` : "+1 1234567890"}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="gstin">GSTIN</Label>
+                <Label htmlFor="gstin">{taxRegistrationLabel}</Label>
                 <Input
                   id="gstin"
                   value={profile.gstin}
                   onChange={(e) => setProfile({ ...profile, gstin: e.target.value })}
-                  placeholder="GST Number"
+                  placeholder={`${taxRegistrationLabel} Number`}
                 />
               </div>
             </div>
