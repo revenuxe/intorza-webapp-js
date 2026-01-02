@@ -1,7 +1,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { PDFEditorSettings, getThemeById, hexToRgb, PDFTheme, getFontById } from './pdfThemes';
+import { PDFEditorSettings, getThemeById, hexToRgb, PDFTheme, getFontById, applyBrandColorsToTheme } from './pdfThemes';
 import { drawAllDecorations, drawSectionDivider, drawFooterDecoration } from './pdfDecorations';
 
 // --- Settings Interface ---
@@ -224,7 +224,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // Get theme from editor settings
   const editorSettings = data.editorSettings;
-  const theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
+  let theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
+  
+  // Apply brand colors if enabled and available
+  if (editorSettings?.useBrandColors && editorSettings?.brandColors) {
+    theme = applyBrandColorsToTheme(theme, editorSettings.brandColors);
+  }
+  
   const logoPlacement = editorSettings?.logoPlacement || 'left';
   const highlightAmounts = editorSettings?.highlightAmounts ?? true;
   

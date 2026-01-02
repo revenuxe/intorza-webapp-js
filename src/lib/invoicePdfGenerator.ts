@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { PDFEditorSettings, InvoiceSettings, getThemeById, hexToRgb, PDFTheme, getFontById } from './pdfThemes';
+import { PDFEditorSettings, InvoiceSettings, getThemeById, hexToRgb, PDFTheme, getFontById, applyBrandColorsToTheme } from './pdfThemes';
 
 interface InvoiceData {
   invoiceNumber: string;
@@ -135,7 +135,13 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   };
 
   // Get theme
-  const theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
+  let theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
+  
+  // Apply brand colors if enabled and available
+  if (editorSettings?.useBrandColors && editorSettings?.brandColors) {
+    theme = applyBrandColorsToTheme(theme, editorSettings.brandColors);
+  }
+  
   const logoPlacement = editorSettings?.logoPlacement || 'left';
   const highlightAmounts = editorSettings?.highlightAmounts ?? true;
   

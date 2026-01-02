@@ -973,6 +973,14 @@ export interface PDFEditorSettings {
     accent?: string;
     highlight?: string;
   };
+  brandColors?: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+    background?: string;
+    text?: string;
+  };
+  useBrandColors?: boolean;
 }
 
 export const defaultEditorSettings: PDFEditorSettings = {
@@ -995,6 +1003,7 @@ export const defaultEditorSettings: PDFEditorSettings = {
   showPageBorder: true,
   showCornerOrnaments: true,
   showSectionDividers: true,
+  useBrandColors: false,
 };
 
 // Invoice Settings
@@ -1136,4 +1145,46 @@ export const getThemeById = (themeId: string): PDFTheme => {
 export const getThemesByCategory = (category: PDFTheme['category']): PDFTheme[] => {
   const allThemes = getAllThemes();
   return allThemes.filter(t => t.category === category);
+};
+
+// Apply brand colors to a theme - overrides theme colors with brand colors
+export const applyBrandColorsToTheme = (
+  theme: PDFTheme, 
+  brandColors?: { primary?: string; secondary?: string; accent?: string; background?: string; text?: string }
+): PDFTheme => {
+  if (!brandColors) return theme;
+  
+  const newTheme = { ...theme, colors: { ...theme.colors } };
+  
+  if (brandColors.primary) {
+    const rgb = hexToRgb(brandColors.primary);
+    newTheme.colors.primary = rgb;
+    newTheme.colors.headerBg = rgb;
+    newTheme.colors.accent = rgb;
+  }
+  
+  if (brandColors.secondary) {
+    const rgb = hexToRgb(brandColors.secondary);
+    newTheme.colors.secondary = rgb;
+    newTheme.colors.border = rgb;
+  }
+  
+  if (brandColors.accent) {
+    const rgb = hexToRgb(brandColors.accent);
+    newTheme.colors.accent = rgb;
+    newTheme.colors.highlight = rgb;
+  }
+  
+  if (brandColors.background) {
+    const rgb = hexToRgb(brandColors.background);
+    newTheme.colors.background = rgb;
+  }
+  
+  if (brandColors.text) {
+    const rgb = hexToRgb(brandColors.text);
+    newTheme.colors.text = rgb;
+    newTheme.colors.headerText = [255, 255, 255]; // Keep header text white for contrast
+  }
+  
+  return newTheme;
 };
