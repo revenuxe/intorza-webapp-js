@@ -32,11 +32,12 @@ export const PaywallModal: React.FC = () => {
   const navigate = useNavigate();
   const { paywallOpen, setPaywallOpen, refreshSubscription } = useSubscription();
   const { session } = useAuth();
-  const { settings } = useLocalization();
+  const { settings, countryConfig } = useLocalization();
   const [loading, setLoading] = useState(false);
   
-  // Determine price text based on country
+  // Determine price text and flag based on country
   const priceText = settings.countryCode === 'IN' ? '₹1' : '$1';
+  const countryFlag = countryConfig?.flag || '🌍';
 
   const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -172,8 +173,8 @@ export const PaywallModal: React.FC = () => {
             <Crown className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <h2 className="text-lg sm:text-xl font-bold mb-1">1 Month FREE</h2>
-          <div className="text-3xl sm:text-4xl font-bold my-2">
-            Just {priceText}
+          <div className="text-3xl sm:text-4xl font-bold my-2 flex items-center justify-center gap-2">
+            <span className="text-xl">{countryFlag}</span> Just {priceText}
           </div>
           <p className="text-primary-foreground/80 text-xs sm:text-sm">
             Unlock all Pro features
