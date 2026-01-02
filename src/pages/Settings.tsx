@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Settings as SettingsIcon, Upload, Loader2, Library, Globe, ChevronDown } from "lucide-react";
+import { Settings as SettingsIcon, Upload, Loader2, Library, Globe, ChevronDown, Palette } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { BillingSection } from "@/components/BillingSection";
+import { BrandColorExtractor } from "@/components/BrandColorExtractor";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Collapsible, 
@@ -463,6 +464,19 @@ const Settings = () => {
                 <Link to="/library">Open Library</Link>
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Brand Colors Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Brand Colors
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BrandColorExtractor />
           </CardContent>
         </Card>
 
