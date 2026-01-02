@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { COUNTRY_CONFIGS, getCountryGroups, type CountryConfig } from "@/lib/countryConfig";
+import { createDefaultTemplatesForUser, createDefaultItemsForUser } from "@/lib/defaultTemplates";
 
 interface OnboardingDialogProps {
   open: boolean;
@@ -84,6 +85,18 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
         .eq('id', userId);
 
       if (error) throw error;
+
+      // Create default templates and items for the selected country
+      if (selectedCountry) {
+        const [templatesResult, itemsResult] = await Promise.all([
+          createDefaultTemplatesForUser(supabase, userId, selectedCountry.code),
+          createDefaultItemsForUser(supabase, userId, selectedCountry.code)
+        ]);
+
+        if (templatesResult.count > 0 || itemsResult.count > 0) {
+          toast.success(`Created ${templatesResult.count} templates and ${itemsResult.count} items for ${selectedCountry.name}`);
+        }
+      }
 
       toast.success("Profile setup complete!");
       onComplete();
