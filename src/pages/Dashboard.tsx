@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,7 @@ import {
   TrendingUp, 
   CheckCircle, 
   Clock, 
-  IndianRupee,
+  Coins,
   Calendar,
   ArrowUpRight,
   ArrowDownRight,
@@ -75,6 +76,7 @@ interface RecentActivity {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { formatCurrency: formatCurrencyLocalized, formatCurrencyShort } = useLocalization();
   const [stats, setStats] = useState<DashboardStats>({
     totalQuotations: 0,
     pendingQuotations: 0,
@@ -283,29 +285,9 @@ export default function Dashboard() {
     };
   }, [user]);
 
-  const formatCurrency = (amount: number) => {
-    if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(2)} Cr`;
-    }
-    if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(2)} L`;
-    }
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const formatFullCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  // Use localized currency formatting from hook
+  const formatCurrency = (amount: number) => formatCurrencyShort(amount);
+  const formatFullCurrency = (amount: number) => formatCurrencyLocalized(amount);
 
   const getGrowthPercentage = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? 100 : 0;
@@ -454,7 +436,7 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground mt-1">{formatFullCurrency(stats.totalRevenue)}</p>
               </div>
               <div className="p-3 bg-primary/10 rounded-xl">
-                <IndianRupee className="h-6 w-6 text-primary" />
+                <Coins className="h-6 w-6 text-primary" />
               </div>
             </div>
             <div className="mt-4 flex items-center gap-2">
