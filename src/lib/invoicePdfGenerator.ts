@@ -139,12 +139,18 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   const logoPlacement = editorSettings?.logoPlacement || 'left';
   const highlightAmounts = editorSettings?.highlightAmounts ?? true;
   
-  // Get font settings
-  const fontSettings = getFontById(editorSettings?.fontFamily || 'helvetica');
-  const fontFamily = fontSettings.family;
+  // Get font settings - separate heading and body fonts
+  const headingFontSettings = getFontById(editorSettings?.headingFont || 'times');
+  const bodyFontSettings = getFontById(editorSettings?.bodyFont || 'helvetica');
+  const headingFont = headingFontSettings.family;
+  const bodyFont = bodyFontSettings.family;
   
-  // Set default font for entire document
-  doc.setFont(fontFamily);
+  // Set default body font for entire document
+  doc.setFont(bodyFont);
+  
+  // Helper functions to switch fonts
+  const setHeadingFont = (style: 'normal' | 'bold' = 'bold') => doc.setFont(headingFont, style);
+  const setBodyFont = (style: 'normal' | 'bold' = 'normal') => doc.setFont(bodyFont, style);
 
   // Get localization settings with defaults
   const loc = data.localization || {

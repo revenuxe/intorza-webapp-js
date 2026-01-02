@@ -22,6 +22,8 @@ import {
   PDFTheme,
   PDF_FONTS,
   getFontById,
+  getHeadingFonts,
+  getBodyFonts,
 } from "@/lib/pdfThemes";
 import { QuotationSettings } from "./CustomizeFieldsDrawer";
 import { CustomThemeBuilder } from "./CustomThemeBuilder";
@@ -486,15 +488,35 @@ export const PDFPreviewEditor = ({
               </div>
             </div>
 
-            {/* Font Family Selection */}
+            {/* Heading Font Selection */}
             <div className="space-y-3 pt-4 border-t">
-              <Label className="text-sm font-semibold">Font Family</Label>
-              <Select value={editorSettings.fontFamily} onValueChange={(v) => updateSettings({ fontFamily: v })}>
+              <Label className="text-sm font-semibold">Heading Font</Label>
+              <Select value={editorSettings.headingFont || 'times'} onValueChange={(v) => updateSettings({ headingFont: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PDF_FONTS.map((font) => (
+                  {getHeadingFonts().map((font) => (
+                    <SelectItem key={font.id} value={font.id}>
+                      <div className="flex flex-col">
+                        <span>{font.name}</span>
+                        <span className="text-xs text-muted-foreground">{font.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Body Font Selection */}
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-semibold">Body Font</Label>
+              <Select value={editorSettings.bodyFont || 'helvetica'} onValueChange={(v) => updateSettings({ bodyFont: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {getBodyFonts().map((font) => (
                     <SelectItem key={font.id} value={font.id}>
                       <div className="flex flex-col">
                         <span>{font.name}</span>
