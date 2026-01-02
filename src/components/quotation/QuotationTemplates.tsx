@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getMultiplier, roundPrice } from "@/lib/defaultTemplates";
 
 interface LineItem {
   id: string;
@@ -2894,9 +2895,10 @@ interface QuotationTemplatesProps {
   onSelectTemplate: (sections: Section[]) => void;
   currentSections?: Section[];
   onSetQuotationTitle?: (title: string) => void;
+  countryCode?: string;
 }
 
-export const QuotationTemplates = ({ onSelectTemplate, currentSections, onSetQuotationTitle }: QuotationTemplatesProps) => {
+export const QuotationTemplates = ({ onSelectTemplate, currentSections, onSetQuotationTitle, countryCode = "IN" }: QuotationTemplatesProps) => {
   const [open, setOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [userTemplates, setUserTemplates] = useState<QuotationTemplate[]>([]);
@@ -2946,14 +2948,25 @@ export const QuotationTemplates = ({ onSelectTemplate, currentSections, onSetQuo
   };
 
   const handleSelectTemplate = async (template: QuotationTemplate) => {
-    // Generate new IDs for sections and items to avoid conflicts
+    // Get the country-specific price multiplier
+    const multiplier = getMultiplier(countryCode);
+    
+    // Generate new IDs for sections and items, and apply country-specific pricing
     const newSections = template.sections.map(section => ({
       ...section,
       id: generateId(),
-      items: section.items.map(item => ({
-        ...item,
-        id: generateId(),
-      })),
+      items: section.items.map(item => {
+        // Apply country-specific pricing to the rate
+        const adjustedRate = roundPrice(item.ratePerSft * multiplier, countryCode);
+        const newArea = item.widthFt * item.heightFt;
+        return {
+          ...item,
+          id: generateId(),
+          ratePerSft: adjustedRate,
+          sftArea: newArea,
+          amount: newArea * adjustedRate,
+        };
+      }),
     }));
     
     // Update usage count for user templates
@@ -2977,7 +2990,7 @@ export const QuotationTemplates = ({ onSelectTemplate, currentSections, onSetQuo
     setOpen(false);
     setSelectedCategory(null);
     setSearchQuery("");
-    toast.success(`Applied "${template.name}" template`);
+    toast.success(`Applied "${template.name}" with ${countryCode} pricing`);
   };
 
   const handleSaveAsTemplate = async () => {
