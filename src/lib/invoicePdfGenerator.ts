@@ -40,6 +40,14 @@ interface InvoiceData {
     upi_id?: string;
     payment_qr_url?: string;
   };
+  // Localization settings
+  localization?: {
+    currencyCode: string;
+    currencySymbol: string;
+    locale: string;
+    taxLabel: string;
+    taxRegistrationLabel: string;
+  };
   editorSettings?: PDFEditorSettings;
   invoiceSettings?: InvoiceSettings;
 }
@@ -130,6 +138,18 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   const theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
   const logoPlacement = editorSettings?.logoPlacement || 'left';
   const highlightAmounts = editorSettings?.highlightAmounts ?? true;
+
+  // Get localization settings with defaults
+  const loc = data.localization || {
+    currencyCode: 'INR',
+    currencySymbol: '₹',
+    locale: 'en-IN',
+    taxLabel: 'GST',
+    taxRegistrationLabel: 'GSTIN',
+  };
+
+  // Create localized currency formatter
+  const fmtCurrency = (amount: number) => formatCurrency(amount, loc.currencyCode, loc.currencySymbol, loc.locale);
 
   const getHighlightColor = (): [number, number, number] => {
     if (editorSettings?.customColors?.highlight) {
@@ -229,7 +249,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     
     if (data.profile.gstin) {
       doc.setFont('helvetica', 'bold');
-      doc.text(`GSTIN: ${data.profile.gstin}`, companyInfoX, headerTextY, { align: companyInfoAlign });
+      doc.text(`${loc.taxRegistrationLabel}: ${data.profile.gstin}`, companyInfoX, headerTextY, { align: companyInfoAlign });
       headerTextY += 4.5;
     }
   }
@@ -337,9 +357,9 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     : '0.0';
 
   const summaryData = [
-    ['Total Amount', formatCurrency(data.totalAmount)],
-    ['Paid Amount', `${formatCurrency(data.paidAmount)} (${paidPercentage}% paid)`],
-    ['Total Remaining', `${formatCurrency(data.remainingAmount)} (${remainingPercentage}% remaining)`],
+    ['Total Amount', fmtCurrency(data.totalAmount)],
+    ['Paid Amount', `${fmtCurrency(data.paidAmount)} (${paidPercentage}% paid)`],
+    ['Total Remaining', `${fmtCurrency(data.remainingAmount)} (${remainingPercentage}% remaining)`],
   ];
 
   autoTable(doc, {
@@ -387,7 +407,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     if (data.nextPaymentAmount) {
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-      doc.text(formatCurrency(data.nextPaymentAmount), pageWidth - margin - 6, yPosition + 11, { align: 'right' });
+      doc.text(fmtCurrency(data.nextPaymentAmount), pageWidth - margin - 6, yPosition + 11, { align: 'right' });
     }
     
     yPosition += 25;
@@ -405,7 +425,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       String(index + 1),
       payment.payment_date,
       (payment.payment_method || '-').toUpperCase(),
-      formatCurrency(payment.amount),
+      fmtCurrency(payment.amount),
       payment.notes || '-',
     ]);
 
