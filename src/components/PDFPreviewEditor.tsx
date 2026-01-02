@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2 } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -24,11 +24,21 @@ import {
   getFontById,
   getHeadingFonts,
   getBodyFonts,
+  applyBrandColorsToTheme,
 } from "@/lib/pdfThemes";
 import { QuotationSettings } from "./CustomizeFieldsDrawer";
 import { CustomThemeBuilder } from "./CustomThemeBuilder";
 import { FontPreviewPanel } from "./FontPreviewPanel";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
+import { supabase } from "@/integrations/supabase/client";
+
+interface BrandColors {
+  primary?: string;
+  secondary?: string;
+  accent?: string;
+  background?: string;
+  text?: string;
+}
 
 interface PDFPreviewEditorProps {
   open: boolean;
@@ -72,23 +82,52 @@ export const PDFPreviewEditor = ({
   const [showEditor, setShowEditor] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<ThemeCategory>('all');
   const [showThemeBuilder, setShowThemeBuilder] = useState(false);
+  const [brandColors, setBrandColors] = useState<BrandColors | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   
   // Load font preferences from database
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences, loading: fontLoading } = useFontPreferences();
 
+  // Load brand colors from profile
+  useEffect(() => {
+    const loadBrandColors = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data } = await supabase
+          .from('profiles')
+          .select('brand_colors')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (data?.brand_colors && typeof data.brand_colors === 'object') {
+          const colors = data.brand_colors as unknown as BrandColors;
+          if (colors.primary) {
+            setBrandColors(colors);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading brand colors:', error);
+      }
+    };
+
+    loadBrandColors();
+  }, []);
+
   useEffect(() => {
     if (open) {
       const savedSettings = getEditorSettings();
-      // Apply saved font preferences from database
+      // Apply saved font preferences from database and include brand colors if available
       setEditorSettings({
         ...savedSettings,
         headingFont: fontPreferences.headingFont || savedSettings.headingFont || 'times',
         bodyFont: fontPreferences.bodyFont || savedSettings.bodyFont || 'helvetica',
+        brandColors: brandColors || savedSettings.brandColors,
       });
       setShowEditor(false);
     }
-  }, [open, fontPreferences]);
+  }, [open, fontPreferences, brandColors]);
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
     const newSettings = { ...editorSettings, ...updates };
@@ -114,7 +153,14 @@ export const PDFPreviewEditor = ({
     onClose();
   };
 
-  const currentTheme = getThemeById(editorSettings.theme);
+  const currentTheme = (() => {
+    let theme = getThemeById(editorSettings.theme);
+    // Apply brand colors if enabled
+    if (editorSettings.useBrandColors && editorSettings.brandColors) {
+      theme = applyBrandColorsToTheme(theme, editorSettings.brandColors);
+    }
+    return theme;
+  })();
 
   // Get filtered themes based on category (including custom themes)
   const getFilteredThemes = (): PDFTheme[] => {
@@ -284,6 +330,56 @@ export const PDFPreviewEditor = ({
                 ))}
               </div>
             </div>
+
+            {/* Brand Colors Section */}
+            {brandColors && (
+              <div className="space-y-3 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-semibold flex items-center gap-2">
+                      <CircleDot className="h-4 w-4 text-primary" />
+                      Use Brand Colors
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Apply your saved brand palette to the PDF
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editorSettings.useBrandColors || false}
+                    onCheckedChange={(v) => updateSettings({ 
+                      useBrandColors: v,
+                      brandColors: brandColors
+                    })}
+                  />
+                </div>
+                
+                {editorSettings.useBrandColors && (
+                  <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-6 h-6 rounded-full border shadow-sm"
+                        style={{ backgroundColor: brandColors.primary }}
+                        title="Primary"
+                      />
+                      <div 
+                        className="w-6 h-6 rounded-full border shadow-sm"
+                        style={{ backgroundColor: brandColors.secondary }}
+                        title="Secondary"
+                      />
+                      <div 
+                        className="w-6 h-6 rounded-full border shadow-sm"
+                        style={{ backgroundColor: brandColors.accent }}
+                        title="Accent"
+                      />
+                      <span className="text-xs text-muted-foreground ml-2">Your brand palette</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Edit brand colors in Settings → Brand Colors
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Custom Color Overrides */}
             <div className="space-y-3 pt-4 border-t">
