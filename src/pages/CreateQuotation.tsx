@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Plus, Trash2, Upload, Eye, Share2, Loader2 } from "lucide-react";
+import { getCountryByCode } from "@/lib/countryConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1210,9 +1211,9 @@ const CreateQuotation = () => {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="5">5%</SelectItem>
-                          <SelectItem value="12">12%</SelectItem>
-                          <SelectItem value="18">18%</SelectItem>
+                          {(getCountryByCode(profile.country_code)?.tax.commonRates || [5, 12, 18]).map((rate) => (
+                            <SelectItem key={rate} value={rate.toString()}>{rate}%</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>}
                   </div>
