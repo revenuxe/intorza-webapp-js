@@ -881,33 +881,53 @@ export const PDF_THEMES: PDFTheme[] = [
 ];
 
 // ===== FONT LIBRARY =====
+// Note: jsPDF only has 3 built-in font families: helvetica, times, courier
+// All fonts map to one of these families but provide different display names for user selection
 export interface PDFFont {
   id: string;
   name: string;
-  family: string; // jsPDF font family name
+  family: string; // jsPDF font family name (helvetica, times, or courier)
   category: 'serif' | 'sans-serif' | 'display' | 'monospace';
   description: string;
   recommended?: 'heading' | 'body' | 'both';
 }
 
 export const PDF_FONTS: PDFFont[] = [
-  // Sans-serif fonts (clean, modern) - great for body text
-  { id: 'helvetica', name: 'Helvetica', family: 'helvetica', category: 'sans-serif', description: 'Classic clean look', recommended: 'both' },
-  { id: 'arial', name: 'Arial', family: 'helvetica', category: 'sans-serif', description: 'Universal readability', recommended: 'body' },
+  // ===== SANS-SERIF FONTS (Clean, Modern) =====
+  { id: 'helvetica', name: 'Helvetica', family: 'helvetica', category: 'sans-serif', description: 'Classic Swiss design', recommended: 'both' },
+  { id: 'arial', name: 'Arial', family: 'helvetica', category: 'sans-serif', description: 'Universal readability', recommended: 'both' },
+  { id: 'roboto', name: 'Roboto', family: 'helvetica', category: 'sans-serif', description: 'Modern geometric', recommended: 'body' },
+  { id: 'open-sans', name: 'Open Sans', family: 'helvetica', category: 'sans-serif', description: 'Friendly humanist', recommended: 'body' },
+  { id: 'lato', name: 'Lato', family: 'helvetica', category: 'sans-serif', description: 'Warm and stable', recommended: 'both' },
+  { id: 'montserrat', name: 'Montserrat', family: 'helvetica', category: 'sans-serif', description: 'Urban modern', recommended: 'heading' },
+  { id: 'poppins', name: 'Poppins', family: 'helvetica', category: 'sans-serif', description: 'Geometric friendly', recommended: 'heading' },
+  { id: 'inter', name: 'Inter', family: 'helvetica', category: 'sans-serif', description: 'Screen optimized', recommended: 'body' },
+  { id: 'nunito', name: 'Nunito', family: 'helvetica', category: 'sans-serif', description: 'Rounded friendly', recommended: 'body' },
+  { id: 'raleway', name: 'Raleway', family: 'helvetica', category: 'sans-serif', description: 'Elegant thin', recommended: 'heading' },
   
-  // Serif fonts (traditional, elegant) - great for headings
-  { id: 'times', name: 'Times New Roman', family: 'times', category: 'serif', description: 'Traditional elegance', recommended: 'both' },
-  { id: 'georgia', name: 'Georgia', family: 'times', category: 'serif', description: 'Warm and readable', recommended: 'heading' },
-  { id: 'palatino', name: 'Palatino', family: 'times', category: 'serif', description: 'Refined typography', recommended: 'heading' },
-  { id: 'bookman', name: 'Bookman', family: 'times', category: 'serif', description: 'Classic book style', recommended: 'body' },
+  // ===== SERIF FONTS (Traditional, Elegant) =====
+  { id: 'times', name: 'Times New Roman', family: 'times', category: 'serif', description: 'Classic newspaper', recommended: 'both' },
+  { id: 'georgia', name: 'Georgia', family: 'times', category: 'serif', description: 'Warm screen serif', recommended: 'both' },
+  { id: 'palatino', name: 'Palatino', family: 'times', category: 'serif', description: 'Renaissance elegance', recommended: 'heading' },
+  { id: 'garamond', name: 'Garamond', family: 'times', category: 'serif', description: 'French classic', recommended: 'both' },
+  { id: 'bookman', name: 'Bookman', family: 'times', category: 'serif', description: 'Bold book style', recommended: 'heading' },
+  { id: 'cambria', name: 'Cambria', family: 'times', category: 'serif', description: 'Modern transitional', recommended: 'body' },
+  { id: 'libre-baskerville', name: 'Libre Baskerville', family: 'times', category: 'serif', description: 'Web optimized classic', recommended: 'both' },
+  { id: 'merriweather', name: 'Merriweather', family: 'times', category: 'serif', description: 'Screen-friendly serif', recommended: 'body' },
+  { id: 'playfair', name: 'Playfair Display', family: 'times', category: 'serif', description: 'High contrast display', recommended: 'heading' },
+  { id: 'lora', name: 'Lora', family: 'times', category: 'serif', description: 'Contemporary serif', recommended: 'both' },
   
-  // Display fonts (headings only)
-  { id: 'century', name: 'Century', family: 'times', category: 'display', description: 'Elegant display', recommended: 'heading' },
-  { id: 'garamond', name: 'Garamond', family: 'times', category: 'display', description: 'Sophisticated classic', recommended: 'heading' },
+  // ===== DISPLAY FONTS (Headings) =====
+  { id: 'century', name: 'Century Gothic', family: 'helvetica', category: 'display', description: 'Geometric display', recommended: 'heading' },
+  { id: 'bebas', name: 'Bebas Neue', family: 'helvetica', category: 'display', description: 'Bold condensed', recommended: 'heading' },
+  { id: 'oswald', name: 'Oswald', family: 'helvetica', category: 'display', description: 'Condensed gothic', recommended: 'heading' },
+  { id: 'abril', name: 'Abril Fatface', family: 'times', category: 'display', description: 'Didone display', recommended: 'heading' },
   
-  // Monospace fonts (technical)
-  { id: 'courier', name: 'Courier', family: 'courier', category: 'monospace', description: 'Technical precision', recommended: 'body' },
-  { id: 'consolas', name: 'Consolas', family: 'courier', category: 'monospace', description: 'Modern monospace', recommended: 'body' },
+  // ===== MONOSPACE FONTS (Technical) =====
+  { id: 'courier', name: 'Courier New', family: 'courier', category: 'monospace', description: 'Classic typewriter', recommended: 'body' },
+  { id: 'consolas', name: 'Consolas', family: 'courier', category: 'monospace', description: 'Modern coding', recommended: 'body' },
+  { id: 'fira-code', name: 'Fira Code', family: 'courier', category: 'monospace', description: 'Developer favorite', recommended: 'body' },
+  { id: 'source-code', name: 'Source Code Pro', family: 'courier', category: 'monospace', description: 'Adobe monospace', recommended: 'body' },
 ];
 
 export const getFontById = (fontId: string): PDFFont => {

@@ -334,13 +334,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     headerTextY = yPosition + logoSize + 10;
   }
   
-  doc.setFont('helvetica', 'bold');
+  setHeadingFont('bold');
   doc.setFontSize(18);
   doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
   doc.text((data.companyName || 'COMPANY NAME').toUpperCase(), companyInfoX, headerTextY, { align: companyInfoAlign });
   
   headerTextY += 7;
-  doc.setFont('helvetica', 'normal');
+  setBodyFont('normal');
   doc.setFontSize(9);
   doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
   
@@ -367,7 +367,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // Get tax registration label from localization (e.g., "GSTIN", "VAT No", "Tax ID")
   const taxRegLabel = data.localization?.taxRegistrationLabel || 'GSTIN';
   if (data.gstin) {
-      doc.setFont('helvetica', 'bold');
+      setBodyFont('bold');
       doc.text(`${taxRegLabel}: ${data.gstin}`, companyInfoX, headerTextY, { align: companyInfoAlign });
       headerTextY += 4.5;
     }
@@ -395,19 +395,19 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const cardPadding = 6;
     const cardContentX = margin + cardPadding;
     
-    doc.setFont('helvetica', 'bold');
+    setHeadingFont('bold');
     doc.setFontSize(8);
     doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
     doc.text('QUOTATION FOR', cardContentX, cardY);
     
     cardY += 6;
-    doc.setFont('helvetica', 'bold');
+    setHeadingFont('bold');
     doc.setFontSize(11);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text(data.clientName, cardContentX, cardY);
     
     cardY += 5;
-    doc.setFont('helvetica', 'normal');
+    setBodyFont('normal');
     doc.setFontSize(9);
     doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
     const clientAddr = doc.splitTextToSize(data.clientAddress, cardWidth - (cardPadding * 2));
@@ -423,19 +423,19 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const metaLabelX = metaContentX;
     const metaValueX = metaContentX + 30; // Align values
     
-    doc.setFont('helvetica', 'bold');
+    setHeadingFont('bold');
     doc.setFontSize(8);
     doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
     doc.text('PROJECT DETAILS', metaContentX, metaY);
     metaY += 6;
 
     const addMeta = (label: string, value: string) => {
-      doc.setFont('helvetica', 'normal');
+      setBodyFont('normal');
       doc.setFontSize(9);
       doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
       doc.text(label, metaLabelX, metaY);
       
-      doc.setFont('helvetica', 'bold');
+      setBodyFont('bold');
       doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
       doc.text(value, metaValueX, metaY);
       metaY += 5.5;
@@ -465,7 +465,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
     // Section Header "Card"
     // Clean underline style with bold text
-    doc.setFont('helvetica', 'bold');
+    setHeadingFont('bold');
     doc.setFontSize(10);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text(section.title.toUpperCase(), margin, yPosition + 4);
@@ -505,7 +505,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         body: tableBody,
         theme: 'grid',
         styles: {
-          font: 'helvetica',
+          font: bodyFont,
           fontSize: 7,
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
@@ -592,7 +592,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         body: tableBody,
         theme: 'grid',
         styles: {
-          font: 'helvetica',
+          font: bodyFont,
           fontSize: 7,
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
@@ -625,7 +625,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     // Section Total with localized currency
     const fmtCurrencyLocal = (amt: number) => formatCurrency(amt, data.localization?.currencyCode || 'INR', data.localization?.currencySymbol || '₹', data.localization?.locale || 'en-IN');
     const totalText = `Total ${section.title}:  ${fmtCurrencyLocal(sectionTotal)}`;
-    doc.setFont('helvetica', 'bold');
+    setBodyFont('bold');
     doc.setFontSize(8);
     const textWidth = doc.getTextWidth(totalText);
     const highlightPadding = 2;
@@ -668,7 +668,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   const finalTotal = taxableAmount + gstAmount;
 
   // Render Summary as a Table but with custom styling
-  doc.setFont('helvetica', 'bold');
+  setHeadingFont('bold');
   doc.setFontSize(10);
   doc.text("PAYMENT SUMMARY", margin, yPosition);
   yPosition += 6;
@@ -798,13 +798,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       yPosition = 15;
     }
 
-  doc.setFont('helvetica', 'bold');
+  setHeadingFont('bold');
   doc.setFontSize(10);
   doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
   doc.text("TERMS & CONDITIONS", margin, yPosition);
   yPosition += 8;
 
-  doc.setFont('helvetica', 'normal');
+  setBodyFont('normal');
   doc.setFontSize(7);
   
   // Helper to add titled blocks with points
@@ -814,11 +814,11 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       yPosition = 15;
     }
     if (title) {
-        doc.setFont('helvetica', 'bold');
+        setBodyFont('bold');
         doc.text(title, margin, yPosition);
         yPosition += 4;
     }
-    doc.setFont('helvetica', 'normal');
+    setBodyFont('normal');
     
     // Ensure points is an array before iterating
     if (!points || !Array.isArray(points)) return;
@@ -910,7 +910,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         yPosition = 15;
       }
 
-      doc.setFont('helvetica', 'bold');
+      setHeadingFont('bold');
       doc.setFontSize(10);
       doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
       doc.text("BANK & PAYMENT DETAILS", margin, yPosition);
@@ -926,16 +926,16 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const labelX = margin + 5;
       const valueX = margin + 45;
 
-      doc.setFont('helvetica', 'normal');
+      setBodyFont('normal');
       doc.setFontSize(8);
 
       const addBankRow = (label: string, value: string) => {
         doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
         doc.text(label, labelX, bankY);
-        doc.setFont('helvetica', 'bold');
+        setBodyFont('bold');
         doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
         doc.text(value, valueX, bankY);
-        doc.setFont('helvetica', 'normal');
+        setBodyFont('normal');
         bankY += 5.5;
       };
 
@@ -971,7 +971,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const signBoxWidth = 70;
     const companySignX = pageWidth - margin - signBoxWidth;
     
-    doc.setFont('helvetica', 'bold');
+    setHeadingFont('bold');
     doc.setFontSize(10);
     doc.text("Acceptance from Customer", margin, yPosition);
     
@@ -988,7 +988,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     doc.setLineWidth(0.5);
     
     doc.line(margin, yPosition, margin + signBoxWidth, yPosition);
-    doc.setFont('helvetica', 'normal');
+    setBodyFont('normal');
     doc.setFontSize(9);
     doc.text("Signatory", margin, yPosition + 5);
 
@@ -1017,7 +1017,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     yPosition += 10;
 
     // Title
-    doc.setFont('helvetica', 'bold');
+    setHeadingFont('bold');
     doc.setFontSize(10);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text("RESPOND TO THIS QUOTATION", pageWidth / 2, yPosition, { align: 'center' });
