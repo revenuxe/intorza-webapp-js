@@ -111,8 +111,8 @@ serve(async (req) => {
             provider: 'razorpay',
             event_type: event,
             provider_event_id: eventId,
-            amount: paymentEntity?.amount || 4900,
-            currency: paymentEntity?.currency || 'INR',
+            amount: paymentEntity?.amount,
+            currency: paymentEntity?.currency,
             status: 'captured',
             raw_payload: payload,
           });
@@ -207,7 +207,7 @@ serve(async (req) => {
             event_type: event,
             provider_event_id: eventId,
             amount: payload.payload?.refund?.entity?.amount,
-            currency: 'INR',
+            currency: payload.payload?.refund?.entity?.currency,
             status: 'refunded',
             raw_payload: payload,
           });
