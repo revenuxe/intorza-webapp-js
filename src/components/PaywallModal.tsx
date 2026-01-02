@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useLocalization } from '@/hooks/useLocalization';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Check, Crown } from 'lucide-react';
@@ -31,7 +32,11 @@ export const PaywallModal: React.FC = () => {
   const navigate = useNavigate();
   const { paywallOpen, setPaywallOpen, refreshSubscription } = useSubscription();
   const { session } = useAuth();
+  const { settings } = useLocalization();
   const [loading, setLoading] = useState(false);
+  
+  // Determine price text based on country
+  const priceText = settings.countryCode === 'IN' ? '₹1' : '$1';
 
   const loadRazorpayScript = (): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -168,7 +173,7 @@ export const PaywallModal: React.FC = () => {
           </div>
           <h2 className="text-lg sm:text-xl font-bold mb-1">1 Month FREE</h2>
           <div className="text-3xl sm:text-4xl font-bold my-2">
-            Just ₹1
+            Just {priceText}
           </div>
           <p className="text-primary-foreground/80 text-xs sm:text-sm">
             Unlock all Pro features
