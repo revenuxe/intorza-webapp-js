@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { Check, Package, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLocalization } from '@/hooks/useLocalization';
 
 interface ItemPattern {
   product_name: string;
@@ -18,6 +19,8 @@ interface ProductNameInputProps {
   patterns: ItemPattern[];
   placeholder?: string;
   className?: string;
+  currencySymbol?: string;
+  areaUnitShort?: string;
 }
 
 export const ProductNameInput: React.FC<ProductNameInputProps> = ({
@@ -27,11 +30,18 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
   patterns,
   placeholder = 'Product name',
   className,
+  currencySymbol,
+  areaUnitShort,
 }) => {
+  const { settings, formatCurrency } = useLocalization();
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Use props if provided, otherwise use localization settings
+  const symbol = currencySymbol || settings.currencySymbol;
+  const areaUnit = areaUnitShort || settings.areaUnitShort.toLowerCase();
 
   // Filter and prioritize products
   const filteredProducts = useMemo(() => {
@@ -105,7 +115,7 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
                       <p className="text-sm font-medium truncate">{pattern.product_name}</p>
                       {pattern.preferred_rate && pattern.preferred_rate > 0 && (
                         <p className="text-xs text-muted-foreground">
-                          ₹{pattern.preferred_rate.toLocaleString('en-IN')}/sft
+                          {symbol}{pattern.preferred_rate.toLocaleString(settings.locale)}/{areaUnit}
                         </p>
                       )}
                     </div>

@@ -1732,6 +1732,53 @@ export const formatCurrencyByCountry = (amount: number, countryCode: string): st
   return `${formattedNumber} ${symbol}`;
 };
 
+// Format large currency amounts with abbreviations
+export const formatCurrencyShort = (amount: number, countryCode: string): string => {
+  const country = getCountryByCode(countryCode) || getDefaultCountry();
+  const { symbol, locale } = country.currency;
+  
+  // Use region-specific abbreviations
+  if (['IN', 'PK', 'BD', 'LK', 'NP'].includes(countryCode)) {
+    // South Asian notation: Crore (Cr) and Lakh (L)
+    if (amount >= 10000000) {
+      return `${symbol}${(amount / 10000000).toFixed(2)} Cr`;
+    }
+    if (amount >= 100000) {
+      return `${symbol}${(amount / 100000).toFixed(2)} L`;
+    }
+  } else {
+    // International notation: M (millions), K (thousands)
+    if (amount >= 1000000) {
+      return `${symbol}${(amount / 1000000).toFixed(2)}M`;
+    }
+    if (amount >= 1000) {
+      return `${symbol}${(amount / 1000).toFixed(1)}K`;
+    }
+  }
+  
+  return `${symbol}${amount.toLocaleString(locale, { maximumFractionDigits: 0 })}`;
+};
+
+// Format date according to country settings
+export const formatDateByCountry = (date: Date | string, countryCode: string): string => {
+  const country = getCountryByCode(countryCode) || getDefaultCountry();
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  
+  switch (country.dateFormat) {
+    case 'MM/DD/YYYY':
+      return `${month}/${day}/${year}`;
+    case 'YYYY-MM-DD':
+      return `${year}-${month}-${day}`;
+    case 'DD.MM.YYYY':
+      return `${day}.${month}.${year}`;
+    default: // DD/MM/YYYY
+      return `${day}/${month}/${year}`;
+  }
+};
+
 export const getCountryGroups = (): { region: string; countries: CountryConfig[] }[] => {
   return [
     {

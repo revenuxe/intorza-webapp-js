@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,7 @@ export default function SiteMeasurementPricing() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { settings, formatCurrency: formatCurrencyLocalized, formatArea } = useLocalization();
   const [project, setProject] = useState<Project | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,14 +212,12 @@ export default function SiteMeasurementPricing() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  // Use localized currency formatting
+  const formatCurrency = (amount: number) => formatCurrencyLocalized(amount);
+  
+  // Get area unit label based on measurement system
+  const areaUnitLabel = settings.measurementSystem === 'metric' ? 'sq.m' : 'sq.ft';
+  const areaUnitShort = settings.areaUnitShort.toLowerCase();
 
   if (loading) {
     return (
@@ -254,7 +254,7 @@ export default function SiteMeasurementPricing() {
               <CardTitle className="text-base flex items-center justify-between">
                 <span>{room.room_name || room.room_type}</span>
                 <span className="text-sm font-normal text-muted-foreground">
-                  {room.area_sqft?.toFixed(1)} sq.ft
+                  {room.area_sqft?.toFixed(1)} {areaUnitLabel}
                 </span>
               </CardTitle>
             </CardHeader>
@@ -269,7 +269,7 @@ export default function SiteMeasurementPricing() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="per_sqft">Per sq.ft</SelectItem>
+                    <SelectItem value="per_sqft">Per {areaUnitLabel}</SelectItem>
                     <SelectItem value="lump_sum">Lump Sum</SelectItem>
                     <SelectItem value="per_unit">Per Unit</SelectItem>
                   </SelectContent>
@@ -279,7 +279,7 @@ export default function SiteMeasurementPricing() {
               {room.pricing_mode === 'per_sqft' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Rate per sq.ft</Label>
+                    <Label>Rate per {areaUnitLabel}</Label>
                     <Input
                       type="number"
                       inputMode="decimal"
