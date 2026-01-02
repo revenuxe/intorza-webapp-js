@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getCountryByCode } from "@/lib/countryConfig";
 
 const CATEGORIES = ["Kitchen", "Wardrobe", "TV Unit", "Bedroom", "Living Room", "Bathroom", "Study", "Dining", "Storage", "General"];
 
@@ -38,10 +39,34 @@ export const SectionTemplatesTab = () => {
     category: "Kitchen",
     items: [{ product_name: "", product_details: "", default_rate: 0 }] as SectionItem[]
   });
+  const [currencySymbol, setCurrencySymbol] = useState("₹");
 
   useEffect(() => {
     loadTemplates();
+    loadLocalization();
   }, []);
+
+  const loadLocalization = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('country_code, currency_symbol')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      if (profile?.country_code) {
+        const countryConfig = getCountryByCode(profile.country_code);
+        if (countryConfig) {
+          setCurrencySymbol(profile.currency_symbol || countryConfig.currency.symbol);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading localization:', error);
+    }
+  };
 
   const loadTemplates = async () => {
     try {
@@ -244,7 +269,7 @@ export const SectionTemplatesTab = () => {
                   />
                   <Input
                     type="number"
-                    placeholder="Rate"
+                    placeholder={`Rate (${currencySymbol})`}
                     value={item.default_rate || ''}
                     onChange={(e) => updateNewItem(index, 'default_rate', parseFloat(e.target.value) || 0)}
                   />

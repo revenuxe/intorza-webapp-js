@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Package, TrendingUp, IndianRupee, Trash2, Search, Plus, Tag, Filter } from "lucide-react";
+import { Package, TrendingUp, Trash2, Search, Plus, Tag, Filter, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { getCountryByCode } from "@/lib/countryConfig";
 
 const CATEGORIES = [
   "General",
@@ -37,6 +38,12 @@ interface ItemPattern {
   category: string;
 }
 
+interface UserLocalization {
+  currency_symbol: string;
+  area_unit_short: string;
+  country_code: string;
+}
+
 export const ItemsPricingTab = () => {
   const { toast } = useToast();
   const [items, setItems] = useState<ItemPattern[]>([]);
@@ -46,10 +53,42 @@ export const ItemsPricingTab = () => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newItem, setNewItem] = useState({ name: "", details: "", rate: "", category: "General" });
   const [saving, setSaving] = useState(false);
+  const [localization, setLocalization] = useState<UserLocalization>({
+    currency_symbol: "₹",
+    area_unit_short: "SFT",
+    country_code: "IN"
+  });
 
   useEffect(() => {
     loadItems();
+    loadLocalization();
   }, []);
+
+  const loadLocalization = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('country_code, currency_symbol')
+        .eq('id', user.id)
+        .maybeSingle();
+      
+      if (profile?.country_code) {
+        const countryConfig = getCountryByCode(profile.country_code);
+        if (countryConfig) {
+          setLocalization({
+            currency_symbol: profile.currency_symbol || countryConfig.currency.symbol,
+            area_unit_short: countryConfig.measurement.areaUnitShort,
+            country_code: profile.country_code
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading localization:', error);
+    }
+  };
 
   const loadItems = async () => {
     try {
@@ -272,7 +311,7 @@ export const ItemsPricingTab = () => {
                       </SelectContent>
                     </Select>
                     <div className="flex items-center gap-1">
-                      <IndianRupee className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">{localization.currency_symbol}</span>
                       <Input
                         type="number"
                         value={item.preferred_rate || item.default_rate || ''}
@@ -334,7 +373,7 @@ export const ItemsPricingTab = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label>Default Rate (₹/sft)</Label>
+              <Label>Default Rate ({localization.currency_symbol}/{localization.area_unit_short.toLowerCase()})</Label>
               <Input
                 type="number"
                 value={newItem.rate}
