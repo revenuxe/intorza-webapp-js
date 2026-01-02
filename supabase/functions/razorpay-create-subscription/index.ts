@@ -11,15 +11,24 @@ const RAZORPAY_KEY_SECRET = Deno.env.get('RAZORPAY_KEY_SECRET');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-// Plan configuration - 30 days Pro for ₹1 token payment (Razorpay minimum is ₹1)
+// Plan configuration - dynamic based on country
 const PLAN_CONFIG = {
   monthly: {
-    amount: 100, // 100 paise (₹1) - Razorpay minimum order amount
-    currency: 'INR',
+    INR: {
+      amount: 100, // 100 paise (₹1) - Razorpay minimum for India
+      currency: 'INR',
+    },
+    USD: {
+      amount: 100, // 100 cents ($1) - for international users
+      currency: 'USD',
+    },
     name: 'Intorza Pro',
     trialDays: 30,
   }
 };
+
+// Countries that use INR pricing (India only)
+const INR_COUNTRIES = ['IN'];
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -83,6 +92,13 @@ serve(async (req) => {
       });
     }
 
+    // Determine pricing based on user's country
+    const userCountry = profile.country_code || 'IN';
+    const useINR = INR_COUNTRIES.includes(userCountry);
+    const pricing = useINR ? planConfig.INR : planConfig.USD;
+    
+    console.log(`User country: ${userCountry}, Using ${pricing.currency} pricing: ${pricing.amount}`);
+
     const razorpayAuth = btoa(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`);
 
     // Create or get Razorpay customer
@@ -122,9 +138,8 @@ serve(async (req) => {
         .eq('id', user.id);
     }
 
-    // Create simple one-time order for ₹0.50 (50 paise)
-    // This enables ALL payment methods (UPI, cards, netbanking, wallets)
-    console.log('Creating simple order for Pro activation');
+    // Create order with country-appropriate pricing
+    console.log(`Creating order for Pro activation: ${pricing.amount} ${pricing.currency}`);
     const orderResponse = await fetch('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -132,13 +147,14 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        amount: planConfig.amount, // 50 paise
-        currency: planConfig.currency,
+        amount: pricing.amount,
+        currency: pricing.currency,
         receipt: `pro_${user.id.substring(0, 8)}_${Date.now().toString(36)}`,
         notes: {
           user_id: user.id,
           plan: plan,
           type: 'pro_activation',
+          country: userCountry,
         }
       }),
     });
@@ -153,8 +169,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       orderId: orderData.id,
       customerId: customerId,
-      amount: planConfig.amount,
-      currency: planConfig.currency,
+      amount: pricing.amount,
+      currency: pricing.currency,
       keyId: RAZORPAY_KEY_ID,
       plan: plan,
       trial: true,
