@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Menu, LogOut, User, Settings, ChevronDown, Crown } from "lucide-react";
+import { Menu, LogOut, User, Settings, ChevronDown, Crown, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,12 +19,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Navigation } from "./Navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useFeedback } from "./FeedbackProvider";
 import logo from "@/assets/intorza-logo.webp";
 import { format } from "date-fns";
 
 export const Header = () => {
   const { user, signOut, isAuthenticated } = useAuth();
   const { isPro, expiry, setPaywallOpen } = useSubscription();
+  const { openFeedback } = useFeedback();
   
   const getInitials = () => {
     if (!user?.email) return "U";
@@ -73,6 +75,25 @@ export const Header = () => {
 
         {/* Mobile auth section */}
         <div className="lg:hidden flex items-center gap-1.5">
+          {/* Feedback button */}
+          {isAuthenticated && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openFeedback()}
+                  className="h-9 w-9 text-muted-foreground hover:text-primary"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Give Feedback</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+          
           {/* Pro badge for Pro users */}
           {isAuthenticated && isPro && (
             <Tooltip>
@@ -128,6 +149,10 @@ export const Header = () => {
                   )}
                 </div>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => openFeedback()}>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Give Feedback
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
                   <Settings className="mr-2 h-4 w-4" />
                   Settings

@@ -11,8 +11,6 @@ import { PaywallModal } from "./components/PaywallModal";
 import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
 import { SEOProvider } from "./components/SEOProvider";
 import { OfflineIndicator } from "./components/OfflineIndicator";
-import { CountrySelectionPopup } from "./components/CountrySelectionPopup";
-import { GuestOnboardingTour } from "./components/GuestOnboardingTour";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import SiteMeasurement from "./pages/SiteMeasurement";
@@ -56,8 +54,6 @@ const App = () => (
               <PaywallModal />
               <PWAInstallPrompt />
               <OfflineIndicator />
-              <CountrySelectionPopup />
-              <GuestOnboardingTour />
               <Routes>
                 {/* Public routes */}
                 <Route path="/auth" element={<Auth />} />
