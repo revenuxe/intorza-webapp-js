@@ -2,6 +2,7 @@ import { FileText, Receipt, Users, Settings, PlusCircle, UsersRound, LayoutDashb
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -74,6 +75,10 @@ const navItems = [
 
 export const Navigation = ({ mobile }: NavigationProps) => {
   const { isPro, setPaywallOpen } = useSubscription();
+  const { settings } = useLocalization();
+  
+  // Determine price text based on country
+  const priceText = settings.countryCode === 'IN' ? '₹1' : '$1';
 
   const handleNavClick = (e: React.MouseEvent, item: typeof navItems[0]) => {
     if (item.requiresPro && !isPro) {
@@ -96,7 +101,7 @@ export const Navigation = ({ mobile }: NavigationProps) => {
           <Crown className="h-5 w-5" />
           <div className="flex-1 text-left">
             <span className="block font-semibold">Upgrade to Pro</span>
-            <span className="text-xs opacity-80">₹1 for first month</span>
+            <span className="text-xs opacity-80">{priceText} for first month</span>
           </div>
         </button>
       )}
