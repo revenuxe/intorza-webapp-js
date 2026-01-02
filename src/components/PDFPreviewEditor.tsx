@@ -20,6 +20,8 @@ import {
   getAllThemes,
   rgbToHex,
   PDFTheme,
+  PDF_FONTS,
+  getFontById,
 } from "@/lib/pdfThemes";
 import { QuotationSettings } from "./CustomizeFieldsDrawer";
 import { CustomThemeBuilder } from "./CustomThemeBuilder";
@@ -482,6 +484,26 @@ export const PDFPreviewEditor = ({
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Font Family Selection */}
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-semibold">Font Family</Label>
+              <Select value={editorSettings.fontFamily} onValueChange={(v) => updateSettings({ fontFamily: v })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PDF_FONTS.map((font) => (
+                    <SelectItem key={font.id} value={font.id}>
+                      <div className="flex flex-col">
+                        <span>{font.name}</span>
+                        <span className="text-xs text-muted-foreground">{font.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-3 pt-4 border-t">

@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   PDF_THEMES, 
   PDFEditorSettings, 
@@ -19,7 +20,9 @@ import {
   InvoiceSettings,
   getInvoiceSettings,
   saveInvoiceSettings,
-  defaultInvoiceSettings
+  defaultInvoiceSettings,
+  PDF_FONTS,
+  getFontById,
 } from "@/lib/pdfThemes";
 
 interface InvoicePreviewEditorProps {
@@ -203,6 +206,25 @@ export const InvoicePreviewEditor = ({
                 </div>
               ))}
             </RadioGroup>
+
+            <div className="pt-3 border-t space-y-3">
+              <Label className="text-xs font-semibold">Font Family</Label>
+              <Select value={editorSettings.fontFamily} onValueChange={(v) => updateEditorSettings({ fontFamily: v })}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PDF_FONTS.map((font) => (
+                    <SelectItem key={font.id} value={font.id}>
+                      <div className="flex flex-col">
+                        <span className="text-xs">{font.name}</span>
+                        <span className="text-[10px] text-muted-foreground">{font.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="pt-3 border-t space-y-3">
               <Label className="text-xs font-semibold">Style Options</Label>
