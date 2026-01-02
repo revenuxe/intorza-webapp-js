@@ -1045,7 +1045,7 @@ const CreateQuotation = () => {
                         <div>Height (Ft)</div>
                         <div>Sft Area</div>
                       </>}
-                    <div>Rate/Sft</div>
+                    <div>Rate/{profile.measurement_system === 'metric' ? 'Sqm' : 'Sft'}</div>
                     <div>Amount</div>
                   </div>
                 </div>
@@ -1091,7 +1091,7 @@ const CreateQuotation = () => {
                           </>}
                         <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
                         <div className="h-9 flex items-center font-semibold tabular-nums">
-                          ₹{item.amount.toLocaleString("en-IN", {
+                          {profile.currency_symbol}{item.amount.toLocaleString(profile.locale, {
                       minimumFractionDigits: 2
                     })}
                         </div>
@@ -1148,14 +1148,14 @@ const CreateQuotation = () => {
                       </>}
 
                     <div className="space-y-2">
-                      <Label>Rate/Sft (₹)</Label>
+                      <Label>Rate/{profile.measurement_system === 'metric' ? 'Sqm' : 'Sft'} ({profile.currency_symbol})</Label>
                       <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" />
                     </div>
 
                     <div className="space-y-1 pt-2 border-t">
                       <div className="flex justify-between">
                         <span className="text-sm font-medium">Amount:</span>
-                        <span className="font-semibold tabular-nums">₹{item.amount.toLocaleString("en-IN", {
+                        <span className="font-semibold tabular-nums">{profile.currency_symbol}{item.amount.toLocaleString(profile.locale, {
                       minimumFractionDigits: 2
                     })}</span>
                       </div>
@@ -1167,7 +1167,7 @@ const CreateQuotation = () => {
               <div className="flex justify-between items-center pt-4 border-t border-border">
                 <span className="font-medium">Section Total</span>
                 <span className="text-lg font-bold text-primary">
-                  ₹{section.items.reduce((sum, item) => sum + item.amount, 0).toLocaleString("en-IN", {
+                  {profile.currency_symbol}{section.items.reduce((sum, item) => sum + item.amount, 0).toLocaleString(profile.locale, {
                 minimumFractionDigits: 2
               })}
                 </span>

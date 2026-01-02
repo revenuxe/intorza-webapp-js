@@ -336,6 +336,13 @@ const InvoiceDetail = () => {
           notes: p.notes
         })),
         profile: profile || {},
+        localization: profile ? {
+          currencyCode: profile.currency_code || 'INR',
+          currencySymbol: profile.currency_symbol || '₹',
+          locale: profile.locale || 'en-IN',
+          taxLabel: profile.tax_label || 'GST',
+          taxRegistrationLabel: profile.tax_label === 'GST' ? 'GSTIN' : `${profile.tax_label || 'Tax'} No`,
+        } : undefined,
         editorSettings: editorSettings || getEditorSettings(),
         invoiceSettings: invoiceSettings || getInvoiceSettings()
       });
@@ -377,6 +384,13 @@ const InvoiceDetail = () => {
           notes: payment.notes
         }],
         profile: profile || {},
+        localization: profile ? {
+          currencyCode: profile.currency_code || 'INR',
+          currencySymbol: profile.currency_symbol || '₹',
+          locale: profile.locale || 'en-IN',
+          taxLabel: profile.tax_label || 'GST',
+          taxRegistrationLabel: profile.tax_label === 'GST' ? 'GSTIN' : `${profile.tax_label || 'Tax'} No`,
+        } : undefined,
         editorSettings: getEditorSettings(),
         invoiceSettings: getInvoiceSettings()
       });
