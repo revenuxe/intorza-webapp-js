@@ -1,7 +1,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { PDFEditorSettings, getThemeById, hexToRgb, PDFTheme } from './pdfThemes';
+import { PDFEditorSettings, getThemeById, hexToRgb, PDFTheme, getFontById } from './pdfThemes';
 import { drawAllDecorations, drawSectionDivider, drawFooterDecoration } from './pdfDecorations';
 
 // --- Settings Interface ---
@@ -227,6 +227,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   const theme: PDFTheme = editorSettings ? getThemeById(editorSettings.theme) : getThemeById('minimal-white');
   const logoPlacement = editorSettings?.logoPlacement || 'left';
   const highlightAmounts = editorSettings?.highlightAmounts ?? true;
+  
+  // Get font settings
+  const fontSettings = getFontById(editorSettings?.fontFamily || 'helvetica');
+  const fontFamily = fontSettings.family;
+  
+  // Set default font for entire document
+  doc.setFont(fontFamily);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();

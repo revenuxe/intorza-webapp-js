@@ -880,9 +880,43 @@ export const PDF_THEMES: PDFTheme[] = [
   },
 ];
 
+// ===== FONT LIBRARY =====
+export interface PDFFont {
+  id: string;
+  name: string;
+  family: string; // jsPDF font family name
+  category: 'serif' | 'sans-serif' | 'display' | 'monospace';
+  description: string;
+}
+
+export const PDF_FONTS: PDFFont[] = [
+  // Sans-serif fonts (clean, modern)
+  { id: 'helvetica', name: 'Helvetica', family: 'helvetica', category: 'sans-serif', description: 'Classic clean look' },
+  { id: 'arial', name: 'Arial', family: 'helvetica', category: 'sans-serif', description: 'Universal readability' },
+  
+  // Serif fonts (traditional, elegant)
+  { id: 'times', name: 'Times New Roman', family: 'times', category: 'serif', description: 'Traditional elegance' },
+  { id: 'georgia', name: 'Georgia', family: 'times', category: 'serif', description: 'Warm and readable' },
+  
+  // Monospace fonts (technical)
+  { id: 'courier', name: 'Courier', family: 'courier', category: 'monospace', description: 'Technical precision' },
+  
+  // Display fonts (headings)
+  { id: 'palatino', name: 'Palatino', family: 'times', category: 'display', description: 'Refined headings' },
+];
+
+export const getFontById = (fontId: string): PDFFont => {
+  return PDF_FONTS.find(f => f.id === fontId) || PDF_FONTS[0];
+};
+
+export const getFontsByCategory = (category: PDFFont['category']): PDFFont[] => {
+  return PDF_FONTS.filter(f => f.category === category);
+};
+
 // ===== EDITOR SETTINGS =====
 export interface PDFEditorSettings {
   theme: string;
+  fontFamily: string; // Font ID from PDF_FONTS
   logoPlacement: 'left' | 'center' | 'right';
   highlightAmounts: boolean;
   showBorders: boolean;
@@ -908,6 +942,7 @@ export interface PDFEditorSettings {
 
 export const defaultEditorSettings: PDFEditorSettings = {
   theme: 'minimal-white',
+  fontFamily: 'helvetica',
   logoPlacement: 'left',
   highlightAmounts: true,
   showBorders: true,
