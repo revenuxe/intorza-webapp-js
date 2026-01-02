@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
 import { ListSkeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -46,6 +47,7 @@ const formatStatusDisplay = (status: string) => {
 const Invoices = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { formatCurrency, formatDate } = useLocalization();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -116,11 +118,7 @@ const Invoices = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN');
-  };
+  // formatDate is now provided by useLocalization hook
 
   return (
     <div className="container max-w-6xl mx-auto p-4 md:p-6 lg:p-8">
@@ -162,19 +160,19 @@ const Invoices = () => {
                       <div>
                         <p className="text-xs text-muted-foreground">Total</p>
                         <p className="text-sm font-bold text-foreground tabular-nums">
-                          ₹{invoice.total_amount?.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                          {formatCurrency(invoice.total_amount || 0, true)}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Paid</p>
                         <p className="text-sm font-bold text-green-600 tabular-nums">
-                          ₹{(invoice.paid_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatCurrency(invoice.paid_amount || 0, true)}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Remaining</p>
                         <p className="text-sm font-bold text-primary tabular-nums">
-                          ₹{(invoice.remaining_amount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatCurrency(invoice.remaining_amount || 0, true)}
                         </p>
                       </div>
                       <div>

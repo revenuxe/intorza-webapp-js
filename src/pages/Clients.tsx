@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Client {
@@ -14,6 +15,7 @@ interface Client {
 
 const Clients = () => {
   const { toast } = useToast();
+  const { formatCurrency } = useLocalization();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -134,13 +136,13 @@ const Clients = () => {
                       <div>
                         <p className="text-xs text-muted-foreground">Total Billed</p>
                         <p className="text-sm font-bold text-foreground tabular-nums">
-                          ₹{client.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatCurrency(client.totalAmount, true)}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Paid</p>
                         <p className="text-sm font-bold text-green-600 tabular-nums">
-                          ₹{client.paidAmount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatCurrency(client.paidAmount, true)}
                         </p>
                       </div>
                     </div>
@@ -148,7 +150,7 @@ const Clients = () => {
                     <div className="pt-2 border-t border-border">
                       <p className="text-xs text-muted-foreground">Outstanding Balance</p>
                       <p className="text-lg font-bold text-primary tabular-nums">
-                        ₹{client.outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrency(client.outstanding, true)}
                       </p>
                     </div>
                   </div>

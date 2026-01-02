@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocalization } from "@/hooks/useLocalization";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +15,7 @@ import {
   Receipt, 
   Ruler,
   Eye,
-  IndianRupee
+  Coins
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -57,6 +58,7 @@ export default function MyProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { formatCurrency } = useLocalization();
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -138,14 +140,7 @@ export default function MyProjectDetail() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  // formatCurrency is now provided by useLocalization hook
 
   const totalInvoiced = invoices.reduce((sum, i) => sum + (i.total_amount || 0), 0);
   const totalPaid = invoices.reduce((sum, i) => sum + (i.paid_amount || 0), 0);
@@ -234,7 +229,7 @@ export default function MyProjectDetail() {
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-primary/10 rounded-lg">
-                    <IndianRupee className="h-5 w-5 text-primary" />
+                    <Coins className="h-5 w-5 text-primary" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Total Value</p>
@@ -247,7 +242,7 @@ export default function MyProjectDetail() {
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-green-100 rounded-lg">
-                    <IndianRupee className="h-5 w-5 text-green-600" />
+                    <Coins className="h-5 w-5 text-green-600" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Collected</p>
@@ -260,7 +255,7 @@ export default function MyProjectDetail() {
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-amber-100 rounded-lg">
-                    <IndianRupee className="h-5 w-5 text-amber-600" />
+                    <Coins className="h-5 w-5 text-amber-600" />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Pending</p>

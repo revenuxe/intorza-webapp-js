@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -65,6 +66,7 @@ const InvoiceDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { formatCurrency, formatDateShort } = useLocalization();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [relatedInvoices, setRelatedInvoices] = useState<Invoice[]>([]);
@@ -74,6 +76,12 @@ const InvoiceDetail = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
+  
+  // Use localized date formatting
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    return formatDateShort(dateString);
+  };
   
   // Payment form state
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -165,11 +173,7 @@ const InvoiceDetail = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
+  // formatDate is defined above using useLocalization hook
 
   const openPaymentDialog = () => {
     setPaymentAmount(invoice?.remaining_amount || 0);
@@ -541,20 +545,20 @@ const InvoiceDetail = () => {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Total Amount</span>
                 <span className="font-semibold tabular-nums">
-                  ₹{invoice.total_amount?.toLocaleString('en-IN')}
+                  {formatCurrency(invoice.total_amount || 0)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Paid Amount</span>
                 <span className="font-semibold text-green-600 tabular-nums">
-                  ₹{(invoice.paid_amount || 0).toLocaleString('en-IN')}
+                  {formatCurrency(invoice.paid_amount || 0)}
                 </span>
               </div>
               <div className="border-t border-border pt-2 mt-2">
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Remaining</span>
                   <span className="font-bold text-xl text-primary tabular-nums">
-                    ₹{(invoice.remaining_amount || 0).toLocaleString('en-IN')}
+                    {formatCurrency(invoice.remaining_amount || 0)}
                   </span>
                 </div>
               </div>
@@ -588,7 +592,7 @@ const InvoiceDetail = () => {
                       </div>
                       <div>
                         <p className="font-medium tabular-nums">
-                          ₹{payment.amount?.toLocaleString('en-IN')}
+                          {formatCurrency(payment.amount || 0)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {formatDate(payment.payment_date)} • {payment.payment_method?.toUpperCase()}

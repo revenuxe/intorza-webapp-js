@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
 import { ListSkeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -41,6 +42,7 @@ const getStatusColor = (status: string) => {
 const Quotations = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { formatCurrency, formatDate } = useLocalization();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -223,11 +225,7 @@ const Quotations = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-IN');
-  };
+  // formatDate is now provided by useLocalization hook
 
   return (
     <div className="container max-w-6xl mx-auto p-4 md:p-6 lg:p-8">
@@ -277,7 +275,7 @@ const Quotations = () => {
                       <div>
                         <p className="text-xs text-muted-foreground">Amount</p>
                         <p className="text-lg font-bold text-primary tabular-nums">
-                          ₹{quotation.grand_total?.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0.00'}
+                          {formatCurrency(quotation.grand_total || 0, true)}
                         </p>
                       </div>
                       <div className="text-right">
