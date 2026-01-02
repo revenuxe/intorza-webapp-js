@@ -139,39 +139,42 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md max-h-[90vh]" onPointerDownOutside={(e) => e.preventDefault()}>
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">
+      <DialogContent 
+        className="sm:max-w-[380px] max-h-[85vh] rounded-2xl p-5" 
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
+        <DialogHeader className="space-y-1">
+          <DialogTitle className="text-lg font-semibold">
             {step === 1 && "Welcome! Select your country"}
             {step === 2 && "What's your company name?"}
             {step === 3 && "Add your company logo"}
             {step === 4 && "Add your contact number"}
           </DialogTitle>
-          <DialogDescription className="text-muted-foreground">
-            {step === 1 && "This will set your currency, tax labels, and measurement units"}
-            {step === 2 && "Your company name will appear on quotations and invoices"}
-            {step === 3 && "Your logo will appear on quotations and invoices"}
+          <DialogDescription className="text-muted-foreground text-sm">
+            {step === 1 && "This will set your currency, tax labels, and units"}
+            {step === 2 && "Your company name appears on quotations"}
+            {step === 3 && "Your logo appears on quotations"}
             {step === 4 && "So clients can reach you easily"}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex justify-center gap-2 my-4">
+        <div className="flex justify-center gap-1.5 my-3">
           {[1, 2, 3, 4].map((s) => (
             <div
               key={s}
-              className={`w-2 h-2 rounded-full transition-colors ${
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${
                 s === step ? 'bg-primary' : s < step ? 'bg-primary/50' : 'bg-muted'
               }`}
             />
           ))}
         </div>
 
-        <div className="space-y-4 py-2">
+        <div className="space-y-3 py-1">
           {step === 1 && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Globe className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-2 text-sm">
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
                   Search Country
                 </Label>
                 <Input
@@ -179,60 +182,61 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   autoFocus
+                  className="h-9 rounded-lg"
                 />
               </div>
 
-              <ScrollArea className="h-[280px] rounded-md border p-2">
+              <ScrollArea className="h-[220px] rounded-lg border p-1.5">
                 {filteredCountries ? (
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     {filteredCountries.map((country) => (
                       <button
                         key={country.code}
                         onClick={() => setSelectedCountry(country)}
-                        className={`w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors ${
+                        className={`w-full flex items-center gap-2 p-1.5 rounded-lg text-left transition-colors text-sm ${
                           selectedCountry?.code === country.code
                             ? 'bg-primary text-primary-foreground'
                             : 'hover:bg-muted'
                         }`}
                       >
-                        <span className="text-xl">{country.flag}</span>
+                        <span className="text-base">{country.flag}</span>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">{country.name}</div>
-                          <div className={`text-xs ${selectedCountry?.code === country.code ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                            {country.currency.symbol} • {country.tax.shortLabel} • {country.measurement.areaUnitShort}
+                          <div className="font-medium truncate text-sm">{country.name}</div>
+                          <div className={`text-[10px] ${selectedCountry?.code === country.code ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                            {country.currency.symbol} • {country.tax.shortLabel}
                           </div>
                         </div>
                       </button>
                     ))}
                     {filteredCountries.length === 0 && (
-                      <div className="text-center py-4 text-muted-foreground">
+                      <div className="text-center py-3 text-muted-foreground text-sm">
                         No countries found
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {countryGroups.map((group) => (
                       <div key={group.region}>
-                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">
                           {group.region}
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           {group.countries.map((country) => (
                             <button
                               key={country.code}
                               onClick={() => setSelectedCountry(country)}
-                              className={`w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors ${
+                              className={`w-full flex items-center gap-2 p-1.5 rounded-lg text-left transition-colors text-sm ${
                                 selectedCountry?.code === country.code
                                   ? 'bg-primary text-primary-foreground'
                                   : 'hover:bg-muted'
                               }`}
                             >
-                              <span className="text-xl">{country.flag}</span>
+                              <span className="text-base">{country.flag}</span>
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium truncate">{country.name}</div>
-                                <div className={`text-xs ${selectedCountry?.code === country.code ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
-                                  {country.currency.symbol} • {country.tax.shortLabel} • {country.measurement.areaUnitShort}
+                                <div className="font-medium truncate text-sm">{country.name}</div>
+                                <div className={`text-[10px] ${selectedCountry?.code === country.code ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+                                  {country.currency.symbol} • {country.tax.shortLabel}
                                 </div>
                               </div>
                             </button>
@@ -245,12 +249,10 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
               </ScrollArea>
 
               {selectedCountry && (
-                <div className="p-3 bg-muted/50 rounded-lg text-sm">
-                  <div className="font-medium mb-1">Selected: {selectedCountry.flag} {selectedCountry.name}</div>
-                  <div className="text-muted-foreground text-xs space-y-0.5">
-                    <div>Currency: {selectedCountry.currency.code} ({selectedCountry.currency.symbol})</div>
-                    <div>Tax: {selectedCountry.tax.label} ({selectedCountry.tax.shortLabel})</div>
-                    <div>Measurement: {selectedCountry.measurement.areaUnit}</div>
+                <div className="p-2 bg-muted/50 rounded-lg text-sm">
+                  <div className="font-medium text-sm">{selectedCountry.flag} {selectedCountry.name}</div>
+                  <div className="text-muted-foreground text-[10px]">
+                    {selectedCountry.currency.symbol} • {selectedCountry.tax.shortLabel} • {selectedCountry.measurement.areaUnitShort}
                   </div>
                 </div>
               )}
@@ -258,10 +260,10 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
           )}
 
           {step === 2 && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="company-name" className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="company-name" className="flex items-center gap-2 text-sm">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                   Company Name
                 </Label>
                 <Input
@@ -269,7 +271,7 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
                   placeholder="Enter your company name"
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
-                  className="text-lg"
+                  className="h-10 rounded-lg"
                   autoFocus
                 />
               </div>
@@ -277,12 +279,12 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
           )}
 
           {step === 3 && (
-            <div className="space-y-4">
-              <div className="flex flex-col items-center gap-4">
-                <Avatar className="h-24 w-24 border-2 border-dashed border-muted-foreground/30">
+            <div className="space-y-3">
+              <div className="flex flex-col items-center gap-3">
+                <Avatar className="h-20 w-20 border-2 border-dashed border-muted-foreground/30 rounded-xl">
                   <AvatarImage src={logoUrl || undefined} />
-                  <AvatarFallback className="bg-muted">
-                    <Upload className="h-8 w-8 text-muted-foreground" />
+                  <AvatarFallback className="bg-muted rounded-xl">
+                    <Upload className="h-6 w-6 text-muted-foreground" />
                   </AvatarFallback>
                 </Avatar>
                 <input
@@ -294,6 +296,8 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
                 />
                 <Button
                   variant="outline"
+                  size="sm"
+                  className="rounded-lg"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
                 >
@@ -304,10 +308,10 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
           )}
 
           {step === 4 && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="phone" className="flex items-center gap-2 text-sm">
+                  <Phone className="h-3.5 w-3.5 text-muted-foreground" />
                   Mobile Number
                 </Label>
                 <Input
@@ -316,7 +320,7 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
                   placeholder={selectedCountry ? `${selectedCountry.phoneCode} 1234567890` : "+1 1234567890"}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="text-lg"
+                  className="h-10 rounded-lg"
                   autoFocus
                 />
               </div>
@@ -324,17 +328,17 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
           )}
         </div>
 
-        <div className="flex justify-between gap-3">
-          <Button variant="ghost" onClick={skipStep} disabled={saving || step === 1}>
+        <div className="flex justify-between gap-2 pt-2">
+          <Button variant="ghost" size="sm" className="rounded-lg" onClick={skipStep} disabled={saving || step === 1}>
             {step === 4 ? "Skip & Finish" : "Skip"}
           </Button>
           {step < 4 ? (
-            <Button onClick={nextStep} className="gap-2" disabled={step === 1 && !selectedCountry}>
-              Next <ArrowRight className="h-4 w-4" />
+            <Button size="sm" className="rounded-lg gap-1.5" onClick={nextStep} disabled={step === 1 && !selectedCountry}>
+              Next <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           ) : (
-            <Button onClick={handleComplete} disabled={saving} className="gap-2">
-              {saving ? "Saving..." : "Complete"} <Check className="h-4 w-4" />
+            <Button size="sm" className="rounded-lg gap-1.5" onClick={handleComplete} disabled={saving}>
+              {saving ? "Saving..." : "Complete"} <Check className="h-3.5 w-3.5" />
             </Button>
           )}
         </div>

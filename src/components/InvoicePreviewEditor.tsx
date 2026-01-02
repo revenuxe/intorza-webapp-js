@@ -23,6 +23,8 @@ import {
   defaultInvoiceSettings,
   PDF_FONTS,
   getFontById,
+  getHeadingFonts,
+  getBodyFonts,
 } from "@/lib/pdfThemes";
 
 interface InvoicePreviewEditorProps {
@@ -208,13 +210,32 @@ export const InvoicePreviewEditor = ({
             </RadioGroup>
 
             <div className="pt-3 border-t space-y-3">
-              <Label className="text-xs font-semibold">Font Family</Label>
-              <Select value={editorSettings.fontFamily} onValueChange={(v) => updateEditorSettings({ fontFamily: v })}>
+              <Label className="text-xs font-semibold">Heading Font</Label>
+              <Select value={editorSettings.headingFont || 'times'} onValueChange={(v) => updateEditorSettings({ headingFont: v })}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PDF_FONTS.map((font) => (
+                  {getHeadingFonts().map((font) => (
+                    <SelectItem key={font.id} value={font.id}>
+                      <div className="flex flex-col">
+                        <span className="text-xs">{font.name}</span>
+                        <span className="text-[10px] text-muted-foreground">{font.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="pt-3 border-t space-y-3">
+              <Label className="text-xs font-semibold">Body Font</Label>
+              <Select value={editorSettings.bodyFont || 'helvetica'} onValueChange={(v) => updateEditorSettings({ bodyFont: v })}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {getBodyFonts().map((font) => (
                     <SelectItem key={font.id} value={font.id}>
                       <div className="flex flex-col">
                         <span className="text-xs">{font.name}</span>

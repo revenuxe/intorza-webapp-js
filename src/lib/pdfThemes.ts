@@ -887,22 +887,27 @@ export interface PDFFont {
   family: string; // jsPDF font family name
   category: 'serif' | 'sans-serif' | 'display' | 'monospace';
   description: string;
+  recommended?: 'heading' | 'body' | 'both';
 }
 
 export const PDF_FONTS: PDFFont[] = [
-  // Sans-serif fonts (clean, modern)
-  { id: 'helvetica', name: 'Helvetica', family: 'helvetica', category: 'sans-serif', description: 'Classic clean look' },
-  { id: 'arial', name: 'Arial', family: 'helvetica', category: 'sans-serif', description: 'Universal readability' },
+  // Sans-serif fonts (clean, modern) - great for body text
+  { id: 'helvetica', name: 'Helvetica', family: 'helvetica', category: 'sans-serif', description: 'Classic clean look', recommended: 'both' },
+  { id: 'arial', name: 'Arial', family: 'helvetica', category: 'sans-serif', description: 'Universal readability', recommended: 'body' },
   
-  // Serif fonts (traditional, elegant)
-  { id: 'times', name: 'Times New Roman', family: 'times', category: 'serif', description: 'Traditional elegance' },
-  { id: 'georgia', name: 'Georgia', family: 'times', category: 'serif', description: 'Warm and readable' },
+  // Serif fonts (traditional, elegant) - great for headings
+  { id: 'times', name: 'Times New Roman', family: 'times', category: 'serif', description: 'Traditional elegance', recommended: 'both' },
+  { id: 'georgia', name: 'Georgia', family: 'times', category: 'serif', description: 'Warm and readable', recommended: 'heading' },
+  { id: 'palatino', name: 'Palatino', family: 'times', category: 'serif', description: 'Refined typography', recommended: 'heading' },
+  { id: 'bookman', name: 'Bookman', family: 'times', category: 'serif', description: 'Classic book style', recommended: 'body' },
+  
+  // Display fonts (headings only)
+  { id: 'century', name: 'Century', family: 'times', category: 'display', description: 'Elegant display', recommended: 'heading' },
+  { id: 'garamond', name: 'Garamond', family: 'times', category: 'display', description: 'Sophisticated classic', recommended: 'heading' },
   
   // Monospace fonts (technical)
-  { id: 'courier', name: 'Courier', family: 'courier', category: 'monospace', description: 'Technical precision' },
-  
-  // Display fonts (headings)
-  { id: 'palatino', name: 'Palatino', family: 'times', category: 'display', description: 'Refined headings' },
+  { id: 'courier', name: 'Courier', family: 'courier', category: 'monospace', description: 'Technical precision', recommended: 'body' },
+  { id: 'consolas', name: 'Consolas', family: 'courier', category: 'monospace', description: 'Modern monospace', recommended: 'body' },
 ];
 
 export const getFontById = (fontId: string): PDFFont => {
@@ -913,10 +918,20 @@ export const getFontsByCategory = (category: PDFFont['category']): PDFFont[] => 
   return PDF_FONTS.filter(f => f.category === category);
 };
 
+export const getHeadingFonts = (): PDFFont[] => {
+  return PDF_FONTS.filter(f => f.recommended === 'heading' || f.recommended === 'both');
+};
+
+export const getBodyFonts = (): PDFFont[] => {
+  return PDF_FONTS.filter(f => f.recommended === 'body' || f.recommended === 'both');
+};
+
 // ===== EDITOR SETTINGS =====
 export interface PDFEditorSettings {
   theme: string;
-  fontFamily: string; // Font ID from PDF_FONTS
+  fontFamily: string; // Deprecated - use headingFont and bodyFont
+  headingFont: string; // Font ID for titles/headings
+  bodyFont: string; // Font ID for body text
   logoPlacement: 'left' | 'center' | 'right';
   highlightAmounts: boolean;
   showBorders: boolean;
@@ -927,7 +942,7 @@ export interface PDFEditorSettings {
   sectionStyle: 'standard' | 'card' | 'line' | 'minimal';
   summaryStyle: 'right' | 'center' | 'full-width';
   pageMargins: 'narrow' | 'normal' | 'wide';
-  // New decoration settings
+  // Decoration settings
   showDecorations: boolean;
   decorationIntensity: 'subtle' | 'medium' | 'bold';
   showPageBorder: boolean;
@@ -943,6 +958,8 @@ export interface PDFEditorSettings {
 export const defaultEditorSettings: PDFEditorSettings = {
   theme: 'minimal-white',
   fontFamily: 'helvetica',
+  headingFont: 'times',
+  bodyFont: 'helvetica',
   logoPlacement: 'left',
   highlightAmounts: true,
   showBorders: true,
