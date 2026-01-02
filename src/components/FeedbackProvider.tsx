@@ -4,18 +4,20 @@ import { useAuth } from "@/hooks/useAuth";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Star, ThumbsUp, Bug, AlertTriangle } from "lucide-react";
+import { Star, ThumbsUp, Bug, AlertTriangle, X } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface FeedbackContextType {
   trackAction: (action: string) => void;
   showFirstTimePopup: (action: string) => void;
+  openFeedback: (type?: 'feedback' | 'bug' | 'issue') => void;
 }
 
 const FeedbackContext = createContext<FeedbackContextType>({ 
   trackAction: () => {},
-  showFirstTimePopup: () => {}
+  showFirstTimePopup: () => {},
+  openFeedback: () => {}
 });
 
 export const useFeedback = () => useContext(FeedbackContext);
@@ -66,6 +68,13 @@ export const FeedbackProvider = ({ children }: FeedbackProviderProps) => {
     } catch (error) {
       console.error('Error tracking activity:', error);
     }
+  };
+
+  const openFeedback = (type: 'feedback' | 'bug' | 'issue' = 'feedback') => {
+    setFeedbackType(type);
+    setTriggerAction('manual');
+    setIsFirstTime(false);
+    setShowFeedback(true);
   };
 
   const showFirstTimePopup = async (action: string) => {
@@ -185,107 +194,111 @@ export const FeedbackProvider = ({ children }: FeedbackProviderProps) => {
     setIsFirstTime(false);
   };
 
+  const feedbackTypeButtons = [
+    { type: 'feedback' as const, icon: ThumbsUp, label: 'Feedback', color: 'bg-primary/10 text-primary border-primary/30' },
+    { type: 'bug' as const, icon: Bug, label: 'Bug', color: 'bg-red-500/10 text-red-600 border-red-500/30' },
+    { type: 'issue' as const, icon: AlertTriangle, label: 'Issue', color: 'bg-orange-500/10 text-orange-600 border-orange-500/30' },
+  ];
+
   return (
-    <FeedbackContext.Provider value={{ trackAction, showFirstTimePopup }}>
+    <FeedbackContext.Provider value={{ trackAction, showFirstTimePopup, openFeedback }}>
       {children}
       
       <Dialog open={showFeedback} onOpenChange={(open) => !open && resetForm()}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-center">
-              {isFirstTime ? "Congratulations! 🎉" : "How's your experience?"}
+        <DialogContent className="max-w-[340px] sm:max-w-sm p-0 gap-0 rounded-2xl overflow-hidden">
+          {/* Header */}
+          <div className="relative px-4 pt-4 pb-3 bg-gradient-to-b from-muted/50 to-background">
+            <button 
+              onClick={resetForm}
+              className="absolute right-3 top-3 p-1.5 rounded-full hover:bg-muted transition-colors"
+            >
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <DialogTitle className="text-base font-semibold pr-8">
+              {isFirstTime ? "🎉 First Success!" : "Share Your Thoughts"}
             </DialogTitle>
             {isFirstTime && (
-              <p className="text-center text-sm text-muted-foreground pt-2">
-                You've just completed your first {triggerAction.replace('_', ' ')}! 
-                We'd love to hear from you.
+              <p className="text-xs text-muted-foreground mt-1">
+                You completed your first {triggerAction.replace(/_/g, ' ')}!
               </p>
             )}
-          </DialogHeader>
+          </div>
           
-          <Tabs value={feedbackType} onValueChange={(v) => setFeedbackType(v as typeof feedbackType)} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="feedback" className="flex items-center gap-1 text-xs">
-                <ThumbsUp className="h-3 w-3" />
-                Feedback
-              </TabsTrigger>
-              <TabsTrigger value="bug" className="flex items-center gap-1 text-xs">
-                <Bug className="h-3 w-3" />
-                Bug
-              </TabsTrigger>
-              <TabsTrigger value="issue" className="flex items-center gap-1 text-xs">
-                <AlertTriangle className="h-3 w-3" />
-                Issue
-              </TabsTrigger>
-            </TabsList>
+          {/* Type Selection */}
+          <div className="px-4 py-3 flex gap-2">
+            {feedbackTypeButtons.map(({ type, icon: Icon, label, color }) => (
+              <button
+                key={type}
+                onClick={() => setFeedbackType(type)}
+                className={cn(
+                  "flex-1 flex flex-col items-center gap-1 p-2.5 rounded-xl border transition-all",
+                  feedbackType === type 
+                    ? color + " border-current" 
+                    : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/50"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="text-[10px] font-medium">{label}</span>
+              </button>
+            ))}
+          </div>
 
-            <TabsContent value="feedback" className="space-y-4 pt-4">
-              <div className="flex justify-center gap-2">
+          {/* Content */}
+          <div className="px-4 pb-4 space-y-3">
+            {feedbackType === 'feedback' && (
+              <div className="flex justify-center gap-1.5">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
                     type="button"
                     onClick={() => setRating(star)}
-                    className="focus:outline-none transition-transform hover:scale-110"
+                    className="focus:outline-none transition-transform hover:scale-110 active:scale-95"
                   >
                     <Star
-                      className={`h-10 w-10 ${
+                      className={cn(
+                        "h-8 w-8 transition-colors",
                         star <= rating
                           ? "fill-yellow-400 text-yellow-400"
-                          : "text-muted-foreground"
-                      }`}
+                          : "text-muted-foreground/40 hover:text-muted-foreground"
+                      )}
                     />
                   </button>
                 ))}
               </div>
-              <Textarea
-                placeholder="Tell us more about your experience (optional)"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={3}
-              />
-            </TabsContent>
+            )}
+            
+            <Textarea
+              placeholder={
+                feedbackType === 'feedback' 
+                  ? "Tell us more (optional)" 
+                  : feedbackType === 'bug'
+                    ? "Describe the bug..."
+                    : "What's the issue?"
+              }
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={2}
+              className="resize-none text-sm rounded-xl"
+            />
 
-            <TabsContent value="bug" className="space-y-4 pt-4">
-              <div className="flex items-center gap-2 p-3 bg-red-50 rounded-lg border border-red-200">
-                <Bug className="h-5 w-5 text-red-500" />
-                <p className="text-sm text-red-700">Report a bug you've encountered</p>
-              </div>
-              <Textarea
-                placeholder="Please describe the bug in detail. What were you trying to do? What happened instead?"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={4}
-                required
-              />
-            </TabsContent>
-
-            <TabsContent value="issue" className="space-y-4 pt-4">
-              <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-lg border border-orange-200">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
-                <p className="text-sm text-orange-700">Report an issue or problem</p>
-              </div>
-              <Textarea
-                placeholder="Describe the issue you're facing. What's not working as expected?"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={4}
-                required
-              />
-            </TabsContent>
-          </Tabs>
-
-          <DialogFooter className="flex gap-2 pt-2">
-            <Button variant="ghost" onClick={resetForm}>
-              Maybe Later
-            </Button>
-            <Button 
-              onClick={handleSubmit} 
-              disabled={submitting || (feedbackType === 'feedback' && rating === 0) || ((feedbackType === 'bug' || feedbackType === 'issue') && !message.trim())}
-            >
-              {submitting ? "Submitting..." : "Submit"}
-            </Button>
-          </DialogFooter>
+            {/* Submit */}
+            <div className="flex gap-2 pt-1">
+              <Button 
+                variant="ghost" 
+                onClick={resetForm}
+                className="flex-1 h-9 text-xs"
+              >
+                Later
+              </Button>
+              <Button 
+                onClick={handleSubmit} 
+                disabled={submitting || (feedbackType === 'feedback' && rating === 0) || ((feedbackType === 'bug' || feedbackType === 'issue') && !message.trim())}
+                className="flex-1 h-9 text-xs"
+              >
+                {submitting ? "..." : "Submit"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </FeedbackContext.Provider>

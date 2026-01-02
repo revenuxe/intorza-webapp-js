@@ -1,4 +1,4 @@
-import { LogOut, LogIn, Settings, ChevronDown, Crown } from "lucide-react";
+import { LogOut, LogIn, Settings, ChevronDown, Crown, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,12 +13,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Navigation } from "./Navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useFeedback } from "./FeedbackProvider";
 import logo from "@/assets/intorza-logo.webp";
 import { format } from "date-fns";
 
 export const Sidebar = () => {
   const { user, signOut, isAuthenticated } = useAuth();
   const { isPro, expiry, setPaywallOpen } = useSubscription();
+  const { openFeedback } = useFeedback();
 
   const getInitials = () => {
     if (user?.user_metadata?.full_name) {
@@ -51,22 +53,41 @@ export const Sidebar = () => {
           alt="INTORZA" 
           className="h-8 w-auto object-contain"
         />
-        {isAuthenticated && isPro && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-[10px] px-1.5 py-0.5 cursor-default">
-                <Crown className="h-3 w-3 mr-0.5" />
-                Pro
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p className="text-xs font-medium">Intorza Pro — Active</p>
-              {formatExpiry() && (
-                <p className="text-xs text-muted-foreground">Expires: {formatExpiry()}</p>
-              )}
-            </TooltipContent>
-          </Tooltip>
-        )}
+        <div className="flex items-center gap-2">
+          {isAuthenticated && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openFeedback()}
+                  className="h-8 w-8 text-muted-foreground hover:text-primary"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">Give Feedback</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {isAuthenticated && isPro && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0 text-[10px] px-1.5 py-0.5 cursor-default">
+                  <Crown className="h-3 w-3 mr-0.5" />
+                  Pro
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs font-medium">Intorza Pro — Active</p>
+                {formatExpiry() && (
+                  <p className="text-xs text-muted-foreground">Expires: {formatExpiry()}</p>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto">
         <Navigation />
@@ -106,6 +127,10 @@ export const Sidebar = () => {
                   <DropdownMenuSeparator />
                 </>
               )}
+              <DropdownMenuItem onClick={() => openFeedback()}>
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Give Feedback
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
