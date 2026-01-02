@@ -75,10 +75,11 @@ const navItems = [
 
 export const Navigation = ({ mobile }: NavigationProps) => {
   const { isPro, setPaywallOpen } = useSubscription();
-  const { settings } = useLocalization();
+  const { settings, countryConfig } = useLocalization();
   
-  // Determine price text based on country
+  // Determine price text and flag based on country
   const priceText = settings.countryCode === 'IN' ? '₹1' : '$1';
+  const countryFlag = countryConfig?.flag || '🌍';
 
   const handleNavClick = (e: React.MouseEvent, item: typeof navItems[0]) => {
     if (item.requiresPro && !isPro) {
@@ -101,7 +102,7 @@ export const Navigation = ({ mobile }: NavigationProps) => {
           <Crown className="h-5 w-5" />
           <div className="flex-1 text-left">
             <span className="block font-semibold">Upgrade to Pro</span>
-            <span className="text-xs opacity-80">{priceText} for first month</span>
+            <span className="text-xs opacity-80">{countryFlag} {priceText} for first month</span>
           </div>
         </button>
       )}

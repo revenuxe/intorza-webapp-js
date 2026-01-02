@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useSubscription } from "@/contexts/SubscriptionContext";
+import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Crown, CreditCard, Calendar, CheckCircle, AlertCircle, Loader2, Download, XCircle } from "lucide-react";
@@ -32,9 +33,15 @@ interface PaymentLog {
 export const BillingSection = () => {
   const { isPro, plan, expiry, status, setPaywallOpen, loading: subLoading, refreshSubscription } = useSubscription();
   const { session } = useAuth();
+  const { settings, countryConfig, formatDate: formatLocalizedDate } = useLocalization();
   const [paymentLogs, setPaymentLogs] = useState<PaymentLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
+  
+  // Determine price text and flag based on country
+  const isIndia = settings.countryCode === 'IN';
+  const priceText = isIndia ? '₹1' : '$1';
+  const countryFlag = countryConfig?.flag || '🌍';
 
   useEffect(() => {
     loadPaymentLogs();
@@ -62,13 +69,19 @@ export const BillingSection = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
+    return new Date(dateString).toLocaleDateString(settings.locale, {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+  
+  // Format currency based on the log's currency
+  const formatPaymentAmount = (amount: number, currency: string) => {
+    const symbol = currency === 'INR' ? '₹' : '$';
+    return `${symbol}${(amount / 100).toFixed(2)}`;
   };
 
   const getStatusBadge = (eventStatus: string) => {
@@ -315,7 +328,7 @@ export const BillingSection = () => {
               </div>
               <h3 className="font-semibold text-sm mb-1">Free Plan</h3>
               <p className="text-xs text-muted-foreground mb-3">
-                Try Pro FREE for 1 month!
+                Try Pro FREE for 1 month! <span className="inline-flex items-center gap-1">({countryFlag} {priceText})</span>
               </p>
               <Button 
                 onClick={() => setPaywallOpen(true, 'Upgrade')}
@@ -366,7 +379,7 @@ export const BillingSection = () => {
                   <div className="flex items-center gap-2">
                     {log.amount && (
                       <span className="text-xs font-medium tabular-nums">
-                        ₹{(log.amount / 100).toFixed(2)}
+                        {formatPaymentAmount(log.amount, log.currency || 'INR')}
                       </span>
                     )}
                     {getStatusBadge(log.status)}
