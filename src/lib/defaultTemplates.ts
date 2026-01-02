@@ -18,7 +18,7 @@ interface CountryTemplates {
 }
 
 // Price multipliers relative to INR base prices
-const PRICE_MULTIPLIERS: Record<string, number> = {
+export const PRICE_MULTIPLIERS: Record<string, number> = {
   // South Asia (lower cost markets)
   IN: 1,       // India - base
   PK: 0.7,    // Pakistan
@@ -178,12 +178,12 @@ const BASE_TEMPLATES: DefaultTemplate[] = [
 ];
 
 // Get price multiplier for a country (default to 1 if not found)
-const getMultiplier = (countryCode: string): number => {
+export const getMultiplier = (countryCode: string): number => {
   return PRICE_MULTIPLIERS[countryCode] || 1;
 };
 
-// Round to appropriate values based on currency
-const roundPrice = (price: number, countryCode: string): number => {
+// Round to appropriate values based on currency - exported for use in templates
+export const roundPrice = (price: number, countryCode: string): number => {
   // Countries with lower value currencies - round to nearest 10
   const lowValueCurrencies = ['IN', 'PK', 'BD', 'LK', 'NP', 'ID', 'VN', 'JP', 'KR'];
   
@@ -199,6 +199,8 @@ const roundPrice = (price: number, countryCode: string): number => {
     return Math.round(price);
   }
 };
+
+// Local roundPrice function for internal use - duplicate removed, using exported version above
 
 // Generate templates for a specific country
 export const getDefaultTemplatesForCountry = (countryCode: string): DefaultTemplate[] => {
