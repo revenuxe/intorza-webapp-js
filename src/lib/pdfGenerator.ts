@@ -107,8 +107,8 @@ interface QuotationData {
 
 // --- Helpers ---
 
-const formatCurrency = (amount: number): string => {
-  return 'INR ' + Math.round(amount).toLocaleString('en-IN');
+const formatCurrency = (amount: number, currencyCode: string = 'INR', currencySymbol: string = '₹', locale: string = 'en-IN'): string => {
+  return currencySymbol + ' ' + Math.round(amount).toLocaleString(locale);
 };
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
