@@ -138,7 +138,14 @@ const CreateQuotation = () => {
     bank_ifsc_code: "",
     bank_account_holder: "",
     upi_id: "",
-    payment_qr_url: ""
+    payment_qr_url: "",
+    // Localization settings
+    currency_code: "INR",
+    currency_symbol: "₹",
+    tax_label: "GST",
+    locale: "en-IN",
+    measurement_system: "imperial",
+    country_code: "IN",
   });
   const [formRestored, setFormRestored] = useState(false);
   const [customizeSettings, setCustomizeSettings] = useState<QuotationSettings>(getQuotationSettings());
@@ -303,7 +310,14 @@ const CreateQuotation = () => {
           bank_ifsc_code: bankTemplate?.ifsc_code || (data as any).bank_ifsc_code || "",
           bank_account_holder: bankTemplate?.account_holder_name || (data as any).bank_account_holder || "",
           upi_id: bankTemplate?.upi_id || (data as any).upi_id || "",
-          payment_qr_url: bankTemplate?.qr_code_url || (data as any).payment_qr_url || ""
+          payment_qr_url: bankTemplate?.qr_code_url || (data as any).payment_qr_url || "",
+          // Localization settings
+          currency_code: data.currency_code || "INR",
+          currency_symbol: data.currency_symbol || "₹",
+          tax_label: data.tax_label || "GST",
+          locale: data.locale || "en-IN",
+          measurement_system: data.measurement_system || "imperial",
+          country_code: data.country_code || "IN",
         });
 
         // Load payment stages - prefer template over profile
@@ -802,7 +816,14 @@ const CreateQuotation = () => {
       bank_ifsc_code: bankTemplate?.ifsc_code || (profileData as any).bank_ifsc_code || "",
       bank_account_holder: bankTemplate?.account_holder_name || (profileData as any).bank_account_holder || "",
       upi_id: bankTemplate?.upi_id || (profileData as any).upi_id || "",
-      payment_qr_url: bankTemplate?.qr_code_url || (profileData as any).payment_qr_url || ""
+      payment_qr_url: bankTemplate?.qr_code_url || (profileData as any).payment_qr_url || "",
+      // Localization settings
+      currency_code: profileData.currency_code || "INR",
+      currency_symbol: profileData.currency_symbol || "₹",
+      tax_label: profileData.tax_label || "GST",
+      locale: profileData.locale || "en-IN",
+      measurement_system: profileData.measurement_system || "imperial",
+      country_code: profileData.country_code || "IN",
     };
   };
 
@@ -874,6 +895,15 @@ const CreateQuotation = () => {
           accountHolder: profileToUse.bank_account_holder,
           upiId: profileToUse.upi_id,
           qrCodeUrl: profileToUse.payment_qr_url
+        },
+        localization: {
+          currencyCode: profileToUse.currency_code,
+          currencySymbol: profileToUse.currency_symbol,
+          locale: profileToUse.locale,
+          taxLabel: profileToUse.tax_label,
+          taxRegistrationLabel: profileToUse.tax_label === 'GST' ? 'GSTIN' : `${profileToUse.tax_label} No`,
+          areaUnit: profileToUse.measurement_system === 'metric' ? 'Square Meters' : 'Square Feet',
+          areaUnitShort: profileToUse.measurement_system === 'metric' ? 'SQM' : 'Sq.Ft',
         },
         settings: customizeSettings,
         editorSettings: editorSettings || getEditorSettings()
@@ -1164,7 +1194,7 @@ const CreateQuotation = () => {
             <div className="space-y-3">
               {customizeSettings.showSubtotal && <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-medium">₹{subtotal.toLocaleString("en-IN", {
+                  <span className="font-medium">{profile.currency_symbol}{subtotal.toLocaleString(profile.locale, {
                   minimumFractionDigits: 2
                 })}</span>
                 </div>}
@@ -1173,7 +1203,7 @@ const CreateQuotation = () => {
                   <div className="flex items-center justify-between py-2 border-t border-border">
                     <div className="flex items-center gap-2">
                       <Switch checked={gstEnabled} onCheckedChange={setGstEnabled} />
-                      <Label className="cursor-pointer">GST</Label>
+                      <Label className="cursor-pointer">{profile.tax_label}</Label>
                     </div>
                     {gstEnabled && <Select value={gstRate} onValueChange={setGstRate}>
                         <SelectTrigger className="w-24">
@@ -1187,8 +1217,8 @@ const CreateQuotation = () => {
                       </Select>}
                   </div>
                   {gstEnabled && <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">GST ({gstRate}%)</span>
-                      <span className="font-medium">₹{gstAmount.toLocaleString("en-IN", {
+                      <span className="text-muted-foreground">{profile.tax_label} ({gstRate}%)</span>
+                      <span className="font-medium">{profile.currency_symbol}{gstAmount.toLocaleString(profile.locale, {
                     minimumFractionDigits: 2
                   })}</span>
                     </div>}
@@ -1207,7 +1237,7 @@ const CreateQuotation = () => {
                   </div>
                   {enableSocialMediaDiscount && <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Social Media Discount ({socialMediaDiscountRate}%)</span>
-                      <span className="font-medium text-green-600">-₹{socialMediaDiscountAmount.toLocaleString("en-IN", {
+                      <span className="font-medium text-green-600">-{profile.currency_symbol}{socialMediaDiscountAmount.toLocaleString(profile.locale, {
                     minimumFractionDigits: 2
                   })}</span>
                     </div>}
@@ -1216,7 +1246,7 @@ const CreateQuotation = () => {
               {customizeSettings.showDiscount && !enableSocialMediaDiscount && <>
                   {discountPercentage > 0 && <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Discount ({discountPercentage}%)</span>
-                      <span className="font-medium text-green-600">-₹{discountAmount.toLocaleString("en-IN", {
+                      <span className="font-medium text-green-600">-{profile.currency_symbol}{discountAmount.toLocaleString(profile.locale, {
                     minimumFractionDigits: 2
                   })}</span>
                     </div>}
@@ -1231,7 +1261,7 @@ const CreateQuotation = () => {
 
               {customizeSettings.showGrandTotal && <div className="flex justify-between text-lg font-bold pt-3 border-t border-border">
                   <span>Grand Total</span>
-                  <span className="text-primary">₹{grandTotal.toLocaleString("en-IN", {
+                  <span className="text-primary">{profile.currency_symbol}{grandTotal.toLocaleString(profile.locale, {
                   minimumFractionDigits: 2
                 })}</span>
                 </div>}

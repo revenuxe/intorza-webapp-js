@@ -101,6 +101,16 @@ interface QuotationData {
     upiId?: string;
     qrCodeUrl?: string;
   };
+  // Localization settings
+  localization?: {
+    currencyCode: string;
+    currencySymbol: string;
+    locale: string;
+    taxLabel: string;
+    taxRegistrationLabel: string;
+    areaUnit: string;
+    areaUnitShort: string;
+  };
   settings?: QuotationPdfSettings;
   editorSettings?: PDFEditorSettings;
 }
@@ -341,9 +351,11 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       headerTextY += 4.5;
     }
     
-    if (data.gstin) {
+  // Get tax registration label from localization (e.g., "GSTIN", "VAT No", "Tax ID")
+  const taxRegLabel = data.localization?.taxRegistrationLabel || 'GSTIN';
+  if (data.gstin) {
       doc.setFont('helvetica', 'bold');
-      doc.text(`GSTIN: ${data.gstin}`, companyInfoX, headerTextY, { align: companyInfoAlign });
+      doc.text(`${taxRegLabel}: ${data.gstin}`, companyInfoX, headerTextY, { align: companyInfoAlign });
       headerTextY += 4.5;
     }
   }
@@ -462,13 +474,16 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
     // Table - different layouts based on settings
     if (settings.useSimpleItemLayout) {
+      // Get localized currency formatter
+      const fmtCurrencyLocal = (amt: number) => formatCurrency(amt, data.localization?.currencyCode || 'INR', data.localization?.currencySymbol || '₹', data.localization?.locale || 'en-IN');
+      
       // Simple layout: Description, Quantity, Rate, Amount
       const tableBody = section.items.map(item => [
         item.productName,
         item.productDetails || '-',
         item.sftArea.toFixed(2),
-        formatCurrency(item.ratePerSft),
-        formatCurrency(item.amount) 
+        fmtCurrencyLocal(item.ratePerSft),
+        fmtCurrencyLocal(item.amount) 
       ]);
 
       autoTable(doc, {
@@ -511,15 +526,19 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const showSide = settings.showSideColumn;
       const showDetails = settings.showProductDetails;
       
+      // Get localization for table headers
+      const areaShort = data.localization?.areaUnitShort || 'Sq.Ft';
+      const lengthShort = 'ft'; // TODO: Could be localized
+      
       // Build dynamic header
       const headerCols: string[] = [];
       if (showSide) headerCols.push('Side');
       headerCols.push('Product');
       if (showDetails) headerCols.push('Details');
       if (showSizeColumns) {
-        headerCols.push('W (ft)', 'H (ft)', 'Sq.Ft');
+        headerCols.push(`W (${lengthShort})`, `H (${lengthShort})`, areaShort);
       }
-      headerCols.push('Price/Sq.ft', 'Amount');
+      headerCols.push(`Price/${areaShort}`, 'Amount');
       
       const tableHead = [headerCols];
       
@@ -532,7 +551,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         if (showSizeColumns) {
           row.push(item.widthFt.toFixed(1), item.heightFt.toFixed(1), item.sftArea.toFixed(2));
         }
-        row.push(formatCurrency(item.ratePerSft), formatCurrency(item.amount));
+        // Use localized currency formatting
+        const fmtCurrencyLocal = (amt: number) => formatCurrency(amt, data.localization?.currencyCode || 'INR', data.localization?.currencySymbol || '₹', data.localization?.locale || 'en-IN');
+        row.push(fmtCurrencyLocal(item.ratePerSft), fmtCurrencyLocal(item.amount));
         return row;
       });
 
@@ -588,7 +609,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const sectionTotal = section.items.reduce((sum, item) => sum + item.amount, 0);
     
     // Draw yellow highlight background
-    const totalText = `Total ${section.title}:  ${formatCurrency(sectionTotal)}`;
+    // Section Total with localized currency
+    const fmtCurrencyLocal = (amt: number) => formatCurrency(amt, data.localization?.currencyCode || 'INR', data.localization?.currencySymbol || '₹', data.localization?.locale || 'en-IN');
+    const totalText = `Total ${section.title}:  ${fmtCurrencyLocal(sectionTotal)}`;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     const textWidth = doc.getTextWidth(totalText);
@@ -637,28 +660,41 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.text("PAYMENT SUMMARY", margin, yPosition);
   yPosition += 6;
 
+  // Get localization settings with defaults
+  const loc = data.localization || {
+    currencyCode: 'INR',
+    currencySymbol: '₹',
+    locale: 'en-IN',
+    taxLabel: 'GST',
+    taxRegistrationLabel: 'GSTIN',
+    areaUnit: 'Square Feet',
+    areaUnitShort: 'Sq.Ft',
+  };
+
+  const fmtCurrency = (amount: number) => formatCurrency(amount, loc.currencyCode, loc.currencySymbol, loc.locale);
+
   const summaryData: any[] = [
-    ['Total Project Area', `${totalSFT.toFixed(2)} Sq.Ft`],
+    ['Total Project Area', `${totalSFT.toFixed(2)} ${loc.areaUnitShort}`],
   ];
 
   if (settings.showSubtotal) {
-    summaryData.push(['Subtotal Amount', formatCurrency(subtotal)]);
+    summaryData.push(['Subtotal Amount', fmtCurrency(subtotal)]);
   }
 
   if (data.enableSocialMediaDiscount) {
     const discountRate = data.socialMediaDiscountRate || 6;
-    summaryData.push([`Social Media Special Discount @ ${discountRate}%`, '-' + formatCurrency(discountAmount)]);
+    summaryData.push([`Social Media Special Discount @ ${discountRate}%`, '-' + fmtCurrency(discountAmount)]);
   } else if (data.discount && data.discount > 0) {
-    summaryData.push(['Discount', '-' + formatCurrency(discountAmount)]);
+    summaryData.push(['Discount', '-' + fmtCurrency(discountAmount)]);
   }
 
   if (settings.showTaxGst && data.gstEnabled) {
-    summaryData.push(['Net Taxable Amount', formatCurrency(taxableAmount)]);
-    summaryData.push([`GST @ ${gstRate}%`, formatCurrency(gstAmount)]);
+    summaryData.push(['Net Taxable Amount', fmtCurrency(taxableAmount)]);
+    summaryData.push([`${loc.taxLabel} @ ${gstRate}%`, fmtCurrency(gstAmount)]);
   }
 
   if (settings.showGrandTotal) {
-    summaryData.push(['GRAND TOTAL', formatCurrency(finalTotal)]);
+    summaryData.push(['GRAND TOTAL', fmtCurrency(finalTotal)]);
   }
 
   autoTable(doc, {
@@ -707,7 +743,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       stage.stage,
       stage.milestone,
       `${stage.percentage}%`,
-      formatCurrency(finalTotal * (stage.percentage / 100))
+      fmtCurrency(finalTotal * (stage.percentage / 100))
     ]);
 
     autoTable(doc, {
