@@ -231,13 +231,13 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     headerTextY = yPosition + logoSize + 10;
   }
   
-  doc.setFont('helvetica', 'bold');
+  setHeadingFont('bold');
   doc.setFontSize(18);
   doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
   doc.text((data.profile.company_name || 'COMPANY NAME').toUpperCase(), companyInfoX, headerTextY, { align: companyInfoAlign });
   
   headerTextY += 7;
-  doc.setFont('helvetica', 'normal');
+  setBodyFont('normal');
   doc.setFontSize(9);
   doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
   
@@ -261,7 +261,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     }
     
     if (data.profile.gstin) {
-      doc.setFont('helvetica', 'bold');
+      setBodyFont('bold');
       doc.text(`${loc.taxRegistrationLabel}: ${data.profile.gstin}`, companyInfoX, headerTextY, { align: companyInfoAlign });
       headerTextY += 4.5;
     }
@@ -288,20 +288,20 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   const cardPadding = 6;
   const cardContentX = margin + cardPadding;
   
-  doc.setFont('helvetica', 'bold');
+  setHeadingFont('bold');
   doc.setFontSize(8);
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
   doc.text('BILL TO', cardContentX, cardY);
   
   cardY += 6;
-  doc.setFont('helvetica', 'bold');
+  setHeadingFont('bold');
   doc.setFontSize(11);
   doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
   doc.text(data.clientName, cardContentX, cardY);
   
   if (invoiceSettings.showProjectName) {
     cardY += 5;
-    doc.setFont('helvetica', 'normal');
+    setBodyFont('normal');
     doc.setFontSize(9);
     doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
     doc.text(data.projectName, cardContentX, cardY);
@@ -309,7 +309,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
 
   if (invoiceSettings.showClientAddress && data.clientAddress) {
     cardY += 5;
-    doc.setFont('helvetica', 'normal');
+    setBodyFont('normal');
     doc.setFontSize(8);
     const clientAddr = doc.splitTextToSize(data.clientAddress, cardWidth - (cardPadding * 2));
     doc.text(clientAddr, cardContentX, cardY);
@@ -325,19 +325,19 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   const metaLabelX = metaContentX;
   const metaValueX = metaContentX + 30;
   
-  doc.setFont('helvetica', 'bold');
+  setHeadingFont('bold');
   doc.setFontSize(8);
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
   doc.text('INVOICE DETAILS', metaContentX, metaY);
   metaY += 6;
 
   const addMeta = (label: string, value: string) => {
-    doc.setFont('helvetica', 'normal');
+    setBodyFont('normal');
     doc.setFontSize(9);
     doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
     doc.text(label, metaLabelX, metaY);
     
-    doc.setFont('helvetica', 'bold');
+    setBodyFont('bold');
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text(value, metaValueX, metaY);
     metaY += 5.5;
@@ -355,7 +355,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   yPosition += cardHeight + 10;
 
   // --- 3. Payment Summary ---
-  doc.setFont('helvetica', 'bold');
+  setHeadingFont('bold');
   doc.setFontSize(10);
   doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
   doc.text("PAYMENT SUMMARY", margin, yPosition);
@@ -407,18 +407,18 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     doc.setLineWidth(0.5);
     doc.roundedRect(margin, yPosition, contentWidth, 20, 2, 2, 'FD');
     
-    doc.setFont('helvetica', 'bold');
+    setHeadingFont('bold');
     doc.setFontSize(9);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text("NEXT PAYMENT DUE", margin + 6, yPosition + 8);
     
-    doc.setFont('helvetica', 'normal');
+    setBodyFont('normal');
     doc.setFontSize(9);
     doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
     doc.text(`Date: ${data.nextPaymentDue}`, margin + 6, yPosition + 14);
     
     if (data.nextPaymentAmount) {
-      doc.setFont('helvetica', 'bold');
+      setBodyFont('bold');
       doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
       doc.text(fmtCurrency(data.nextPaymentAmount), pageWidth - margin - 6, yPosition + 11, { align: 'right' });
     }
@@ -428,7 +428,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
 
   // --- 5. Payment History ---
   if (invoiceSettings.showPaymentHistory && data.payments && data.payments.length > 0) {
-    doc.setFont('helvetica', 'bold');
+    setHeadingFont('bold');
     doc.setFontSize(10);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text("PAYMENT HISTORY", margin, yPosition);
@@ -488,13 +488,13 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       yPosition = 15;
     }
 
-    doc.setFont('helvetica', 'bold');
+    setHeadingFont('bold');
     doc.setFontSize(10);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text("TERMS & CONDITIONS", margin, yPosition);
     yPosition += 8;
 
-    doc.setFont('helvetica', 'normal');
+    setBodyFont('normal');
     doc.setFontSize(7);
 
     const addBlock = (title: string, points: string[]) => {
@@ -503,12 +503,12 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         yPosition = 15;
       }
       if (title) {
-        doc.setFont('helvetica', 'bold');
+        setBodyFont('bold');
         doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
         doc.text(title, margin, yPosition);
         yPosition += 4;
       }
-      doc.setFont('helvetica', 'normal');
+      setBodyFont('normal');
       doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
       
       if (!points || !Array.isArray(points)) return;
@@ -554,7 +554,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         yPosition = 15;
       }
 
-      doc.setFont('helvetica', 'bold');
+      setHeadingFont('bold');
       doc.setFontSize(10);
       doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
       doc.text("BANK & PAYMENT DETAILS", margin, yPosition);
@@ -571,16 +571,16 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       const labelX = margin + 5;
       const valueX = margin + 45;
 
-      doc.setFont('helvetica', 'normal');
+      setBodyFont('normal');
       doc.setFontSize(8);
 
       const addBankRow = (label: string, value: string) => {
         doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
         doc.text(label, labelX, bankY);
-        doc.setFont('helvetica', 'bold');
+        setBodyFont('bold');
         doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
         doc.text(value, valueX, bankY);
-        doc.setFont('helvetica', 'normal');
+        setBodyFont('normal');
         bankY += 5.5;
       };
 
