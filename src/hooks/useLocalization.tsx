@@ -217,6 +217,7 @@ export const useLocalization = () => {
       taxRegistrationLabel: settings.taxRegistrationLabel,
       areaUnit: settings.areaUnit,
       areaUnitShort: settings.areaUnitShort,
+      countryCode: settings.countryCode, // Added for proper currency formatting
     };
   }, [settings]);
 
