@@ -53,7 +53,8 @@ interface InvoiceData {
 }
 
 const formatCurrency = (amount: number, currencyCode: string = 'INR', currencySymbol: string = '₹', locale: string = 'en-IN'): string => {
-  return currencySymbol + ' ' + Math.round(amount).toLocaleString(locale);
+  const formattedNumber = Math.round(amount).toLocaleString(locale);
+  return `${currencySymbol} ${formattedNumber}`;
 };
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
@@ -381,19 +382,25 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     ['Total Remaining', `${fmtCurrency(data.remainingAmount)} (${remainingPercentage}% remaining)`],
   ];
 
+  // Calculate optimal column widths based on content width
+  const labelColumnWidth = contentWidth * 0.5;
+  const amountColumnWidth = contentWidth * 0.5;
+
   autoTable(doc, {
     startY: yPosition,
     body: summaryData,
     theme: 'grid',
+    tableWidth: contentWidth,
     styles: {
       lineColor: COLORS.BORDER,
       lineWidth: 0.1,
-      cellPadding: 5,
-      fontSize: 8
+      cellPadding: { top: 4, right: 8, bottom: 4, left: 8 },
+      fontSize: 8,
+      overflow: 'linebreak'
     },
     columnStyles: {
-      0: { cellWidth: 120, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
-      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8 }
+      0: { cellWidth: labelColumnWidth, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
+      1: { cellWidth: amountColumnWidth, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8, minCellWidth: 60 }
     },
     willDrawCell: (cellData) => {
       if (highlightAmounts && cellData.column.index === 1 && cellData.section === 'body') {
