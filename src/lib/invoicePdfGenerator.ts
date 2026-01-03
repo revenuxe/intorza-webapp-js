@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PDFEditorSettings, InvoiceSettings, getThemeById, hexToRgb, PDFTheme, getFontById, applyBrandColorsToTheme } from './pdfThemes';
+import { formatPDFCurrency, getNumericFont, createPDFCurrencyFormatter } from './pdfCurrencyFormatter';
 
 interface InvoiceData {
   invoiceNumber: string;
@@ -47,15 +48,14 @@ interface InvoiceData {
     locale: string;
     taxLabel: string;
     taxRegistrationLabel: string;
+    countryCode?: string;
   };
   editorSettings?: PDFEditorSettings;
   invoiceSettings?: InvoiceSettings;
 }
 
-const formatCurrency = (amount: number, currencyCode: string = 'INR', currencySymbol: string = '₹', locale: string = 'en-IN'): string => {
-  const formattedNumber = Math.round(amount).toLocaleString(locale);
-  return `${currencySymbol} ${formattedNumber}`;
-};
+// Currency-safe font for numeric values
+const NUMERIC_FONT = getNumericFont();
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -168,8 +168,13 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     taxRegistrationLabel: 'GSTIN',
   };
 
-  // Create localized currency formatter
-  const fmtCurrency = (amount: number) => formatCurrency(amount, loc.currencyCode, loc.currencySymbol, loc.locale);
+  // Create localized currency formatter using professional formatter
+  const fmtCurrency = createPDFCurrencyFormatter({
+    currencyCode: loc.currencyCode,
+    currencySymbol: loc.currencySymbol,
+    locale: loc.locale,
+    countryCode: data.localization?.countryCode || 'IN',
+  });
 
   const getHighlightColor = (): [number, number, number] => {
     if (editorSettings?.customColors?.highlight) {
@@ -382,9 +387,9 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     ['Total Remaining', `${fmtCurrency(data.remainingAmount)} (${remainingPercentage}% remaining)`],
   ];
 
-  // Calculate optimal column widths based on content width
-  const labelColumnWidth = contentWidth * 0.5;
-  const amountColumnWidth = contentWidth * 0.5;
+  // Calculate optimal column widths - ensure amount column has enough space
+  const labelColumnWidth = contentWidth * 0.45;
+  const amountColumnWidth = contentWidth * 0.55;
 
   autoTable(doc, {
     startY: yPosition,
@@ -394,13 +399,27 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     styles: {
       lineColor: COLORS.BORDER,
       lineWidth: 0.1,
-      cellPadding: { top: 4, right: 8, bottom: 4, left: 8 },
-      fontSize: 8,
-      overflow: 'linebreak'
+      cellPadding: { top: 5, right: 10, bottom: 5, left: 10 },
+      fontSize: 9,
+      valign: 'middle',
     },
     columnStyles: {
-      0: { cellWidth: labelColumnWidth, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
-      1: { cellWidth: amountColumnWidth, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8, minCellWidth: 60 }
+      0: { 
+        cellWidth: labelColumnWidth, 
+        halign: 'right', 
+        fontStyle: 'bold', 
+        textColor: COLORS.TEXT_SECONDARY, 
+        fontSize: 9 
+      },
+      1: { 
+        cellWidth: amountColumnWidth, 
+        halign: 'right', 
+        fontStyle: 'bold', 
+        textColor: COLORS.TEXT_PRIMARY, 
+        fontSize: 10, // Slightly larger for totals - visual hierarchy
+        minCellWidth: 70,
+        overflow: 'visible' as const,
+      }
     },
     willDrawCell: (cellData) => {
       if (highlightAmounts && cellData.column.index === 1 && cellData.section === 'body') {
@@ -465,7 +484,8 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         lineWidth: 0.1,
         textColor: COLORS.TEXT_SECONDARY,
         fontSize: 7,
-        cellPadding: 3
+        cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+        valign: 'middle',
       },
       headStyles: {
         fillColor: COLORS.BG_CARD,
@@ -473,14 +493,16 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         fontStyle: 'bold',
         lineColor: COLORS.BORDER,
         lineWidth: 0.1,
-        fontSize: 7
+        fontSize: 7,
+        valign: 'middle',
       },
       columnStyles: {
-        0: { cellWidth: 12, halign: 'center', fontSize: 7 },
-        1: { cellWidth: 30, fontSize: 7 },
-        2: { cellWidth: 25, halign: 'center', fontSize: 7 },
-        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: 7 },
-        4: { cellWidth: 'auto', fontSize: 6 }
+        0: { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' },
+        1: { cellWidth: 30, fontSize: 7, valign: 'middle' },
+        2: { cellWidth: 25, halign: 'center', fontSize: 7, valign: 'middle' },
+        // Amount column - fixed width, right-aligned, no wrap
+        3: { cellWidth: 40, halign: 'right', fontStyle: 'bold', fontSize: 8, overflow: 'visible' as const, minCellWidth: 40, valign: 'middle' },
+        4: { cellWidth: 'auto', fontSize: 6, valign: 'middle' }
       },
       willDrawCell: (cellData) => {
         if (highlightAmounts && cellData.column.index === 3 && cellData.section === 'body') {

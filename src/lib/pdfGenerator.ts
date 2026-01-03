@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PDFEditorSettings, getThemeById, hexToRgb, PDFTheme, getFontById, applyBrandColorsToTheme } from './pdfThemes';
 import { drawAllDecorations, drawSectionDivider, drawFooterDecoration } from './pdfDecorations';
+import { formatPDFCurrency, formatPDFNumber, getNumericFont, createPDFCurrencyFormatter } from './pdfCurrencyFormatter';
 
 // --- Settings Interface ---
 export interface QuotationPdfSettings {
@@ -110,17 +111,15 @@ interface QuotationData {
     taxRegistrationLabel: string;
     areaUnit: string;
     areaUnitShort: string;
+    countryCode?: string;
   };
   settings?: QuotationPdfSettings;
   editorSettings?: PDFEditorSettings;
 }
 
 // --- Helpers ---
-
-const formatCurrency = (amount: number, currencyCode: string = 'INR', currencySymbol: string = '₹', locale: string = 'en-IN'): string => {
-  const formattedNumber = Math.round(amount).toLocaleString(locale);
-  return `${currencySymbol} ${formattedNumber}`;
-};
+// Currency-safe font for numeric values (always use helvetica for numbers)
+const NUMERIC_FONT = getNumericFont();
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -494,8 +493,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
     // Table - different layouts based on settings
     if (settings.useSimpleItemLayout) {
-      // Get localized currency formatter
-      const fmtCurrencyLocal = (amt: number) => formatCurrency(amt, data.localization?.currencyCode || 'INR', data.localization?.currencySymbol || '₹', data.localization?.locale || 'en-IN');
+      // Get localized currency formatter using professional formatter
+      const fmtCurrencyLocal = createPDFCurrencyFormatter({
+        currencyCode: data.localization?.currencyCode || 'INR',
+        currencySymbol: data.localization?.currencySymbol || '₹',
+        locale: data.localization?.locale || 'en-IN',
+        countryCode: data.localization?.countryCode || 'IN',
+      });
       
       // Simple layout: Description, Quantity, Rate, Amount
       const tableBody = section.items.map(item => [
@@ -517,7 +521,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
           lineWidth: 0.1,
-          cellPadding: 3,
+          cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+          valign: 'middle',
         },
         headStyles: {
           fillColor: [255, 255, 255],
@@ -526,14 +531,17 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           fontSize: 7,
           lineWidth: 0.1,
           lineColor: COLORS.BORDER,
-          halign: 'left'
+          halign: 'left',
+          valign: 'middle',
         },
         columnStyles: {
           0: { cellWidth: 35, fontStyle: 'bold', fontSize: 7 },
           1: { cellWidth: 'auto', fontSize: 6 },
-          2: { cellWidth: 20, halign: 'center', fontSize: 7 },
-          3: { cellWidth: 28, halign: 'right', fontStyle: 'bold', fontSize: 7 },
-          4: { cellWidth: 30, halign: 'right', fontStyle: 'bold', fontSize: 7 }
+          2: { cellWidth: 18, halign: 'center', fontSize: 7 },
+          // Rate column - fixed width, right-aligned, no wrap
+          3: { cellWidth: 32, halign: 'right', fontStyle: 'bold', fontSize: 7, overflow: 'visible' as const, minCellWidth: 32 },
+          // Amount column - fixed width, right-aligned, no wrap
+          4: { cellWidth: 38, halign: 'right', fontStyle: 'bold', fontSize: 8, overflow: 'visible' as const, minCellWidth: 38 }
         },
         margin: { left: margin, right: margin },
         didDrawPage: (d) => {
@@ -571,8 +579,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         if (showSizeColumns) {
           row.push(item.widthFt.toFixed(1), item.heightFt.toFixed(1), item.sftArea.toFixed(2));
         }
-        // Use localized currency formatting
-        const fmtCurrencyLocal = (amt: number) => formatCurrency(amt, data.localization?.currencyCode || 'INR', data.localization?.currencySymbol || '₹', data.localization?.locale || 'en-IN');
+        // Use professional currency formatting
+        const fmtCurrencyLocal = createPDFCurrencyFormatter({
+          currencyCode: data.localization?.currencyCode || 'INR',
+          currencySymbol: data.localization?.currencySymbol || '₹',
+          locale: data.localization?.locale || 'en-IN',
+          countryCode: data.localization?.countryCode || 'IN',
+        });
         row.push(fmtCurrencyLocal(item.ratePerSft), fmtCurrencyLocal(item.amount));
         return row;
       });
@@ -584,12 +597,14 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       colStyles[colIndex++] = { cellWidth: showDetails ? 28 : 40, fontStyle: 'bold', fontSize: 7 };
       if (showDetails) { colStyles[colIndex++] = { cellWidth: 'auto', fontSize: 6 }; }
       if (showSizeColumns) {
-        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6 };
-        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6 };
-        colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 7 };
+        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 7, valign: 'middle' };
       }
-      colStyles[colIndex++] = { cellWidth: 24, halign: 'right', fontStyle: 'bold', fontSize: 7 };
-      colStyles[colIndex++] = { cellWidth: 26, halign: 'right', fontStyle: 'bold', fontSize: 7 };
+      // Rate column - fixed width, right-aligned, no wrap
+      colStyles[colIndex++] = { cellWidth: 30, halign: 'right', fontStyle: 'bold', fontSize: 7, overflow: 'visible' as const, minCellWidth: 30, valign: 'middle' };
+      // Amount column - fixed width, right-aligned, no wrap, slightly larger font for emphasis
+      colStyles[colIndex++] = { cellWidth: 36, halign: 'right', fontStyle: 'bold', fontSize: 8, overflow: 'visible' as const, minCellWidth: 36, valign: 'middle' };
 
       const columnStyles = colStyles;
 
@@ -604,7 +619,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
           lineWidth: 0.1,
-          cellPadding: 3,
+          cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+          valign: 'middle',
         },
         headStyles: {
           fillColor: [255, 255, 255],
@@ -613,7 +629,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           fontSize: 7,
           lineWidth: 0.1,
           lineColor: COLORS.BORDER,
-          halign: 'left'
+          halign: 'left',
+          valign: 'middle',
         },
         columnStyles: columnStyles as any,
         margin: { left: margin, right: margin },
@@ -629,8 +646,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const sectionTotal = section.items.reduce((sum, item) => sum + item.amount, 0);
     
     // Draw yellow highlight background
-    // Section Total with localized currency
-    const fmtCurrencyLocal = (amt: number) => formatCurrency(amt, data.localization?.currencyCode || 'INR', data.localization?.currencySymbol || '₹', data.localization?.locale || 'en-IN');
+    // Section Total with professional currency formatting
+    const fmtCurrencyLocal = createPDFCurrencyFormatter({
+      currencyCode: data.localization?.currencyCode || 'INR',
+      currencySymbol: data.localization?.currencySymbol || '₹',
+      locale: data.localization?.locale || 'en-IN',
+      countryCode: data.localization?.countryCode || 'IN',
+    });
     const totalText = `Total ${section.title}:  ${fmtCurrencyLocal(sectionTotal)}`;
     setBodyFont('bold');
     doc.setFontSize(8);
@@ -689,9 +711,16 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     taxRegistrationLabel: 'GSTIN',
     areaUnit: 'Square Feet',
     areaUnitShort: 'Sq.Ft',
+    countryCode: 'IN',
   };
 
-  const fmtCurrency = (amount: number) => formatCurrency(amount, loc.currencyCode, loc.currencySymbol, loc.locale);
+  // Create professional currency formatter for summary section
+  const fmtCurrency = createPDFCurrencyFormatter({
+    currencyCode: loc.currencyCode,
+    currencySymbol: loc.currencySymbol,
+    locale: loc.locale,
+    countryCode: loc.countryCode || 'IN',
+  });
 
   const summaryData: any[] = [
     ['Total Project Area', `${totalSFT.toFixed(2)} ${loc.areaUnitShort}`],
@@ -717,9 +746,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     summaryData.push(['GRAND TOTAL', fmtCurrency(finalTotal)]);
   }
 
-  // Calculate optimal column widths based on content width
-  const labelColumnWidth = contentWidth * 0.6;
-  const amountColumnWidth = contentWidth * 0.4;
+  // Calculate optimal column widths - ensure amount column has enough space
+  const labelColumnWidth = contentWidth * 0.55;
+  const amountColumnWidth = contentWidth * 0.45;
 
   autoTable(doc, {
     startY: yPosition,
@@ -729,13 +758,27 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     styles: {
       lineColor: COLORS.BORDER,
       lineWidth: 0.1,
-      cellPadding: { top: 4, right: 8, bottom: 4, left: 8 },
-      fontSize: 8,
-      overflow: 'linebreak'
+      cellPadding: { top: 5, right: 10, bottom: 5, left: 10 },
+      fontSize: 9,
+      valign: 'middle',
     },
     columnStyles: {
-      0: { cellWidth: labelColumnWidth, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
-      1: { cellWidth: amountColumnWidth, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8, minCellWidth: 50 }
+      0: { 
+        cellWidth: labelColumnWidth, 
+        halign: 'right', 
+        fontStyle: 'bold', 
+        textColor: COLORS.TEXT_SECONDARY, 
+        fontSize: 9 
+      },
+      1: { 
+        cellWidth: amountColumnWidth, 
+        halign: 'right', 
+        fontStyle: 'bold', 
+        textColor: COLORS.TEXT_PRIMARY, 
+        fontSize: 10, // Slightly larger for totals
+        minCellWidth: 60,
+        overflow: 'visible' as const,
+      }
     },
     willDrawCell: (cellData) => {
       if (cellData.column.index === 1 && cellData.section === 'body') {
@@ -781,7 +824,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           lineWidth: 0.1,
           textColor: COLORS.TEXT_SECONDARY,
           fontSize: 7,
-          cellPadding: 3
+          cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+          valign: 'middle',
       },
       headStyles: {
         fillColor: COLORS.BG_CARD,
@@ -789,13 +833,15 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         fontStyle: 'bold',
         lineColor: COLORS.BORDER,
         lineWidth: 0.1,
-        fontSize: 7
+        fontSize: 7,
+        valign: 'middle',
       },
       columnStyles: {
-        0: { cellWidth: 12, halign: 'center', fontSize: 7 },
-        1: { cellWidth: 'auto', fontSize: 7 },
-        2: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fontSize: 7 },
-        3: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fontSize: 7 }
+        0: { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' },
+        1: { cellWidth: 'auto', fontSize: 7, valign: 'middle' },
+        2: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fontSize: 7, valign: 'middle' },
+        // Amount column - fixed width, right-aligned, no wrap
+        3: { cellWidth: 40, halign: 'right', fontStyle: 'bold', fontSize: 8, overflow: 'visible' as const, minCellWidth: 40, valign: 'middle' }
       },
       margin: { left: margin, right: margin }
     });
