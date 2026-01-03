@@ -1,9 +1,9 @@
-import { FileText, Receipt, Users, Settings, PlusCircle, UsersRound, LayoutDashboard, Ruler, FolderOpen, Lock, Crown, Library } from "lucide-react";
+import { FileText, Receipt, Users, Settings, PlusCircle, UsersRound, LayoutDashboard, Ruler, FolderOpen, Lock, Crown, Library, MessageSquare } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useLocalization } from "@/hooks/useLocalization";
-import { Badge } from "@/components/ui/badge";
+import { useFeedback } from "@/components/FeedbackProvider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface NavigationProps {
@@ -76,6 +76,7 @@ const navItems = [
 export const Navigation = ({ mobile }: NavigationProps) => {
   const { isPro, setPaywallOpen } = useSubscription();
   const { settings, countryConfig } = useLocalization();
+  const { openFeedback } = useFeedback();
   
   // Determine price text and flag based on country
   const priceText = settings.countryCode === 'IN' ? '₹1' : '$1';
@@ -144,6 +145,17 @@ export const Navigation = ({ mobile }: NavigationProps) => {
           </NavLink>
         );
       })}
+
+      {/* Give Feedback button - below Settings */}
+      {!mobile && (
+        <button
+          onClick={() => openFeedback()}
+          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors mt-1"
+        >
+          <MessageSquare className="h-5 w-5" />
+          <span className="flex-1">Give Feedback</span>
+        </button>
+      )}
     </nav>
   );
 };

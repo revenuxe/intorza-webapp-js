@@ -118,7 +118,8 @@ interface QuotationData {
 // --- Helpers ---
 
 const formatCurrency = (amount: number, currencyCode: string = 'INR', currencySymbol: string = '₹', locale: string = 'en-IN'): string => {
-  return currencySymbol + ' ' + Math.round(amount).toLocaleString(locale);
+  const formattedNumber = Math.round(amount).toLocaleString(locale);
+  return `${currencySymbol} ${formattedNumber}`;
 };
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
@@ -716,27 +717,32 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     summaryData.push(['GRAND TOTAL', fmtCurrency(finalTotal)]);
   }
 
+  // Calculate optimal column widths based on content width
+  const labelColumnWidth = contentWidth * 0.6;
+  const amountColumnWidth = contentWidth * 0.4;
+
   autoTable(doc, {
     startY: yPosition,
     body: summaryData,
     theme: 'grid',
+    tableWidth: contentWidth,
     styles: {
       lineColor: COLORS.BORDER,
       lineWidth: 0.1,
-      cellPadding: 5,
-      fontSize: 8
+      cellPadding: { top: 4, right: 8, bottom: 4, left: 8 },
+      fontSize: 8,
+      overflow: 'linebreak'
     },
     columnStyles: {
-      0: { cellWidth: 120, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
-      1: { cellWidth: 'auto', halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8 }
+      0: { cellWidth: labelColumnWidth, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_SECONDARY, fontSize: 8 },
+      1: { cellWidth: amountColumnWidth, halign: 'right', fontStyle: 'bold', textColor: COLORS.TEXT_PRIMARY, fontSize: 8, minCellWidth: 50 }
     },
-        willDrawCell: (cellData) => {
-          if (cellData.column.index === 1 && cellData.section === 'body') {
-            doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
-            // Use contrasting text color for highlighted cells
-            doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
-          }
-        },
+    willDrawCell: (cellData) => {
+      if (cellData.column.index === 1 && cellData.section === 'body') {
+        doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
+        doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
+      }
+    },
     margin: { left: margin, right: margin }
   });
 
