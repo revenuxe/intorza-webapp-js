@@ -183,6 +183,14 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     return theme.colors.highlight;
   };
 
+  const getContrastingTextColor = (bgColor: [number, number, number]): [number, number, number] => {
+    const luminance = (0.299 * bgColor[0] + 0.587 * bgColor[1] + 0.114 * bgColor[2]) / 255;
+    return luminance > 0.5 ? [20, 20, 20] : [255, 255, 255];
+  };
+
+  const highlightColor = getHighlightColor();
+  const highlightTextColor = getContrastingTextColor(highlightColor);
+
   const COLORS = {
     TEXT_PRIMARY: theme.colors.text,
     TEXT_SECONDARY: theme.colors.textSecondary,
@@ -190,7 +198,8 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     BG_CARD: theme.colors.cardBackground,
     BORDER: theme.colors.border,
     ACCENT: theme.colors.accent,
-    HIGHLIGHT: getHighlightColor(),
+    HIGHLIGHT: highlightColor,
+    HIGHLIGHT_TEXT: highlightTextColor,
     HEADER_BG: theme.colors.headerBg,
     HEADER_TEXT: theme.colors.headerText,
   };
@@ -383,8 +392,8 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
 
   const summaryData = [
     ['Total Amount', fmtCurrency(data.totalAmount)],
-    ['Paid Amount', `${fmtCurrency(data.paidAmount)} (${paidPercentage}% paid)`],
-    ['Total Remaining', `${fmtCurrency(data.remainingAmount)} (${remainingPercentage}% remaining)`],
+    [`Paid Amount (${paidPercentage}% paid)`, fmtCurrency(data.paidAmount)],
+    [`Total Remaining (${remainingPercentage}% remaining)`, fmtCurrency(data.remainingAmount)],
   ];
 
   // Calculate optimal column widths - ensure amount column has enough space
@@ -397,6 +406,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     theme: 'grid',
     tableWidth: contentWidth,
     styles: {
+      font: bodyFont,
       lineColor: COLORS.BORDER,
       lineWidth: 0.1,
       cellPadding: { top: 5, right: 10, bottom: 5, left: 10 },
@@ -406,25 +416,28 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     columnStyles: {
       0: { 
         cellWidth: labelColumnWidth, 
-        halign: 'right', 
+        halign: 'left', 
         fontStyle: 'bold', 
         textColor: COLORS.TEXT_SECONDARY, 
-        fontSize: 9 
+        fontSize: 9,
+        valign: 'middle',
       },
       1: { 
         cellWidth: amountColumnWidth, 
-        halign: 'right', 
+        halign: 'right',
+        font: NUMERIC_FONT,
         fontStyle: 'bold', 
         textColor: COLORS.TEXT_PRIMARY, 
         fontSize: 10, // Slightly larger for totals - visual hierarchy
         minCellWidth: 70,
-        overflow: 'visible' as const,
+        overflow: 'hidden' as const,
+        valign: 'middle',
       }
     },
     willDrawCell: (cellData) => {
       if (highlightAmounts && cellData.column.index === 1 && cellData.section === 'body') {
         doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
-        doc.setTextColor(0, 0, 0);
+        doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
       }
     },
     margin: { left: margin, right: margin }
@@ -480,6 +493,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       body: paymentRows,
       theme: 'grid',
       styles: {
+        font: bodyFont,
         lineColor: COLORS.BORDER,
         lineWidth: 0.1,
         textColor: COLORS.TEXT_SECONDARY,
@@ -500,14 +514,14 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         0: { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' },
         1: { cellWidth: 30, fontSize: 7, valign: 'middle' },
         2: { cellWidth: 25, halign: 'center', fontSize: 7, valign: 'middle' },
-        // Amount column - fixed width, right-aligned, no wrap
-        3: { cellWidth: 40, halign: 'right', fontStyle: 'bold', fontSize: 8, overflow: 'visible' as const, minCellWidth: 40, valign: 'middle' },
+        // Amount column - fixed width, right-aligned, numeric-safe, no wrap/overflow
+        3: { cellWidth: 44, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 44, valign: 'middle' },
         4: { cellWidth: 'auto', fontSize: 6, valign: 'middle' }
       },
       willDrawCell: (cellData) => {
         if (highlightAmounts && cellData.column.index === 3 && cellData.section === 'body') {
           doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
-          doc.setTextColor(0, 0, 0);
+          doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
         }
       },
       margin: { left: margin, right: margin }

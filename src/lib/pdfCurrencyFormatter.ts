@@ -1,9 +1,10 @@
 // Professional PDF Currency & Number Formatting Utility
 // Ensures perfect alignment, no overflow, and currency-safe rendering
 
-// Currency-safe fonts that support all major currency symbols
-export const NUMERIC_SAFE_FONTS = ['helvetica', 'times', 'courier'] as const;
-export const DEFAULT_NUMERIC_FONT = 'helvetica';
+// Currency-safe fonts available in jsPDF core.
+// We intentionally default numeric rendering to a *tabular* (monospaced) font to guarantee alignment.
+export const NUMERIC_SAFE_FONTS = ['courier', 'helvetica', 'times'] as const;
+export const DEFAULT_NUMERIC_FONT = 'courier';
 
 // Country to currency symbol mapping for fail-safe rendering
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -66,6 +67,33 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   IL: '₪', // Israel
 };
 
+// Country-to-currency-code mapping used for PDFs.
+// We render currency as a code prefix (e.g., "INR") to avoid broken symbol glyphs.
+const COUNTRY_TO_CURRENCY_CODE: Record<string, string> = {
+  IN: 'INR',
+  US: 'USD',
+  GB: 'GBP',
+  AE: 'AED',
+  SA: 'SAR',
+
+  // Europe
+  EU: 'EUR',
+  DE: 'EUR',
+  FR: 'EUR',
+  IT: 'EUR',
+  ES: 'EUR',
+  NL: 'EUR',
+  BE: 'EUR',
+  AT: 'EUR',
+  PT: 'EUR',
+  IE: 'EUR',
+  FI: 'EUR',
+};
+
+function getCurrencyCodeForCountry(countryCode: string): string | undefined {
+  return COUNTRY_TO_CURRENCY_CODE[countryCode];
+}
+
 // Locale-specific number formatting patterns
 interface LocaleFormat {
   thousandSeparator: string;
@@ -81,7 +109,8 @@ const LOCALE_FORMATS: Record<string, LocaleFormat> = {
   'en-AU': { thousandSeparator: ',', decimalSeparator: '.', groupingPattern: 'standard' },
   'en-CA': { thousandSeparator: ',', decimalSeparator: '.', groupingPattern: 'standard' },
   'de-DE': { thousandSeparator: '.', decimalSeparator: ',', groupingPattern: 'standard' },
-  'fr-FR': { thousandSeparator: ' ', decimalSeparator: ',', groupingPattern: 'standard' },
+  // Use dot-grouping for Europe-style PDFs (no spaces inside numbers)
+  'fr-FR': { thousandSeparator: '.', decimalSeparator: ',', groupingPattern: 'standard' },
   'es-ES': { thousandSeparator: '.', decimalSeparator: ',', groupingPattern: 'standard' },
   'it-IT': { thousandSeparator: '.', decimalSeparator: ',', groupingPattern: 'standard' },
   'pt-BR': { thousandSeparator: '.', decimalSeparator: ',', groupingPattern: 'standard' },
@@ -150,17 +179,17 @@ export function formatPDFCurrency(
   } = {}
 ): string {
   const {
-    currencyCode = 'INR',
-    currencySymbol,
+    currencyCode,
+    currencySymbol: _currencySymbol, // ignored for PDFs (prevents broken currency glyphs)
     countryCode = 'IN',
     locale = 'en-IN',
     showDecimals = false,
     decimalPlaces = showDecimals ? 2 : 0,
   } = options;
 
-  // Get currency symbol - prefer provided symbol, fallback to country mapping
-  const symbol = currencySymbol || CURRENCY_SYMBOLS[countryCode] || currencyCode;
-  
+  // Always prefer a currency *code* prefix (INR/USD/AED/...), never a symbol.
+  const prefix = (currencyCode || getCurrencyCodeForCountry(countryCode) || 'USD').toUpperCase();
+
   // Get locale format - fallback to standard format
   const format = LOCALE_FORMATS[locale] || LOCALE_FORMATS['en-US'] || {
     thousandSeparator: ',',
@@ -172,20 +201,19 @@ export function formatPDFCurrency(
   let formattedNumber: string;
   const absoluteAmount = Math.abs(amount);
   const isNegative = amount < 0;
-  
+
   if (format.groupingPattern === 'indian') {
     formattedNumber = formatIndianNumber(absoluteAmount, decimalPlaces);
   } else {
     formattedNumber = formatStandardNumber(absoluteAmount, format, decimalPlaces);
   }
 
-  // Use non-breaking space (Unicode \u00A0) between symbol and amount
-  // This prevents line breaks between currency symbol and number
+  // Non‑breaking space to guarantee the prefix never detaches from the number.
   const nbsp = '\u00A0';
-  
-  // Format with currency symbol BEFORE the amount (standard for most currencies)
-  const result = `${symbol}${nbsp}${formattedNumber}`;
-  
+
+  // Format with currency code BEFORE the amount
+  const result = `${prefix}${nbsp}${formattedNumber}`;
+
   return isNegative ? `-${result}` : result;
 }
 
@@ -272,14 +300,20 @@ export function getNumericColumnStyles(options: {
   minWidth?: number;
 } = {}) {
   const { fontSize = 8, minWidth = 35 } = options;
-  
+
   return {
+    font: getNumericFont(),
     halign: 'right' as const,
     fontStyle: 'bold' as const,
     fontSize,
     minCellWidth: minWidth,
-    overflow: 'visible' as const, // Never wrap or ellipsis
-    cellPadding: { top: 4, right: 6, bottom: 4, left: 4 },
+
+    // Keep values inside borders at all costs (never wrap).
+    overflow: 'hidden' as const,
+
+    // ~8–10px in PDF terms (mm-based units)
+    cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+    valign: 'middle' as const,
   };
 }
 
