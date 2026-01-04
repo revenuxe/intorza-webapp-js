@@ -535,13 +535,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           valign: 'middle',
         },
         columnStyles: {
-          0: { cellWidth: 35, fontStyle: 'bold', fontSize: 7 },
-          1: { cellWidth: 'auto', fontSize: 6 },
-          2: { cellWidth: 18, halign: 'center', fontSize: 7 },
-          // Rate column - fixed width, right-aligned, numeric-safe, no wrap/overflow
-          3: { cellWidth: 34, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 7, overflow: 'hidden' as const, minCellWidth: 34, valign: 'middle' },
-          // Amount column - fixed width, right-aligned, numeric-safe, no wrap/overflow
-          4: { cellWidth: 44, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 44, valign: 'middle' }
+          0: { cellWidth: 35, fontStyle: 'bold', fontSize: 8 },
+          1: { cellWidth: 'auto', fontSize: 7 },
+          2: { cellWidth: 18, halign: 'center', fontSize: 8 },
+          // Rate column - fixed width, right-aligned, numeric-safe, bold, no wrap
+          3: { cellWidth: 36, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 9, overflow: 'hidden' as const, minCellWidth: 36, valign: 'middle' },
+          // Amount column - fixed width, right-aligned, numeric-safe, BOLD & larger, no wrap
+          4: { cellWidth: 48, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 10, overflow: 'hidden' as const, minCellWidth: 48, valign: 'middle' }
         },
         margin: { left: margin, right: margin },
         didDrawPage: (d) => {
@@ -601,10 +601,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6, valign: 'middle' };
         colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 7, valign: 'middle' };
       }
-      // Rate column - fixed width, right-aligned, numeric-safe, no wrap/overflow
-      colStyles[colIndex++] = { cellWidth: 30, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 7, overflow: 'hidden' as const, minCellWidth: 30, valign: 'middle' };
-      // Amount column - fixed width, right-aligned, numeric-safe, no wrap/overflow
-      colStyles[colIndex++] = { cellWidth: 38, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 38, valign: 'middle' };
+      // Rate column - fixed width, right-aligned, numeric-safe, bold, no wrap
+      colStyles[colIndex++] = { cellWidth: 34, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 9, overflow: 'hidden' as const, minCellWidth: 34, valign: 'middle' };
+      // Amount column - fixed width, right-aligned, numeric-safe, BOLD & larger, no wrap
+      colStyles[colIndex++] = { cellWidth: 44, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 10, overflow: 'hidden' as const, minCellWidth: 44, valign: 'middle' };
 
       const columnStyles = colStyles;
 
@@ -655,9 +655,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const labelText = `Total ${section.title}:`;
     const amountText = fmtCurrencyLocal(sectionTotal);
 
-    const highlightPadding = 2;
-    const highlightHeight = 6;
-    const fontSize = 8;
+    const highlightPadding = 3;
+    const highlightHeight = 8;
+    const fontSize = 10; // Larger for section totals
 
     // Measure widths using their respective fonts
     setBodyFont('bold');
@@ -677,8 +677,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
     doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
 
-    const textY = yPosition + 6;
-    const startX = pageWidth - margin - totalWidth;
+    const textY = yPosition + 7;
+    const startX = pageWidth - margin - totalWidth - 2;
 
     // Label in user-selected body font
     setBodyFont('bold');
@@ -783,8 +783,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
        font: bodyFont,
        lineColor: COLORS.BORDER,
        lineWidth: 0.1,
-       cellPadding: { top: 5, right: 10, bottom: 5, left: 10 },
-       fontSize: 9,
+       cellPadding: { top: 6, right: 12, bottom: 6, left: 12 },
+       fontSize: 10,
        valign: 'middle',
      },
      columnStyles: {
@@ -793,7 +793,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
          halign: 'left', 
          fontStyle: 'bold', 
          textColor: COLORS.TEXT_SECONDARY, 
-         fontSize: 9,
+         fontSize: 10,
          valign: 'middle',
        },
        1: { 
@@ -802,8 +802,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
          font: NUMERIC_FONT,
          fontStyle: 'bold', 
          textColor: COLORS.TEXT_PRIMARY, 
-         fontSize: 10, // Slightly larger for totals
-         minCellWidth: 60,
+         fontSize: 12, // Larger for summary totals
+         minCellWidth: 65,
          overflow: 'hidden' as const,
          valign: 'middle',
        }
@@ -865,11 +865,11 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         valign: 'middle',
       },
        columnStyles: {
-         0: { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' },
-         1: { cellWidth: 'auto', fontSize: 7, valign: 'middle' },
-         2: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fontSize: 7, valign: 'middle' },
-         // Amount column - fixed width, right-aligned, numeric-safe, no wrap/overflow
-         3: { cellWidth: 44, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 44, valign: 'middle' }
+         0: { cellWidth: 12, halign: 'center', fontSize: 8, valign: 'middle' },
+         1: { cellWidth: 'auto', fontSize: 8, valign: 'middle' },
+         2: { cellWidth: 24, halign: 'center', fontStyle: 'bold', fontSize: 9, valign: 'middle' },
+         // Amount column - fixed width, right-aligned, numeric-safe, BOLD & larger
+         3: { cellWidth: 50, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 10, overflow: 'hidden' as const, minCellWidth: 50, valign: 'middle' }
        },
       margin: { left: margin, right: margin }
     });
