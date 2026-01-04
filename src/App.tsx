@@ -30,6 +30,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import PDFPreviewQA from "./pages/admin/PDFPreviewQA";
 import Team from "./pages/Team";
 import TeamLogin from "./pages/team/TeamLogin";
 import TeamDashboard from "./pages/team/TeamDashboard";
@@ -63,6 +64,7 @@ const App = () => (
                 {/* Admin routes */}
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/admin/pdf-qa" element={<PDFPreviewQA />} />
                 
                 {/* Team member routes */}
                 <Route path="/team/login" element={<TeamLogin />} />

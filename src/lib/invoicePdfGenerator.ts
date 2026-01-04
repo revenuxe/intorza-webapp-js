@@ -409,8 +409,8 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       font: bodyFont,
       lineColor: COLORS.BORDER,
       lineWidth: 0.1,
-      cellPadding: { top: 5, right: 10, bottom: 5, left: 10 },
-      fontSize: 9,
+      cellPadding: { top: 6, right: 12, bottom: 6, left: 12 },
+      fontSize: 10,
       valign: 'middle',
     },
     columnStyles: {
@@ -419,7 +419,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         halign: 'left', 
         fontStyle: 'bold', 
         textColor: COLORS.TEXT_SECONDARY, 
-        fontSize: 9,
+        fontSize: 10,
         valign: 'middle',
       },
       1: { 
@@ -428,8 +428,8 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         font: NUMERIC_FONT,
         fontStyle: 'bold', 
         textColor: COLORS.TEXT_PRIMARY, 
-        fontSize: 10, // Slightly larger for totals - visual hierarchy
-        minCellWidth: 70,
+        fontSize: 12, // Larger for totals - clear visual hierarchy
+        minCellWidth: 75,
         overflow: 'hidden' as const,
         valign: 'middle',
       }
@@ -511,12 +511,12 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         valign: 'middle',
       },
       columnStyles: {
-        0: { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' },
-        1: { cellWidth: 30, fontSize: 7, valign: 'middle' },
-        2: { cellWidth: 25, halign: 'center', fontSize: 7, valign: 'middle' },
-        // Amount column - fixed width, right-aligned, numeric-safe, no wrap/overflow
-        3: { cellWidth: 44, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 44, valign: 'middle' },
-        4: { cellWidth: 'auto', fontSize: 6, valign: 'middle' }
+        0: { cellWidth: 12, halign: 'center', fontSize: 8, valign: 'middle' },
+        1: { cellWidth: 30, fontSize: 8, valign: 'middle' },
+        2: { cellWidth: 28, halign: 'center', fontSize: 8, valign: 'middle' },
+        // Amount column - fixed width, right-aligned, numeric-safe, BOLD & larger
+        3: { cellWidth: 50, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 10, overflow: 'hidden' as const, minCellWidth: 50, valign: 'middle' },
+        4: { cellWidth: 'auto', fontSize: 7, valign: 'middle' }
       },
       willDrawCell: (cellData) => {
         if (highlightAmounts && cellData.column.index === 3 && cellData.section === 'body') {
