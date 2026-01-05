@@ -660,16 +660,17 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const amountText = fmtCurrencyLocal(sectionTotal);
 
     const highlightPadding = 4;
-    const highlightHeight = 7;
-    const labelFontSize = 9;
-    const amountFontSize = 9;
+    const highlightHeight = 8;
+    const labelFontSize = 10;
+    const amountFontSize = 10;
+    const TOTAL_AMOUNT_FONT = 'helvetica';
 
     // Measure widths using their respective fonts
     setBodyFont('bold');
     doc.setFontSize(labelFontSize);
     const labelWidth = doc.getTextWidth(labelText + ' ');
 
-    doc.setFont(NUMERIC_FONT, 'bold');
+    doc.setFont(TOTAL_AMOUNT_FONT, 'bold');
     doc.setFontSize(amountFontSize);
     const amountWidth = doc.getTextWidth(amountText);
 
@@ -684,7 +685,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     // Set text color for highlighted text
     doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
 
-    const textY = yPosition + 5;
+    const textY = yPosition + 5.7;
     const textStartX = highlightX + highlightPadding;
 
     // Label in user-selected body font
@@ -692,8 +693,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     doc.setFontSize(labelFontSize);
     doc.text(labelText, textStartX, textY);
 
-    // Amount in numeric-safe tabular font - right aligned within the box
-    doc.setFont(NUMERIC_FONT, 'bold');
+    // Amount in a bold, currency-safe font - right aligned within the box
+    doc.setFont(TOTAL_AMOUNT_FONT, 'bold');
     doc.setFontSize(amountFontSize);
     doc.text(amountText, pageWidth - margin - highlightPadding, textY, { align: 'right' });
 
@@ -815,6 +816,24 @@ export const generateQuotationPDF = async (data: QuotationData) => {
          valign: 'middle',
        }
      },
+    didParseCell: (hookData) => {
+      if (hookData.section !== 'body') return;
+      const row = hookData.row?.raw as any[] | undefined;
+      const label = String(row?.[0] ?? '');
+
+      // Make the GRAND TOTAL row slightly larger and bolder (like the reference PDF)
+      if (label.toUpperCase() === 'GRAND TOTAL') {
+        if (hookData.column.index === 0) {
+          hookData.cell.styles.fontStyle = 'bold';
+          hookData.cell.styles.fontSize = 10;
+        }
+        if (hookData.column.index === 1) {
+          hookData.cell.styles.font = 'helvetica';
+          hookData.cell.styles.fontStyle = 'bold';
+          hookData.cell.styles.fontSize = 11;
+        }
+      }
+    },
     willDrawCell: (cellData) => {
       if (cellData.column.index === 1 && cellData.section === 'body') {
         doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);

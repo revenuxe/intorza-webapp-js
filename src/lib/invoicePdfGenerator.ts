@@ -434,6 +434,24 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         valign: 'middle',
       }
     },
+    didParseCell: (hookData) => {
+      if (hookData.section !== 'body') return;
+      const row = hookData.row?.raw as any[] | undefined;
+      const label = String(row?.[0] ?? '');
+
+      // Make the main Total Amount slightly larger
+      if (label.toLowerCase().startsWith('total amount')) {
+        if (hookData.column.index === 0) {
+          hookData.cell.styles.fontSize = 10;
+          hookData.cell.styles.fontStyle = 'bold';
+        }
+        if (hookData.column.index === 1) {
+          hookData.cell.styles.font = 'helvetica';
+          hookData.cell.styles.fontSize = 11;
+          hookData.cell.styles.fontStyle = 'bold';
+        }
+      }
+    },
     willDrawCell: (cellData) => {
       if (highlightAmounts && cellData.column.index === 1 && cellData.section === 'body') {
         doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
