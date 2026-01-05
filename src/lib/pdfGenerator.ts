@@ -282,9 +282,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   const highlightTextColor = getContrastingTextColor(highlightColor);
 
   const COLORS = {
-    TEXT_PRIMARY: theme.colors.text,
-    TEXT_SECONDARY: theme.colors.textSecondary,
-    TEXT_LIGHT: [120, 120, 120] as [number, number, number],
+    TEXT_PRIMARY: [0, 0, 0] as [number, number, number], // Solid black
+    TEXT_SECONDARY: [0, 0, 0] as [number, number, number], // Solid black
+    TEXT_LIGHT: [40, 40, 40] as [number, number, number], // Dark gray for labels
     BG_CARD: theme.colors.cardBackground,
     BORDER: theme.colors.border,
     ACCENT: theme.colors.accent,
