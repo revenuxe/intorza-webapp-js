@@ -419,7 +419,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         halign: 'left', 
         fontStyle: 'bold', 
         textColor: COLORS.TEXT_SECONDARY, 
-        fontSize: 10,
+        fontSize: 9,
         valign: 'middle',
       },
       1: { 
@@ -428,8 +428,8 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         font: NUMERIC_FONT,
         fontStyle: 'bold', 
         textColor: COLORS.TEXT_PRIMARY, 
-        fontSize: 12, // Larger for totals - clear visual hierarchy
-        minCellWidth: 75,
+        fontSize: 9,
+        minCellWidth: 55,
         overflow: 'hidden' as const,
         valign: 'middle',
       }
@@ -514,8 +514,8 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         0: { cellWidth: 12, halign: 'center', fontSize: 8, valign: 'middle' },
         1: { cellWidth: 30, fontSize: 8, valign: 'middle' },
         2: { cellWidth: 28, halign: 'center', fontSize: 8, valign: 'middle' },
-        // Amount column - fixed width, right-aligned, numeric-safe, BOLD & larger
-        3: { cellWidth: 50, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 10, overflow: 'hidden' as const, minCellWidth: 50, valign: 'middle' },
+        // Amount column - fixed width, right-aligned, numeric-safe, BOLD
+        3: { cellWidth: 42, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 42, valign: 'middle' },
         4: { cellWidth: 'auto', fontSize: 7, valign: 'middle' }
       },
       willDrawCell: (cellData) => {

@@ -535,13 +535,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           valign: 'middle',
         },
         columnStyles: {
-          0: { cellWidth: 35, fontStyle: 'bold', fontSize: 8 },
-          1: { cellWidth: 'auto', fontSize: 7 },
-          2: { cellWidth: 18, halign: 'center', fontSize: 8 },
-          // Rate column - fixed width, right-aligned, numeric-safe, bold, no wrap
-          3: { cellWidth: 36, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 9, overflow: 'hidden' as const, minCellWidth: 36, valign: 'middle' },
-          // Amount column - fixed width, right-aligned, numeric-safe, BOLD & larger, no wrap
-          4: { cellWidth: 48, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 10, overflow: 'hidden' as const, minCellWidth: 48, valign: 'middle' }
+          0: { cellWidth: 35, fontStyle: 'bold', fontSize: 8, valign: 'middle' },
+          1: { cellWidth: 'auto', fontSize: 7, valign: 'middle' },
+          2: { cellWidth: 18, halign: 'center', fontSize: 8, valign: 'middle' },
+          // Rate column - fixed width, right-aligned, numeric-safe, bold
+          3: { cellWidth: 32, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' },
+          // Amount column - fixed width, right-aligned, numeric-safe, BOLD
+          4: { cellWidth: 38, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 38, valign: 'middle' }
         },
         margin: { left: margin, right: margin },
         didDrawPage: (d) => {
@@ -593,18 +593,22 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       // Dynamic column styles based on visible columns
       const colStyles: any = {};
       let colIndex = 0;
-      if (showSide) { colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6 }; }
-      colStyles[colIndex++] = { cellWidth: showDetails ? 28 : 40, fontStyle: 'bold', fontSize: 7 };
-      if (showDetails) { colStyles[colIndex++] = { cellWidth: 'auto', fontSize: 6 }; }
+      // Side column - slightly wider to prevent wrapping
+      if (showSide) { colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 7, valign: 'middle' }; }
+      // Product column
+      colStyles[colIndex++] = { cellWidth: showDetails ? 30 : 42, fontStyle: 'bold', fontSize: 8, valign: 'middle' };
+      // Details column
+      if (showDetails) { colStyles[colIndex++] = { cellWidth: 'auto', fontSize: 7, valign: 'middle' }; }
+      // Size columns
       if (showSizeColumns) {
-        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6, valign: 'middle' };
-        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 6, valign: 'middle' };
-        colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 7, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: 13, halign: 'center', fontSize: 7, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: 13, halign: 'center', fontSize: 7, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: 15, halign: 'center', fontSize: 8, valign: 'middle' };
       }
-      // Rate column - fixed width, right-aligned, numeric-safe, bold, no wrap
-      colStyles[colIndex++] = { cellWidth: 34, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 9, overflow: 'hidden' as const, minCellWidth: 34, valign: 'middle' };
-      // Amount column - fixed width, right-aligned, numeric-safe, BOLD & larger, no wrap
-      colStyles[colIndex++] = { cellWidth: 44, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 10, overflow: 'hidden' as const, minCellWidth: 44, valign: 'middle' };
+      // Rate column - fixed width, right-aligned, numeric-safe, bold
+      colStyles[colIndex++] = { cellWidth: 32, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' };
+      // Amount column - fixed width, right-aligned, numeric-safe, BOLD
+      colStyles[colIndex++] = { cellWidth: 38, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 38, valign: 'middle' };
 
       const columnStyles = colStyles;
 
@@ -655,45 +659,48 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const labelText = `Total ${section.title}:`;
     const amountText = fmtCurrencyLocal(sectionTotal);
 
-    const highlightPadding = 3;
-    const highlightHeight = 8;
-    const fontSize = 10; // Larger for section totals
+    const highlightPadding = 4;
+    const highlightHeight = 7;
+    const labelFontSize = 9;
+    const amountFontSize = 9;
 
     // Measure widths using their respective fonts
     setBodyFont('bold');
-    doc.setFontSize(fontSize);
+    doc.setFontSize(labelFontSize);
     const labelWidth = doc.getTextWidth(labelText + ' ');
 
     doc.setFont(NUMERIC_FONT, 'bold');
-    doc.setFontSize(fontSize);
+    doc.setFontSize(amountFontSize);
     const amountWidth = doc.getTextWidth(amountText);
 
     const totalWidth = labelWidth + amountWidth;
-    const highlightX = Math.max(margin, pageWidth - margin - totalWidth - highlightPadding);
-    const highlightY = yPosition + 1;
+    const highlightX = pageWidth - margin - totalWidth - (highlightPadding * 2);
+    const highlightY = yPosition;
 
+    // Draw highlight background - right aligned to page margin
     doc.setFillColor(COLORS.HIGHLIGHT[0], COLORS.HIGHLIGHT[1], COLORS.HIGHLIGHT[2]);
     doc.rect(highlightX, highlightY, totalWidth + (highlightPadding * 2), highlightHeight, 'F');
 
+    // Set text color for highlighted text
     doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
 
-    const textY = yPosition + 7;
-    const startX = pageWidth - margin - totalWidth - 2;
+    const textY = yPosition + 5;
+    const textStartX = highlightX + highlightPadding;
 
     // Label in user-selected body font
     setBodyFont('bold');
-    doc.setFontSize(fontSize);
-    doc.text(labelText + ' ', startX, textY);
+    doc.setFontSize(labelFontSize);
+    doc.text(labelText, textStartX, textY);
 
-    // Amount in numeric-safe tabular font
+    // Amount in numeric-safe tabular font - right aligned within the box
     doc.setFont(NUMERIC_FONT, 'bold');
-    doc.setFontSize(fontSize);
-    doc.text(amountText, startX + labelWidth, textY);
+    doc.setFontSize(amountFontSize);
+    doc.text(amountText, pageWidth - margin - highlightPadding, textY, { align: 'right' });
 
     // Restore body font for subsequent content
     setBodyFont('normal');
 
-    yPosition += 15;
+    yPosition += 12;
   }
 
   // --- 4. Payment Summary ---
@@ -793,7 +800,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
          halign: 'left', 
          fontStyle: 'bold', 
          textColor: COLORS.TEXT_SECONDARY, 
-         fontSize: 10,
+         fontSize: 9,
          valign: 'middle',
        },
        1: { 
@@ -802,8 +809,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
          font: NUMERIC_FONT,
          fontStyle: 'bold', 
          textColor: COLORS.TEXT_PRIMARY, 
-         fontSize: 12, // Larger for summary totals
-         minCellWidth: 65,
+         fontSize: 9,
+         minCellWidth: 55,
          overflow: 'hidden' as const,
          valign: 'middle',
        }
@@ -867,9 +874,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
        columnStyles: {
          0: { cellWidth: 12, halign: 'center', fontSize: 8, valign: 'middle' },
          1: { cellWidth: 'auto', fontSize: 8, valign: 'middle' },
-         2: { cellWidth: 24, halign: 'center', fontStyle: 'bold', fontSize: 9, valign: 'middle' },
-         // Amount column - fixed width, right-aligned, numeric-safe, BOLD & larger
-         3: { cellWidth: 50, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 10, overflow: 'hidden' as const, minCellWidth: 50, valign: 'middle' }
+         2: { cellWidth: 22, halign: 'center', fontStyle: 'bold', fontSize: 8, valign: 'middle' },
+         // Amount column - fixed width, right-aligned, numeric-safe, BOLD
+         3: { cellWidth: 42, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 42, valign: 'middle' }
        },
       margin: { left: margin, right: margin }
     });

@@ -305,21 +305,21 @@ export function getNumericColumnStyles(options: {
   minWidth?: number;
   isTotal?: boolean;
 } = {}) {
-  const { fontSize = 9, minWidth = 38, isTotal = false } = options;
+  const { fontSize = 8, minWidth = 35, isTotal = false } = options;
 
   return {
     font: getNumericFont(),
     halign: 'right' as const,
     fontStyle: 'bold' as const,
-    // Totals get even larger font
-    fontSize: isTotal ? fontSize + 2 : fontSize,
+    // Consistent font size - totals only slightly larger
+    fontSize: isTotal ? fontSize + 1 : fontSize,
     minCellWidth: minWidth,
 
     // Keep values inside borders at all costs (never wrap).
     overflow: 'hidden' as const,
 
-    // ~8–10px in PDF terms (mm-based units)
-    cellPadding: { top: 3, right: 5, bottom: 3, left: 5 },
+    // Consistent padding
+    cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
     valign: 'middle' as const,
   };
 }
