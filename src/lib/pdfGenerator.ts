@@ -538,10 +538,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           0: { cellWidth: 35, fontStyle: 'bold', fontSize: 8, valign: 'middle' },
           1: { cellWidth: 'auto', fontSize: 7, valign: 'middle' },
           2: { cellWidth: 18, halign: 'center', fontSize: 8, valign: 'middle' },
-          // Rate column - fixed width, right-aligned, numeric-safe, bold
-          3: { cellWidth: 32, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' },
-          // Amount column - fixed width, right-aligned, numeric-safe, BOLD
-          4: { cellWidth: 38, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 38, valign: 'middle' }
+          // Rate column - fixed width, right-aligned, default font
+          3: { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' },
+          // Amount column - fixed width, right-aligned, default font
+          4: { cellWidth: 38, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 38, valign: 'middle' }
         },
         margin: { left: margin, right: margin },
         didDrawPage: (d) => {
@@ -605,10 +605,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         colStyles[colIndex++] = { cellWidth: 13, halign: 'center', fontSize: 7, valign: 'middle' };
         colStyles[colIndex++] = { cellWidth: 15, halign: 'center', fontSize: 8, valign: 'middle' };
       }
-      // Rate column - fixed width, right-aligned, numeric-safe, bold
-      colStyles[colIndex++] = { cellWidth: 32, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' };
-      // Amount column - fixed width, right-aligned, numeric-safe, BOLD
-      colStyles[colIndex++] = { cellWidth: 38, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 38, valign: 'middle' };
+      // Rate column - fixed width, right-aligned, default font
+      colStyles[colIndex++] = { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' };
+      // Amount column - fixed width, right-aligned, default font
+      colStyles[colIndex++] = { cellWidth: 38, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 38, valign: 'middle' };
 
       const columnStyles = colStyles;
 
@@ -807,8 +807,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
        1: { 
          cellWidth: amountColumnWidth, 
          halign: 'right',
-         font: NUMERIC_FONT,
-         fontStyle: 'bold', 
+         fontStyle: 'normal', 
          textColor: COLORS.TEXT_PRIMARY, 
          fontSize: 9,
          minCellWidth: 55,
