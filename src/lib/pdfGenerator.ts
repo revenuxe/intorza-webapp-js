@@ -594,16 +594,16 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const colStyles: any = {};
       let colIndex = 0;
       // Side column - slightly wider to prevent wrapping
-      if (showSide) { colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 7, valign: 'middle' }; }
+      if (showSide) { colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 6, valign: 'middle' }; }
       // Product column - reduced to give more space to details
       colStyles[colIndex++] = { cellWidth: showDetails ? 26 : 42, fontStyle: 'bold', fontSize: 8, valign: 'middle' };
       // Details column - auto expands to fill available space
       if (showDetails) { colStyles[colIndex++] = { cellWidth: 'auto', fontSize: 7, valign: 'middle' }; }
-      // Size columns - optimized widths to prevent wrapping
+      // Size columns - 6pt font to ensure single line display
       if (showSizeColumns) {
-        colStyles[colIndex++] = { cellWidth: 11, halign: 'center', fontSize: 7, valign: 'middle' }; // W
-        colStyles[colIndex++] = { cellWidth: 11, halign: 'center', fontSize: 7, valign: 'middle' }; // H
-        colStyles[colIndex++] = { cellWidth: 16, halign: 'center', fontSize: 7, valign: 'middle' }; // Sq.Ft - wider to prevent wrap
+        colStyles[colIndex++] = { cellWidth: 13, halign: 'center', fontSize: 6, valign: 'middle' }; // W - wider with smaller font
+        colStyles[colIndex++] = { cellWidth: 13, halign: 'center', fontSize: 6, valign: 'middle' }; // H - wider with smaller font
+        colStyles[colIndex++] = { cellWidth: 18, halign: 'center', fontSize: 6, valign: 'middle' }; // Sq.Ft - wider with smaller font
       }
       // Rate column - reduced width
       colStyles[colIndex++] = { cellWidth: 26, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 26, valign: 'middle' };
@@ -633,7 +633,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           fontSize: 7,
           lineWidth: 0.1,
           lineColor: COLORS.BORDER,
-          halign: 'left',
+          halign: 'center', // Center align all column headers
           valign: 'middle',
         },
         columnStyles: columnStyles as any,
@@ -659,8 +659,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const labelText = `Total ${section.title}:`;
     const amountText = fmtCurrencyLocal(sectionTotal);
 
-    const highlightPadding = 4;
-    const highlightHeight = 8;
+    const highlightPadding = 6; // Increased padding to prevent touching borders
+    const highlightHeight = 10; // Increased height for better spacing
     const labelFontSize = 10;
     const amountFontSize = 10;
     const TOTAL_AMOUNT_FONT = 'helvetica';
