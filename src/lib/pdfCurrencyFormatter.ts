@@ -4,7 +4,7 @@
 // Currency-safe fonts available in jsPDF core.
 // We intentionally default numeric rendering to a *tabular* (monospaced) font to guarantee alignment.
 export const NUMERIC_SAFE_FONTS = ['courier', 'helvetica', 'times'] as const;
-export const DEFAULT_NUMERIC_FONT = 'courier';
+export const DEFAULT_NUMERIC_FONT = 'helvetica';
 
 // Country to currency symbol mapping for fail-safe rendering
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -310,7 +310,7 @@ export function getNumericColumnStyles(options: {
   return {
     font: getNumericFont(),
     halign: 'right' as const,
-    fontStyle: 'bold' as const,
+    fontStyle: 'normal' as const,
     // Consistent font size - totals only slightly larger
     fontSize: isTotal ? fontSize + 1 : fontSize,
     minCellWidth: minWidth,
