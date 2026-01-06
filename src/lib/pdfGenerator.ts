@@ -388,7 +388,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- 2. Info Cards (Client & Project) ---
   if (settings.showProjectDetails) {
-    const cardHeight = 42;
+    const cardHeight = 48; // Increased height for better spacing
     const gap = 12; // Increased gap to prevent borders touching
     const cardWidth = (contentWidth - gap) / 2;
   
@@ -397,8 +397,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
     doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, 'FD'); // Fill & Draw
     
-    let cardY = yPosition + 8;
-    const cardPadding = 6;
+    let cardY = yPosition + 10; // Increased top padding
+    const cardPadding = 8; // Increased padding
     const cardContentX = margin + cardPadding;
     
     setHeadingFont('bold');
@@ -406,13 +406,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
     doc.text('QUOTATION FOR', cardContentX, cardY);
     
-    cardY += 6;
+    cardY += 7; // Increased spacing
     setHeadingFont('bold');
     doc.setFontSize(11);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text(data.clientName, cardContentX, cardY);
     
-    cardY += 5;
+    cardY += 6; // Increased spacing
     setBodyFont('normal');
     doc.setFontSize(9);
     doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
@@ -424,16 +424,16 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
     doc.roundedRect(rightCardX, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
     
-    let metaY = yPosition + 8;
+    let metaY = yPosition + 10; // Increased top padding
     const metaContentX = rightCardX + cardPadding;
     const metaLabelX = metaContentX;
-    const metaValueX = metaContentX + 30; // Align values
+    const metaValueX = metaContentX + 32; // Align values with more space
     
     setHeadingFont('bold');
     doc.setFontSize(8);
     doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
     doc.text('PROJECT DETAILS', metaContentX, metaY);
-    metaY += 6;
+    metaY += 7; // Increased spacing
 
     const addMeta = (label: string, value: string) => {
       setBodyFont('normal');
@@ -444,7 +444,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       setBodyFont('bold');
       doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
       doc.text(value, metaValueX, metaY);
-      metaY += 5.5;
+      metaY += 6; // Increased line spacing
     };
 
     addMeta('Date:', data.dateOfProposal);
@@ -599,11 +599,11 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       colStyles[colIndex++] = { cellWidth: showDetails ? 26 : 42, fontStyle: 'bold', fontSize: 8, valign: 'middle' };
       // Details column - auto expands to fill available space
       if (showDetails) { colStyles[colIndex++] = { cellWidth: 'auto', fontSize: 7, valign: 'middle' }; }
-      // Size columns - slightly reduced
+      // Size columns - optimized widths to prevent wrapping
       if (showSizeColumns) {
-        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' };
-        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' };
-        colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 8, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: 11, halign: 'center', fontSize: 7, valign: 'middle' }; // W
+        colStyles[colIndex++] = { cellWidth: 11, halign: 'center', fontSize: 7, valign: 'middle' }; // H
+        colStyles[colIndex++] = { cellWidth: 16, halign: 'center', fontSize: 7, valign: 'middle' }; // Sq.Ft - wider to prevent wrap
       }
       // Rate column - reduced width
       colStyles[colIndex++] = { cellWidth: 26, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 26, valign: 'middle' };
