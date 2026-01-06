@@ -389,7 +389,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // --- 2. Info Cards (Client & Project) ---
   if (settings.showProjectDetails) {
     const cardHeight = 42;
-    const gap = 5;
+    const gap = 12; // Increased gap to prevent borders touching
     const cardWidth = (contentWidth - gap) / 2;
   
     // Left Card: Client Info
@@ -535,13 +535,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           valign: 'middle',
         },
         columnStyles: {
-          0: { cellWidth: 35, fontStyle: 'bold', fontSize: 8, valign: 'middle' },
-          1: { cellWidth: 'auto', fontSize: 7, valign: 'middle' },
+          0: { cellWidth: 32, fontStyle: 'bold', fontSize: 8, valign: 'middle' },
+          1: { cellWidth: 'auto', fontSize: 7, valign: 'middle' }, // Details - auto expands
           2: { cellWidth: 18, halign: 'center', fontSize: 8, valign: 'middle' },
-          // Rate column - fixed width, right-aligned, default font
-          3: { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' },
-          // Amount column - fixed width, right-aligned, default font
-          4: { cellWidth: 38, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 38, valign: 'middle' }
+          // Rate column - reduced width
+          3: { cellWidth: 28, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 28, valign: 'middle' },
+          // Amount column - reduced width
+          4: { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' }
         },
         margin: { left: margin, right: margin },
         didDrawPage: (d) => {
@@ -595,20 +595,20 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       let colIndex = 0;
       // Side column - slightly wider to prevent wrapping
       if (showSide) { colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 7, valign: 'middle' }; }
-      // Product column
-      colStyles[colIndex++] = { cellWidth: showDetails ? 30 : 42, fontStyle: 'bold', fontSize: 8, valign: 'middle' };
-      // Details column
+      // Product column - reduced to give more space to details
+      colStyles[colIndex++] = { cellWidth: showDetails ? 26 : 42, fontStyle: 'bold', fontSize: 8, valign: 'middle' };
+      // Details column - auto expands to fill available space
       if (showDetails) { colStyles[colIndex++] = { cellWidth: 'auto', fontSize: 7, valign: 'middle' }; }
-      // Size columns
+      // Size columns - slightly reduced
       if (showSizeColumns) {
-        colStyles[colIndex++] = { cellWidth: 13, halign: 'center', fontSize: 7, valign: 'middle' };
-        colStyles[colIndex++] = { cellWidth: 13, halign: 'center', fontSize: 7, valign: 'middle' };
-        colStyles[colIndex++] = { cellWidth: 15, halign: 'center', fontSize: 8, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 8, valign: 'middle' };
       }
-      // Rate column - fixed width, right-aligned, default font
+      // Rate column - reduced width
+      colStyles[colIndex++] = { cellWidth: 26, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 26, valign: 'middle' };
+      // Amount column - reduced width to give more space to Details
       colStyles[colIndex++] = { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' };
-      // Amount column - fixed width, right-aligned, default font
-      colStyles[colIndex++] = { cellWidth: 38, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 38, valign: 'middle' };
 
       const columnStyles = colStyles;
 
