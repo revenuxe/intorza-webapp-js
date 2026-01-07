@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -15,6 +15,7 @@ import {
   getEditorSettings, 
   saveEditorSettings, 
   defaultEditorSettings,
+  defaultAdvancedSettings,
   getThemeById,
   getThemesByCategory,
   getAllThemes,
@@ -31,6 +32,7 @@ import {
 import { QuotationSettings } from "./CustomizeFieldsDrawer";
 import { CustomThemeBuilder } from "./CustomThemeBuilder";
 import { FontPreviewPanel } from "./FontPreviewPanel";
+import { PDFAdvancedEditor } from "./PDFAdvancedEditor";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -232,7 +234,7 @@ export const PDFPreviewEditor = ({
   const EditorPanel = () => (
     <div className="flex flex-col h-full overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid grid-cols-4 m-4 flex-shrink-0">
+        <TabsList className="grid grid-cols-5 m-4 flex-shrink-0">
           <TabsTrigger value="themes" className="text-xs">
             <Palette className="h-3 w-3 mr-1" />
             Themes
@@ -248,6 +250,10 @@ export const PDFPreviewEditor = ({
           <TabsTrigger value="style" className="text-xs">
             <Eye className="h-3 w-3 mr-1" />
             Style
+          </TabsTrigger>
+          <TabsTrigger value="advanced" className="text-xs">
+            <Sliders className="h-3 w-3 mr-1" />
+            Edit
           </TabsTrigger>
         </TabsList>
 
@@ -792,6 +798,14 @@ export const PDFPreviewEditor = ({
                 </SelectContent>
               </Select>
             </div>
+          </TabsContent>
+
+          {/* ADVANCED TAB */}
+          <TabsContent value="advanced" className="mt-0">
+            <PDFAdvancedEditor 
+              settings={editorSettings} 
+              onUpdate={updateSettings}
+            />
           </TabsContent>
         </div>
       </Tabs>
