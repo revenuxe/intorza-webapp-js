@@ -1,7 +1,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { PDFEditorSettings, getThemeById, hexToRgb, PDFTheme, getFontById, applyBrandColorsToTheme } from './pdfThemes';
+import { PDFEditorSettings, getThemeById, hexToRgb, PDFTheme, getFontById, applyBrandColorsToTheme, defaultAdvancedSettings } from './pdfThemes';
 import { drawAllDecorations, drawSectionDivider, drawFooterDecoration } from './pdfDecorations';
 import { formatPDFCurrency, formatPDFNumber, getNumericFont, createPDFCurrencyFormatter } from './pdfCurrencyFormatter';
 
@@ -590,25 +590,75 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         return row;
       });
 
-      // Dynamic column styles based on visible columns
+      // Get advanced settings with fallback to defaults
+      const advSettings = editorSettings?.advancedSettings || defaultAdvancedSettings;
+
+      // Dynamic column styles based on visible columns and advanced settings
       const colStyles: any = {};
       let colIndex = 0;
-      // Side column - slightly wider to prevent wrapping
-      if (showSide) { colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 6, valign: 'middle' }; }
-      // Product column - wider with same font as details
-      colStyles[colIndex++] = { cellWidth: showDetails ? 32 : 42, fontStyle: 'bold', fontSize: 7, valign: 'middle' };
-      // Details column - auto expands to fill available space
-      if (showDetails) { colStyles[colIndex++] = { cellWidth: 'auto', fontSize: 7, valign: 'middle' }; }
-      // Size columns - 6pt font with wider columns to fit values like 6.5 in single line
-      if (showSizeColumns) {
-        colStyles[colIndex++] = { cellWidth: 16, halign: 'center', fontSize: 6, valign: 'middle' }; // W - wider to fit decimals
-        colStyles[colIndex++] = { cellWidth: 16, halign: 'center', fontSize: 6, valign: 'middle' }; // H - wider to fit decimals
-        colStyles[colIndex++] = { cellWidth: 18, halign: 'center', fontSize: 6, valign: 'middle' }; // Sq.Ft
+      // Side column
+      if (showSide) { 
+        colStyles[colIndex++] = { 
+          cellWidth: advSettings!.columnWidths.side, 
+          halign: 'center', 
+          fontSize: 6, 
+          valign: 'middle' 
+        }; 
       }
-      // Rate column - reduced width
-      colStyles[colIndex++] = { cellWidth: 26, halign: 'right', fontSize: 7, overflow: 'hidden' as const, minCellWidth: 26, valign: 'middle' };
-      // Amount column - smaller width and font to give more space to Details
-      colStyles[colIndex++] = { cellWidth: 28, halign: 'right', fontSize: 7, overflow: 'hidden' as const, minCellWidth: 28, valign: 'middle' };
+      // Product column
+      colStyles[colIndex++] = { 
+        cellWidth: showDetails ? advSettings!.columnWidths.product : 42, 
+        fontStyle: 'bold', 
+        fontSize: advSettings!.fontSizes.productName, 
+        valign: 'middle' 
+      };
+      // Details column - auto expands to fill available space
+      if (showDetails) { 
+        colStyles[colIndex++] = { 
+          cellWidth: 'auto', 
+          fontSize: advSettings!.fontSizes.details, 
+          valign: 'middle' 
+        }; 
+      }
+      // Size columns
+      if (showSizeColumns) {
+        colStyles[colIndex++] = { 
+          cellWidth: advSettings!.columnWidths.width, 
+          halign: 'center', 
+          fontSize: 6, 
+          valign: 'middle' 
+        }; // W
+        colStyles[colIndex++] = { 
+          cellWidth: advSettings!.columnWidths.height, 
+          halign: 'center', 
+          fontSize: 6, 
+          valign: 'middle' 
+        }; // H
+        colStyles[colIndex++] = { 
+          cellWidth: advSettings!.columnWidths.area, 
+          halign: 'center', 
+          fontSize: 6, 
+          valign: 'middle' 
+        }; // Sq.Ft
+      }
+      // Rate column
+      colStyles[colIndex++] = { 
+        cellWidth: advSettings!.columnWidths.rate, 
+        halign: 'right', 
+        fontSize: advSettings!.fontSizes.amounts, 
+        overflow: 'hidden' as const, 
+        minCellWidth: advSettings!.columnWidths.rate, 
+        valign: 'middle' 
+      };
+      // Amount column
+      colStyles[colIndex++] = { 
+        cellWidth: advSettings!.columnWidths.amount, 
+        halign: 'right', 
+        fontSize: advSettings!.fontSizes.amounts, 
+        overflow: 'hidden' as const, 
+        minCellWidth: advSettings!.columnWidths.amount, 
+        valign: 'middle' 
+      };
 
       const columnStyles = colStyles;
 
@@ -619,21 +669,21 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         theme: 'grid',
         styles: {
           font: bodyFont,
-          fontSize: 7,
+          fontSize: advSettings!.fontSizes.tableBody,
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
-          lineWidth: 0.1,
-          cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+          lineWidth: advSettings!.tableBorderWidth,
+          cellPadding: { top: advSettings!.rowPadding, right: 4, bottom: advSettings!.rowPadding, left: 4 },
           valign: 'middle',
         },
         headStyles: {
           fillColor: [255, 255, 255],
           textColor: COLORS.TEXT_PRIMARY,
           fontStyle: 'bold',
-          fontSize: 7,
-          lineWidth: 0.1,
+          fontSize: advSettings!.fontSizes.tableHeader,
+          lineWidth: advSettings!.tableBorderWidth,
           lineColor: COLORS.BORDER,
-          halign: 'center', // Center align all column headers
+          halign: 'center',
           valign: 'middle',
         },
         columnStyles: columnStyles as any,
@@ -659,10 +709,12 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const labelText = `Total ${section.title}:`;
     const amountText = fmtCurrencyLocal(sectionTotal);
 
-    const highlightPadding = 6; // Increased padding to prevent touching borders
-    const highlightHeight = 10; // Increased height for better spacing
-    const labelFontSize = 10;
-    const amountFontSize = 10;
+    // Get advanced settings for highlight styling
+    const advSettingsHighlight = editorSettings?.advancedSettings || defaultAdvancedSettings;
+    const highlightPadding = advSettingsHighlight!.highlightPadding;
+    const highlightHeight = advSettingsHighlight!.highlightPadding + 4;
+    const labelFontSize = advSettingsHighlight!.fontSizes.sectionTitle;
+    const amountFontSize = advSettingsHighlight!.fontSizes.sectionTitle;
     const TOTAL_AMOUNT_FONT = 'helvetica';
 
     // Measure widths using their respective fonts
