@@ -595,15 +595,15 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       let colIndex = 0;
       // Side column - slightly wider to prevent wrapping
       if (showSide) { colStyles[colIndex++] = { cellWidth: 14, halign: 'center', fontSize: 6, valign: 'middle' }; }
-      // Product column - reduced to give more space to details
-      colStyles[colIndex++] = { cellWidth: showDetails ? 26 : 42, fontStyle: 'bold', fontSize: 8, valign: 'middle' };
+      // Product column - wider with same font as details
+      colStyles[colIndex++] = { cellWidth: showDetails ? 32 : 42, fontStyle: 'bold', fontSize: 7, valign: 'middle' };
       // Details column - auto expands to fill available space
       if (showDetails) { colStyles[colIndex++] = { cellWidth: 'auto', fontSize: 7, valign: 'middle' }; }
-      // Size columns - 6pt font to ensure single line display
+      // Size columns - 6pt font with wider columns to fit values like 6.5 in single line
       if (showSizeColumns) {
-        colStyles[colIndex++] = { cellWidth: 13, halign: 'center', fontSize: 6, valign: 'middle' }; // W - wider with smaller font
-        colStyles[colIndex++] = { cellWidth: 13, halign: 'center', fontSize: 6, valign: 'middle' }; // H - wider with smaller font
-        colStyles[colIndex++] = { cellWidth: 18, halign: 'center', fontSize: 6, valign: 'middle' }; // Sq.Ft - wider with smaller font
+        colStyles[colIndex++] = { cellWidth: 16, halign: 'center', fontSize: 6, valign: 'middle' }; // W - wider to fit decimals
+        colStyles[colIndex++] = { cellWidth: 16, halign: 'center', fontSize: 6, valign: 'middle' }; // H - wider to fit decimals
+        colStyles[colIndex++] = { cellWidth: 18, halign: 'center', fontSize: 6, valign: 'middle' }; // Sq.Ft
       }
       // Rate column - reduced width
       colStyles[colIndex++] = { cellWidth: 26, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 26, valign: 'middle' };
