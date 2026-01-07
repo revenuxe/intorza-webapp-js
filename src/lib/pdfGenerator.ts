@@ -606,9 +606,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         colStyles[colIndex++] = { cellWidth: 18, halign: 'center', fontSize: 6, valign: 'middle' }; // Sq.Ft
       }
       // Rate column - reduced width
-      colStyles[colIndex++] = { cellWidth: 26, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 26, valign: 'middle' };
-      // Amount column - reduced width to give more space to Details
-      colStyles[colIndex++] = { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' };
+      colStyles[colIndex++] = { cellWidth: 26, halign: 'right', fontSize: 7, overflow: 'hidden' as const, minCellWidth: 26, valign: 'middle' };
+      // Amount column - smaller width and font to give more space to Details
+      colStyles[colIndex++] = { cellWidth: 28, halign: 'right', fontSize: 7, overflow: 'hidden' as const, minCellWidth: 28, valign: 'middle' };
 
       const columnStyles = colStyles;
 
