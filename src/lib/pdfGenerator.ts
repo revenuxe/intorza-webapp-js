@@ -115,8 +115,6 @@ interface QuotationData {
   };
   settings?: QuotationPdfSettings;
   editorSettings?: PDFEditorSettings;
-  // Preview mode - if true, returns doc without saving
-  previewOnly?: boolean;
 }
 
 // --- Helpers ---
@@ -1239,11 +1237,6 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
   doc.text("This quotation is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
 
-  // If previewOnly is set, just return the doc without saving
-  if (data.previewOnly) {
-    return doc;
-  }
-
   // Generate PDF and handle sharing + download
   const fileName = `Quotation_${data.clientName.replace(/\s+/g, '_')}.pdf`;
   const pdfBlob = doc.output('blob');
@@ -1269,6 +1262,4 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       }
     }
   }
-  
-  return doc;
 };
