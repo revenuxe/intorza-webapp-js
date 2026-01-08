@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2 } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize } from "lucide-react";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
+import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -101,6 +102,8 @@ export const PDFPreviewEditor = ({
   const [brandColors, setBrandColors] = useState<BrandColors | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
+  const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<NodeJS.Timeout | null>(null);
   
@@ -947,6 +950,7 @@ export const PDFPreviewEditor = ({
             <PDFAdvancedEditor 
               settings={editorSettings} 
               onUpdate={updateSettings}
+              onHighlight={setHighlightedElement}
             />
           </TabsContent>
         </div>
@@ -960,35 +964,95 @@ export const PDFPreviewEditor = ({
     </div>
   );
 
-  // Preview Panel Component - Now shows actual PDF
+  // Preview Panel Component - Now shows actual PDF with zoom controls
   const PreviewPanel = () => (
-    <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden p-4 md:p-6 flex flex-col">
-      {isGeneratingPdf && !pdfBlobUrl ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Generating preview...</p>
+    <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
+      {/* Zoom Controls */}
+      <div className="flex items-center justify-between px-4 py-2 border-b bg-background/50 backdrop-blur-sm">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setPreviewZoom(Math.max(25, previewZoom - 25))}
+            disabled={previewZoom <= 25}
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <div className="flex items-center gap-2 w-32">
+            <Slider
+              value={[previewZoom]}
+              onValueChange={([v]) => setPreviewZoom(v)}
+              min={25}
+              max={200}
+              step={5}
+              className="w-full"
+            />
           </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))}
+            disabled={previewZoom >= 200}
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <span className="text-xs text-muted-foreground w-12 text-center">{previewZoom}%</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            onClick={() => setPreviewZoom(100)}
+          >
+            <Maximize className="h-3 w-3 mr-1" />
+            <span className="text-xs">Reset</span>
+          </Button>
         </div>
-      ) : pdfBlobUrl ? (
-        <div className="flex-1 relative">
-          {isGeneratingPdf && (
-            <div className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-2 shadow-sm">
-              <Loader2 className="h-3 w-3 animate-spin text-primary" />
-              <span className="text-xs text-muted-foreground">Updating...</span>
+        {highlightedElement && (
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            Highlighting: {highlightedElement}
+          </div>
+        )}
+      </div>
+
+      {/* PDF Preview */}
+      <div className="flex-1 overflow-auto p-4 md:p-6">
+        {isGeneratingPdf && !pdfBlobUrl ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Generating preview...</p>
             </div>
-          )}
-          <iframe
-            src={pdfBlobUrl}
-            className="w-full h-full rounded-lg shadow-lg border bg-white"
-            title="PDF Preview"
-          />
-        </div>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">Failed to generate preview</p>
-        </div>
-      )}
+          </div>
+        ) : pdfBlobUrl ? (
+          <div 
+            className="relative mx-auto transition-transform duration-200 origin-top"
+            style={{ 
+              width: `${595 * (previewZoom / 100)}px`,
+              height: `${842 * (previewZoom / 100)}px`,
+            }}
+          >
+            {isGeneratingPdf && (
+              <div className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-2 shadow-sm">
+                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                <span className="text-xs text-muted-foreground">Updating...</span>
+              </div>
+            )}
+            <iframe
+              src={pdfBlobUrl}
+              className="w-full h-full rounded-lg shadow-lg border bg-white"
+              title="PDF Preview"
+              style={{ transform: `scale(1)`, transformOrigin: 'top left' }}
+            />
+          </div>
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <p className="text-sm text-muted-foreground">Failed to generate preview</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 
