@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
+import { downloadInvoicePDF } from "@/lib/invoicePdfGenerator";
 import { InvoicePreviewEditor } from "@/components/InvoicePreviewEditor";
 import { PDFEditorSettings, InvoiceSettings, getEditorSettings, getInvoiceSettings } from "@/lib/pdfThemes";
 
@@ -320,7 +320,7 @@ const InvoiceDetail = () => {
       let nextDue = invoice.due_date ? formatDate(invoice.due_date) : undefined;
       let nextAmount = invoice.remaining_amount;
 
-      await generateInvoicePDF({
+      await downloadInvoicePDF({
         invoiceNumber: invoice.invoice_number,
         invoiceDate: formatDate(invoice.invoice_date),
         dueDate: invoice.due_date ? formatDate(invoice.due_date) : undefined,
@@ -371,7 +371,7 @@ const InvoiceDetail = () => {
     if (!invoice) return;
     
     try {
-      await generateInvoicePDF({
+      await downloadInvoicePDF({
         invoiceNumber: `${invoice.invoice_number}-R${payments.indexOf(payment) + 1}`,
         invoiceDate: formatDate(payment.payment_date),
         clientName: invoice.client_name,

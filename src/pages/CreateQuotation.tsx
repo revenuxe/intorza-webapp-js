@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { generateQuotationPDF } from "@/lib/pdfGenerator";
+import { downloadQuotationPDF } from "@/lib/pdfGenerator";
 import { useSearchParams } from "react-router-dom";
 import { useAuthAction } from "@/hooks/useAuthAction";
 import { useQuotationAutomation } from "@/hooks/useQuotationAutomation";
@@ -852,7 +852,7 @@ const CreateQuotation = () => {
         }
       }
       
-      await generateQuotationPDF({
+      await downloadQuotationPDF({
         quotationId: overrideQuotationId || quotationId || undefined,
         quotationTitle: projectTitle,
         clientName,
