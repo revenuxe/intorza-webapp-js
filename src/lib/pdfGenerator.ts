@@ -1237,7 +1237,15 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
   doc.text("This quotation is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
 
-  // Generate PDF and handle sharing + download
+  // Return the document for external handling
+  return doc;
+};
+
+/**
+ * Download quotation PDF locally
+ */
+export const downloadQuotationPDF = async (data: QuotationData & { settings?: QuotationPdfSettings; editorSettings?: PDFEditorSettings }) => {
+  const doc = await generateQuotationPDF(data);
   const fileName = `Quotation_${data.clientName.replace(/\s+/g, '_')}.pdf`;
   const pdfBlob = doc.output('blob');
   
@@ -1262,4 +1270,50 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       }
     }
   }
+  
+  return doc;
+};
+
+/**
+ * Upload quotation PDF to S3 and return the URL
+ */
+export const uploadQuotationPDFToS3 = async (
+  data: QuotationData & { settings?: QuotationPdfSettings; editorSettings?: PDFEditorSettings },
+  options?: { downloadLocally?: boolean }
+): Promise<{ url: string; blob: Blob }> => {
+  const { uploadToS3 } = await import('./s3Upload');
+  
+  const doc = await generateQuotationPDF(data);
+  const fileName = `Quotation_${data.clientName.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
+  const pdfBlob = doc.output('blob');
+  
+  // Upload to S3
+  const result = await uploadToS3(new File([pdfBlob], fileName, { type: 'application/pdf' }), {
+    folder: 'quotes',
+    fileName: fileName,
+    contentType: 'application/pdf'
+  });
+  
+  // Optionally download locally as well
+  if (options?.downloadLocally) {
+    doc.save(fileName);
+    
+    // Try Web Share API
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+        const shareData = { files: [file], title: `Quotation for ${data.clientName}` };
+        if (navigator.canShare && navigator.canShare(shareData)) {
+          await navigator.share(shareData);
+        }
+      } catch (err) {
+        const error = err as Error;
+        if (error.name !== 'AbortError') {
+          console.log('Share failed:', error.message);
+        }
+      }
+    }
+  }
+  
+  return { url: result.url, blob: pdfBlob };
 };

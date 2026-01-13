@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { generateQuotationPDF } from "@/lib/pdfGenerator";
+import { downloadQuotationPDF } from "@/lib/pdfGenerator";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getEditorSettings } from "@/lib/pdfThemes";
 import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
@@ -178,7 +178,7 @@ const QuotationDetail = () => {
       const editorSettings = getEditorSettings();
       const customizeSettings = getQuotationSettings();
 
-      await generateQuotationPDF({
+      await downloadQuotationPDF({
         quotationId: quotation.id,
         quotationTitle: quotation.quotation_title || quotation.project_name,
         dateOfProposal: quotation.date_of_proposal,
