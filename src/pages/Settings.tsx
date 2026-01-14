@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { BillingSection } from "@/components/BillingSection";
 import { BrandColorExtractor } from "@/components/BrandColorExtractor";
+import { DataMigrationCard } from "@/components/DataMigrationCard";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Collapsible, 
@@ -629,6 +630,9 @@ const Settings = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* AWS Data Migration */}
+        <DataMigrationCard />
 
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={loading} size="lg">

@@ -15,6 +15,7 @@ import { downloadQuotationPDF } from "@/lib/pdfGenerator";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getEditorSettings } from "@/lib/pdfThemes";
 import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
+import { updateQuotation, createInvoice as createInvoiceInAws, createClientBehavior, logAdminAction } from "@/lib/awsApi";
 
 interface Quotation {
   id: string;
@@ -244,6 +245,8 @@ const QuotationDetail = () => {
 
   const handleMarkStatus = async (status: string) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { error } = await supabase
         .from('quotations')
         .update({ status })
@@ -256,6 +259,29 @@ const QuotationDetail = () => {
         title: "Status Updated",
         description: `Quotation marked as ${status}`,
       });
+
+      // Sync status to AWS
+      try {
+        await updateQuotation(id!, { status });
+        
+        // Record client behavior for learning
+        if (user && quotation && (status === 'accepted' || status === 'rejected')) {
+          await createClientBehavior({
+            behavior_id: `behavior_${Date.now()}`,
+            company_id: user.id,
+            client_id: quotation.client_id || undefined,
+            quotation_id: quotation.id,
+            city: quotation.place_of_project || '',
+            category: quotation.project_type || 'general',
+            rate: quotation.subtotal || 0,
+            final_price: quotation.grand_total || 0,
+            won_or_lost: status === 'accepted' ? 'won' : 'lost',
+          });
+          await logAdminAction(user.id, user.id, `mark_quotation_${status}`, 'quotation', id!);
+        }
+      } catch (awsError) {
+        console.error('AWS sync failed:', awsError);
+      }
 
       if (status === 'accepted') {
         setConvertDialogOpen(true);
@@ -277,6 +303,7 @@ const QuotationDetail = () => {
 
       const invoiceNumber = `INV-${Date.now()}`;
       const remaining = invoiceAmount - paidAmount;
+      const invoiceStatus = remaining === 0 ? 'paid' : (paidAmount > 0 ? 'partially_paid' : 'unpaid');
 
       const { data: invoice, error } = await supabase
         .from('invoices')
@@ -290,7 +317,7 @@ const QuotationDetail = () => {
           total_amount: invoiceAmount,
           paid_amount: paidAmount,
           remaining_amount: remaining,
-          status: remaining === 0 ? 'paid' : (paidAmount > 0 ? 'partially_paid' : 'unpaid'),
+          status: invoiceStatus,
           invoice_date: new Date().toISOString().split('T')[0],
           due_date: dueDate || null,
           notes: invoiceNotes
@@ -305,6 +332,37 @@ const QuotationDetail = () => {
         .from('quotations')
         .update({ status: 'converted' })
         .eq('id', quotation?.id);
+
+      // Sync to AWS
+      try {
+        // Create invoice in AWS
+        await createInvoiceInAws({
+          invoice_id: invoice.id,
+          company_id: user.id,
+          quotation_id: quotation?.id,
+          client_id: quotation?.client_id || undefined,
+          invoice_number: invoiceNumber,
+          client_name: quotation?.client_name || '',
+          project_name: quotation?.project_name || '',
+          total_amount: invoiceAmount,
+          paid_amount: paidAmount,
+          remaining_amount: remaining,
+          status: invoiceStatus,
+          invoice_date: new Date().toISOString().split('T')[0],
+          due_date: dueDate || undefined,
+          notes: invoiceNotes,
+        });
+
+        // Update quotation status in AWS
+        await updateQuotation(quotation?.id!, { status: 'converted' });
+        
+        await logAdminAction(user.id, user.id, 'convert_to_invoice', 'quotation', quotation?.id!, {
+          invoice_id: invoice.id,
+          invoice_number: invoiceNumber,
+        });
+      } catch (awsError) {
+        console.error('AWS sync failed:', awsError);
+      }
 
       toast({
         title: "Invoice Created",

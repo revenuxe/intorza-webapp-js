@@ -9,6 +9,7 @@ import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
 import { ListSkeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { deleteQuotation as deleteQuotationFromAws, createQuotation, buildQuotationPayload, logAdminAction } from "@/lib/awsApi";
 
 interface Quotation {
   id: string;
@@ -81,6 +82,8 @@ const Quotations = () => {
     try {
       setDeletingId(quotationId);
       
+      const { data: { user } } = await supabase.auth.getUser();
+      
       // First get all sections for this quotation
       const { data: sections } = await supabase
         .from('quotation_sections')
@@ -102,13 +105,23 @@ const Quotations = () => {
           .eq('quotation_id', quotationId);
       }
       
-      // Finally delete the quotation
+      // Finally delete the quotation from Supabase
       const { error } = await supabase
         .from('quotations')
         .delete()
         .eq('id', quotationId);
       
       if (error) throw error;
+
+      // Sync delete to AWS (best-effort)
+      try {
+        await deleteQuotationFromAws(quotationId);
+        if (user) {
+          await logAdminAction(user.id, user.id, 'delete_quotation', 'quotation', quotationId);
+        }
+      } catch (awsError) {
+        console.error('AWS delete sync failed:', awsError);
+      }
       
       toast({
         title: "Quotation Deleted",

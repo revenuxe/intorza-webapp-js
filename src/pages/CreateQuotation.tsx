@@ -20,6 +20,7 @@ import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
 import { ClientSelector } from "@/components/quotation/ClientSelector";
 import { ProductNameInput } from "@/components/quotation/ProductNameInput";
 import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
+import { createQuotation, updateQuotation, buildQuotationPayload, logAdminAction } from "@/lib/awsApi";
 interface LineItem {
   id: string;
   side: string;
@@ -653,6 +654,62 @@ const CreateQuotation = () => {
           title: "Quotation saved",
           description: `Quotation ${quotationNumber} has been saved successfully`
         });
+      }
+
+      // Sync quotation to AWS backend
+      try {
+        const awsPayload = buildQuotationPayload(savedQuotationId!, user.id, {
+          quotationNumber: quotationId ? `QT-${quotationId}` : `QT-${Date.now()}`,
+          quotationTitle: projectTitle,
+          clientName,
+          clientAddress,
+          dateOfProposal: dateOfProposal || new Date().toISOString().split('T')[0],
+          validTill: quotationValidTill,
+          projectDeadline: projectDeadline || undefined,
+          placeOfProject,
+          warranty,
+          projectType,
+          status,
+          gstEnabled,
+          gstPercentage: parseFloat(gstRate),
+          gstAmount,
+          discountAmount,
+          subtotal,
+          grandTotal,
+          sections: sections.map(section => ({
+            id: section.id,
+            title: section.title,
+            items: section.items.map(item => ({
+              side: item.side,
+              productName: item.productName,
+              productDetails: item.productDetails,
+              widthFt: item.widthFt,
+              heightFt: item.heightFt,
+              sftArea: item.sftArea,
+              ratePerSft: item.ratePerSft,
+              amount: item.amount,
+            })),
+          })),
+        });
+
+        if (quotationId) {
+          await updateQuotation(savedQuotationId!, awsPayload);
+        } else {
+          await createQuotation(awsPayload);
+        }
+
+        // Log admin action
+        await logAdminAction(
+          user.id,
+          user.id,
+          quotationId ? 'update_quotation' : 'create_quotation',
+          'quotation',
+          savedQuotationId!,
+          { status, grand_total: grandTotal }
+        );
+      } catch (awsError) {
+        // AWS sync failed - log but don't block the operation
+        console.error('AWS sync failed:', awsError);
       }
 
       // Silently save last used preferences and track item usage
