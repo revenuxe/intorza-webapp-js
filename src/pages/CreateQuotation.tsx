@@ -592,74 +592,13 @@ const CreateQuotation = () => {
         // Return existing quotation ID for PDF generation
         savedQuotationId = quotationId;
       } else {
-        // Create new quotation
+        // Create new quotation - AWS First approach
         const quotationNumber = `QT-${Date.now()}`;
-        const {
-          data: quotationData,
-          error: quotationError
-        } = await supabase.from('quotations').insert({
-          user_id: user.id,
-          quotation_number: quotationNumber,
-          quotation_title: projectTitle,
-          client_name: clientName,
-          client_address: clientAddress,
-          project_name: projectTitle,
-          date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
-          valid_till: quotationValidTill,
-          project_deadline: projectDeadline || null,
-          place_of_project: placeOfProject,
-          warranty: warranty,
-          project_type: projectType,
-          status: status,
-          gst_enabled: gstEnabled,
-          gst_percentage: parseFloat(gstRate),
-          gst_amount: gstAmount,
-          discount_amount: discountAmount,
-          subtotal: subtotal,
-          grand_total: grandTotal
-        }).select().single();
-        if (quotationError) throw quotationError;
+        const newQuotationId = crypto.randomUUID();
         
-        // Store the new quotation ID
-        savedQuotationId = quotationData.id;
-        
-        for (const section of sections) {
-          const {
-            data: sectionData,
-            error: sectionError
-          } = await supabase.from('quotation_sections').insert({
-            quotation_id: quotationData.id,
-            section_name: section.title,
-            sort_order: sections.indexOf(section)
-          }).select().single();
-          if (sectionError) throw sectionError;
-          const itemsToInsert = section.items.map((item, index) => ({
-            section_id: sectionData.id,
-            side: item.side,
-            product_name: item.productName,
-            product_details: item.productDetails,
-            width_ft: item.widthFt,
-            height_ft: item.heightFt,
-            sft_area: item.sftArea,
-            rate_per_sft: item.ratePerSft,
-            amount: item.amount,
-            sort_order: index
-          }));
-          const {
-            error: itemsError
-          } = await supabase.from('quotation_items').insert(itemsToInsert);
-          if (itemsError) throw itemsError;
-        }
-        toast({
-          title: "Quotation saved",
-          description: `Quotation ${quotationNumber} has been saved successfully`
-        });
-      }
-
-      // Sync quotation to AWS backend
-      try {
-        const awsPayload = buildQuotationPayload(savedQuotationId!, user.id, {
-          quotationNumber: quotationId ? `QT-${quotationId}` : `QT-${Date.now()}`,
+        // Build AWS payload first
+        const awsPayload = buildQuotationPayload(newQuotationId, user.id, {
+          quotationNumber,
           quotationTitle: projectTitle,
           clientName,
           clientAddress,
@@ -692,13 +631,125 @@ const CreateQuotation = () => {
           })),
         });
 
-        if (quotationId) {
-          await updateQuotation(savedQuotationId!, awsPayload);
-        } else {
-          await createQuotation(awsPayload);
+        // Send to AWS first (source of truth)
+        const awsResponse = await createQuotation(awsPayload);
+        if (!awsResponse.success) {
+          throw new Error(awsResponse.error || 'Failed to save quotation to AWS');
         }
+        
+        // After AWS success, store only minimal data in Supabase (quotation_id, status, total)
+        const {
+          data: quotationData,
+          error: quotationError
+        } = await supabase.from('quotations').insert({
+          id: newQuotationId,
+          user_id: user.id,
+          quotation_number: quotationNumber,
+          quotation_title: projectTitle,
+          client_name: clientName,
+          client_address: clientAddress,
+          project_name: projectTitle,
+          date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
+          valid_till: quotationValidTill,
+          project_deadline: projectDeadline || null,
+          place_of_project: placeOfProject,
+          warranty: warranty,
+          project_type: projectType,
+          status: status,
+          gst_enabled: gstEnabled,
+          gst_percentage: parseFloat(gstRate),
+          gst_amount: gstAmount,
+          discount_amount: discountAmount,
+          subtotal: subtotal,
+          grand_total: grandTotal
+        }).select().single();
+        if (quotationError) throw quotationError;
+        
+        // Store the new quotation ID
+        savedQuotationId = quotationData.id;
+        
+        // NOTE: Sections and items are NOT stored in Supabase - AWS is the source of truth
+        // We still need sections in Supabase for UI queries until full migration
+        for (const section of sections) {
+          const {
+            data: sectionData,
+            error: sectionError
+          } = await supabase.from('quotation_sections').insert({
+            quotation_id: quotationData.id,
+            section_name: section.title,
+            sort_order: sections.indexOf(section)
+          }).select().single();
+          if (sectionError) throw sectionError;
+          const itemsToInsert = section.items.map((item, index) => ({
+            section_id: sectionData.id,
+            side: item.side,
+            product_name: item.productName,
+            product_details: item.productDetails,
+            width_ft: item.widthFt,
+            height_ft: item.heightFt,
+            sft_area: item.sftArea,
+            rate_per_sft: item.ratePerSft,
+            amount: item.amount,
+            sort_order: index
+          }));
+          const {
+            error: itemsError
+          } = await supabase.from('quotation_items').insert(itemsToInsert);
+          if (itemsError) throw itemsError;
+        }
+        
+        toast({
+          title: "Quotation saved",
+          description: `Quotation ${quotationNumber} has been saved successfully`
+        });
+      }
 
-        // Log admin action
+      // For updates, sync to AWS backend
+      if (quotationId) {
+        try {
+          const awsPayload = buildQuotationPayload(savedQuotationId!, user.id, {
+            quotationNumber: `QT-${quotationId}`,
+            quotationTitle: projectTitle,
+            clientName,
+            clientAddress,
+            dateOfProposal: dateOfProposal || new Date().toISOString().split('T')[0],
+            validTill: quotationValidTill,
+            projectDeadline: projectDeadline || undefined,
+            placeOfProject,
+            warranty,
+            projectType,
+            status,
+            gstEnabled,
+            gstPercentage: parseFloat(gstRate),
+            gstAmount,
+            discountAmount,
+            subtotal,
+            grandTotal,
+            sections: sections.map(section => ({
+              id: section.id,
+              title: section.title,
+              items: section.items.map(item => ({
+                side: item.side,
+                productName: item.productName,
+                productDetails: item.productDetails,
+                widthFt: item.widthFt,
+                heightFt: item.heightFt,
+                sftArea: item.sftArea,
+                ratePerSft: item.ratePerSft,
+                amount: item.amount,
+              })),
+            })),
+          });
+
+          await updateQuotation(savedQuotationId!, awsPayload);
+        } catch (awsError) {
+          // AWS sync failed for update - log but don't block the operation
+          console.error('AWS update sync failed:', awsError);
+        }
+      }
+
+      // Log admin action
+      try {
         await logAdminAction(
           user.id,
           user.id,
@@ -707,9 +758,8 @@ const CreateQuotation = () => {
           savedQuotationId!,
           { status, grand_total: grandTotal }
         );
-      } catch (awsError) {
-        // AWS sync failed - log but don't block the operation
-        console.error('AWS sync failed:', awsError);
+      } catch (logError) {
+        console.error('Admin log failed:', logError);
       }
 
       // Silently save last used preferences and track item usage
