@@ -953,6 +953,7 @@ export interface PDFEditorSettings {
   headingFont: string; // Font ID for titles/headings
   bodyFont: string; // Font ID for body text
   logoPlacement: 'left' | 'center' | 'right';
+  headerInfoColumns: 1 | 2 | 3; // Number of columns for header info section
   highlightAmounts: boolean;
   showBorders: boolean;
   compactMode: boolean;
@@ -1052,6 +1053,7 @@ export const defaultEditorSettings: PDFEditorSettings = {
   headingFont: 'times',
   bodyFont: 'helvetica',
   logoPlacement: 'left',
+  headerInfoColumns: 2,
   highlightAmounts: true,
   showBorders: true,
   compactMode: false,
