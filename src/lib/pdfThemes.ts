@@ -954,6 +954,7 @@ export interface PDFEditorSettings {
   bodyFont: string; // Font ID for body text
   logoPlacement: 'left' | 'center' | 'right';
   headerInfoColumns: 1 | 2 | 3; // Number of columns for header info section
+  headerLayout: 'cards' | 'unified'; // 'cards' = separate cards, 'unified' = single box with columns
   highlightAmounts: boolean;
   showBorders: boolean;
   compactMode: boolean;
@@ -1054,6 +1055,7 @@ export const defaultEditorSettings: PDFEditorSettings = {
   bodyFont: 'helvetica',
   logoPlacement: 'left',
   headerInfoColumns: 2,
+  headerLayout: 'unified',
   highlightAmounts: true,
   showBorders: true,
   compactMode: false,

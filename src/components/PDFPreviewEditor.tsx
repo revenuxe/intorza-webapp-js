@@ -578,36 +578,55 @@ export const PDFPreviewEditor = ({
               </RadioGroup>
             </div>
 
-            {/* Header Info Columns */}
+            {/* Header Layout Style */}
             <div className="space-y-3 pt-4 border-t">
-              <Label className="text-sm font-semibold">Header Info Columns</Label>
+              <Label className="text-sm font-semibold">Quotation Details Layout</Label>
               <p className="text-xs text-muted-foreground mb-2">
-                Choose how quotation details are displayed
+                Choose how client and project info appears
               </p>
               <RadioGroup
-                value={String(editorSettings.headerInfoColumns || 2)}
-                onValueChange={(v) => updateSettings({ headerInfoColumns: parseInt(v) as 1 | 2 | 3 })}
-                className="grid grid-cols-3 gap-2"
+                value={editorSettings.headerLayout || 'unified'}
+                onValueChange={(v) => updateSettings({ headerLayout: v as 'cards' | 'unified' })}
+                className="grid grid-cols-2 gap-2"
               >
-                {[1, 2, 3].map((cols) => (
-                  <div key={cols}>
-                    <RadioGroupItem value={String(cols)} id={`cols-${cols}`} className="peer sr-only" />
-                    <Label
-                      htmlFor={`cols-${cols}`}
-                      className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
-                    >
-                      <div className="w-full h-6 border rounded mb-1 flex items-center gap-1 px-1">
-                        {Array.from({ length: cols }).map((_, i) => (
-                          <div 
-                            key={i}
-                            className="flex-1 h-3 bg-muted-foreground/30 rounded"
-                          />
-                        ))}
+                <div>
+                  <RadioGroupItem value="unified" id="layout-unified" className="peer sr-only" />
+                  <Label
+                    htmlFor="layout-unified"
+                    className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
+                  >
+                    <div className="w-full h-8 border rounded mb-1 flex items-stretch">
+                      <div className="flex-1 border-r flex flex-col justify-center px-1">
+                        <div className="h-1 w-8 bg-muted-foreground/40 rounded mb-0.5" />
+                        <div className="h-1 w-6 bg-muted-foreground/30 rounded" />
                       </div>
-                      <span className="text-[10px]">{cols} Column{cols > 1 ? 's' : ''}</span>
-                    </Label>
-                  </div>
-                ))}
+                      <div className="flex-1 flex flex-col justify-center px-1">
+                        <div className="h-1 w-8 bg-muted-foreground/40 rounded mb-0.5" />
+                        <div className="h-1 w-6 bg-muted-foreground/30 rounded" />
+                      </div>
+                    </div>
+                    <span className="text-[10px]">Single Row</span>
+                  </Label>
+                </div>
+                <div>
+                  <RadioGroupItem value="cards" id="layout-cards" className="peer sr-only" />
+                  <Label
+                    htmlFor="layout-cards"
+                    className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
+                  >
+                    <div className="w-full h-8 flex gap-1 mb-1">
+                      <div className="flex-1 border rounded flex flex-col justify-center px-1">
+                        <div className="h-1 w-6 bg-muted-foreground/40 rounded mb-0.5" />
+                        <div className="h-1 w-4 bg-muted-foreground/30 rounded" />
+                      </div>
+                      <div className="flex-1 border rounded flex flex-col justify-center px-1">
+                        <div className="h-1 w-6 bg-muted-foreground/40 rounded mb-0.5" />
+                        <div className="h-1 w-4 bg-muted-foreground/30 rounded" />
+                      </div>
+                    </div>
+                    <span className="text-[10px]">Two Cards</span>
+                  </Label>
+                </div>
               </RadioGroup>
             </div>
 
@@ -950,58 +969,87 @@ export const PDFPreviewEditor = ({
           </div>
         </div>
 
-        {/* Client & Project Cards - Dynamic Columns */}
+        {/* Client & Project Details - Unified or Cards layout */}
         {customizeSettings.showProjectDetails && (
-          <div 
-            className={`grid gap-3 mb-6 ${
-              (editorSettings.headerInfoColumns || 2) === 1 
-                ? 'grid-cols-1' 
-                : (editorSettings.headerInfoColumns || 2) === 3 
-                  ? 'grid-cols-1 md:grid-cols-3' 
-                  : 'grid-cols-1 md:grid-cols-2'
-            }`}
-          >
-            <div 
-              className="p-3 rounded"
-              style={{ ...getCardStyle(), border: editorSettings.showBorders ? '1px solid' : 'none' }}
-            >
-              <p className="text-[10px] font-medium mb-1" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
-                QUOTATION FOR
-              </p>
-              <p className="font-semibold text-xs">{quotationData.clientName || 'Client Name'}</p>
-              {customizeSettings.showClientAddress && (
-                <p className="text-[10px]" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
-                  {quotationData.clientAddress || 'Client Address'}
-                </p>
-              )}
-            </div>
-            <div 
-              className="p-3 rounded"
-              style={{ ...getCardStyle(), border: editorSettings.showBorders ? '1px solid' : 'none' }}
-            >
-              <p className="text-[10px] font-medium mb-1" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
-                PROJECT DETAILS
-              </p>
-              <div className="space-y-1 text-[10px]">
-                {customizeSettings.showDateOfProposal && <p>Date: {quotationData.dateOfProposal || 'DD/MM/YYYY'}</p>}
-                <p>Project: {quotationData.quotationTitle || 'Project Name'}</p>
-              </div>
-            </div>
-            {(editorSettings.headerInfoColumns || 2) === 3 && (
+          <>
+            {(editorSettings.headerLayout || 'unified') === 'unified' ? (
+              // UNIFIED LAYOUT: Single box with two columns
               <div 
-                className="p-3 rounded"
+                className="p-3 rounded mb-6"
                 style={{ ...getCardStyle(), border: editorSettings.showBorders ? '1px solid' : 'none' }}
               >
-                <p className="text-[10px] font-medium mb-1" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
-                  VALIDITY
+                <p className="text-[10px] font-medium mb-2" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
+                  QUOTATION DETAILS
                 </p>
-                <div className="space-y-1 text-[10px]">
-                  <p>Valid Till: DD/MM/YYYY</p>
-                  <p>Place: Project Location</p>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Left column */}
+                  <div className="space-y-1 text-[10px]">
+                    <div className="flex">
+                      <span className="w-20 text-muted-foreground">Project Name:</span>
+                      <span className="font-semibold">{quotationData.quotationTitle || 'Project Name'}</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-20 text-muted-foreground">Client Name:</span>
+                      <span className="font-semibold">{quotationData.clientName || 'Client Name'}</span>
+                    </div>
+                    {customizeSettings.showClientAddress && (
+                      <div className="flex">
+                        <span className="w-20 text-muted-foreground">Client Address:</span>
+                        <span className="font-semibold truncate">{quotationData.clientAddress || 'Address'}</span>
+                      </div>
+                    )}
+                  </div>
+                  {/* Right column */}
+                  <div className="space-y-1 text-[10px]">
+                    {customizeSettings.showDateOfProposal && (
+                      <div className="flex">
+                        <span className="w-24 text-muted-foreground">Date of Proposal:</span>
+                        <span className="font-semibold">{quotationData.dateOfProposal || 'DD/MM/YYYY'}</span>
+                      </div>
+                    )}
+                    <div className="flex">
+                      <span className="w-24 text-muted-foreground">Valid Till:</span>
+                      <span className="font-semibold">DD/MM/YYYY</span>
+                    </div>
+                    <div className="flex">
+                      <span className="w-24 text-muted-foreground">Place of Project:</span>
+                      <span className="font-semibold">Location</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // CARDS LAYOUT: Two separate cards
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+                <div 
+                  className="p-3 rounded"
+                  style={{ ...getCardStyle(), border: editorSettings.showBorders ? '1px solid' : 'none' }}
+                >
+                  <p className="text-[10px] font-medium mb-1" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
+                    QUOTATION FOR
+                  </p>
+                  <p className="font-semibold text-xs">{quotationData.clientName || 'Client Name'}</p>
+                  {customizeSettings.showClientAddress && (
+                    <p className="text-[10px]" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
+                      {quotationData.clientAddress || 'Client Address'}
+                    </p>
+                  )}
+                </div>
+                <div 
+                  className="p-3 rounded"
+                  style={{ ...getCardStyle(), border: editorSettings.showBorders ? '1px solid' : 'none' }}
+                >
+                  <p className="text-[10px] font-medium mb-1" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
+                    PROJECT DETAILS
+                  </p>
+                  <div className="space-y-1 text-[10px]">
+                    {customizeSettings.showDateOfProposal && <p>Date: {quotationData.dateOfProposal || 'DD/MM/YYYY'}</p>}
+                    <p>Project: {quotationData.quotationTitle || 'Project Name'}</p>
+                  </div>
                 </div>
               </div>
             )}
-          </div>
+          </>
         )}
 
         {/* Section Divider (Preview) */}
