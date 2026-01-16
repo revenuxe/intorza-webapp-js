@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { downloadInvoicePDF } from "@/lib/invoicePdfGenerator";
 import { InvoicePreviewEditor } from "@/components/InvoicePreviewEditor";
 import { PDFEditorSettings, InvoiceSettings, getEditorSettings, getInvoiceSettings } from "@/lib/pdfThemes";
+import { updateInvoice as updateInvoiceInAws, deleteInvoice as deleteInvoiceInAws, logAdminAction } from "@/lib/awsApi";
 
 interface Invoice {
   id: string;
@@ -187,21 +188,22 @@ const InvoiceDetail = () => {
     try {
       setDeleting(true);
       
-      // First delete all payments associated with this invoice
-      const { error: paymentsError } = await supabase
-        .from('payments')
-        .delete()
-        .eq('invoice_id', id);
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (paymentsError) throw paymentsError;
+      // AWS-FIRST: Delete from AWS before Supabase
+      const awsResponse = await deleteInvoiceInAws(id!);
+      if (!awsResponse.success) {
+        throw new Error(awsResponse.error || 'Failed to delete invoice from AWS');
+      }
       
-      // Then delete the invoice
-      const { error: invoiceError } = await supabase
-        .from('invoices')
-        .delete()
-        .eq('id', id);
+      // After AWS success, delete from Supabase
+      await supabase.from('payments').delete().eq('invoice_id', id);
+      await supabase.from('invoices').delete().eq('id', id);
       
-      if (invoiceError) throw invoiceError;
+      // Log admin action
+      if (user) {
+        await logAdminAction(user.id, user.id, 'delete_invoice', 'invoice', id!);
+      }
       
       toast({
         title: "Invoice Deleted",
@@ -213,7 +215,7 @@ const InvoiceDetail = () => {
       console.error('Error deleting invoice:', error);
       toast({
         title: "Error",
-        description: "Failed to delete invoice",
+        description: error instanceof Error ? error.message : "Failed to delete invoice",
         variant: "destructive",
       });
     } finally {
@@ -248,6 +250,25 @@ const InvoiceDetail = () => {
         finalNotes = finalNotes ? `${finalNotes} | Next due: ${nextPaymentDue} - ₹${nextPaymentAmount}` : `Next due: ${nextPaymentDue} - ₹${nextPaymentAmount}`;
       }
 
+      const newPaidAmount = (invoice?.paid_amount || 0) + paymentAmount;
+      const newRemainingAmount = (invoice?.total_amount || 0) - newPaidAmount;
+      const newStatus = newRemainingAmount <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partially_paid' : 'unpaid');
+
+      // AWS-FIRST: Update invoice in AWS before Supabase
+      const awsUpdatePayload = {
+        paid_amount: newPaidAmount,
+        remaining_amount: Math.max(0, newRemainingAmount),
+        status: newStatus,
+        due_date: nextPaymentDue || undefined,
+      };
+
+      const awsResponse = await updateInvoiceInAws(id!, awsUpdatePayload);
+      
+      if (!awsResponse.success) {
+        throw new Error(awsResponse.error || 'Failed to update invoice in AWS');
+      }
+
+      // After AWS success, update Supabase (payment record)
       const { error: paymentError } = await supabase
         .from('payments')
         .insert({
@@ -259,16 +280,11 @@ const InvoiceDetail = () => {
         });
 
       if (paymentError) {
-        console.error('Payment insert error:', paymentError);
-        throw paymentError;
+        console.error('Payment insert error (AWS succeeded):', paymentError);
+        // Don't throw - AWS is the source of truth
       }
 
-      const newPaidAmount = (invoice?.paid_amount || 0) + paymentAmount;
-      const newRemainingAmount = (invoice?.total_amount || 0) - newPaidAmount;
-      // Use underscore format to match database constraint
-      const newStatus = newRemainingAmount <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partially_paid' : 'unpaid');
-
-      // Update invoice with new due date if provided
+      // Update invoice in Supabase with minimal data
       const updateData: any = {
         paid_amount: newPaidAmount,
         remaining_amount: Math.max(0, newRemainingAmount),
@@ -285,8 +301,19 @@ const InvoiceDetail = () => {
         .eq('id', id);
 
       if (invoiceError) {
-        console.error('Invoice update error:', invoiceError);
-        throw invoiceError;
+        console.error('Invoice update error (AWS succeeded):', invoiceError);
+        // Don't throw - AWS is the source of truth
+      }
+
+      // Log admin action
+      try {
+        await logAdminAction(user.id, user.id, 'add_payment', 'invoice', id!, {
+          amount: paymentAmount,
+          payment_method: paymentMethod,
+          new_status: newStatus,
+        });
+      } catch (logError) {
+        console.error('Failed to log admin action:', logError);
       }
 
       toast({
@@ -305,7 +332,7 @@ const InvoiceDetail = () => {
       console.error('Error adding payment:', error);
       toast({
         title: "Error",
-        description: "Failed to add payment",
+        description: error instanceof Error ? error.message : "Failed to add payment",
         variant: "destructive",
       });
     }

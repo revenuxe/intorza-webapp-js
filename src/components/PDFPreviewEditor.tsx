@@ -578,6 +578,39 @@ export const PDFPreviewEditor = ({
               </RadioGroup>
             </div>
 
+            {/* Header Info Columns */}
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-semibold">Header Info Columns</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Choose how quotation details are displayed
+              </p>
+              <RadioGroup
+                value={String(editorSettings.headerInfoColumns || 2)}
+                onValueChange={(v) => updateSettings({ headerInfoColumns: parseInt(v) as 1 | 2 | 3 })}
+                className="grid grid-cols-3 gap-2"
+              >
+                {[1, 2, 3].map((cols) => (
+                  <div key={cols}>
+                    <RadioGroupItem value={String(cols)} id={`cols-${cols}`} className="peer sr-only" />
+                    <Label
+                      htmlFor={`cols-${cols}`}
+                      className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer"
+                    >
+                      <div className="w-full h-6 border rounded mb-1 flex items-center gap-1 px-1">
+                        {Array.from({ length: cols }).map((_, i) => (
+                          <div 
+                            key={i}
+                            className="flex-1 h-3 bg-muted-foreground/30 rounded"
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[10px]">{cols} Column{cols > 1 ? 's' : ''}</span>
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+
             <div className="space-y-3 pt-4 border-t">
               <Label className="text-sm font-semibold">Layout Options</Label>
               <div className="space-y-3">
@@ -917,9 +950,17 @@ export const PDFPreviewEditor = ({
           </div>
         </div>
 
-        {/* Client & Project Cards */}
+        {/* Client & Project Cards - Dynamic Columns */}
         {customizeSettings.showProjectDetails && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+          <div 
+            className={`grid gap-3 mb-6 ${
+              (editorSettings.headerInfoColumns || 2) === 1 
+                ? 'grid-cols-1' 
+                : (editorSettings.headerInfoColumns || 2) === 3 
+                  ? 'grid-cols-1 md:grid-cols-3' 
+                  : 'grid-cols-1 md:grid-cols-2'
+            }`}
+          >
             <div 
               className="p-3 rounded"
               style={{ ...getCardStyle(), border: editorSettings.showBorders ? '1px solid' : 'none' }}
@@ -946,6 +987,20 @@ export const PDFPreviewEditor = ({
                 <p>Project: {quotationData.quotationTitle || 'Project Name'}</p>
               </div>
             </div>
+            {(editorSettings.headerInfoColumns || 2) === 3 && (
+              <div 
+                className="p-3 rounded"
+                style={{ ...getCardStyle(), border: editorSettings.showBorders ? '1px solid' : 'none' }}
+              >
+                <p className="text-[10px] font-medium mb-1" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
+                  VALIDITY
+                </p>
+                <div className="space-y-1 text-[10px]">
+                  <p>Valid Till: DD/MM/YYYY</p>
+                  <p>Place: Project Location</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

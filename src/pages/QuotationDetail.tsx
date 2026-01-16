@@ -301,13 +301,41 @@ const QuotationDetail = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const invoiceId = crypto.randomUUID();
       const invoiceNumber = `INV-${Date.now()}`;
       const remaining = invoiceAmount - paidAmount;
       const invoiceStatus = remaining === 0 ? 'paid' : (paidAmount > 0 ? 'partially_paid' : 'unpaid');
+      const invoiceDate = new Date().toISOString().split('T')[0];
 
-      const { data: invoice, error } = await supabase
+      // AWS-FIRST: Call AWS API before Supabase
+      const awsPayload = {
+        invoice_id: invoiceId,
+        company_id: user.id,
+        quotation_id: quotation?.id,
+        client_id: quotation?.client_id || undefined,
+        invoice_number: invoiceNumber,
+        client_name: quotation?.client_name || '',
+        project_name: quotation?.project_name || '',
+        total_amount: invoiceAmount,
+        paid_amount: paidAmount,
+        remaining_amount: remaining,
+        status: invoiceStatus,
+        invoice_date: invoiceDate,
+        due_date: dueDate || undefined,
+        notes: invoiceNotes,
+      };
+
+      const awsResponse = await createInvoiceInAws(awsPayload);
+      
+      if (!awsResponse.success) {
+        throw new Error(awsResponse.error || 'Failed to create invoice in AWS');
+      }
+
+      // After AWS success, save minimal metadata to Supabase
+      const { error } = await supabase
         .from('invoices')
         .insert({
+          id: invoiceId,
           user_id: user.id,
           quotation_id: quotation?.id,
           client_id: quotation?.client_id || null,
@@ -318,14 +346,15 @@ const QuotationDetail = () => {
           paid_amount: paidAmount,
           remaining_amount: remaining,
           status: invoiceStatus,
-          invoice_date: new Date().toISOString().split('T')[0],
+          invoice_date: invoiceDate,
           due_date: dueDate || null,
           notes: invoiceNotes
-        })
-        .select()
-        .single();
+        });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase insert failed (AWS succeeded):', error);
+        // Don't throw - AWS is the source of truth
+      }
 
       // Update quotation status to converted
       await supabase
@@ -333,35 +362,16 @@ const QuotationDetail = () => {
         .update({ status: 'converted' })
         .eq('id', quotation?.id);
 
-      // Sync to AWS
+      // Sync quotation status to AWS
       try {
-        // Create invoice in AWS
-        await createInvoiceInAws({
-          invoice_id: invoice.id,
-          company_id: user.id,
-          quotation_id: quotation?.id,
-          client_id: quotation?.client_id || undefined,
-          invoice_number: invoiceNumber,
-          client_name: quotation?.client_name || '',
-          project_name: quotation?.project_name || '',
-          total_amount: invoiceAmount,
-          paid_amount: paidAmount,
-          remaining_amount: remaining,
-          status: invoiceStatus,
-          invoice_date: new Date().toISOString().split('T')[0],
-          due_date: dueDate || undefined,
-          notes: invoiceNotes,
-        });
-
-        // Update quotation status in AWS
         await updateQuotation(quotation?.id!, { status: 'converted' });
         
         await logAdminAction(user.id, user.id, 'convert_to_invoice', 'quotation', quotation?.id!, {
-          invoice_id: invoice.id,
+          invoice_id: invoiceId,
           invoice_number: invoiceNumber,
         });
       } catch (awsError) {
-        console.error('AWS sync failed:', awsError);
+        console.error('AWS quotation status sync failed:', awsError);
       }
 
       toast({
@@ -370,12 +380,12 @@ const QuotationDetail = () => {
       });
 
       setConvertDialogOpen(false);
-      navigate(`/invoices/${invoice.id}`);
+      navigate(`/invoices/${invoiceId}`);
     } catch (error) {
       console.error('Error converting to invoice:', error);
       toast({
         title: "Error",
-        description: "Failed to convert to invoice",
+        description: error instanceof Error ? error.message : "Failed to convert to invoice",
         variant: "destructive",
       });
     }
