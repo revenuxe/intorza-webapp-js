@@ -15,7 +15,7 @@ import { downloadQuotationPDF } from "@/lib/pdfGenerator";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getEditorSettings } from "@/lib/pdfThemes";
 import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
-import { updateQuotation, createInvoice as createInvoiceInAws, createClientBehavior, logAdminAction } from "@/lib/awsApi";
+import { updateQuotation, createInvoice as createInvoiceInAws, createClientBehavior, logAdminAction, InvoicePayload } from "@/lib/awsApi";
 
 interface Quotation {
   id: string;
@@ -247,12 +247,23 @@ const QuotationDetail = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      // AWS-FIRST: Update status in AWS before Supabase
+      const awsResponse = await updateQuotation(id!, { status });
+      
+      if (!awsResponse.success) {
+        throw new Error(awsResponse.error || 'Failed to update status in AWS');
+      }
+      
+      // After AWS success, update Supabase
       const { error } = await supabase
         .from('quotations')
         .update({ status })
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase status update failed (AWS succeeded):', error);
+        // Don't throw - AWS is the source of truth
+      }
 
       setQuotation(prev => prev ? { ...prev, status } : null);
       toast({
@@ -260,12 +271,9 @@ const QuotationDetail = () => {
         description: `Quotation marked as ${status}`,
       });
 
-      // Sync status to AWS
-      try {
-        await updateQuotation(id!, { status });
-        
-        // Record client behavior for learning
-        if (user && quotation && (status === 'accepted' || status === 'rejected')) {
+      // Record client behavior for learning
+      if (user && quotation && (status === 'accepted' || status === 'rejected')) {
+        try {
           await createClientBehavior({
             behavior_id: `behavior_${Date.now()}`,
             company_id: user.id,
@@ -278,9 +286,9 @@ const QuotationDetail = () => {
             won_or_lost: status === 'accepted' ? 'won' : 'lost',
           });
           await logAdminAction(user.id, user.id, `mark_quotation_${status}`, 'quotation', id!);
+        } catch (awsError) {
+          console.error('Failed to record client behavior:', awsError);
         }
-      } catch (awsError) {
-        console.error('AWS sync failed:', awsError);
       }
 
       if (status === 'accepted') {
@@ -290,7 +298,7 @@ const QuotationDetail = () => {
       console.error('Error updating status:', error);
       toast({
         title: "Error",
-        description: "Failed to update status",
+        description: error instanceof Error ? error.message : "Failed to update status",
         variant: "destructive",
       });
     }
@@ -306,11 +314,20 @@ const QuotationDetail = () => {
       const remaining = invoiceAmount - paidAmount;
       const invoiceStatus = remaining === 0 ? 'paid' : (paidAmount > 0 ? 'partially_paid' : 'unpaid');
       const invoiceDate = new Date().toISOString().split('T')[0];
+      const nowISO = new Date().toISOString();
 
-      // AWS-FIRST: Call AWS API before Supabase
-      const awsPayload = {
+      // Fetch quotation sections and items for full invoice payload
+      const { data: sections } = await supabase
+        .from('quotation_sections')
+        .select('*, quotation_items(*)')
+        .eq('quotation_id', quotation?.id)
+        .order('sort_order');
+
+      // AWS-FIRST: Call AWS API with full invoice payload
+      const awsPayload: InvoicePayload = {
         invoice_id: invoiceId,
         company_id: user.id,
+        user_id: user.id,
         quotation_id: quotation?.id,
         client_id: quotation?.client_id || undefined,
         invoice_number: invoiceNumber,
@@ -320,9 +337,37 @@ const QuotationDetail = () => {
         paid_amount: paidAmount,
         remaining_amount: remaining,
         status: invoiceStatus,
+        action: 'save',
         invoice_date: invoiceDate,
         due_date: dueDate || undefined,
         notes: invoiceNotes,
+        sections: sections?.map(s => ({
+          title: s.section_name,
+          items: s.quotation_items.map((item: any) => ({
+            productName: item.product_name,
+            productDetails: item.product_details,
+            side: item.side,
+            widthFt: item.width_ft,
+            heightFt: item.height_ft,
+            sftArea: item.sft_area,
+            ratePerSft: item.rate_per_sft,
+            amount: item.amount
+          }))
+        })) || [],
+        items: sections?.flatMap(s => s.quotation_items.map((item: any) => ({
+          productName: item.product_name,
+          productDetails: item.product_details,
+          side: item.side,
+          widthFt: item.width_ft,
+          heightFt: item.height_ft,
+          sftArea: item.sft_area,
+          ratePerSft: item.rate_per_sft,
+          amount: item.amount
+        }))) || [],
+        timestamps: {
+          created_at: nowISO,
+          saved_at: nowISO,
+        }
       };
 
       const awsResponse = await createInvoiceInAws(awsPayload);

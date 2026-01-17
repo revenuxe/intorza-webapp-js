@@ -143,6 +143,7 @@ export const deleteQuotation = async (quotationId: string): Promise<ApiResponse>
 export interface InvoicePayload {
   invoice_id: string;
   company_id: string;
+  user_id?: string;
   project_id?: string;
   quotation_id?: string;
   client_id?: string;
@@ -152,11 +153,28 @@ export interface InvoicePayload {
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  status: string;
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'paid' | 'unpaid' | 'partially_paid' | 'overdue' | string;
+  action?: 'save' | 'share' | 'accept' | 'reject' | 'finalize' | 'payment' | 'delete';
   invoice_date: string;
   due_date?: string;
   notes?: string;
   items?: any[];
+  sections?: any[];
+  timestamps?: {
+    created_at?: string;
+    updated_at?: string;
+    saved_at?: string;
+    shared_at?: string;
+    accepted_at?: string;
+    rejected_at?: string;
+    paid_at?: string;
+  };
+  payments?: Array<{
+    amount: number;
+    payment_date: string;
+    payment_method: string;
+    notes?: string;
+  }>;
 }
 
 export const createInvoice = async (payload: InvoicePayload): Promise<ApiResponse> => {
