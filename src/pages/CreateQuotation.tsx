@@ -20,7 +20,7 @@ import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
 import { ClientSelector } from "@/components/quotation/ClientSelector";
 import { ProductNameInput } from "@/components/quotation/ProductNameInput";
 import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
-import { createQuotation, updateQuotation, buildQuotationPayload, logAdminAction } from "@/lib/awsApi";
+import { createQuotation, updateQuotation, getQuotation, buildQuotationPayload, logAdminAction } from "@/lib/awsApi";
 interface LineItem {
   id: string;
   side: string;
@@ -335,15 +335,17 @@ const CreateQuotation = () => {
   };
   const loadQuotation = async (id: string) => {
     try {
-      // Load quotation data
-      const {
-        data: quotation,
-        error: quotationError
-      } = await supabase.from('quotations').select('*').eq('id', id).single();
-      if (quotationError) throw quotationError;
+      // Fetch quotation from AWS (source of truth)
+      const awsResponse = await getQuotation(id);
+      
+      if (!awsResponse.success || !awsResponse.data) {
+        throw new Error(awsResponse.error || 'Failed to fetch quotation from AWS');
+      }
 
-      // Pre-fill form fields - use quotation_title or project_name as fallback
-      setProjectTitle(quotation.quotation_title || quotation.project_name || "");
+      const quotation = awsResponse.data;
+
+      // Pre-fill form fields from AWS data
+      setProjectTitle(quotation.quotation_title || quotation.project_id || "");
       setClientName(quotation.client_name || "");
       setClientAddress(quotation.client_address || "");
       setDateOfProposal(quotation.date_of_proposal || "");
@@ -363,49 +365,35 @@ const CreateQuotation = () => {
         setDiscountPercentage(0);
       }
 
-      // Load sections
-      const {
-        data: sectionsData,
-        error: sectionsError
-      } = await supabase.from('quotation_sections').select('*').eq('quotation_id', id).order('sort_order');
-      if (sectionsError) throw sectionsError;
-
-      // Load items for each section
-      const loadedSections: Section[] = [];
-      for (const section of sectionsData || []) {
-        const {
-          data: itemsData,
-          error: itemsError
-        } = await supabase.from('quotation_items').select('*').eq('section_id', section.id).order('sort_order');
-        if (itemsError) throw itemsError;
-        loadedSections.push({
-          id: section.id,
-          title: section.section_name,
-          items: (itemsData || []).map(item => ({
-            id: item.id,
+      // Load sections from AWS data
+      if (quotation.sections && quotation.sections.length > 0) {
+        const loadedSections: Section[] = quotation.sections.map((section: any, sectionIndex: number) => ({
+          id: section.id || `section-${sectionIndex + 1}`,
+          title: section.title || "",
+          items: (section.items || []).map((item: any, itemIndex: number) => ({
+            id: item.id || `item-${sectionIndex}-${itemIndex}`,
             side: item.side || "A",
-            productName: item.product_name || "",
-            productDetails: item.product_details || "",
-            widthFt: item.width_ft || 0,
-            heightFt: item.height_ft || 0,
-            sftArea: item.sft_area || 0,
-            ratePerSft: item.rate_per_sft || 0,
+            productName: item.productName || item.product_name || "",
+            productDetails: item.productDetails || item.product_details || "",
+            widthFt: item.widthFt || item.width_ft || 0,
+            heightFt: item.heightFt || item.height_ft || 0,
+            sftArea: item.sftArea || item.sft_area || 0,
+            ratePerSft: item.ratePerSft || item.rate_per_sft || 0,
             amount: item.amount || 0
           }))
-        });
-      }
-      if (loadedSections.length > 0) {
+        }));
         setSections(loadedSections);
       }
+
       toast({
         title: "Quotation loaded",
-        description: "Existing quotation data has been loaded for editing"
+        description: "Existing quotation data has been loaded from AWS for editing"
       });
     } catch (error) {
-      console.error('Error loading quotation:', error);
+      console.error('Error loading quotation from AWS:', error);
       toast({
         title: "Load failed",
-        description: "Failed to load quotation data",
+        description: "Failed to load quotation data from AWS",
         variant: "destructive"
       });
     }
