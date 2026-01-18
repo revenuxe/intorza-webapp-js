@@ -15,7 +15,7 @@ import { downloadQuotationPDF } from "@/lib/pdfGenerator";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getEditorSettings } from "@/lib/pdfThemes";
 import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
-import { updateQuotation, createInvoice as createInvoiceInAws, createClientBehavior, logAdminAction, InvoicePayload } from "@/lib/awsApi";
+import { updateQuotation, getQuotation, createInvoice as createInvoiceInAws, createClientBehavior, logAdminAction, InvoicePayload, QuotationPayload } from "@/lib/awsApi";
 
 interface Quotation {
   id: string;
@@ -39,6 +39,21 @@ interface Quotation {
   project_type: string;
   project_deadline: string | null;
   created_at: string;
+  // AWS data - sections with items
+  sections?: Array<{
+    id?: string;
+    title: string;
+    items: Array<{
+      productName: string;
+      productDetails: string;
+      side: string;
+      widthFt: number;
+      heightFt: number;
+      sftArea: number;
+      ratePerSft: number;
+      amount: number;
+    }>;
+  }>;
 }
 
 const getStatusColor = (status: string) => {
@@ -81,20 +96,49 @@ const QuotationDetail = () => {
   const loadQuotation = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('quotations')
-        .select('*')
-        .eq('id', id)
-        .single();
+      
+      // Fetch full quotation data from AWS (source of truth)
+      const awsResponse = await getQuotation(id!);
+      
+      if (!awsResponse.success || !awsResponse.data) {
+        throw new Error(awsResponse.error || 'Failed to fetch quotation from AWS');
+      }
 
-      if (error) throw error;
-      setQuotation(data);
-      setInvoiceAmount(data?.grand_total || 0);
+      const awsData = awsResponse.data;
+      
+      // Map AWS data to Quotation interface
+      const quotationData: Quotation = {
+        id: awsData.quotation_id || id!,
+        quotation_number: awsData.quotation_number || '',
+        quotation_title: awsData.quotation_title || '',
+        project_name: awsData.quotation_title || '',
+        client_name: awsData.client_name || '',
+        client_address: awsData.client_address || '',
+        client_id: awsData.client_id || null,
+        grand_total: awsData.grand_total || awsData.total || 0,
+        subtotal: awsData.subtotal || 0,
+        gst_amount: awsData.gst_amount || 0,
+        discount_amount: awsData.discount_amount || 0,
+        gst_enabled: awsData.gst_enabled || false,
+        gst_percentage: awsData.gst_percentage || 18,
+        status: awsData.status || 'pending',
+        date_of_proposal: awsData.date_of_proposal || '',
+        valid_till: awsData.valid_till || '',
+        place_of_project: awsData.place_of_project || '',
+        warranty: awsData.warranty || '',
+        project_type: awsData.project_type || '',
+        project_deadline: awsData.project_deadline || null,
+        created_at: awsData.date_of_proposal || '',
+        sections: awsData.sections || [],
+      };
+
+      setQuotation(quotationData);
+      setInvoiceAmount(quotationData.grand_total || 0);
     } catch (error) {
-      console.error('Error loading quotation:', error);
+      console.error('Error loading quotation from AWS:', error);
       toast({
         title: "Error",
-        description: "Failed to load quotation details",
+        description: "Failed to load quotation details from AWS",
         variant: "destructive",
       });
     } finally {
@@ -116,12 +160,6 @@ const QuotationDetail = () => {
         .from('profiles')
         .select('*')
         .single();
-
-      const { data: sections } = await supabase
-        .from('quotation_sections')
-        .select('*, quotation_items(*)')
-        .eq('quotation_id', quotation.id)
-        .order('sort_order');
 
       // Fetch latest templates from My Library
       const { data: { user } } = await supabase.auth.getUser();
@@ -179,6 +217,21 @@ const QuotationDetail = () => {
       const editorSettings = getEditorSettings();
       const customizeSettings = getQuotationSettings();
 
+      // Use sections from AWS data (already loaded in quotation state)
+      const pdfSections = quotation.sections?.map(s => ({
+        title: s.title,
+        items: s.items.map((item: any) => ({
+          productName: item.productName || item.product_name || '',
+          productDetails: item.productDetails || item.product_details || '',
+          side: item.side || '',
+          widthFt: item.widthFt || item.width_ft || 0,
+          heightFt: item.heightFt || item.height_ft || 0,
+          sftArea: item.sftArea || item.sft_area || 0,
+          ratePerSft: item.ratePerSft || item.rate_per_sft || 0,
+          amount: item.amount || 0
+        }))
+      })) || [];
+
       await downloadQuotationPDF({
         quotationId: quotation.id,
         quotationTitle: quotation.quotation_title || quotation.project_name,
@@ -190,19 +243,7 @@ const QuotationDetail = () => {
         placeOfProject: quotation.place_of_project,
         warranty: quotation.warranty,
         projectType: quotation.project_type,
-        sections: sections?.map(s => ({
-          title: s.section_name,
-          items: s.quotation_items.map((item: any) => ({
-            productName: item.product_name,
-            productDetails: item.product_details,
-            side: item.side,
-            widthFt: item.width_ft,
-            heightFt: item.height_ft,
-            sftArea: item.sft_area,
-            ratePerSft: item.rate_per_sft,
-            amount: item.amount
-          }))
-        })) || [],
+        sections: pdfSections,
         subtotal: quotation.subtotal,
         discount: quotation.discount_amount,
         gstEnabled: quotation.gst_enabled,
@@ -316,12 +357,33 @@ const QuotationDetail = () => {
       const invoiceDate = new Date().toISOString().split('T')[0];
       const nowISO = new Date().toISOString();
 
-      // Fetch quotation sections and items for full invoice payload
-      const { data: sections } = await supabase
-        .from('quotation_sections')
-        .select('*, quotation_items(*)')
-        .eq('quotation_id', quotation?.id)
-        .order('sort_order');
+      // Use sections from AWS data (already loaded in quotation state)
+      const invoiceSections = quotation?.sections?.map(s => ({
+        title: s.title,
+        items: s.items.map((item: any) => ({
+          productName: item.productName || item.product_name || '',
+          productDetails: item.productDetails || item.product_details || '',
+          side: item.side || '',
+          widthFt: item.widthFt || item.width_ft || 0,
+          heightFt: item.heightFt || item.height_ft || 0,
+          sftArea: item.sftArea || item.sft_area || 0,
+          ratePerSft: item.ratePerSft || item.rate_per_sft || 0,
+          amount: item.amount || 0
+        }))
+      })) || [];
+
+      const invoiceItems = quotation?.sections?.flatMap(s => 
+        s.items.map((item: any) => ({
+          productName: item.productName || item.product_name || '',
+          productDetails: item.productDetails || item.product_details || '',
+          side: item.side || '',
+          widthFt: item.widthFt || item.width_ft || 0,
+          heightFt: item.heightFt || item.height_ft || 0,
+          sftArea: item.sftArea || item.sft_area || 0,
+          ratePerSft: item.ratePerSft || item.rate_per_sft || 0,
+          amount: item.amount || 0
+        }))
+      ) || [];
 
       // AWS-FIRST: Call AWS API with full invoice payload
       const awsPayload: InvoicePayload = {
@@ -341,29 +403,8 @@ const QuotationDetail = () => {
         invoice_date: invoiceDate,
         due_date: dueDate || undefined,
         notes: invoiceNotes,
-        sections: sections?.map(s => ({
-          title: s.section_name,
-          items: s.quotation_items.map((item: any) => ({
-            productName: item.product_name,
-            productDetails: item.product_details,
-            side: item.side,
-            widthFt: item.width_ft,
-            heightFt: item.height_ft,
-            sftArea: item.sft_area,
-            ratePerSft: item.rate_per_sft,
-            amount: item.amount
-          }))
-        })) || [],
-        items: sections?.flatMap(s => s.quotation_items.map((item: any) => ({
-          productName: item.product_name,
-          productDetails: item.product_details,
-          side: item.side,
-          widthFt: item.width_ft,
-          heightFt: item.height_ft,
-          sftArea: item.sft_area,
-          ratePerSft: item.rate_per_sft,
-          amount: item.amount
-        }))) || [],
+        sections: invoiceSections,
+        items: invoiceItems,
         timestamps: {
           created_at: nowISO,
           saved_at: nowISO,
