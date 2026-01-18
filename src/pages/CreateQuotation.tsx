@@ -345,7 +345,7 @@ const CreateQuotation = () => {
       const quotation = awsResponse.data;
 
       // Pre-fill form fields from AWS data
-      setProjectTitle(quotation.quotation_title || quotation.project_id || "");
+      setProjectTitle(quotation.quotation_title || "");
       setClientName(quotation.client_name || "");
       setClientAddress(quotation.client_address || "");
       setDateOfProposal(quotation.date_of_proposal || "");

@@ -174,7 +174,7 @@ const QuotationDetail = () => {
           .select('stages')
           .eq('user_id', user.id)
           .eq('is_default', true)
-          .single();
+          .maybeSingle();
         
         if (paymentTemplate?.stages) {
           paymentStages = paymentTemplate.stages;
@@ -187,7 +187,7 @@ const QuotationDetail = () => {
           .eq('user_id', user.id)
           .eq('is_default', true)
           .eq('template_type', 'quotation')
-          .single();
+          .maybeSingle();
         
         if (termsTemplate?.content) {
           termsConditions = termsTemplate.content;
@@ -199,7 +199,7 @@ const QuotationDetail = () => {
           .select('*')
           .eq('user_id', user.id)
           .eq('is_default', true)
-          .single();
+          .maybeSingle();
         
         if (bankTemplate) {
           bankDetails = {
