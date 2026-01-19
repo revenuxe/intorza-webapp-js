@@ -11,8 +11,6 @@ import { supabase } from "@/integrations/supabase/client";
 const AWS_API_BASE_URL = "https://bqqxbtxch3.execute-api.ap-south-1.amazonaws.com";
 
 // IMPORTANT: Browser-to-AWS calls are blocked by CORS (API Gateway lacks ACAO headers).
-// Route all AWS API calls through a Supabase Edge Function proxy.
-const AWS_PROXY_FUNCTION_URL = "https://gclsgkhtwqurniitfeir.supabase.co/functions/v1/aws-proxy";
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -43,20 +41,41 @@ const apiRequest = async <T = any>(
       return { success: false, error: "Not authenticated" };
     }
 
-    const proxyUrl = new URL(AWS_PROXY_FUNCTION_URL);
-    proxyUrl.searchParams.set("path", endpoint);
-
-    const response = await fetch(proxyUrl.toString(), {
-      ...options,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        ...options.headers,
-      },
-    });
+    const response = await fetch(
+      `${AWS_API_BASE_URL}${endpoint}`,
+      {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          ...options.headers,
+        },
+      }
+    );
 
     const text = await response.text();
     const parsed = text ? JSON.parse(text) : null;
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error:
+          parsed?.error ||
+          parsed?.message ||
+          `API request failed (${response.status})`,
+      };
+    }
+
+    return { success: true, data: parsed as T };
+
+  } catch (error) {
+    console.error("AWS API Error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+};
 
     // Support both shapes:
     // 1) AWS returns the object directly
