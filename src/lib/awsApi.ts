@@ -1,36 +1,42 @@
 /**
  * AWS API Client for Intorza
- * 
- * This module provides a centralized client for communicating with the AWS backend.
- * All business data (quotations, invoices, clients, etc.) is stored in AWS DynamoDB.
- * Supabase is only used for authentication and storing reference IDs.
+ *
+ * Centralized client for AWS API Gateway → Lambda → DynamoDB
+ * Supabase is used ONLY for authentication.
  */
 
 import { supabase } from "@/integrations/supabase/client";
 
-const AWS_API_BASE_URL = "https://bqqxbtxch3.execute-api.ap-south-1.amazonaws.com";
+/* =======================================================
+   CONFIG
+======================================================= */
 
-// IMPORTANT: Browser-to-AWS calls are blocked by CORS (API Gateway lacks ACAO headers).
+const AWS_API_BASE_URL =
+  "https://bqqxbtxch3.execute-api.ap-south-1.amazonaws.com";
 
-interface ApiResponse<T = any> {
+/* =======================================================
+   TYPES
+======================================================= */
+
+export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   error?: string;
 }
 
-/**
- * Get the current user's JWT token from Supabase for AWS API authentication
- */
+/* =======================================================
+   AUTH
+======================================================= */
+
 const getAuthToken = async (): Promise<string | null> => {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return session?.access_token || null;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
 };
 
-/**
- * // <-- end of apiRequest
- */
+/* =======================================================
+   CORE REQUEST HANDLER
+======================================================= */
+
 const apiRequest = async <T = any>(
   endpoint: string,
   options: RequestInit = {}
@@ -41,58 +47,51 @@ const apiRequest = async <T = any>(
       return { success: false, error: "Not authenticated" };
     }
 
-    const response = await fetch(
-      `${AWS_API_BASE_URL}${endpoint}`,
-      {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-          ...options.headers,
-        },
-      }
-    );
+    const response = await fetch(`${AWS_API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
 
     const text = await response.text();
     const parsed = text ? JSON.parse(text) : null;
 
-    // ✅ Handle AWS wrapped responses { success, data }
-    if (parsed && typeof parsed === "object" && "success" in parsed) {
-      if (parsed.success === false) {
-        return {
-          success: false,
-          error: parsed.error || parsed.message || "API request failed",
-        };
-      }
-      if (parsed.success === true && "data" in parsed) {
-        return { success: true, data: parsed.data as T };
-      }
-    }
-
-    // ✅ Handle normal HTTP errors
     if (!response.ok) {
       return {
         success: false,
         error:
           parsed?.error ||
           parsed?.message ||
-          `API request failed (${response.status})`,
+          `Request failed (${response.status})`,
       };
     }
 
-    return { success: true, data: parsed as T };
+    // 🔑 NORMALIZATION RULE
+    // If AWS already returned { success, data }
+    if (parsed && typeof parsed === "object" && "success" in parsed) {
+      return parsed as ApiResponse<T>;
+    }
 
-  } catch (error) {
-    console.error("AWS API Error:", error);
+    // Otherwise, wrap raw AWS object
+    return {
+      success: true,
+      data: parsed as T,
+    };
+  } catch (err) {
+    console.error("AWS API Error:", err);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: err instanceof Error ? err.message : "Unknown error",
     };
   }
 };
 
-
-// ==================== QUOTATIONS ====================
+/* =======================================================
+   QUOTATIONS
+======================================================= */
 
 export interface QuotationItem {
   side: string;
@@ -134,109 +133,80 @@ export interface QuotationPayload {
   discount_amount: number;
   subtotal: number;
   grand_total: number;
-  sections: QuotationSection[];
-  items: QuotationItem[]; // Flattened list of all items
   total: number;
+  sections: QuotationSection[];
+  items: QuotationItem[];
 }
 
-export const createQuotation = async (payload: QuotationPayload): Promise<ApiResponse> => {
-  return apiRequest("/quotations", {
+export const createQuotation = (payload: QuotationPayload) =>
+  apiRequest("/quotations", {
     method: "POST",
     body: JSON.stringify(payload),
   });
-};
 
-export const updateQuotation = async (quotationId: string, payload: Partial<QuotationPayload>): Promise<ApiResponse> => {
-  return apiRequest(`/quotations/${quotationId}`, {
+export const updateQuotation = (
+  quotationId: string,
+  payload: Partial<QuotationPayload>
+) =>
+  apiRequest(`/quotations/${quotationId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
-};
 
-export const getQuotation = async (quotationId: string): Promise<ApiResponse<QuotationPayload>> => {
-  return apiRequest(`/quotations/${quotationId}`, {
-    method: "GET",
-  });
-};
+export const getQuotation = (quotationId: string) =>
+  apiRequest<QuotationPayload>(`/quotations/${quotationId}`);
 
-export const listQuotations = async (companyId: string): Promise<ApiResponse<QuotationPayload[]>> => {
-  return apiRequest(`/quotations?company_id=${companyId}`, {
-    method: "GET",
-  });
-};
+export const listQuotations = (companyId: string) =>
+  apiRequest<QuotationPayload[]>(
+    `/quotations?company_id=${companyId}`
+  );
 
-export const deleteQuotation = async (quotationId: string): Promise<ApiResponse> => {
-  return apiRequest(`/quotations/${quotationId}`, {
-    method: "DELETE",
-  });
-};
+export const deleteQuotation = (quotationId: string) =>
+  apiRequest(`/quotations/${quotationId}`, { method: "DELETE" });
 
-// ==================== INVOICES ====================
+/* =======================================================
+   INVOICES
+======================================================= */
 
 export interface InvoicePayload {
   invoice_id: string;
   company_id: string;
-  user_id?: string;
-  project_id?: string;
   quotation_id?: string;
-  client_id?: string;
   invoice_number: string;
   client_name: string;
   project_name: string;
   total_amount: number;
   paid_amount: number;
   remaining_amount: number;
-  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'paid' | 'unpaid' | 'partially_paid' | 'overdue' | string;
-  action?: 'save' | 'share' | 'accept' | 'reject' | 'finalize' | 'payment' | 'delete';
+  status: string;
   invoice_date: string;
   due_date?: string;
-  notes?: string;
   items?: any[];
   sections?: any[];
-  timestamps?: {
-    created_at?: string;
-    updated_at?: string;
-    saved_at?: string;
-    shared_at?: string;
-    accepted_at?: string;
-    rejected_at?: string;
-    paid_at?: string;
-  };
-  payments?: Array<{
-    amount: number;
-    payment_date: string;
-    payment_method: string;
-    notes?: string;
-  }>;
+  payments?: any[];
 }
 
-export const createInvoice = async (payload: InvoicePayload): Promise<ApiResponse> => {
-  return apiRequest("/invoices", {
+export const createInvoice = (payload: InvoicePayload) =>
+  apiRequest("/invoices", {
     method: "POST",
     body: JSON.stringify(payload),
   });
-};
 
-export const updateInvoice = async (invoiceId: string, payload: Partial<InvoicePayload>): Promise<ApiResponse> => {
-  return apiRequest(`/invoices/${invoiceId}`, {
+export const updateInvoice = (
+  invoiceId: string,
+  payload: Partial<InvoicePayload>
+) =>
+  apiRequest(`/invoices/${invoiceId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
-};
 
-export const getInvoice = async (invoiceId: string): Promise<ApiResponse<InvoicePayload>> => {
-  return apiRequest(`/invoices/${invoiceId}`, {
-    method: "GET",
-  });
-};
+export const getInvoice = (invoiceId: string) =>
+  apiRequest<InvoicePayload>(`/invoices/${invoiceId}`);
 
-export const deleteInvoice = async (invoiceId: string): Promise<ApiResponse> => {
-  return apiRequest(`/invoices/${invoiceId}`, {
-    method: "DELETE",
-  });
-};
-
-// ==================== CLIENTS ====================
+/* =======================================================
+   CLIENTS
+======================================================= */
 
 export interface ClientPayload {
   client_id: string;
@@ -248,288 +218,19 @@ export interface ClientPayload {
   city?: string;
 }
 
-export const createClient = async (payload: ClientPayload): Promise<ApiResponse> => {
-  return apiRequest("/clients", {
+export const createClient = (payload: ClientPayload) =>
+  apiRequest("/clients", {
     method: "POST",
     body: JSON.stringify(payload),
   });
-};
 
-export const updateClient = async (clientId: string, payload: Partial<ClientPayload>): Promise<ApiResponse> => {
-  return apiRequest(`/clients/${clientId}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
-};
+export const getClient = (clientId: string) =>
+  apiRequest<ClientPayload>(`/clients/${clientId}`);
 
-export const getClient = async (clientId: string): Promise<ApiResponse<ClientPayload>> => {
-  return apiRequest(`/clients/${clientId}`, {
-    method: "GET",
-  });
-};
+/* =======================================================
+   HELPERS
+======================================================= */
 
-// ==================== SITE MEASUREMENTS ====================
-
-export interface MeasurementPayload {
-  measurement_id: string;
-  company_id: string;
-  project_id?: string;
-  client_name: string;
-  site_location: string;
-  assigned_to?: string;
-  status: string;
-  total_area: number;
-  room_count: number;
-  photo_count: number;
-  rooms?: any[];
-}
-
-export const createMeasurement = async (payload: MeasurementPayload): Promise<ApiResponse> => {
-  return apiRequest("/measurements", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const updateMeasurement = async (measurementId: string, payload: Partial<MeasurementPayload>): Promise<ApiResponse> => {
-  return apiRequest(`/measurements/${measurementId}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
-};
-
-// ==================== TEMPLATES ====================
-
-export interface TemplateCategoryPayload {
-  category_id: string;
-  company_id: string;
-  name: string;
-  type: string;
-}
-
-export interface TemplatePayload {
-  template_id: string;
-  company_id: string;
-  category_id?: string;
-  template_name: string;
-  template_type: string;
-  content: any;
-  is_default?: boolean;
-}
-
-export interface TemplateItemPayload {
-  item_id: string;
-  company_id: string;
-  product_name: string;
-  product_details?: string;
-  default_rate?: number;
-  preferred_rate?: number;
-  category?: string;
-  usage_count?: number;
-}
-
-export const createTemplateCategory = async (payload: TemplateCategoryPayload): Promise<ApiResponse> => {
-  return apiRequest("/template-categories", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const createTemplate = async (payload: TemplatePayload): Promise<ApiResponse> => {
-  return apiRequest("/templates", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const createTemplateItem = async (payload: TemplateItemPayload): Promise<ApiResponse> => {
-  return apiRequest("/template-items", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-// ==================== LIBRARY / LEARNING DATA ====================
-
-export interface LibraryItemPayload {
-  item_id: string;
-  company_id: string;
-  product_name: string;
-  product_details?: string;
-  city: string;
-  category: string;
-  rate: number;
-  area?: number;
-  usage_count: number;
-}
-
-export interface LibrarySectionPayload {
-  section_id: string;
-  company_id: string;
-  template_name: string;
-  category: string;
-  items: any[];
-  usage_count: number;
-}
-
-export interface LibraryQuotePayload {
-  quote_id: string;
-  company_id: string;
-  template_name: string;
-  category: string;
-  sections: any[];
-  city: string;
-  total: number;
-  usage_count: number;
-}
-
-export interface ClientBehaviorPayload {
-  behavior_id: string;
-  company_id: string;
-  client_id?: string;
-  quotation_id?: string;
-  city: string;
-  category: string;
-  template?: string;
-  rate: number;
-  area?: number;
-  final_price: number;
-  won_or_lost: "won" | "lost" | "pending";
-  payment_days?: number;
-}
-
-export const createLibraryItem = async (payload: LibraryItemPayload): Promise<ApiResponse> => {
-  return apiRequest("/library-items", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const createLibrarySection = async (payload: LibrarySectionPayload): Promise<ApiResponse> => {
-  return apiRequest("/library-sections", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const createLibraryQuote = async (payload: LibraryQuotePayload): Promise<ApiResponse> => {
-  return apiRequest("/library-quotes", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const createClientBehavior = async (payload: ClientBehaviorPayload): Promise<ApiResponse> => {
-  return apiRequest("/client-behavior", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-// ==================== FILES ====================
-
-export interface FilePayload {
-  file_id: string;
-  company_id: string;
-  project_id?: string;
-  quote_id?: string;
-  invoice_id?: string;
-  file_url: string;
-  file_type: "logo" | "signature" | "qr_code" | "room_photo" | "quote_pdf" | "invoice_pdf" | "document";
-  file_name?: string;
-}
-
-export const createFileRecord = async (payload: FilePayload): Promise<ApiResponse> => {
-  return apiRequest("/files", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-// ==================== ADMIN LOGS ====================
-
-export interface AdminLogPayload {
-  log_id: string;
-  company_id: string;
-  user_id: string;
-  action: string;
-  object_type: "quotation" | "invoice" | "client" | "measurement" | "template" | "file" | "user" | "settings";
-  object_id: string;
-  timestamp: string;
-  metadata?: any;
-}
-
-export const createAdminLog = async (payload: AdminLogPayload): Promise<ApiResponse> => {
-  return apiRequest("/admin-logs", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-// ==================== HELPER FUNCTIONS ====================
-
-/**
- * Log an admin action to AWS
- */
-export const logAdminAction = async (
-  companyId: string,
-  userId: string,
-  action: string,
-  objectType: AdminLogPayload["object_type"],
-  objectId: string,
-  metadata?: any
-): Promise<void> => {
-  try {
-    await createAdminLog({
-      log_id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      company_id: companyId,
-      user_id: userId,
-      action,
-      object_type: objectType,
-      object_id: objectId,
-      timestamp: new Date().toISOString(),
-      metadata,
-    });
-  } catch (error) {
-    // Silently fail - logging should not block operations
-    console.error("Failed to log admin action:", error);
-  }
-};
-
-/**
- * Record file upload in AWS after S3 upload
- */
-export const recordFileUpload = async (
-  companyId: string,
-  fileUrl: string,
-  fileType: FilePayload["file_type"],
-  options?: {
-    projectId?: string;
-    quoteId?: string;
-    invoiceId?: string;
-    fileName?: string;
-  }
-): Promise<void> => {
-  try {
-    await createFileRecord({
-      file_id: `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      company_id: companyId,
-      file_url: fileUrl,
-      file_type: fileType,
-      project_id: options?.projectId,
-      quote_id: options?.quoteId,
-      invoice_id: options?.invoiceId,
-      file_name: options?.fileName,
-    });
-  } catch (error) {
-    // Silently fail - file recording should not block operations
-    console.error("Failed to record file upload:", error);
-  }
-};
-
-/**
- * Build quotation payload for AWS from local data
- */
 export const buildQuotationPayload = (
   quotationId: string,
   companyId: string,
@@ -538,11 +239,8 @@ export const buildQuotationPayload = (
     quotationTitle: string;
     clientName: string;
     clientAddress: string;
-    clientId?: string;
-    projectId?: string;
     dateOfProposal: string;
     validTill: string;
-    projectDeadline?: string;
     placeOfProject: string;
     warranty: string;
     projectType: string;
@@ -556,14 +254,11 @@ export const buildQuotationPayload = (
     sections: QuotationSection[];
   }
 ): QuotationPayload => {
-  // Flatten all items for the items array
-  const allItems = data.sections.flatMap(section => section.items);
-  
+  const items = data.sections.flatMap(s => s.items);
+
   return {
     quotation_id: quotationId,
     company_id: companyId,
-    project_id: data.projectId,
-    client_id: data.clientId,
     quotation_number: data.quotationNumber,
     quotation_title: data.quotationTitle,
     client_name: data.clientName,
@@ -571,7 +266,6 @@ export const buildQuotationPayload = (
     city: data.placeOfProject,
     date_of_proposal: data.dateOfProposal,
     valid_till: data.validTill,
-    project_deadline: data.projectDeadline,
     place_of_project: data.placeOfProject,
     warranty: data.warranty,
     project_type: data.projectType,
@@ -584,6 +278,7 @@ export const buildQuotationPayload = (
     grand_total: data.grandTotal,
     total: data.grandTotal,
     sections: data.sections,
-    items: allItems,
+    items,
   };
 };
+
