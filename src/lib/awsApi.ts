@@ -29,7 +29,7 @@ const getAuthToken = async (): Promise<string | null> => {
 };
 
 /**
- * Make an authenticated request to the AWS API (via Supabase Edge Function proxy)
+ * // <-- end of apiRequest
  */
 const apiRequest = async <T = any>(
   endpoint: string,
@@ -56,6 +56,20 @@ const apiRequest = async <T = any>(
     const text = await response.text();
     const parsed = text ? JSON.parse(text) : null;
 
+    // ✅ Handle AWS wrapped responses { success, data }
+    if (parsed && typeof parsed === "object" && "success" in parsed) {
+      if (parsed.success === false) {
+        return {
+          success: false,
+          error: parsed.error || parsed.message || "API request failed",
+        };
+      }
+      if (parsed.success === true && "data" in parsed) {
+        return { success: true, data: parsed.data as T };
+      }
+    }
+
+    // ✅ Handle normal HTTP errors
     if (!response.ok) {
       return {
         success: false,
@@ -77,35 +91,6 @@ const apiRequest = async <T = any>(
   }
 };
 
-    // Support both shapes:
-    // 1) AWS returns the object directly
-    // 2) AWS returns { success, data, error/message }
-    if (parsed && typeof parsed === "object" && "success" in parsed) {
-      const wrapped = parsed as any;
-      if (wrapped.success === false) {
-        return { success: false, error: wrapped.error || wrapped.message || "API request failed" };
-      }
-      if (wrapped.success === true && "data" in wrapped) {
-        return { success: true, data: wrapped.data as T };
-      }
-    }
-
-    if (!response.ok) {
-      const message =
-        (parsed && (parsed.message || parsed.error)) ||
-        `API request failed (${response.status})`;
-      return { success: false, error: message };
-    }
-
-    return { success: true, data: parsed as T };
-  } catch (error) {
-    console.error("AWS API Error:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
-};
 
 // ==================== QUOTATIONS ====================
 
