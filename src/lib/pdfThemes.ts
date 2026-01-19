@@ -964,6 +964,8 @@ export interface PDFEditorSettings {
   sectionStyle: 'standard' | 'card' | 'line' | 'minimal';
   summaryStyle: 'right' | 'center' | 'full-width';
   pageMargins: 'narrow' | 'normal' | 'wide';
+  // Accept/Reject buttons
+  showAcceptRejectButtons: boolean;
   // Decoration settings
   showDecorations: boolean;
   decorationIntensity: 'subtle' | 'medium' | 'bold';
@@ -1065,6 +1067,7 @@ export const defaultEditorSettings: PDFEditorSettings = {
   sectionStyle: 'standard',
   summaryStyle: 'right',
   pageMargins: 'normal',
+  showAcceptRejectButtons: true,
   showDecorations: true,
   decorationIntensity: 'medium',
   showPageBorder: true,

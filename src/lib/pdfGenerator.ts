@@ -1225,7 +1225,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   // --- Accept/Reject Links Section ---
-  if (data.quotationId) {
+  const showAcceptReject = data.editorSettings?.showAcceptRejectButtons !== false;
+  if (data.quotationId && showAcceptReject) {
     if (yPosition > pageHeight - 45) {
       doc.addPage();
       yPosition = 15;
