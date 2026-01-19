@@ -644,6 +644,20 @@ export const PDFPreviewEditor = ({
                   Reduces spacing for more content per page
                 </p>
               </div>
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm">Accept/Reject Buttons</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Show response buttons in PDF
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editorSettings.showAcceptRejectButtons !== false}
+                    onCheckedChange={(v) => updateSettings({ showAcceptRejectButtons: v })}
+                  />
+                </div>
+              </div>
             </div>
           </TabsContent>
 
