@@ -10,10 +10,6 @@ import { supabase } from "@/integrations/supabase/client";
 
 const AWS_API_BASE_URL = "https://bqqxbtxch3.execute-api.ap-south-1.amazonaws.com";
 
-// IMPORTANT: Browser-to-AWS calls are blocked by CORS (API Gateway lacks ACAO headers).
-// Route all AWS API calls through a Supabase Edge Function proxy.
-const AWS_PROXY_FUNCTION_URL = "https://gclsgkhtwqurniitfeir.supabase.co/functions/v1/aws-proxy";
-
 interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -31,7 +27,7 @@ const getAuthToken = async (): Promise<string | null> => {
 };
 
 /**
- * Make an authenticated request to the AWS API (via Supabase Edge Function proxy)
+ * Make an authenticated request to the AWS API directly (no proxy)
  */
 const apiRequest = async <T = any>(
   endpoint: string,
@@ -43,10 +39,10 @@ const apiRequest = async <T = any>(
       return { success: false, error: "Not authenticated" };
     }
 
-    const proxyUrl = new URL(AWS_PROXY_FUNCTION_URL);
-    proxyUrl.searchParams.set("path", endpoint);
+    const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+    const url = `${AWS_API_BASE_URL}${normalizedEndpoint}`;
 
-    const response = await fetch(proxyUrl.toString(), {
+    const response = await fetch(url, {
       ...options,
       headers: {
         "Content-Type": "application/json",

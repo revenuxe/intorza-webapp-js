@@ -1,10 +1,12 @@
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Eye, EyeOff, Lock, Pencil } from "lucide-react";
+import { GripVertical, Eye, EyeOff, Lock, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PDFBlock } from "./types";
-import { PDFTheme, rgbToHex } from "@/lib/pdfThemes";
+import { PDFTheme } from "@/lib/pdfThemes";
+import { Input } from "@/components/ui/input";
 
 interface PDFBlockRendererProps {
   block: PDFBlock;
@@ -14,7 +16,7 @@ interface PDFBlockRendererProps {
   onSelect: () => void;
   onHover: (hovered: boolean) => void;
   onToggleVisibility: () => void;
-  onEdit?: () => void;
+  onDataChange?: (field: string, value: string) => void;
   quotationData: Record<string, unknown>;
   editorSettings: Record<string, unknown>;
   customizeSettings: Record<string, unknown>;
@@ -32,6 +34,100 @@ const BLOCK_LABELS: Record<string, string> = {
   'accept-reject': 'Accept/Reject Buttons',
 };
 
+// Inline editable text component
+const EditableText = ({ 
+  value, 
+  field, 
+  onSave, 
+  className = "",
+  placeholder = "Click to edit",
+  as: Component = "span"
+}: {
+  value: string;
+  field: string;
+  onSave: (field: string, value: string) => void;
+  className?: string;
+  placeholder?: string;
+  as?: "span" | "p" | "h1" | "div";
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    setEditValue(value);
+  }, [value]);
+
+  const handleSave = () => {
+    onSave(field, editValue);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(value);
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave();
+    } else if (e.key === 'Escape') {
+      handleCancel();
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-1 relative">
+        <Input
+          ref={inputRef}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSave}
+          className="h-6 text-xs py-0 px-2 min-w-[80px]"
+        />
+        <button 
+          onClick={handleSave}
+          className="p-0.5 hover:bg-green-100 rounded text-green-600"
+        >
+          <Check className="h-3 w-3" />
+        </button>
+        <button 
+          onClick={handleCancel}
+          className="p-0.5 hover:bg-red-100 rounded text-red-600"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <Component 
+      className={cn(
+        className,
+        "cursor-text hover:bg-primary/5 hover:outline hover:outline-1 hover:outline-primary/30 rounded px-0.5 transition-all inline-block",
+        !value && "text-muted-foreground italic"
+      )}
+      onClick={(e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
+      title="Click to edit"
+    >
+      {value || placeholder}
+    </Component>
+  );
+};
+
 export const PDFBlockRenderer = ({
   block,
   isSelected,
@@ -40,7 +136,7 @@ export const PDFBlockRenderer = ({
   onSelect,
   onHover,
   onToggleVisibility,
-  onEdit,
+  onDataChange,
   quotationData,
   editorSettings,
   customizeSettings,
@@ -61,6 +157,10 @@ export const PDFBlockRenderer = ({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : block.visible ? 1 : 0.4,
+  };
+
+  const handleDataChange = (field: string, value: string) => {
+    onDataChange?.(field, value);
   };
 
   const getPreviewStyles = () => ({
@@ -90,15 +190,22 @@ export const PDFBlockRenderer = ({
         return (
           <div className="flex items-center gap-4 pb-4 border-b" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>
             <div 
-              className="w-14 h-14 rounded flex items-center justify-center text-white text-xs font-bold"
+              className="w-14 h-14 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
               style={getHeaderStyle()}
             >
               {(quotationData.companyLogo as string) ? (
                 <img src={quotationData.companyLogo as string} alt="Logo" className="w-full h-full object-contain rounded" />
               ) : 'LOGO'}
             </div>
-            <div className="flex-1">
-              <h1 className="text-lg font-bold">{(quotationData.companyName as string) || 'Company Name'}</h1>
+            <div className="flex-1 min-w-0">
+              <EditableText
+                value={(quotationData.companyName as string) || ''}
+                field="companyName"
+                onSave={handleDataChange}
+                placeholder="Company Name"
+                as="h1"
+                className="text-lg font-bold"
+              />
               <p className="text-xs text-muted-foreground">Company Address & Contact</p>
             </div>
           </div>
@@ -108,8 +215,22 @@ export const PDFBlockRenderer = ({
         return (
           <div className="p-3 rounded border" style={getCardStyle()}>
             <p className="text-[10px] font-medium text-muted-foreground mb-1">QUOTATION FOR</p>
-            <p className="font-semibold text-sm">{(quotationData.clientName as string) || 'Client Name'}</p>
-            <p className="text-xs text-muted-foreground">{(quotationData.clientAddress as string) || 'Client Address'}</p>
+            <EditableText
+              value={(quotationData.clientName as string) || ''}
+              field="clientName"
+              onSave={handleDataChange}
+              placeholder="Client Name"
+              as="p"
+              className="font-semibold text-sm"
+            />
+            <EditableText
+              value={(quotationData.clientAddress as string) || ''}
+              field="clientAddress"
+              onSave={handleDataChange}
+              placeholder="Client Address"
+              as="p"
+              className="text-xs text-muted-foreground"
+            />
           </div>
         );
 
@@ -118,8 +239,24 @@ export const PDFBlockRenderer = ({
           <div className="p-3 rounded border" style={getCardStyle()}>
             <p className="text-[10px] font-medium text-muted-foreground mb-1">PROJECT DETAILS</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div><span className="text-muted-foreground">Project:</span> {(quotationData.quotationTitle as string) || 'Project Name'}</div>
-              <div><span className="text-muted-foreground">Date:</span> {(quotationData.dateOfProposal as string) || 'DD/MM/YYYY'}</div>
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground shrink-0">Project:</span>
+                <EditableText
+                  value={(quotationData.quotationTitle as string) || ''}
+                  field="quotationTitle"
+                  onSave={handleDataChange}
+                  placeholder="Project Name"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground shrink-0">Date:</span>
+                <EditableText
+                  value={(quotationData.dateOfProposal as string) || ''}
+                  field="dateOfProposal"
+                  onSave={handleDataChange}
+                  placeholder="DD/MM/YYYY"
+                />
+              </div>
             </div>
           </div>
         );
@@ -150,6 +287,9 @@ export const PDFBlockRenderer = ({
                 </tr>
               </tbody>
             </table>
+            <p className="text-[9px] text-muted-foreground mt-2 text-center italic">
+              Table data is read-only in preview. Edit in form.
+            </p>
           </div>
         );
 
@@ -283,14 +423,6 @@ export const PDFBlockRenderer = ({
           <span className="text-xs font-medium">{BLOCK_LABELS[block.type]}</span>
         </div>
         <div className="flex items-center gap-1">
-          {onEdit && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); onEdit(); }}
-              className="p-1 hover:bg-muted rounded transition-colors"
-            >
-              <Pencil className="h-3 w-3 text-muted-foreground" />
-            </button>
-          )}
           <button 
             onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
             className="p-1 hover:bg-muted rounded transition-colors"
