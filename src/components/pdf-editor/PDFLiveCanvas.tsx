@@ -34,6 +34,7 @@ interface PDFLiveCanvasProps {
   quotationData: Record<string, unknown>;
   customizeSettings: Record<string, unknown>;
   onBlockOrderChange?: (blocks: PDFBlock[]) => void;
+  onDataChange?: (field: string, value: string) => void;
   className?: string;
 }
 
@@ -42,6 +43,7 @@ export const PDFLiveCanvas = ({
   quotationData,
   customizeSettings,
   onBlockOrderChange,
+  onDataChange,
   className,
 }: PDFLiveCanvasProps) => {
   const [state, dispatch] = useReducer(pdfEditorReducer, {
@@ -239,6 +241,7 @@ export const PDFLiveCanvas = ({
                             dispatch({ type: 'PUSH_HISTORY' });
                             dispatch({ type: 'TOGGLE_VISIBILITY', blockId: block.id });
                           }}
+                          onDataChange={onDataChange}
                           quotationData={quotationData}
                           editorSettings={editorSettings as unknown as Record<string, unknown>}
                           customizeSettings={customizeSettings}
