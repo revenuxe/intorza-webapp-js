@@ -228,25 +228,27 @@ export const PDFLiveCanvas = ({
                 >
                   <AnimatePresence mode="popLayout">
                     <div className="space-y-4">
-                      {state.blocks.map((block) => (
-                        <PDFBlockRenderer
-                          key={block.id}
-                          block={block}
-                          isSelected={state.selectedBlockId === block.id}
-                          isHovered={state.hoveredBlockId === block.id}
-                          theme={currentTheme}
-                          onSelect={() => dispatch({ type: 'SELECT_BLOCK', blockId: block.id })}
-                          onHover={(hovered) => dispatch({ type: 'HOVER_BLOCK', blockId: hovered ? block.id : null })}
-                          onToggleVisibility={() => {
-                            dispatch({ type: 'PUSH_HISTORY' });
-                            dispatch({ type: 'TOGGLE_VISIBILITY', blockId: block.id });
-                          }}
-                          onDataChange={onDataChange}
-                          quotationData={quotationData}
-                          editorSettings={editorSettings as unknown as Record<string, unknown>}
-                          customizeSettings={customizeSettings}
-                        />
-                      ))}
+                      {state.blocks
+                        .filter((block) => block.visible)
+                        .map((block) => (
+                          <PDFBlockRenderer
+                            key={block.id}
+                            block={block}
+                            isSelected={state.selectedBlockId === block.id}
+                            isHovered={state.hoveredBlockId === block.id}
+                            theme={currentTheme}
+                            onSelect={() => dispatch({ type: 'SELECT_BLOCK', blockId: block.id })}
+                            onHover={(hovered) => dispatch({ type: 'HOVER_BLOCK', blockId: hovered ? block.id : null })}
+                            onToggleVisibility={() => {
+                              dispatch({ type: 'PUSH_HISTORY' });
+                              dispatch({ type: 'TOGGLE_VISIBILITY', blockId: block.id });
+                            }}
+                            onDataChange={onDataChange}
+                            quotationData={quotationData}
+                            editorSettings={editorSettings}
+                            customizeSettings={customizeSettings}
+                          />
+                        ))}
                     </div>
                   </AnimatePresence>
                 </SortableContext>
@@ -274,6 +276,15 @@ function getInitialBlocks(customizeSettings: Record<string, unknown>, editorSett
         break;
       case 'project-info':
         visible = (customizeSettings.showProjectDetails as boolean) !== false;
+        break;
+      case 'payment-stages':
+        visible = (customizeSettings.showPaymentStages as boolean) !== false;
+        break;
+      case 'terms':
+        visible = (customizeSettings.showTermsConditions as boolean) !== false;
+        break;
+      case 'warranty':
+        visible = editorSettings.showWarranty !== false;
         break;
       case 'signature':
         visible = (customizeSettings.showSignatureArea as boolean) !== false;

@@ -966,6 +966,8 @@ export interface PDFEditorSettings {
   pageMargins: 'narrow' | 'normal' | 'wide';
   // Accept/Reject buttons
   showAcceptRejectButtons: boolean;
+  // Warranty section
+  showWarranty: boolean;
   // Decoration settings
   showDecorations: boolean;
   decorationIntensity: 'subtle' | 'medium' | 'bold';
@@ -1068,6 +1070,7 @@ export const defaultEditorSettings: PDFEditorSettings = {
   summaryStyle: 'right',
   pageMargins: 'normal',
   showAcceptRejectButtons: true,
+  showWarranty: true,
   showDecorations: true,
   decorationIntensity: 'medium',
   showPageBorder: true,

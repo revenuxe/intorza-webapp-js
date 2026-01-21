@@ -5,8 +5,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Eye, EyeOff, Lock, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PDFBlock } from "./types";
-import { PDFTheme } from "@/lib/pdfThemes";
+import { PDFTheme, PDFEditorSettings } from "@/lib/pdfThemes";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 interface PDFBlockRendererProps {
   block: PDFBlock;
@@ -18,7 +19,7 @@ interface PDFBlockRendererProps {
   onToggleVisibility: () => void;
   onDataChange?: (field: string, value: string) => void;
   quotationData: Record<string, unknown>;
-  editorSettings: Record<string, unknown>;
+  editorSettings: PDFEditorSettings;
   customizeSettings: Record<string, unknown>;
 }
 
@@ -30,6 +31,7 @@ const BLOCK_LABELS: Record<string, string> = {
   'summary': 'Price Summary',
   'payment-stages': 'Payment Stages',
   'terms': 'Terms & Conditions',
+  'warranty': 'Warranty',
   'signature': 'Signature Area',
   'accept-reject': 'Accept/Reject Buttons',
 };
@@ -41,7 +43,8 @@ const EditableText = ({
   onSave, 
   className = "",
   placeholder = "Click to edit",
-  as: Component = "span"
+  as: Component = "span",
+  multiline = false,
 }: {
   value: string;
   field: string;
@@ -49,17 +52,24 @@ const EditableText = ({
   className?: string;
   placeholder?: string;
   as?: "span" | "p" | "h1" | "div";
+  multiline?: boolean;
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+    if (isEditing) {
+      if (multiline && textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.select();
+      } else if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
     }
-  }, [isEditing]);
+  }, [isEditing, multiline]);
 
   useEffect(() => {
     setEditValue(value);
@@ -76,7 +86,7 @@ const EditableText = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !multiline) {
       handleSave();
     } else if (e.key === 'Escape') {
       handleCancel();
@@ -85,15 +95,25 @@ const EditableText = ({
 
   if (isEditing) {
     return (
-      <div className="flex items-center gap-1 relative">
-        <Input
-          ref={inputRef}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={handleSave}
-          className="h-6 text-xs py-0 px-2 min-w-[80px]"
-        />
+      <div className="flex items-start gap-1 relative">
+        {multiline ? (
+          <Textarea
+            ref={textareaRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="text-xs min-h-[60px] min-w-[150px]"
+          />
+        ) : (
+          <Input
+            ref={inputRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleSave}
+            className="h-6 text-xs py-0 px-2 min-w-[80px]"
+          />
+        )}
         <button 
           onClick={handleSave}
           className="p-0.5 hover:bg-green-100 rounded text-green-600"
@@ -184,29 +204,48 @@ export const PDFBlockRenderer = ({
     borderRadius: '2px',
   });
 
+  // Get decoration styles based on theme
+  const getDecorationColor = () => {
+    const decorColor = theme.colors.decorationPrimary || theme.colors.accent;
+    return `rgb(${decorColor.join(',')})`;
+  };
+
+  const showDecorations = editorSettings.showDecorations !== false;
+  const showCornerOrnaments = editorSettings.showCornerOrnaments !== false;
+  const showSectionDividers = editorSettings.showSectionDividers !== false;
+
   const renderBlockContent = () => {
     switch (block.type) {
       case 'header':
         return (
-          <div className="flex items-center gap-4 pb-4 border-b" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>
-            <div 
-              className="w-14 h-14 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
-              style={getHeaderStyle()}
-            >
-              {(quotationData.companyLogo as string) ? (
-                <img src={quotationData.companyLogo as string} alt="Logo" className="w-full h-full object-contain rounded" />
-              ) : 'LOGO'}
-            </div>
-            <div className="flex-1 min-w-0">
-              <EditableText
-                value={(quotationData.companyName as string) || ''}
-                field="companyName"
-                onSave={handleDataChange}
-                placeholder="Company Name"
-                as="h1"
-                className="text-lg font-bold"
-              />
-              <p className="text-xs text-muted-foreground">Company Address & Contact</p>
+          <div className="relative">
+            {/* Corner ornaments */}
+            {showDecorations && showCornerOrnaments && theme.decorations.showCornerOrnaments && (
+              <>
+                <div className="absolute -top-2 -left-2 w-6 h-6" style={{ borderTop: `2px solid ${getDecorationColor()}`, borderLeft: `2px solid ${getDecorationColor()}` }} />
+                <div className="absolute -top-2 -right-2 w-6 h-6" style={{ borderTop: `2px solid ${getDecorationColor()}`, borderRight: `2px solid ${getDecorationColor()}` }} />
+              </>
+            )}
+            <div className="flex items-center gap-4 pb-4 border-b" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>
+              <div 
+                className="w-14 h-14 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
+                style={getHeaderStyle()}
+              >
+                {(quotationData.companyLogo as string) ? (
+                  <img src={quotationData.companyLogo as string} alt="Logo" className="w-full h-full object-contain rounded" />
+                ) : 'LOGO'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <EditableText
+                  value={(quotationData.companyName as string) || ''}
+                  field="companyName"
+                  onSave={handleDataChange}
+                  placeholder="Company Name"
+                  as="h1"
+                  className="text-lg font-bold"
+                />
+                <p className="text-xs text-muted-foreground">Company Address & Contact</p>
+              </div>
             </div>
           </div>
         );
@@ -317,52 +356,123 @@ export const PDFBlockRenderer = ({
           </div>
         );
 
-      case 'payment-stages':
+      case 'payment-stages': {
+        const paymentStages = (quotationData.paymentStages as Array<{ stageName?: string; percentage?: number; amount?: number }>) || [
+          { stageName: 'Advance', percentage: 40, amount: 22184 },
+          { stageName: 'Progress', percentage: 40, amount: 22184 },
+          { stageName: 'Completion', percentage: 20, amount: 11092 },
+        ];
         return (
           <div className="p-3 rounded border" style={getCardStyle()}>
+            {showDecorations && showSectionDividers && (
+              <div className="h-0.5 mb-3" style={{ background: `linear-gradient(90deg, transparent, ${getDecorationColor()}, transparent)` }} />
+            )}
             <p className="text-xs font-bold mb-2">STAGEWISE PAYMENT OPTION</p>
             <div className="grid grid-cols-3 gap-2 text-[10px]">
-              <div className="text-center p-2 rounded bg-muted/50">
-                <p className="font-semibold">Stage 1</p>
-                <p>Advance - 40%</p>
-                <p className="font-bold" style={getHighlightStyle()}>₹22,184</p>
-              </div>
-              <div className="text-center p-2 rounded bg-muted/50">
-                <p className="font-semibold">Stage 2</p>
-                <p>Progress - 40%</p>
-                <p className="font-bold">₹22,184</p>
-              </div>
-              <div className="text-center p-2 rounded bg-muted/50">
-                <p className="font-semibold">Stage 3</p>
-                <p>Completion - 20%</p>
-                <p className="font-bold">₹11,092</p>
-              </div>
+              {paymentStages.map((stage, index) => (
+                <div key={index} className="text-center p-2 rounded bg-muted/50">
+                  <p className="font-semibold">Stage {index + 1}</p>
+                  <div className="flex items-center justify-center gap-1">
+                    <EditableText
+                      value={stage.stageName || `Stage ${index + 1}`}
+                      field={`paymentStage.${index}.stageName`}
+                      onSave={handleDataChange}
+                      placeholder="Stage Name"
+                      className="text-[10px]"
+                    />
+                    <span>-</span>
+                    <EditableText
+                      value={String(stage.percentage || 0)}
+                      field={`paymentStage.${index}.percentage`}
+                      onSave={handleDataChange}
+                      placeholder="0"
+                      className="text-[10px] w-6"
+                    />
+                    <span>%</span>
+                  </div>
+                  <p className="font-bold" style={index === 0 ? getHighlightStyle() : {}}>
+                    ₹{(stage.amount || 0).toLocaleString()}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         );
+      }
 
-      case 'terms':
+      case 'terms': {
+        const termsContent = (quotationData.termsConditions as string[]) || [
+          'Project duration is 30 days after design phase',
+          'Material dispatch as per schedule',
+          'Site must be ready for work',
+        ];
         return (
           <div className="p-3 rounded border" style={getCardStyle()}>
+            {showDecorations && showSectionDividers && (
+              <div className="h-0.5 mb-3" style={{ background: `linear-gradient(90deg, transparent, ${getDecorationColor()}, transparent)` }} />
+            )}
             <p className="text-xs font-bold mb-2">TERMS & CONDITIONS</p>
             <ul className="text-[10px] space-y-1 text-muted-foreground list-disc list-inside">
-              <li>Project duration is 30 days after design phase</li>
-              <li>Material dispatch as per schedule</li>
-              <li>Site must be ready for work</li>
+              {termsContent.map((term, index) => (
+                <li key={index} className="flex items-start gap-1">
+                  <span className="shrink-0">•</span>
+                  <EditableText
+                    value={term}
+                    field={`terms.${index}`}
+                    onSave={handleDataChange}
+                    placeholder="Enter term"
+                    className="text-[10px]"
+                  />
+                </li>
+              ))}
             </ul>
+            <p className="text-[9px] text-primary mt-2 cursor-pointer hover:underline" onClick={(e) => e.stopPropagation()}>
+              + Add term
+            </p>
           </div>
         );
+      }
+
+      case 'warranty': {
+        const warrantyText = (quotationData.warranty as string) || '1 year warranty on all work performed. Warranty covers manufacturing defects and installation issues.';
+        return (
+          <div className="p-3 rounded border" style={getCardStyle()}>
+            {showDecorations && showSectionDividers && (
+              <div className="h-0.5 mb-3" style={{ background: `linear-gradient(90deg, transparent, ${getDecorationColor()}, transparent)` }} />
+            )}
+            <p className="text-xs font-bold mb-2">WARRANTY</p>
+            <EditableText
+              value={warrantyText}
+              field="warranty"
+              onSave={handleDataChange}
+              placeholder="Enter warranty terms"
+              as="p"
+              className="text-[10px] text-muted-foreground"
+              multiline
+            />
+          </div>
+        );
+      }
 
       case 'signature':
         return (
-          <div className="grid grid-cols-2 gap-4 pt-4 border-t" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>
-            <div className="text-center">
-              <div className="h-12 border-b mb-1" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}></div>
-              <p className="text-[9px] text-muted-foreground">Customer Signature</p>
-            </div>
-            <div className="text-center">
-              <div className="h-12 border-b mb-1" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}></div>
-              <p className="text-[9px] text-muted-foreground">Authorized Signature</p>
+          <div className="relative">
+            {/* Bottom corner ornaments */}
+            {showDecorations && showCornerOrnaments && theme.decorations.showCornerOrnaments && (
+              <>
+                <div className="absolute -bottom-2 -left-2 w-6 h-6" style={{ borderBottom: `2px solid ${getDecorationColor()}`, borderLeft: `2px solid ${getDecorationColor()}` }} />
+                <div className="absolute -bottom-2 -right-2 w-6 h-6" style={{ borderBottom: `2px solid ${getDecorationColor()}`, borderRight: `2px solid ${getDecorationColor()}` }} />
+              </>
+            )}
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>
+              <div className="text-center">
+                <div className="h-12 border-b mb-1" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}></div>
+                <p className="text-[9px] text-muted-foreground">Customer Signature</p>
+              </div>
+              <div className="text-center">
+                <div className="h-12 border-b mb-1" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}></div>
+                <p className="text-[9px] text-muted-foreground">Authorized Signature</p>
+              </div>
             </div>
           </div>
         );

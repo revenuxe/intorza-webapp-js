@@ -9,7 +9,8 @@ import {
   CreditCard,
   ScrollText,
   PenTool,
-  CheckCircle2
+  CheckCircle2,
+  Shield
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,7 @@ const BLOCKS: BlockConfig[] = [
   { id: 'summary', label: 'Price Summary', description: 'Totals and GST', icon: Calculator, settingKey: 'showProjectDetails', locked: true },
   { id: 'payment', label: 'Payment Stages', description: 'Milestone payments', icon: CreditCard, settingKey: 'showPaymentStages' },
   { id: 'terms', label: 'Terms & Conditions', description: 'Legal terms', icon: ScrollText, settingKey: 'showTermsConditions' },
+  { id: 'warranty', label: 'Warranty', description: 'Warranty terms', icon: Shield, settingKey: 'showWarranty', isEditorSetting: true },
   { id: 'signature', label: 'Signature Area', description: 'Signature boxes', icon: PenTool, settingKey: 'showSignatureArea' },
   { id: 'accept-reject', label: 'Accept/Reject', description: 'Response buttons', icon: CheckCircle2, settingKey: 'showAcceptRejectButtons', isEditorSetting: true },
 ];
