@@ -2,7 +2,7 @@
 
 export interface PDFBlock {
   id: string;
-  type: 'header' | 'client-info' | 'project-info' | 'section' | 'items-table' | 'summary' | 'payment-stages' | 'terms' | 'signature' | 'accept-reject';
+  type: 'header' | 'client-info' | 'project-info' | 'section' | 'items-table' | 'summary' | 'payment-stages' | 'terms' | 'warranty' | 'signature' | 'accept-reject';
   visible: boolean;
   locked?: boolean;
   data?: Record<string, unknown>;
@@ -37,6 +37,7 @@ export const DEFAULT_BLOCKS: PDFBlock[] = [
   { id: 'summary', type: 'summary', visible: true },
   { id: 'payment-stages', type: 'payment-stages', visible: true },
   { id: 'terms', type: 'terms', visible: true },
+  { id: 'warranty', type: 'warranty', visible: true },
   { id: 'signature', type: 'signature', visible: true },
   { id: 'accept-reject', type: 'accept-reject', visible: true },
 ];
