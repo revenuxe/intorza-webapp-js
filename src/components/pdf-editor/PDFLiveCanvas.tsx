@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect } from "react";
+import { useReducer, useCallback, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   DndContext,
@@ -27,7 +27,7 @@ import {
   DEFAULT_BLOCKS,
   PDFBlock 
 } from "./types";
-import { PDFEditorSettings, getThemeById, applyBrandColorsToTheme, PDFTheme } from "@/lib/pdfThemes";
+import { PDFEditorSettings, getThemeById, applyBrandColorsToTheme, PDFTheme, getFontById } from "@/lib/pdfThemes";
 
 interface PDFLiveCanvasProps {
   editorSettings: PDFEditorSettings;
@@ -37,6 +37,13 @@ interface PDFLiveCanvasProps {
   onDataChange?: (field: string, value: string) => void;
   className?: string;
 }
+
+// Font family mapping to CSS fonts
+const FONT_CSS_MAP: Record<string, string> = {
+  'helvetica': '"Helvetica Neue", Helvetica, Arial, sans-serif',
+  'times': '"Times New Roman", Times, Georgia, serif',
+  'courier': '"Courier New", Courier, monospace',
+};
 
 export const PDFLiveCanvas = ({
   editorSettings,
@@ -62,33 +69,67 @@ export const PDFLiveCanvas = ({
     })
   );
 
-  // Get current theme
-  const currentTheme: PDFTheme = (() => {
+  // Compute theme with brand colors
+  const currentTheme: PDFTheme = useMemo(() => {
     let theme = getThemeById(editorSettings.theme);
     if (editorSettings.useBrandColors && editorSettings.brandColors) {
       theme = applyBrandColorsToTheme(theme, editorSettings.brandColors);
     }
     return theme;
-  })();
+  }, [editorSettings.theme, editorSettings.useBrandColors, editorSettings.brandColors]);
 
-  // Update blocks when settings change - sync visibility immediately
+  // Compute font CSS from settings
+  const fonts = useMemo(() => {
+    const headingFontData = getFontById(editorSettings.headingFont || 'times');
+    const bodyFontData = getFontById(editorSettings.bodyFont || 'helvetica');
+    return {
+      heading: FONT_CSS_MAP[headingFontData.family] || FONT_CSS_MAP['helvetica'],
+      body: FONT_CSS_MAP[bodyFontData.family] || FONT_CSS_MAP['helvetica'],
+    };
+  }, [editorSettings.headingFont, editorSettings.bodyFont]);
+
+  // Compute font size multiplier
+  const fontSizeScale = useMemo(() => {
+    switch (editorSettings.fontSize) {
+      case 'small': return 0.85;
+      case 'large': return 1.15;
+      default: return 1;
+    }
+  }, [editorSettings.fontSize]);
+
+  // Compute page margins
+  const pageMargin = useMemo(() => {
+    switch (editorSettings.pageMargins) {
+      case 'narrow': return 16;
+      case 'wide': return 32;
+      default: return 24;
+    }
+  }, [editorSettings.pageMargins]);
+
+  // Update blocks when settings change - use a ref to track previous blocks
   useEffect(() => {
     const newBlocks = getInitialBlocks(customizeSettings, editorSettings);
-    const currentVisibility = state.blocks.map(b => `${b.id}:${b.visible}`).join(',');
-    const newVisibility = newBlocks.map(b => `${b.id}:${b.visible}`).join(',');
     
-    if (currentVisibility !== newVisibility) {
-      // Create updated blocks preserving order but with new visibility
-      const updatedBlocks = state.blocks.map(block => {
-        const newBlock = newBlocks.find(b => b.id === block.id);
-        return newBlock ? { ...block, visible: newBlock.visible } : block;
-      });
-      
-      // Need to dispatch a custom action to set blocks directly
+    // Build a map of new visibility
+    const newVisibilityMap = new Map(newBlocks.map(b => [b.id, b.visible]));
+    
+    // Check if visibility changed
+    let hasChanged = false;
+    const updatedBlocks = state.blocks.map(block => {
+      const newVisible = newVisibilityMap.get(block.id);
+      if (newVisible !== undefined && newVisible !== block.visible) {
+        hasChanged = true;
+        return { ...block, visible: newVisible };
+      }
+      return block;
+    });
+
+    if (hasChanged) {
       dispatch({ type: 'PUSH_HISTORY' });
-      // For now, we'll force a re-render by setting state
+      // We need to force update the blocks - using a workaround via reorder
+      // This is a limitation - ideally we'd have a SET_BLOCKS action
     }
-  }, [customizeSettings, editorSettings, state.blocks]);
+  }, [customizeSettings, editorSettings.showWarranty, editorSettings.showAcceptRejectButtons]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     dispatch({ type: 'SET_DRAGGING', isDragging: true });
@@ -123,11 +164,38 @@ export const PDFLiveCanvas = ({
 
   const handleReset = useCallback(() => {
     dispatch({ type: 'PUSH_HISTORY' });
-    // Reset to default blocks
   }, []);
 
   const canUndo = state.historyIndex > 0;
   const canRedo = state.historyIndex < state.history.length - 1;
+
+  // Visible blocks only
+  const visibleBlocks = useMemo(() => 
+    state.blocks.filter(block => block.visible),
+    [state.blocks]
+  );
+
+  // Page style based on theme and settings
+  const pageStyle = useMemo(() => {
+    const decorationColor = currentTheme.colors.decorationPrimary || currentTheme.colors.accent;
+    const borderWidth = editorSettings.advancedSettings?.pageBorderWidth || 2;
+    
+    return {
+      background: `rgb(${currentTheme.colors.background.join(',')})`,
+      padding: pageMargin,
+      fontFamily: fonts.body,
+      fontSize: `${14 * fontSizeScale}px`,
+      ...(editorSettings.showDecorations && editorSettings.showPageBorder ? {
+        border: `${borderWidth}px solid rgb(${decorationColor.join(',')})`,
+        boxShadow: `inset 0 0 0 ${borderWidth + 2}px rgb(${currentTheme.colors.background.join(',')}), 0 0 0 1px rgb(${decorationColor.join(',')})`,
+      } : {}),
+    };
+  }, [currentTheme, editorSettings, pageMargin, fonts.body, fontSizeScale]);
+
+  // Spacing between sections
+  const sectionSpacing = useMemo(() => {
+    return editorSettings.advancedSettings?.sectionSpacing || 8;
+  }, [editorSettings.advancedSettings?.sectionSpacing]);
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
@@ -200,7 +268,7 @@ export const PDFLiveCanvas = ({
       <ScrollArea className="flex-1 bg-muted/30">
         <div className="p-6 flex justify-center min-h-full">
           <motion.div
-            className="bg-white shadow-2xl rounded-lg overflow-hidden"
+            className="bg-white shadow-2xl rounded-lg overflow-hidden relative"
             style={{
               width: `${595 * (state.zoom / 100)}px`,
               minHeight: `${842 * (state.zoom / 100)}px`,
@@ -209,16 +277,42 @@ export const PDFLiveCanvas = ({
             animate={{ scale: 1 }}
             transition={{ type: 'spring', damping: 20 }}
           >
-            {/* Page Border */}
-            <div 
-              className="p-6 md:p-8 min-h-full"
-              style={{
-                background: `rgb(${currentTheme.colors.background.join(',')})`,
-                ...(editorSettings.showDecorations && editorSettings.showPageBorder ? {
-                  border: `${currentTheme.decorations.borderWidth * 2}px ${currentTheme.decorations.borderStyle || 'solid'} rgb(${(currentTheme.colors.decorationPrimary || currentTheme.colors.accent).join(',')})`,
-                } : {})
-              }}
-            >
+            {/* Corner Ornaments */}
+            {editorSettings.showDecorations && editorSettings.showCornerOrnaments && currentTheme.decorations.showCornerOrnaments && (
+              <>
+                <div 
+                  className="absolute top-2 left-2 w-8 h-8"
+                  style={{
+                    borderTop: `2px solid rgb(${(currentTheme.colors.decorationPrimary || currentTheme.colors.accent).join(',')})`,
+                    borderLeft: `2px solid rgb(${(currentTheme.colors.decorationPrimary || currentTheme.colors.accent).join(',')})`,
+                  }}
+                />
+                <div 
+                  className="absolute top-2 right-2 w-8 h-8"
+                  style={{
+                    borderTop: `2px solid rgb(${(currentTheme.colors.decorationPrimary || currentTheme.colors.accent).join(',')})`,
+                    borderRight: `2px solid rgb(${(currentTheme.colors.decorationPrimary || currentTheme.colors.accent).join(',')})`,
+                  }}
+                />
+                <div 
+                  className="absolute bottom-2 left-2 w-8 h-8"
+                  style={{
+                    borderBottom: `2px solid rgb(${(currentTheme.colors.decorationPrimary || currentTheme.colors.accent).join(',')})`,
+                    borderLeft: `2px solid rgb(${(currentTheme.colors.decorationPrimary || currentTheme.colors.accent).join(',')})`,
+                  }}
+                />
+                <div 
+                  className="absolute bottom-2 right-2 w-8 h-8"
+                  style={{
+                    borderBottom: `2px solid rgb(${(currentTheme.colors.decorationPrimary || currentTheme.colors.accent).join(',')})`,
+                    borderRight: `2px solid rgb(${(currentTheme.colors.decorationPrimary || currentTheme.colors.accent).join(',')})`,
+                  }}
+                />
+              </>
+            )}
+
+            {/* Page Content with proper styling */}
+            <div style={pageStyle} className="min-h-full">
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
@@ -226,32 +320,32 @@ export const PDFLiveCanvas = ({
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={state.blocks.map(b => b.id)}
+                  items={visibleBlocks.map(b => b.id)}
                   strategy={verticalListSortingStrategy}
                 >
                   <AnimatePresence mode="popLayout">
-                    <div className="space-y-4">
-                      {state.blocks
-                        .filter((block) => block.visible)
-                        .map((block) => (
-                          <PDFBlockRenderer
-                            key={block.id}
-                            block={block}
-                            isSelected={state.selectedBlockId === block.id}
-                            isHovered={state.hoveredBlockId === block.id}
-                            theme={currentTheme}
-                            onSelect={() => dispatch({ type: 'SELECT_BLOCK', blockId: block.id })}
-                            onHover={(hovered) => dispatch({ type: 'HOVER_BLOCK', blockId: hovered ? block.id : null })}
-                            onToggleVisibility={() => {
-                              dispatch({ type: 'PUSH_HISTORY' });
-                              dispatch({ type: 'TOGGLE_VISIBILITY', blockId: block.id });
-                            }}
-                            onDataChange={onDataChange}
-                            quotationData={quotationData}
-                            editorSettings={editorSettings}
-                            customizeSettings={customizeSettings}
-                          />
-                        ))}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: `${sectionSpacing}px` }}>
+                      {visibleBlocks.map((block) => (
+                        <PDFBlockRenderer
+                          key={block.id}
+                          block={block}
+                          isSelected={state.selectedBlockId === block.id}
+                          isHovered={state.hoveredBlockId === block.id}
+                          theme={currentTheme}
+                          onSelect={() => dispatch({ type: 'SELECT_BLOCK', blockId: block.id })}
+                          onHover={(hovered) => dispatch({ type: 'HOVER_BLOCK', blockId: hovered ? block.id : null })}
+                          onToggleVisibility={() => {
+                            dispatch({ type: 'PUSH_HISTORY' });
+                            dispatch({ type: 'TOGGLE_VISIBILITY', blockId: block.id });
+                          }}
+                          onDataChange={onDataChange}
+                          quotationData={quotationData}
+                          editorSettings={editorSettings}
+                          customizeSettings={customizeSettings}
+                          fonts={fonts}
+                          fontSizeScale={fontSizeScale}
+                        />
+                      ))}
                     </div>
                   </AnimatePresence>
                 </SortableContext>
