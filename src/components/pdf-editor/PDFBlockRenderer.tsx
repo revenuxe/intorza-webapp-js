@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Eye, EyeOff, Lock, Check, X } from "lucide-react";
@@ -21,6 +21,8 @@ interface PDFBlockRendererProps {
   quotationData: Record<string, unknown>;
   editorSettings: PDFEditorSettings;
   customizeSettings: Record<string, unknown>;
+  fonts: { heading: string; body: string };
+  fontSizeScale: number;
 }
 
 const BLOCK_LABELS: Record<string, string> = {
@@ -43,7 +45,7 @@ const EditableText = ({
   onSave, 
   className = "",
   placeholder = "Click to edit",
-  as: Component = "span",
+  style = {},
   multiline = false,
 }: {
   value: string;
@@ -51,7 +53,7 @@ const EditableText = ({
   onSave: (field: string, value: string) => void;
   className?: string;
   placeholder?: string;
-  as?: "span" | "p" | "h1" | "div";
+  style?: React.CSSProperties;
   multiline?: boolean;
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -95,14 +97,14 @@ const EditableText = ({
 
   if (isEditing) {
     return (
-      <div className="flex items-start gap-1 relative">
+      <div className="flex items-start gap-1 relative z-10">
         {multiline ? (
           <Textarea
             ref={textareaRef}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="text-xs min-h-[60px] min-w-[150px]"
+            className="text-xs min-h-[60px] min-w-[150px] bg-white"
           />
         ) : (
           <Input
@@ -111,18 +113,18 @@ const EditableText = ({
             onChange={(e) => setEditValue(e.target.value)}
             onKeyDown={handleKeyDown}
             onBlur={handleSave}
-            className="h-6 text-xs py-0 px-2 min-w-[80px]"
+            className="h-6 text-xs py-0 px-2 min-w-[80px] bg-white"
           />
         )}
         <button 
           onClick={handleSave}
-          className="p-0.5 hover:bg-green-100 rounded text-green-600"
+          className="p-0.5 hover:bg-green-100 rounded text-green-600 bg-white shadow-sm"
         >
           <Check className="h-3 w-3" />
         </button>
         <button 
           onClick={handleCancel}
-          className="p-0.5 hover:bg-red-100 rounded text-red-600"
+          className="p-0.5 hover:bg-red-100 rounded text-red-600 bg-white shadow-sm"
         >
           <X className="h-3 w-3" />
         </button>
@@ -131,20 +133,21 @@ const EditableText = ({
   }
 
   return (
-    <Component 
+    <span 
       className={cn(
         className,
-        "cursor-text hover:bg-primary/5 hover:outline hover:outline-1 hover:outline-primary/30 rounded px-0.5 transition-all inline-block",
+        "cursor-text hover:bg-primary/10 hover:outline hover:outline-2 hover:outline-primary/40 rounded px-0.5 transition-all inline-block",
         !value && "text-muted-foreground italic"
       )}
-      onClick={(e: React.MouseEvent) => {
+      style={style}
+      onClick={(e) => {
         e.stopPropagation();
         setIsEditing(true);
       }}
       title="Click to edit"
     >
       {value || placeholder}
-    </Component>
+    </span>
   );
 };
 
@@ -160,6 +163,8 @@ export const PDFBlockRenderer = ({
   quotationData,
   editorSettings,
   customizeSettings,
+  fonts,
+  fontSizeScale,
 }: PDFBlockRendererProps) => {
   const {
     attributes,
@@ -176,75 +181,150 @@ export const PDFBlockRenderer = ({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : block.visible ? 1 : 0.4,
+    opacity: isDragging ? 0.5 : 1,
   };
 
   const handleDataChange = (field: string, value: string) => {
     onDataChange?.(field, value);
   };
 
-  const getPreviewStyles = () => ({
-    background: `rgb(${theme.colors.background.join(',')})`,
-    color: `rgb(${theme.colors.text.join(',')})`,
-  });
+  // Theme-based styles computed once
+  const themeStyles = useMemo(() => {
+    const bgRgb = theme.colors.background;
+    const cardBgRgb = theme.colors.cardBackground;
+    const borderRgb = theme.colors.border;
+    const textRgb = theme.colors.text;
+    const accentRgb = theme.colors.accent;
+    const highlightRgb = theme.colors.highlight;
+    const headerBgRgb = theme.colors.headerBg;
+    const headerTextRgb = theme.colors.headerText;
+    const decorRgb = theme.colors.decorationPrimary || accentRgb;
 
-  const getCardStyle = () => ({
-    backgroundColor: `rgb(${theme.colors.cardBackground.join(',')})`,
-    borderColor: `rgb(${theme.colors.border.join(',')})`,
-  });
+    // Calculate contrast for highlight
+    const highlightLuminance = (0.299 * highlightRgb[0] + 0.587 * highlightRgb[1] + 0.114 * highlightRgb[2]) / 255;
+    const highlightTextColor = highlightLuminance > 0.5 ? [20, 20, 20] : [255, 255, 255];
 
-  const getHeaderStyle = () => ({
-    backgroundColor: `rgb(${theme.colors.headerBg.join(',')})`,
-    color: `rgb(${theme.colors.headerText.join(',')})`,
-  });
+    return {
+      background: `rgb(${bgRgb.join(',')})`,
+      cardBackground: `rgb(${cardBgRgb.join(',')})`,
+      border: `rgb(${borderRgb.join(',')})`,
+      text: `rgb(${textRgb.join(',')})`,
+      accent: `rgb(${accentRgb.join(',')})`,
+      highlight: `rgb(${highlightRgb.join(',')})`,
+      highlightText: `rgb(${highlightTextColor.join(',')})`,
+      headerBg: `rgb(${headerBgRgb.join(',')})`,
+      headerText: `rgb(${headerTextRgb.join(',')})`,
+      decoration: `rgb(${decorRgb.join(',')})`,
+    };
+  }, [theme]);
 
-  const getHighlightStyle = () => ({
-    backgroundColor: `rgb(${theme.colors.highlight.join(',')})`,
-    padding: '2px 6px',
-    borderRadius: '2px',
-  });
-
-  // Get decoration styles based on theme
-  const getDecorationColor = () => {
-    const decorColor = theme.colors.decorationPrimary || theme.colors.accent;
-    return `rgb(${decorColor.join(',')})`;
-  };
+  // Font sizes based on scale
+  const sizes = useMemo(() => ({
+    heading: `${18 * fontSizeScale}px`,
+    subheading: `${12 * fontSizeScale}px`,
+    label: `${10 * fontSizeScale}px`,
+    body: `${11 * fontSizeScale}px`,
+    small: `${9 * fontSizeScale}px`,
+    tiny: `${8 * fontSizeScale}px`,
+  }), [fontSizeScale]);
 
   const showDecorations = editorSettings.showDecorations !== false;
-  const showCornerOrnaments = editorSettings.showCornerOrnaments !== false;
   const showSectionDividers = editorSettings.showSectionDividers !== false;
+
+  // Card style based on settings
+  const getCardStyle = (): React.CSSProperties => ({
+    backgroundColor: themeStyles.cardBackground,
+    border: editorSettings.showBorders ? `1px solid ${themeStyles.border}` : 'none',
+    borderRadius: '4px',
+    padding: `${(editorSettings.advancedSettings?.cardPadding || 8) * 0.75}px`,
+  });
+
+  // Highlight style for amounts
+  const getHighlightStyle = (): React.CSSProperties => {
+    if (!editorSettings.highlightAmounts) return {};
+    const padding = editorSettings.advancedSettings?.highlightPadding || 4;
+    const radius = editorSettings.advancedSettings?.highlightBorderRadius || 2;
+    return {
+      backgroundColor: themeStyles.highlight,
+      color: themeStyles.highlightText,
+      padding: `${padding * 0.3}px ${padding * 0.6}px`,
+      borderRadius: `${radius}px`,
+      fontWeight: 600,
+    };
+  };
+
+  // Section divider component
+  const SectionDivider = () => {
+    if (!showDecorations || !showSectionDividers) return null;
+    return (
+      <div 
+        className="h-px mb-3"
+        style={{
+          background: `linear-gradient(90deg, transparent, ${themeStyles.decoration}, transparent)`,
+        }}
+      />
+    );
+  };
 
   const renderBlockContent = () => {
     switch (block.type) {
       case 'header':
         return (
           <div className="relative">
-            {/* Corner ornaments */}
-            {showDecorations && showCornerOrnaments && theme.decorations.showCornerOrnaments && (
-              <>
-                <div className="absolute -top-2 -left-2 w-6 h-6" style={{ borderTop: `2px solid ${getDecorationColor()}`, borderLeft: `2px solid ${getDecorationColor()}` }} />
-                <div className="absolute -top-2 -right-2 w-6 h-6" style={{ borderTop: `2px solid ${getDecorationColor()}`, borderRight: `2px solid ${getDecorationColor()}` }} />
-              </>
-            )}
-            <div className="flex items-center gap-4 pb-4 border-b" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>
+            <div 
+              className="flex items-center gap-4 pb-4"
+              style={{
+                borderBottom: `2px solid ${themeStyles.accent}`,
+                flexDirection: editorSettings.logoPlacement === 'center' ? 'column' : 'row',
+                alignItems: editorSettings.logoPlacement === 'center' ? 'center' : 'flex-start',
+              }}
+            >
+              {/* Logo */}
               <div 
-                className="w-14 h-14 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
-                style={getHeaderStyle()}
+                className="shrink-0 rounded flex items-center justify-center overflow-hidden"
+                style={{
+                  width: '56px',
+                  height: '56px',
+                  backgroundColor: themeStyles.headerBg,
+                  order: editorSettings.logoPlacement === 'right' ? 1 : 0,
+                }}
               >
                 {(quotationData.companyLogo as string) ? (
-                  <img src={quotationData.companyLogo as string} alt="Logo" className="w-full h-full object-contain rounded" />
-                ) : 'LOGO'}
+                  <img 
+                    src={quotationData.companyLogo as string} 
+                    alt="Logo" 
+                    className="w-full h-full object-contain" 
+                  />
+                ) : (
+                  <span style={{ color: themeStyles.headerText, fontSize: sizes.tiny, fontWeight: 700 }}>LOGO</span>
+                )}
               </div>
-              <div className="flex-1 min-w-0">
+              
+              {/* Company Info */}
+              <div 
+                className="flex-1 min-w-0"
+                style={{
+                  textAlign: editorSettings.logoPlacement === 'center' ? 'center' : 
+                            editorSettings.logoPlacement === 'right' ? 'left' : 'right',
+                }}
+              >
                 <EditableText
                   value={(quotationData.companyName as string) || ''}
                   field="companyName"
                   onSave={handleDataChange}
                   placeholder="Company Name"
-                  as="h1"
-                  className="text-lg font-bold"
+                  style={{
+                    fontFamily: fonts.heading,
+                    fontSize: sizes.heading,
+                    fontWeight: 700,
+                    color: themeStyles.text,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                  }}
                 />
-                <p className="text-xs text-muted-foreground">Company Address & Contact</p>
+                <p style={{ fontSize: sizes.small, color: themeStyles.text, opacity: 0.7, marginTop: '4px' }}>
+                  Company Address & Contact
+                </p>
               </div>
             </div>
           </div>
@@ -252,109 +332,183 @@ export const PDFBlockRenderer = ({
 
       case 'client-info':
         return (
-          <div className="p-3 rounded border" style={getCardStyle()}>
-            <p className="text-[10px] font-medium text-muted-foreground mb-1">QUOTATION FOR</p>
+          <div style={getCardStyle()}>
+            <p style={{ fontSize: sizes.tiny, fontWeight: 600, color: themeStyles.text, opacity: 0.6, marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              QUOTATION FOR
+            </p>
             <EditableText
               value={(quotationData.clientName as string) || ''}
               field="clientName"
               onSave={handleDataChange}
               placeholder="Client Name"
-              as="p"
-              className="font-semibold text-sm"
+              style={{
+                fontFamily: fonts.heading,
+                fontSize: sizes.subheading,
+                fontWeight: 700,
+                color: themeStyles.text,
+                display: 'block',
+              }}
             />
             <EditableText
               value={(quotationData.clientAddress as string) || ''}
               field="clientAddress"
               onSave={handleDataChange}
               placeholder="Client Address"
-              as="p"
-              className="text-xs text-muted-foreground"
+              style={{
+                fontSize: sizes.small,
+                color: themeStyles.text,
+                opacity: 0.7,
+                display: 'block',
+                marginTop: '2px',
+              }}
             />
           </div>
         );
 
       case 'project-info':
         return (
-          <div className="p-3 rounded border" style={getCardStyle()}>
-            <p className="text-[10px] font-medium text-muted-foreground mb-1">PROJECT DETAILS</p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground shrink-0">Project:</span>
+          <div style={getCardStyle()}>
+            <p style={{ fontSize: sizes.tiny, fontWeight: 600, color: themeStyles.text, opacity: 0.6, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              PROJECT DETAILS
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: editorSettings.headerInfoColumns === 1 ? '1fr' : '1fr 1fr', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: sizes.small, color: themeStyles.text, opacity: 0.6 }}>Project:</span>
                 <EditableText
                   value={(quotationData.quotationTitle as string) || ''}
                   field="quotationTitle"
                   onSave={handleDataChange}
                   placeholder="Project Name"
+                  style={{ fontSize: sizes.body, fontWeight: 600, color: themeStyles.text }}
                 />
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground shrink-0">Date:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: sizes.small, color: themeStyles.text, opacity: 0.6 }}>Date:</span>
                 <EditableText
                   value={(quotationData.dateOfProposal as string) || ''}
                   field="dateOfProposal"
                   onSave={handleDataChange}
                   placeholder="DD/MM/YYYY"
+                  style={{ fontSize: sizes.body, fontWeight: 600, color: themeStyles.text }}
                 />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: sizes.small, color: themeStyles.text, opacity: 0.6 }}>Valid Till:</span>
+                <span style={{ fontSize: sizes.body, fontWeight: 600, color: themeStyles.text }}>
+                  {(quotationData.quotationValidTill as string) || '30 days'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: sizes.small, color: themeStyles.text, opacity: 0.6 }}>Location:</span>
+                <span style={{ fontSize: sizes.body, fontWeight: 600, color: themeStyles.text }}>
+                  {(quotationData.placeOfProject as string) || 'On-site'}
+                </span>
               </div>
             </div>
           </div>
         );
 
-      case 'items-table':
+      case 'items-table': {
+        const tableStyle = editorSettings.tableStyle || 'bordered';
+        const cellStyle: React.CSSProperties = {
+          padding: `${(editorSettings.advancedSettings?.rowPadding || 4) * 0.75}px`,
+          fontSize: sizes.small,
+          border: tableStyle === 'minimal' ? 'none' : `1px solid ${themeStyles.border}`,
+          color: themeStyles.text,
+        };
+        
         return (
           <div>
-            <div className="text-xs font-bold mb-2 pb-1 border-b-2" style={{ borderColor: `rgb(${theme.colors.accent.join(',')})` }}>
+            <div 
+              style={{
+                fontSize: sizes.body,
+                fontFamily: fonts.heading,
+                fontWeight: 700,
+                marginBottom: '8px',
+                paddingBottom: '4px',
+                borderBottom: `2px solid ${themeStyles.accent}`,
+                color: themeStyles.text,
+              }}
+            >
               SAMPLE SECTION
             </div>
-            <table className="w-full text-[10px]" style={{ borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ backgroundColor: `rgb(${theme.colors.cardBackground.join(',')})` }}>
-                  <th className="p-2 text-left border" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>Product</th>
-                  <th className="p-2 text-center border" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>Area</th>
-                  <th className="p-2 text-center border" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>Rate</th>
-                  <th className="p-2 text-right border" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>Amount</th>
+                <tr style={{ backgroundColor: tableStyle === 'striped' || tableStyle === 'grid' ? themeStyles.cardBackground : 'transparent' }}>
+                  <th style={{ ...cellStyle, textAlign: 'left', fontWeight: 600 }}>Product</th>
+                  <th style={{ ...cellStyle, textAlign: 'center', fontWeight: 600 }}>Area</th>
+                  <th style={{ ...cellStyle, textAlign: 'center', fontWeight: 600 }}>Rate</th>
+                  <th style={{ ...cellStyle, textAlign: 'right', fontWeight: 600 }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td className="p-2 border" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>Sample Item</td>
-                  <td className="p-2 text-center border" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>32 sq.ft</td>
-                  <td className="p-2 text-center border" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>₹850</td>
-                  <td className="p-2 text-right border" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>
+                  <td style={cellStyle}>Sample Item</td>
+                  <td style={{ ...cellStyle, textAlign: 'center' }}>32 sq.ft</td>
+                  <td style={{ ...cellStyle, textAlign: 'center' }}>₹850</td>
+                  <td style={{ ...cellStyle, textAlign: 'right' }}>
                     <span style={getHighlightStyle()}>₹27,200</span>
+                  </td>
+                </tr>
+                <tr style={tableStyle === 'striped' ? { backgroundColor: themeStyles.cardBackground } : {}}>
+                  <td style={cellStyle}>Another Item</td>
+                  <td style={{ ...cellStyle, textAlign: 'center' }}>24 sq.ft</td>
+                  <td style={{ ...cellStyle, textAlign: 'center' }}>₹950</td>
+                  <td style={{ ...cellStyle, textAlign: 'right' }}>
+                    <span style={getHighlightStyle()}>₹22,800</span>
                   </td>
                 </tr>
               </tbody>
             </table>
-            <p className="text-[9px] text-muted-foreground mt-2 text-center italic">
+            <p style={{ fontSize: sizes.tiny, color: themeStyles.text, opacity: 0.5, marginTop: '8px', textAlign: 'center', fontStyle: 'italic' }}>
               Table data is read-only in preview. Edit in form.
             </p>
           </div>
         );
+      }
 
-      case 'summary':
+      case 'summary': {
+        const summaryPosition = editorSettings.summaryStyle || 'right';
+        const containerStyle: React.CSSProperties = {
+          display: 'flex',
+          justifyContent: summaryPosition === 'center' ? 'center' : summaryPosition === 'full-width' ? 'stretch' : 'flex-end',
+        };
+        
         return (
-          <div className="flex justify-end">
-            <div className="w-56 p-3 rounded border" style={getCardStyle()}>
-              <div className="flex justify-between mb-1 text-xs">
+          <div style={containerStyle}>
+            <div style={{ 
+              ...getCardStyle(), 
+              width: summaryPosition === 'full-width' ? '100%' : '200px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: sizes.small, color: themeStyles.text }}>
                 <span>Subtotal</span>
                 <span style={getHighlightStyle()}>₹{((quotationData.subtotal as number) || 50000).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between mb-1 text-xs">
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: sizes.small, color: themeStyles.text }}>
                 <span>Discount</span>
                 <span>-₹3,000</span>
               </div>
-              <div className="flex justify-between mb-1 text-xs">
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: sizes.small, color: themeStyles.text }}>
                 <span>GST (18%)</span>
                 <span>₹8,460</span>
               </div>
-              <div className="flex justify-between pt-2 mt-2 font-bold text-sm border-t" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                paddingTop: '8px', 
+                marginTop: '8px', 
+                fontWeight: 700, 
+                fontSize: sizes.subheading,
+                borderTop: `1px solid ${themeStyles.border}`,
+                color: themeStyles.text,
+              }}>
                 <span>Grand Total</span>
                 <span style={getHighlightStyle()}>₹{((quotationData.grandTotal as number) || 55460).toLocaleString()}</span>
               </div>
             </div>
           </div>
         );
+      }
 
       case 'payment-stages': {
         const paymentStages = (quotationData.paymentStages as Array<{ stageName?: string; percentage?: number; amount?: number }>) || [
@@ -363,34 +517,43 @@ export const PDFBlockRenderer = ({
           { stageName: 'Completion', percentage: 20, amount: 11092 },
         ];
         return (
-          <div className="p-3 rounded border" style={getCardStyle()}>
-            {showDecorations && showSectionDividers && (
-              <div className="h-0.5 mb-3" style={{ background: `linear-gradient(90deg, transparent, ${getDecorationColor()}, transparent)` }} />
-            )}
-            <p className="text-xs font-bold mb-2">STAGEWISE PAYMENT OPTION</p>
-            <div className="grid grid-cols-3 gap-2 text-[10px]">
+          <div style={getCardStyle()}>
+            <SectionDivider />
+            <p style={{ fontSize: sizes.body, fontFamily: fonts.heading, fontWeight: 700, marginBottom: '8px', color: themeStyles.text }}>
+              STAGEWISE PAYMENT OPTION
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(paymentStages.length, 3)}, 1fr)`, gap: '8px' }}>
               {paymentStages.map((stage, index) => (
-                <div key={index} className="text-center p-2 rounded bg-muted/50">
-                  <p className="font-semibold">Stage {index + 1}</p>
-                  <div className="flex items-center justify-center gap-1">
+                <div 
+                  key={index} 
+                  style={{ 
+                    textAlign: 'center', 
+                    padding: '8px', 
+                    borderRadius: '4px', 
+                    backgroundColor: themeStyles.cardBackground,
+                    border: `1px solid ${themeStyles.border}`,
+                  }}
+                >
+                  <p style={{ fontWeight: 600, fontSize: sizes.small, color: themeStyles.text }}>Stage {index + 1}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontSize: sizes.tiny }}>
                     <EditableText
                       value={stage.stageName || `Stage ${index + 1}`}
                       field={`paymentStage.${index}.stageName`}
                       onSave={handleDataChange}
                       placeholder="Stage Name"
-                      className="text-[10px]"
+                      style={{ fontSize: sizes.tiny, color: themeStyles.text }}
                     />
-                    <span>-</span>
+                    <span style={{ color: themeStyles.text }}>-</span>
                     <EditableText
                       value={String(stage.percentage || 0)}
                       field={`paymentStage.${index}.percentage`}
                       onSave={handleDataChange}
                       placeholder="0"
-                      className="text-[10px] w-6"
+                      style={{ fontSize: sizes.tiny, width: '20px', color: themeStyles.text }}
                     />
-                    <span>%</span>
+                    <span style={{ color: themeStyles.text }}>%</span>
                   </div>
-                  <p className="font-bold" style={index === 0 ? getHighlightStyle() : {}}>
+                  <p style={{ fontWeight: 700, ...(index === 0 ? getHighlightStyle() : { color: themeStyles.text }), marginTop: '4px', fontSize: sizes.small }}>
                     ₹{(stage.amount || 0).toLocaleString()}
                   </p>
                 </div>
@@ -407,28 +570,24 @@ export const PDFBlockRenderer = ({
           'Site must be ready for work',
         ];
         return (
-          <div className="p-3 rounded border" style={getCardStyle()}>
-            {showDecorations && showSectionDividers && (
-              <div className="h-0.5 mb-3" style={{ background: `linear-gradient(90deg, transparent, ${getDecorationColor()}, transparent)` }} />
-            )}
-            <p className="text-xs font-bold mb-2">TERMS & CONDITIONS</p>
-            <ul className="text-[10px] space-y-1 text-muted-foreground list-disc list-inside">
+          <div style={getCardStyle()}>
+            <SectionDivider />
+            <p style={{ fontSize: sizes.body, fontFamily: fonts.heading, fontWeight: 700, marginBottom: '8px', color: themeStyles.text }}>
+              TERMS & CONDITIONS
+            </p>
+            <ul style={{ fontSize: sizes.small, color: themeStyles.text, opacity: 0.8, margin: 0, paddingLeft: '16px' }}>
               {termsContent.map((term, index) => (
-                <li key={index} className="flex items-start gap-1">
-                  <span className="shrink-0">•</span>
+                <li key={index} style={{ marginBottom: '4px' }}>
                   <EditableText
                     value={term}
                     field={`terms.${index}`}
                     onSave={handleDataChange}
                     placeholder="Enter term"
-                    className="text-[10px]"
+                    style={{ fontSize: sizes.small }}
                   />
                 </li>
               ))}
             </ul>
-            <p className="text-[9px] text-primary mt-2 cursor-pointer hover:underline" onClick={(e) => e.stopPropagation()}>
-              + Add term
-            </p>
           </div>
         );
       }
@@ -436,18 +595,17 @@ export const PDFBlockRenderer = ({
       case 'warranty': {
         const warrantyText = (quotationData.warranty as string) || '1 year warranty on all work performed. Warranty covers manufacturing defects and installation issues.';
         return (
-          <div className="p-3 rounded border" style={getCardStyle()}>
-            {showDecorations && showSectionDividers && (
-              <div className="h-0.5 mb-3" style={{ background: `linear-gradient(90deg, transparent, ${getDecorationColor()}, transparent)` }} />
-            )}
-            <p className="text-xs font-bold mb-2">WARRANTY</p>
+          <div style={getCardStyle()}>
+            <SectionDivider />
+            <p style={{ fontSize: sizes.body, fontFamily: fonts.heading, fontWeight: 700, marginBottom: '8px', color: themeStyles.text }}>
+              WARRANTY
+            </p>
             <EditableText
               value={warrantyText}
               field="warranty"
               onSave={handleDataChange}
               placeholder="Enter warranty terms"
-              as="p"
-              className="text-[10px] text-muted-foreground"
+              style={{ fontSize: sizes.small, color: themeStyles.text, opacity: 0.8 }}
               multiline
             />
           </div>
@@ -456,41 +614,66 @@ export const PDFBlockRenderer = ({
 
       case 'signature':
         return (
-          <div className="relative">
-            {/* Bottom corner ornaments */}
-            {showDecorations && showCornerOrnaments && theme.decorations.showCornerOrnaments && (
-              <>
-                <div className="absolute -bottom-2 -left-2 w-6 h-6" style={{ borderBottom: `2px solid ${getDecorationColor()}`, borderLeft: `2px solid ${getDecorationColor()}` }} />
-                <div className="absolute -bottom-2 -right-2 w-6 h-6" style={{ borderBottom: `2px solid ${getDecorationColor()}`, borderRight: `2px solid ${getDecorationColor()}` }} />
-              </>
-            )}
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}>
-              <div className="text-center">
-                <div className="h-12 border-b mb-1" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}></div>
-                <p className="text-[9px] text-muted-foreground">Customer Signature</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '24px', paddingTop: '16px' }}>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ height: '48px', borderBottom: `1px solid ${themeStyles.border}`, marginBottom: '4px' }} />
+              <p style={{ fontSize: sizes.small, color: themeStyles.text, opacity: 0.7 }}>Customer Signature</p>
+            </div>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ height: '48px', borderBottom: `1px solid ${themeStyles.border}`, marginBottom: '4px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                {(quotationData.signatureUrl as string) && (
+                  <img 
+                    src={quotationData.signatureUrl as string} 
+                    alt="Signature" 
+                    style={{ maxHeight: '44px', objectFit: 'contain' }}
+                  />
+                )}
               </div>
-              <div className="text-center">
-                <div className="h-12 border-b mb-1" style={{ borderColor: `rgb(${theme.colors.border.join(',')})` }}></div>
-                <p className="text-[9px] text-muted-foreground">Authorized Signature</p>
-              </div>
+              <p style={{ fontSize: sizes.small, color: themeStyles.text, opacity: 0.7 }}>Authorized Signature</p>
             </div>
           </div>
         );
 
       case 'accept-reject':
         return (
-          <div className="flex justify-center gap-4 pt-4">
-            <div className="px-8 py-2 bg-green-500 text-white text-sm font-bold rounded cursor-pointer hover:bg-green-600 transition-colors">
-              ✓ ACCEPT
-            </div>
-            <div className="px-8 py-2 bg-red-500 text-white text-sm font-bold rounded cursor-pointer hover:bg-red-600 transition-colors">
-              ✗ REJECT
-            </div>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', paddingTop: '16px' }}>
+            <button
+              style={{
+                padding: '10px 24px',
+                backgroundColor: '#22c55e',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontWeight: 600,
+                fontSize: sizes.body,
+                cursor: 'pointer',
+              }}
+            >
+              ✓ Accept Quotation
+            </button>
+            <button
+              style={{
+                padding: '10px 24px',
+                backgroundColor: '#ef4444',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                fontWeight: 600,
+                fontSize: sizes.body,
+                cursor: 'pointer',
+              }}
+            >
+              ✗ Reject
+            </button>
           </div>
         );
 
       default:
-        return <div className="p-4 text-center text-muted-foreground">Unknown block type</div>;
+        return (
+          <div style={{ padding: '16px', backgroundColor: themeStyles.cardBackground, borderRadius: '4px' }}>
+            <p style={{ fontSize: sizes.small, color: themeStyles.text, opacity: 0.6 }}>Unknown block type: {block.type}</p>
+          </div>
+        );
     }
   };
 
@@ -498,59 +681,68 @@ export const PDFBlockRenderer = ({
     <motion.div
       ref={setNodeRef}
       style={style}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: block.visible ? 1 : 0.4, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
       className={cn(
-        "relative group rounded-lg transition-all duration-200",
+        "relative group",
         isSelected && "ring-2 ring-primary ring-offset-2",
-        isHovered && !isSelected && "ring-1 ring-primary/50",
-        isDragging && "z-50 shadow-2xl scale-[1.02]",
-        !block.visible && "opacity-50"
+        isDragging && "z-50"
       )}
-      onClick={onSelect}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
+      onClick={onSelect}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.2 }}
     >
-      {/* Control overlay */}
-      <div className={cn(
-        "absolute -top-8 left-0 right-0 flex items-center justify-between px-2 py-1 bg-background/95 backdrop-blur-sm rounded-t-lg border border-b-0 transition-opacity duration-200 z-10",
-        (isHovered || isSelected) ? "opacity-100" : "opacity-0 pointer-events-none"
-      )}>
-        <div className="flex items-center gap-2">
-          {!block.locked && (
-            <div 
-              {...attributes} 
-              {...listeners}
-              className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
-            >
-              <GripVertical className="h-4 w-4 text-muted-foreground" />
-            </div>
-          )}
-          {block.locked && (
-            <Lock className="h-3 w-3 text-muted-foreground" />
-          )}
-          <span className="text-xs font-medium">{BLOCK_LABELS[block.type]}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button 
-            onClick={(e) => { e.stopPropagation(); onToggleVisibility(); }}
-            className="p-1 hover:bg-muted rounded transition-colors"
+      {/* Block controls overlay */}
+      <AnimatePresence>
+        {(isHovered || isSelected) && (
+          <motion.div
+            className="absolute -top-3 left-0 right-0 flex items-center justify-between z-20"
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 5 }}
           >
-            {block.visible ? (
-              <Eye className="h-3 w-3 text-muted-foreground" />
-            ) : (
-              <EyeOff className="h-3 w-3 text-muted-foreground" />
-            )}
-          </button>
-        </div>
-      </div>
+            <div className="flex items-center gap-1">
+              <div
+                {...attributes}
+                {...listeners}
+                className={cn(
+                  "cursor-grab active:cursor-grabbing p-1 rounded bg-background/95 backdrop-blur-sm shadow-sm border",
+                  block.locked && "cursor-not-allowed opacity-50"
+                )}
+              >
+                <GripVertical className="h-3 w-3 text-muted-foreground" />
+              </div>
+              <span className="text-[10px] font-medium text-muted-foreground bg-background/95 px-2 py-0.5 rounded shadow-sm border">
+                {BLOCK_LABELS[block.type] || block.type}
+              </span>
+              {block.locked && (
+                <div className="p-1 rounded bg-background/95 shadow-sm border">
+                  <Lock className="h-3 w-3 text-muted-foreground" />
+                </div>
+              )}
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleVisibility();
+              }}
+              className="p-1 rounded bg-background/95 shadow-sm border hover:bg-muted transition-colors"
+              title={block.visible ? "Hide block" : "Show block"}
+            >
+              {block.visible ? (
+                <Eye className="h-3 w-3 text-muted-foreground" />
+              ) : (
+                <EyeOff className="h-3 w-3 text-muted-foreground" />
+              )}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Block content */}
-      <div className={cn(
-        "p-4 rounded-lg border transition-colors",
-        isSelected ? "border-primary" : "border-transparent hover:border-muted-foreground/20"
-      )} style={getPreviewStyles()}>
+      <div className="pt-1">
         {renderBlockContent()}
       </div>
     </motion.div>
