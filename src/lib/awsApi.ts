@@ -260,6 +260,18 @@ export const getClient = async (clientId: string): Promise<ApiResponse<ClientPay
   });
 };
 
+export const listClients = async (companyId: string): Promise<ApiResponse<ClientPayload[]>> => {
+  return apiRequest(`/clients?company_id=${companyId}`, {
+    method: "GET",
+  });
+};
+
+export const deleteClient = async (clientId: string): Promise<ApiResponse> => {
+  return apiRequest(`/clients/${clientId}`, {
+    method: "DELETE",
+  });
+};
+
 // ==================== SITE MEASUREMENTS ====================
 
 export interface MeasurementPayload {
@@ -287,6 +299,24 @@ export const updateMeasurement = async (measurementId: string, payload: Partial<
   return apiRequest(`/measurements/${measurementId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+};
+
+export const getMeasurement = async (measurementId: string): Promise<ApiResponse<MeasurementPayload>> => {
+  return apiRequest(`/measurements/${measurementId}`, {
+    method: "GET",
+  });
+};
+
+export const listMeasurements = async (companyId: string): Promise<ApiResponse<MeasurementPayload[]>> => {
+  return apiRequest(`/measurements?company_id=${companyId}`, {
+    method: "GET",
+  });
+};
+
+export const deleteMeasurement = async (measurementId: string): Promise<ApiResponse> => {
+  return apiRequest(`/measurements/${measurementId}`, {
+    method: "DELETE",
   });
 };
 

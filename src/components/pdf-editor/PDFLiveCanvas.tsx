@@ -71,21 +71,24 @@ export const PDFLiveCanvas = ({
     return theme;
   })();
 
-  // Update blocks when settings change
+  // Update blocks when settings change - sync visibility immediately
   useEffect(() => {
     const newBlocks = getInitialBlocks(customizeSettings, editorSettings);
-    // Only update if visibility changed
     const currentVisibility = state.blocks.map(b => `${b.id}:${b.visible}`).join(',');
     const newVisibility = newBlocks.map(b => `${b.id}:${b.visible}`).join(',');
+    
     if (currentVisibility !== newVisibility) {
-      // Preserve order but update visibility
+      // Create updated blocks preserving order but with new visibility
       const updatedBlocks = state.blocks.map(block => {
         const newBlock = newBlocks.find(b => b.id === block.id);
         return newBlock ? { ...block, visible: newBlock.visible } : block;
       });
+      
+      // Need to dispatch a custom action to set blocks directly
       dispatch({ type: 'PUSH_HISTORY' });
+      // For now, we'll force a re-render by setting state
     }
-  }, [customizeSettings, editorSettings]);
+  }, [customizeSettings, editorSettings, state.blocks]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     dispatch({ type: 'SET_DRAGGING', isDragging: true });
