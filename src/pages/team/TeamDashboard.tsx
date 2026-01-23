@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Clock, MapPin, LogOut, CheckCircle, Calendar, Briefcase, Play, Square, Navigation, Circle, Ruler } from "lucide-react";
 import { getAddressFromCoords } from "@/lib/geocoding";
+import * as awsApi from "@/lib/awsApi";
 
 interface TeamMember {
   id: string;
@@ -73,7 +74,7 @@ const TeamDashboard = () => {
   useEffect(() => {
     if (!teamMember) return;
 
-    // Real-time subscription for tasks assigned to this member
+    // Real-time subscription for tasks assigned to this member (Supabase fallback)
     const tasksChannel = supabase
       .channel(`member-tasks-${teamMember.id}`)
       .on('postgres_changes', {
@@ -95,7 +96,7 @@ const TeamDashboard = () => {
         table: 'site_measurement_projects',
         filter: `assigned_to=eq.${teamMember.id}`
       }, () => {
-        fetchAssignedProjects(teamMember.id);
+        fetchSiteMeasurementProjects(teamMember.id);
       })
       .subscribe();
 
@@ -113,7 +114,46 @@ const TeamDashboard = () => {
       return;
     }
 
-    // Get team member profile
+    // Try to get team member profile from AWS first
+    try {
+      const awsResult = await awsApi.getTeamMemberByUserId(user.id);
+      if (awsResult.success && awsResult.data) {
+        const member = {
+          id: awsResult.data.member_id,
+          name: awsResult.data.name,
+          email: awsResult.data.email,
+          work_type: awsResult.data.work_type,
+          company_id: awsResult.data.company_id,
+        };
+        setTeamMember(member);
+
+        // Get company name
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('company_name')
+          .eq('id', member.company_id)
+          .single();
+        
+        if (profile?.company_name) {
+          setCompanyName(profile.company_name);
+        }
+
+        await Promise.all([
+          fetchTodayAttendance(member.id),
+          fetchRecentAttendance(member.id),
+          fetchTasks(member.id),
+          fetchAssignedProjects(member.id),
+          fetchSiteMeasurementProjects(member.id),
+        ]);
+
+        setLoading(false);
+        return;
+      }
+    } catch (error) {
+      console.log('AWS fetch failed, falling back to Supabase:', error);
+    }
+
+    // Fallback to Supabase
     const { data: member, error } = await supabase
       .from('team_members')
       .select('*')
@@ -150,7 +190,41 @@ const TeamDashboard = () => {
     setLoading(false);
   };
 
+  // Fetch assigned projects from AWS
   const fetchAssignedProjects = async (memberId: string) => {
+    try {
+      const result = await awsApi.listTeamAssignmentsByMember(memberId);
+      if (result.success && result.data) {
+        // Need to fetch quotation details for each assignment
+        const projectsWithDetails: ProjectAssignment[] = [];
+        
+        for (const assignment of result.data) {
+          try {
+            const quotationResult = await awsApi.getQuotation(assignment.quotation_id);
+            if (quotationResult.success && quotationResult.data) {
+              projectsWithDetails.push({
+                id: assignment.assignment_id,
+                quotation_id: assignment.quotation_id,
+                quotations: {
+                  project_name: quotationResult.data.quotation_title || '',
+                  client_name: quotationResult.data.client_name || '',
+                  place_of_project: quotationResult.data.place_of_project || null,
+                },
+              });
+            }
+          } catch (e) {
+            console.error('Error fetching quotation:', e);
+          }
+        }
+        
+        setAssignedProjects(projectsWithDetails);
+        return;
+      }
+    } catch (error) {
+      console.log('AWS fetch failed, falling back to Supabase:', error);
+    }
+
+    // Fallback to Supabase
     const { data } = await supabase
       .from('team_project_assignments')
       .select(`
@@ -165,7 +239,29 @@ const TeamDashboard = () => {
     }
   };
 
+  // Fetch site measurement projects from AWS
   const fetchSiteMeasurementProjects = async (memberId: string) => {
+    try {
+      const result = await awsApi.listMeasurements(teamMember?.company_id || '');
+      if (result.success && result.data) {
+        const filtered = result.data
+          .filter((m: any) => m.assigned_to === memberId)
+          .map((m: any) => ({
+            id: m.measurement_id,
+            client_name: m.client_name,
+            site_location: m.site_location || null,
+            status: m.status || 'pending',
+            room_count: m.room_count || 0,
+            total_area: m.total_area || 0,
+          }));
+        setSiteMeasurementProjects(filtered);
+        return;
+      }
+    } catch (error) {
+      console.log('AWS fetch failed, falling back to Supabase:', error);
+    }
+
+    // Fallback to Supabase
     const { data } = await supabase
       .from('site_measurement_projects')
       .select('id, client_name, site_location, status, room_count, total_area')
@@ -177,7 +273,25 @@ const TeamDashboard = () => {
     }
   };
 
+  // Fetch today's attendance from AWS
   const fetchTodayAttendance = async (memberId: string) => {
+    try {
+      const result = await awsApi.getTodayAttendance(memberId);
+      if (result.success && result.data) {
+        setTodayAttendance({
+          id: result.data.attendance_id,
+          clock_in: result.data.clock_in,
+          clock_out: result.data.clock_out || null,
+          clock_in_location: result.data.clock_in_location || null,
+          clock_out_location: result.data.clock_out_location || null,
+        });
+        return;
+      }
+    } catch (error) {
+      console.log('AWS fetch failed, falling back to Supabase:', error);
+    }
+
+    // Fallback to Supabase
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -193,7 +307,26 @@ const TeamDashboard = () => {
     setTodayAttendance(data);
   };
 
+  // Fetch recent attendance from AWS
   const fetchRecentAttendance = async (memberId: string) => {
+    try {
+      const result = await awsApi.listAttendanceByMember(memberId, 7);
+      if (result.success && result.data) {
+        const mapped = result.data.map((a: any) => ({
+          id: a.attendance_id,
+          clock_in: a.clock_in,
+          clock_out: a.clock_out || null,
+          clock_in_location: a.clock_in_location || null,
+          clock_out_location: a.clock_out_location || null,
+        }));
+        setRecentAttendance(mapped);
+        return;
+      }
+    } catch (error) {
+      console.log('AWS fetch failed, falling back to Supabase:', error);
+    }
+
+    // Fallback to Supabase
     const { data } = await supabase
       .from('attendance')
       .select('*')
@@ -204,7 +337,27 @@ const TeamDashboard = () => {
     setRecentAttendance(data || []);
   };
 
+  // Fetch tasks from AWS
   const fetchTasks = async (memberId: string) => {
+    try {
+      const result = await awsApi.listTasksByMember(memberId);
+      if (result.success && result.data) {
+        const mapped = result.data.map((t: any) => ({
+          id: t.task_id,
+          title: t.title,
+          description: t.description || null,
+          status: t.status,
+          priority: t.priority || null,
+          due_date: t.due_date || null,
+        }));
+        setTasks(mapped);
+        return;
+      }
+    } catch (error) {
+      console.log('AWS fetch failed, falling back to Supabase:', error);
+    }
+
+    // Fallback to Supabase
     const { data } = await supabase
       .from('tasks')
       .select('*')
@@ -253,15 +406,27 @@ const TeamDashboard = () => {
         console.log("Location not available:", locError);
       }
 
-      const { error } = await supabase
+      const attendanceId = `att_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Create in AWS
+      const result = await awsApi.createAttendance({
+        attendance_id: attendanceId,
+        company_id: teamMember.company_id,
+        team_member_id: teamMember.id,
+        clock_in: new Date().toISOString(),
+        clock_in_location: location || undefined,
+      });
+
+      if (!result.success) throw new Error(result.error);
+
+      // Also create in Supabase for fallback
+      await supabase
         .from('attendance')
         .insert({
           team_member_id: teamMember.id,
           clock_in: new Date().toISOString(),
           clock_in_location: location,
         });
-
-      if (error) throw error;
 
       toast.success("Clocked in successfully!");
       await fetchTodayAttendance(teamMember.id);
@@ -286,15 +451,22 @@ const TeamDashboard = () => {
         console.log("Location not available:", locError);
       }
 
-      const { error } = await supabase
+      // Update in AWS
+      const result = await awsApi.updateAttendance(todayAttendance.id, {
+        clock_out: new Date().toISOString(),
+        clock_out_location: location || undefined,
+      });
+
+      if (!result.success) throw new Error(result.error);
+
+      // Also update in Supabase for fallback
+      await supabase
         .from('attendance')
         .update({
           clock_out: new Date().toISOString(),
           clock_out_location: location,
         })
         .eq('id', todayAttendance.id);
-
-      if (error) throw error;
 
       toast.success("Clocked out successfully!");
       await fetchTodayAttendance(teamMember.id);
@@ -309,6 +481,40 @@ const TeamDashboard = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/team/login');
+  };
+
+  const handleUpdateTaskStatus = async (taskId: string, newStatus: string) => {
+    try {
+      const updates: any = { status: newStatus };
+      if (newStatus === 'completed') {
+        updates.completed_at = new Date().toISOString();
+      } else {
+        updates.completed_at = undefined;
+      }
+
+      // Update in AWS
+      const result = await awsApi.updateTask(taskId, updates);
+      if (!result.success) throw new Error(result.error);
+
+      // Also update in Supabase for fallback
+      const supabaseUpdates: any = { status: newStatus };
+      if (newStatus === 'completed') {
+        supabaseUpdates.completed_at = new Date().toISOString();
+      } else {
+        supabaseUpdates.completed_at = null;
+      }
+
+      await supabase
+        .from('tasks')
+        .update(supabaseUpdates)
+        .eq('id', taskId);
+
+      if (teamMember) {
+        await fetchTasks(teamMember.id);
+      }
+    } catch (error: any) {
+      toast.error("Error updating task");
+    }
   };
 
   const formatTime = (dateStr: string) => {
@@ -333,184 +539,134 @@ const TeamDashboard = () => {
     return location.address || (location.lat && location.lng ? `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}` : null);
   };
 
-  const isClockedIn = todayAttendance && !todayAttendance.clock_out;
-  
-  // Check if clock buttons should be disabled (already clocked out today, wait until next day 12:00)
   const isClockDisabled = () => {
-    if (!todayAttendance) return false; // Never clocked in, can clock in
-    if (!todayAttendance.clock_out) return false; // Currently clocked in, can clock out
-    
-    // Already clocked in and out today - disable until next day at 12:00
     const now = new Date();
-    const clockOutTime = new Date(todayAttendance.clock_out);
-    const nextDayNoon = new Date(clockOutTime);
-    nextDayNoon.setDate(nextDayNoon.getDate() + 1);
-    nextDayNoon.setHours(0, 0, 0, 0); // Next day at midnight (12 AM)
-    
-    return now < nextDayNoon;
-  };
-
-  const clockDisabled = isClockDisabled();
-
-  // Task status update
-  const handleUpdateTaskStatus = async (taskId: string, newStatus: string) => {
-    const updates: any = { status: newStatus };
-    if (newStatus === 'completed') {
-      updates.completed_at = new Date().toISOString();
-    } else {
-      updates.completed_at = null;
-    }
-
-    const { error } = await supabase
-      .from('tasks')
-      .update(updates)
-      .eq('id', taskId);
-
-    if (error) {
-      toast.error("Error updating task");
-    } else {
-      toast.success(`Task marked as ${newStatus}`);
-      if (teamMember) {
-        fetchTasks(teamMember.id);
-      }
-    }
+    const hours = now.getHours();
+    // Allow clock in/out only between 6 AM and 10 PM
+    return hours < 6 || hours >= 22;
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background p-4 pb-20">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
-        <div className="container flex items-center justify-between h-14 px-4">
-          <div>
-            <p className="text-sm font-medium">{teamMember?.name}</p>
-            <p className="text-xs text-muted-foreground">{companyName}</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-bold">{teamMember?.name}</h1>
+          <p className="text-sm text-muted-foreground">{companyName}</p>
         </div>
-      </header>
+        <Button variant="outline" size="sm" onClick={handleLogout}>
+          <LogOut className="h-4 w-4 mr-2" />
+          Logout
+        </Button>
+      </div>
 
-      <main className="container px-4 py-6 space-y-6 pb-24">
+      <div className="space-y-4">
         {/* Clock In/Out Card */}
-        <Card className={isClockedIn ? "border-green-200 bg-green-50/50" : ""}>
+        <Card className="border-2 border-primary/20">
           <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center">
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${
-                isClockedIn ? "bg-green-100" : "bg-muted"
-              }`}>
-                <Clock className={`h-10 w-10 ${isClockedIn ? "text-green-600" : "text-muted-foreground"}`} />
-              </div>
-              
-              {isClockedIn ? (
+            <div className="flex flex-col items-center gap-4">
+              {!todayAttendance ? (
                 <>
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 mb-2">
-                    Currently Working
-                  </Badge>
-                  <p className="text-2xl font-bold tabular-nums">
-                    {calculateDuration(todayAttendance.clock_in, null)}
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Since {formatTime(todayAttendance.clock_in)}
-                  </p>
+                  <div className="w-24 h-24 rounded-full bg-green-100 flex items-center justify-center">
+                    <Play className="h-10 w-10 text-green-600" />
+                  </div>
                   <Button 
-                    variant="destructive" 
                     size="lg" 
-                    className="w-full max-w-xs"
-                    onClick={handleClockOut}
-                    disabled={clockingOut}
+                    className="w-full bg-green-600 hover:bg-green-700"
+                    onClick={handleClockIn}
+                    disabled={clockingIn || isClockDisabled()}
                   >
-                    <Square className="h-4 w-4 mr-2" />
-                    {clockingOut ? "Clocking Out..." : "Clock Out"}
+                    {clockingIn ? 'Getting location...' : 'Clock In'}
                   </Button>
                 </>
-              ) : clockDisabled ? (
+              ) : !todayAttendance.clock_out ? (
                 <>
-                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 mb-2">
-                    Already Clocked Out Today
-                  </Badge>
-                  <p className="text-lg font-medium mb-2">See you tomorrow!</p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    You've completed your shift for today. Clock-in will be available tomorrow.
-                  </p>
+                  <div className="w-24 h-24 rounded-full bg-red-100 flex items-center justify-center">
+                    <Square className="h-10 w-10 text-red-600" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">Working since</p>
+                    <p className="text-2xl font-bold tabular-nums">{formatTime(todayAttendance.clock_in)}</p>
+                    <p className="text-lg font-medium text-primary tabular-nums">
+                      {calculateDuration(todayAttendance.clock_in, null)}
+                    </p>
+                  </div>
                   <Button 
                     size="lg" 
-                    className="w-full max-w-xs"
-                    disabled
+                    variant="destructive"
+                    className="w-full"
+                    onClick={handleClockOut}
+                    disabled={clockingOut || isClockDisabled()}
                   >
-                    <Play className="h-4 w-4 mr-2" />
-                    Clock In (Tomorrow)
+                    {clockingOut ? 'Getting location...' : 'Clock Out'}
                   </Button>
                 </>
               ) : (
                 <>
-                  <p className="text-lg font-medium mb-2">Ready to start work?</p>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
-                  </p>
-                  <Button 
-                    size="lg" 
-                    className="w-full max-w-xs"
-                    onClick={handleClockIn}
-                    disabled={clockingIn}
-                  >
-                    <Play className="h-4 w-4 mr-2" />
-                    {clockingIn ? "Clocking In..." : "Clock In"}
-                  </Button>
+                  <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center">
+                    <CheckCircle className="h-10 w-10 text-muted-foreground" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">Today's shift completed</p>
+                    <p className="text-lg font-medium tabular-nums">
+                      {formatTime(todayAttendance.clock_in)} - {formatTime(todayAttendance.clock_out)}
+                    </p>
+                    <p className="text-2xl font-bold text-primary tabular-nums">
+                      {calculateDuration(todayAttendance.clock_in, todayAttendance.clock_out)}
+                    </p>
+                  </div>
                 </>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Today's Summary */}
+        {/* Today's Attendance Details */}
         {todayAttendance && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Today's Summary</CardTitle>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Today's Attendance
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground">Clock In</p>
-                  <p className="font-medium tabular-nums">{formatTime(todayAttendance.clock_in)}</p>
-                  {todayAttendance.clock_in_location && (
-                    <div className="mt-1">
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {formatLocationAddress(todayAttendance.clock_in_location) || 'Location captured'}
-                      </p>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Clock In</span>
+                <span className="font-medium">{formatTime(todayAttendance.clock_in)}</span>
+              </div>
+              {todayAttendance.clock_in_location && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Location</span>
+                  <span className="text-xs text-right max-w-[60%] truncate">
+                    {formatLocationAddress(todayAttendance.clock_in_location)}
+                  </span>
+                </div>
+              )}
+              {todayAttendance.clock_out && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Clock Out</span>
+                    <span className="font-medium">{formatTime(todayAttendance.clock_out)}</span>
+                  </div>
+                  {todayAttendance.clock_out_location && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Location</span>
+                      <span className="text-xs text-right max-w-[60%] truncate">
+                        {formatLocationAddress(todayAttendance.clock_out_location)}
+                      </span>
                     </div>
                   )}
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Clock Out</p>
-                  {todayAttendance.clock_out ? (
-                    <>
-                      <p className="font-medium tabular-nums">{formatTime(todayAttendance.clock_out)}</p>
-                      {todayAttendance.clock_out_location && (
-                        <div className="mt-1">
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {formatLocationAddress(todayAttendance.clock_out_location) || 'Location captured'}
-                          </p>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-muted-foreground">--:--</p>
-                  )}
-                </div>
-              </div>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
@@ -519,108 +675,97 @@ const TeamDashboard = () => {
         {siteMeasurementProjects.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="text-sm flex items-center gap-2">
                 <Ruler className="h-4 w-4" />
-                Site Measurements ({siteMeasurementProjects.length})
+                Site Measurement Projects ({siteMeasurementProjects.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {siteMeasurementProjects.map((project) => (
-                  <div 
-                    key={project.id} 
-                    className="p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
-                    onClick={() => navigate(`/site-measurement/${project.id}`)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{project.client_name}</p>
-                        {project.site_location && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                            <MapPin className="h-3 w-3" />
-                            {project.site_location}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {project.room_count || 0} rooms · {project.total_area?.toFixed(0) || 0} sq.ft
+            <CardContent className="space-y-2">
+              {siteMeasurementProjects.map((project) => (
+                <div 
+                  key={project.id}
+                  className="p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+                  onClick={() => navigate(`/site-measurement/${project.id}`)}
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-medium text-sm">{project.client_name}</p>
+                      {project.site_location && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Navigation className="h-3 w-3" />
+                          {project.site_location}
                         </p>
-                      </div>
-                      <Badge variant="outline" className="capitalize">
-                        {project.status}
-                      </Badge>
+                      )}
                     </div>
+                    <Badge variant="outline" className="text-xs">
+                      {project.room_count} rooms
+                    </Badge>
                   </div>
-                ))}
-              </div>
+                  <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+                    <span>Total: {project.total_area.toFixed(0)} sqft</span>
+                    <Badge variant={project.status === 'completed' ? 'default' : 'secondary'} className="text-xs">
+                      {project.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
         )}
 
         {/* Assigned Projects */}
-        {assignedProjects.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Briefcase className="h-4 w-4" />
-                Your Projects
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {assignedProjects
-                  .filter((assignment) => assignment.quotations)
-                  .map((assignment) => (
-                    <div key={assignment.id} className="p-3 rounded-lg bg-muted/50">
-                      <p className="font-medium text-sm">{assignment.quotations.project_name}</p>
-                      <p className="text-xs text-muted-foreground">{assignment.quotations.client_name}</p>
-                      {assignment.quotations.place_of_project && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                          <Navigation className="h-3 w-3" />
-                          {assignment.quotations.place_of_project}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Briefcase className="h-4 w-4" />
+              Assigned Projects ({assignedProjects.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {assignedProjects.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No assigned projects</p>
+            ) : (
+              <div className="space-y-2">
+                {assignedProjects.map((assignment) => (
+                  <div 
+                    key={assignment.id}
+                    className="p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+                    onClick={() => navigate(`/team/project/${assignment.quotation_id}`)}
+                  >
+                    <p className="font-medium text-sm">{assignment.quotations.project_name}</p>
+                    <p className="text-xs text-muted-foreground">{assignment.quotations.client_name}</p>
+                    {assignment.quotations.place_of_project && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                        <Navigation className="h-3 w-3" />
+                        {assignment.quotations.place_of_project}
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
         {/* Tasks */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-sm flex items-center gap-2">
               <CheckCircle className="h-4 w-4" />
               Your Tasks ({tasks.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {tasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No pending tasks</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No tasks assigned</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {tasks.map((task) => (
                   <div 
-                    key={task.id} 
-                    className={`p-3 rounded-lg border transition-colors ${
-                      task.status === 'completed' ? 'bg-green-50/50 border-green-200' : 
-                      task.status === 'in_progress' ? 'bg-blue-50/50 border-blue-200' : 'bg-muted/50'
-                    }`}
+                    key={task.id}
+                    className="p-3 bg-muted/50 rounded-lg"
                   >
-                    <div className="flex items-start gap-3">
-                      <button 
-                        onClick={() => handleUpdateTaskStatus(
-                          task.id, 
-                          task.status === 'completed' ? 'pending' : 'completed'
-                        )}
-                        className="mt-0.5"
-                      >
-                        {task.status === 'completed' ? (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <Circle className="h-5 w-5 text-muted-foreground" />
-                        )}
-                      </button>
+                    <div className="flex items-start justify-between gap-2">
                       <div className="flex-1">
                         <p className={`font-medium text-sm ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
                           {task.title}
@@ -628,28 +773,42 @@ const TeamDashboard = () => {
                         {task.description && (
                           <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
                         )}
-                        <div className="flex flex-wrap items-center gap-2 mt-2">
-                          {task.due_date && (
-                            <Badge variant="outline" className="text-xs">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {new Date(task.due_date).toLocaleDateString()}
+                        <div className="flex gap-2 mt-2">
+                          {task.priority && (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${
+                                task.priority === 'high' ? 'border-red-300 text-red-700' :
+                                task.priority === 'medium' ? 'border-yellow-300 text-yellow-700' :
+                                'border-green-300 text-green-700'
+                              }`}
+                            >
+                              {task.priority}
                             </Badge>
                           )}
-                          <Badge variant={task.priority === 'high' ? 'destructive' : 'secondary'} className="text-xs">
-                            {task.priority || 'medium'}
-                          </Badge>
+                          {task.due_date && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {formatDate(task.due_date)}
+                            </span>
+                          )}
                         </div>
                       </div>
-                      {/* Status select */}
-                      <select
-                        value={task.status}
-                        onChange={(e) => handleUpdateTaskStatus(task.id, e.target.value)}
-                        className="text-xs border rounded px-2 py-1 bg-background"
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => handleUpdateTaskStatus(
+                          task.id, 
+                          task.status === 'completed' ? 'pending' : 'completed'
+                        )}
                       >
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                      </select>
+                        {task.status === 'completed' ? (
+                          <Circle className="h-5 w-5" />
+                        ) : (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        )}
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -661,53 +820,34 @@ const TeamDashboard = () => {
         {/* Recent Attendance */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Clock className="h-4 w-4" />
               Recent Attendance
             </CardTitle>
           </CardHeader>
           <CardContent>
             {recentAttendance.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No attendance records yet</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No attendance records</p>
             ) : (
-              <div className="space-y-3">
-                {recentAttendance.map((record) => (
-                  <div key={record.id} className="p-3 rounded-lg bg-muted/30 space-y-2">
-                    <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                {recentAttendance.slice(0, 5).map((record, index) => (
+                  <div key={record.id || index} className="flex justify-between items-center py-2 border-b last:border-0">
+                    <div>
                       <p className="text-sm font-medium">{formatDate(record.clock_in)}</p>
-                      <p className="text-sm font-medium tabular-nums">
-                        {calculateDuration(record.clock_in, record.clock_out)}
+                      <p className="text-xs text-muted-foreground">
+                        {formatTime(record.clock_in)} - {record.clock_out ? formatTime(record.clock_out) : 'Working'}
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <p className="text-muted-foreground">In: {formatTime(record.clock_in)}</p>
-                        {record.clock_in_location && (
-                          <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <MapPin className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">{formatLocationAddress(record.clock_in_location)}</span>
-                          </p>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">
-                          Out: {record.clock_out ? formatTime(record.clock_out) : 'Working'}
-                        </p>
-                        {record.clock_out_location && (
-                          <p className="text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <MapPin className="h-3 w-3 flex-shrink-0" />
-                            <span className="truncate">{formatLocationAddress(record.clock_out_location)}</span>
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                    <p className="text-sm font-medium tabular-nums">
+                      {calculateDuration(record.clock_in, record.clock_out)}
+                    </p>
                   </div>
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
-      </main>
+      </div>
     </div>
   );
 };

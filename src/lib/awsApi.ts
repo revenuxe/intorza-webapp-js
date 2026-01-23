@@ -448,6 +448,220 @@ export const createClientBehavior = async (payload: ClientBehaviorPayload): Prom
   });
 };
 
+// ==================== TEAMS ====================
+
+export interface TeamMemberPayload {
+  member_id: string;
+  company_id: string;
+  user_id?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  work_type: string;
+  status: string;
+  daily_rate?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TeamProjectAssignmentPayload {
+  assignment_id: string;
+  company_id: string;
+  team_member_id: string;
+  quotation_id: string;
+  assigned_at?: string;
+}
+
+export interface AttendancePayload {
+  attendance_id: string;
+  company_id: string;
+  team_member_id: string;
+  clock_in: string;
+  clock_out?: string;
+  clock_in_location?: {
+    lat: number;
+    lng: number;
+    address?: string;
+  };
+  clock_out_location?: {
+    lat: number;
+    lng: number;
+    address?: string;
+  };
+}
+
+export interface TaskPayload {
+  task_id: string;
+  company_id: string;
+  quotation_id?: string;
+  assigned_to?: string;
+  title: string;
+  description?: string;
+  status: string;
+  priority?: string;
+  due_date?: string;
+  completed_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Team Members
+export const createTeamMember = async (payload: TeamMemberPayload): Promise<ApiResponse> => {
+  return apiRequest("/teams/members", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateTeamMember = async (memberId: string, payload: Partial<TeamMemberPayload>): Promise<ApiResponse> => {
+  return apiRequest(`/teams/members/${memberId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const getTeamMember = async (memberId: string): Promise<ApiResponse<TeamMemberPayload>> => {
+  return apiRequest(`/teams/members/${memberId}`, {
+    method: "GET",
+  });
+};
+
+export const getTeamMemberByUserId = async (userId: string): Promise<ApiResponse<TeamMemberPayload>> => {
+  return apiRequest(`/teams/members/user/${userId}`, {
+    method: "GET",
+  });
+};
+
+export const listTeamMembers = async (companyId: string): Promise<ApiResponse<TeamMemberPayload[]>> => {
+  return apiRequest(`/teams/members?company_id=${companyId}`, {
+    method: "GET",
+  });
+};
+
+export const deleteTeamMember = async (memberId: string): Promise<ApiResponse> => {
+  return apiRequest(`/teams/members/${memberId}`, {
+    method: "DELETE",
+  });
+};
+
+// Project Assignments
+export const createTeamAssignment = async (payload: TeamProjectAssignmentPayload): Promise<ApiResponse> => {
+  return apiRequest("/teams/assignments", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const listTeamAssignments = async (companyId: string): Promise<ApiResponse<TeamProjectAssignmentPayload[]>> => {
+  return apiRequest(`/teams/assignments?company_id=${companyId}`, {
+    method: "GET",
+  });
+};
+
+export const listTeamAssignmentsByMember = async (memberId: string): Promise<ApiResponse<TeamProjectAssignmentPayload[]>> => {
+  return apiRequest(`/teams/assignments/member/${memberId}`, {
+    method: "GET",
+  });
+};
+
+export const listTeamAssignmentsByProject = async (quotationId: string): Promise<ApiResponse<TeamProjectAssignmentPayload[]>> => {
+  return apiRequest(`/teams/assignments/project/${quotationId}`, {
+    method: "GET",
+  });
+};
+
+export const deleteTeamAssignment = async (assignmentId: string): Promise<ApiResponse> => {
+  return apiRequest(`/teams/assignments/${assignmentId}`, {
+    method: "DELETE",
+  });
+};
+
+// Attendance
+export const createAttendance = async (payload: AttendancePayload): Promise<ApiResponse> => {
+  return apiRequest("/teams/attendance", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateAttendance = async (attendanceId: string, payload: Partial<AttendancePayload>): Promise<ApiResponse> => {
+  return apiRequest(`/teams/attendance/${attendanceId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const getTodayAttendance = async (memberId: string): Promise<ApiResponse<AttendancePayload>> => {
+  const today = new Date().toISOString().split('T')[0];
+  return apiRequest(`/teams/attendance/member/${memberId}/today?date=${today}`, {
+    method: "GET",
+  });
+};
+
+export const listAttendanceByMember = async (memberId: string, days: number = 7): Promise<ApiResponse<AttendancePayload[]>> => {
+  return apiRequest(`/teams/attendance/member/${memberId}?days=${days}`, {
+    method: "GET",
+  });
+};
+
+export const listAttendanceByCompany = async (companyId: string, date?: string): Promise<ApiResponse<AttendancePayload[]>> => {
+  const queryDate = date || new Date().toISOString().split('T')[0];
+  return apiRequest(`/teams/attendance?company_id=${companyId}&date=${queryDate}`, {
+    method: "GET",
+  });
+};
+
+export const listAttendanceByMembers = async (memberIds: string[], days: number = 7): Promise<ApiResponse<AttendancePayload[]>> => {
+  return apiRequest(`/teams/attendance/members?member_ids=${memberIds.join(',')}&days=${days}`, {
+    method: "GET",
+  });
+};
+
+// Tasks
+export const createTask = async (payload: TaskPayload): Promise<ApiResponse> => {
+  return apiRequest("/teams/tasks", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateTask = async (taskId: string, payload: Partial<TaskPayload>): Promise<ApiResponse> => {
+  return apiRequest(`/teams/tasks/${taskId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const getTask = async (taskId: string): Promise<ApiResponse<TaskPayload>> => {
+  return apiRequest(`/teams/tasks/${taskId}`, {
+    method: "GET",
+  });
+};
+
+export const listTasksByMember = async (memberId: string): Promise<ApiResponse<TaskPayload[]>> => {
+  return apiRequest(`/teams/tasks/member/${memberId}`, {
+    method: "GET",
+  });
+};
+
+export const listTasksByProject = async (quotationId: string): Promise<ApiResponse<TaskPayload[]>> => {
+  return apiRequest(`/teams/tasks/project/${quotationId}`, {
+    method: "GET",
+  });
+};
+
+export const listTasksByCompany = async (companyId: string): Promise<ApiResponse<TaskPayload[]>> => {
+  return apiRequest(`/teams/tasks?company_id=${companyId}`, {
+    method: "GET",
+  });
+};
+
+export const deleteTask = async (taskId: string): Promise<ApiResponse> => {
+  return apiRequest(`/teams/tasks/${taskId}`, {
+    method: "DELETE",
+  });
+};
+
 // ==================== FILES ====================
 
 export interface FilePayload {
