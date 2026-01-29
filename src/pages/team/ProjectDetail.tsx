@@ -145,7 +145,7 @@ const ProjectDetail = () => {
       const result = await awsApi.listTeamsByProject(projectId);
       if (result.success && result.data) {
         const membersList: TeamMember[] = result.data
-          .filter((r: any) => r.quotation_id === projectId && r.role === 'assignment')
+          .filter((r: any) => r.quotation_id === projectId && r.role === 'assignment' && r.status !== 'deleted')
           .map((r: any) => ({
             id: r.team_id,
             name: r.name,
@@ -166,7 +166,9 @@ const ProjectDetail = () => {
     try {
       const result = await awsApi.listTasksByProject(projectId);
       if (result.success && result.data) {
-        const mapped = result.data.map((t: any) => ({
+        const mapped = result.data
+          .filter((t: any) => t.status !== 'deleted')
+          .map((t: any) => ({
           id: t.task_id,
           title: t.title,
           description: t.description || null,
@@ -268,8 +270,8 @@ const ProjectDetail = () => {
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      // Delete task in AWS using deleteTeam
-      const result = await awsApi.deleteTeam(taskId);
+      // AWS does NOT support DELETE. Soft-delete the task via PUT /teams/:id
+      const result = await awsApi.updateTeam(taskId, { status: 'deleted' });
       if (!result.success) throw new Error(result.error);
       
       toast.success("Task deleted");
