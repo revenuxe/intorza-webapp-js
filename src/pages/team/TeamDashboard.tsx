@@ -70,43 +70,8 @@ const TeamDashboard = () => {
     checkAuthAndFetch();
   }, []);
 
-  // Set up real-time subscription after teamMember is loaded
-  useEffect(() => {
-    if (!teamMember) return;
-
-    // Real-time subscription for tasks assigned to this member (Supabase fallback)
-    const tasksChannel = supabase
-      .channel(`member-tasks-${teamMember.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'tasks',
-        filter: `assigned_to=eq.${teamMember.id}`
-      }, () => {
-        fetchTasks(teamMember.id);
-      })
-      .subscribe();
-
-    // Real-time subscription for site measurement projects assigned to this member
-    const projectsChannel = supabase
-      .channel(`member-projects-${teamMember.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'site_measurement_projects',
-        filter: `assigned_to=eq.${teamMember.id}`
-      }, () => {
-        fetchSiteMeasurementProjects(teamMember.id);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(tasksChannel);
-      supabase.removeChannel(projectsChannel);
-    };
-  }, [teamMember?.id]);
-
   const checkAuthAndFetch = async () => {
+    // Auth check only uses Supabase
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
@@ -114,7 +79,7 @@ const TeamDashboard = () => {
       return;
     }
 
-    // Try to get team member profile from AWS first
+    // Get team member profile from AWS
     try {
       const awsResult = await awsApi.getTeamMemberByUserId(user.id);
       if (awsResult.success && awsResult.data) {
@@ -127,7 +92,7 @@ const TeamDashboard = () => {
         };
         setTeamMember(member);
 
-        // Get company name
+        // Get company name from Supabase profiles (auth-related metadata only)
         const { data: profile } = await supabase
           .from('profiles')
           .select('company_name')
@@ -143,51 +108,19 @@ const TeamDashboard = () => {
           fetchRecentAttendance(member.id),
           fetchTasks(member.id),
           fetchAssignedProjects(member.id),
-          fetchSiteMeasurementProjects(member.id),
+          fetchSiteMeasurementProjects(member.id, member.company_id),
         ]);
 
         setLoading(false);
         return;
       }
     } catch (error) {
-      console.log('AWS fetch failed, falling back to Supabase:', error);
+      console.error('Error fetching team member from AWS:', error);
     }
 
-    // Fallback to Supabase
-    const { data: member, error } = await supabase
-      .from('team_members')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
-
-    if (error || !member) {
-      toast.error("Team member profile not found");
-      navigate('/team/login');
-      return;
-    }
-
-    setTeamMember(member);
-
-    // Get company name
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('company_name')
-      .eq('id', member.company_id)
-      .single();
-    
-    if (profile?.company_name) {
-      setCompanyName(profile.company_name);
-    }
-
-    await Promise.all([
-      fetchTodayAttendance(member.id),
-      fetchRecentAttendance(member.id),
-      fetchTasks(member.id),
-      fetchAssignedProjects(member.id),
-      fetchSiteMeasurementProjects(member.id),
-    ]);
-
-    setLoading(false);
+    // If AWS fails, show error and redirect
+    toast.error("Team member profile not found");
+    navigate('/team/login');
   };
 
   // Fetch assigned projects from AWS
@@ -218,31 +151,16 @@ const TeamDashboard = () => {
         }
         
         setAssignedProjects(projectsWithDetails);
-        return;
       }
     } catch (error) {
-      console.log('AWS fetch failed, falling back to Supabase:', error);
-    }
-
-    // Fallback to Supabase
-    const { data } = await supabase
-      .from('team_project_assignments')
-      .select(`
-        id,
-        quotation_id,
-        quotations:quotation_id(project_name, client_name, place_of_project)
-      `)
-      .eq('team_member_id', memberId);
-
-    if (data) {
-      setAssignedProjects(data as unknown as ProjectAssignment[]);
+      console.error('Error fetching assigned projects from AWS:', error);
     }
   };
 
   // Fetch site measurement projects from AWS
-  const fetchSiteMeasurementProjects = async (memberId: string) => {
+  const fetchSiteMeasurementProjects = async (memberId: string, companyId: string) => {
     try {
-      const result = await awsApi.listMeasurements(teamMember?.company_id || '');
+      const result = await awsApi.listMeasurements(companyId);
       if (result.success && result.data) {
         const filtered = result.data
           .filter((m: any) => m.assigned_to === memberId)
@@ -255,21 +173,9 @@ const TeamDashboard = () => {
             total_area: m.total_area || 0,
           }));
         setSiteMeasurementProjects(filtered);
-        return;
       }
     } catch (error) {
-      console.log('AWS fetch failed, falling back to Supabase:', error);
-    }
-
-    // Fallback to Supabase
-    const { data } = await supabase
-      .from('site_measurement_projects')
-      .select('id, client_name, site_location, status, room_count, total_area')
-      .eq('assigned_to', memberId)
-      .order('updated_at', { ascending: false });
-
-    if (data) {
-      setSiteMeasurementProjects(data);
+      console.error('Error fetching site measurement projects from AWS:', error);
     }
   };
 
@@ -285,26 +191,13 @@ const TeamDashboard = () => {
           clock_in_location: result.data.clock_in_location || null,
           clock_out_location: result.data.clock_out_location || null,
         });
-        return;
+      } else {
+        setTodayAttendance(null);
       }
     } catch (error) {
-      console.log('AWS fetch failed, falling back to Supabase:', error);
+      console.error('Error fetching today attendance from AWS:', error);
+      setTodayAttendance(null);
     }
-
-    // Fallback to Supabase
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const { data } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('team_member_id', memberId)
-      .gte('clock_in', today.toISOString())
-      .order('clock_in', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    setTodayAttendance(data);
   };
 
   // Fetch recent attendance from AWS
@@ -320,21 +213,10 @@ const TeamDashboard = () => {
           clock_out_location: a.clock_out_location || null,
         }));
         setRecentAttendance(mapped);
-        return;
       }
     } catch (error) {
-      console.log('AWS fetch failed, falling back to Supabase:', error);
+      console.error('Error fetching recent attendance from AWS:', error);
     }
-
-    // Fallback to Supabase
-    const { data } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('team_member_id', memberId)
-      .order('clock_in', { ascending: false })
-      .limit(7);
-
-    setRecentAttendance(data || []);
   };
 
   // Fetch tasks from AWS
@@ -351,21 +233,10 @@ const TeamDashboard = () => {
           due_date: t.due_date || null,
         }));
         setTasks(mapped);
-        return;
       }
     } catch (error) {
-      console.log('AWS fetch failed, falling back to Supabase:', error);
+      console.error('Error fetching tasks from AWS:', error);
     }
-
-    // Fallback to Supabase
-    const { data } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('assigned_to', memberId)
-      .order('status', { ascending: true })
-      .order('due_date', { ascending: true });
-
-    setTasks(data || []);
   };
 
   const getCurrentLocation = async (): Promise<{ lat: number; lng: number; address?: string }> => {
@@ -408,7 +279,7 @@ const TeamDashboard = () => {
 
       const attendanceId = `att_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Create in AWS
+      // Create in AWS only
       const result = await awsApi.createAttendance({
         attendance_id: attendanceId,
         company_id: teamMember.company_id,
@@ -418,15 +289,6 @@ const TeamDashboard = () => {
       });
 
       if (!result.success) throw new Error(result.error);
-
-      // Also create in Supabase for fallback
-      await supabase
-        .from('attendance')
-        .insert({
-          team_member_id: teamMember.id,
-          clock_in: new Date().toISOString(),
-          clock_in_location: location,
-        });
 
       toast.success("Clocked in successfully!");
       await fetchTodayAttendance(teamMember.id);
@@ -451,22 +313,13 @@ const TeamDashboard = () => {
         console.log("Location not available:", locError);
       }
 
-      // Update in AWS
+      // Update in AWS only
       const result = await awsApi.updateAttendance(todayAttendance.id, {
         clock_out: new Date().toISOString(),
         clock_out_location: location || undefined,
       });
 
       if (!result.success) throw new Error(result.error);
-
-      // Also update in Supabase for fallback
-      await supabase
-        .from('attendance')
-        .update({
-          clock_out: new Date().toISOString(),
-          clock_out_location: location,
-        })
-        .eq('id', todayAttendance.id);
 
       toast.success("Clocked out successfully!");
       await fetchTodayAttendance(teamMember.id);
@@ -479,6 +332,7 @@ const TeamDashboard = () => {
   };
 
   const handleLogout = async () => {
+    // Auth signout uses Supabase
     await supabase.auth.signOut();
     navigate('/team/login');
   };
@@ -492,26 +346,15 @@ const TeamDashboard = () => {
         updates.completed_at = undefined;
       }
 
-      // Update in AWS
+      // Update in AWS only
       const result = await awsApi.updateTask(taskId, updates);
       if (!result.success) throw new Error(result.error);
-
-      // Also update in Supabase for fallback
-      const supabaseUpdates: any = { status: newStatus };
-      if (newStatus === 'completed') {
-        supabaseUpdates.completed_at = new Date().toISOString();
-      } else {
-        supabaseUpdates.completed_at = null;
-      }
-
-      await supabase
-        .from('tasks')
-        .update(supabaseUpdates)
-        .eq('id', taskId);
 
       if (teamMember) {
         await fetchTasks(teamMember.id);
       }
+      
+      toast.success(`Task marked as ${newStatus}`);
     } catch (error: any) {
       toast.error("Error updating task");
     }
