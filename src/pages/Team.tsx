@@ -178,7 +178,7 @@ const Team = () => {
       if (result.success && result.data) {
         // Filter for team members (role = 'member' or by work_type presence)
         const membersList = result.data
-          .filter((t: any) => t.work_type && !t.attendance_id && !t.task_id)
+          .filter((t: any) => t.work_type && !t.attendance_id && !t.task_id && t.status !== 'deleted')
           .map((m: any) => ({
             id: m.team_id,
             name: m.name,
@@ -208,6 +208,7 @@ const Team = () => {
         const teamsMap = new Map<string, ProjectTeam>();
         
         for (const record of result.data) {
+          if (record.status === 'deleted') continue;
           if (!record.quotation_id) continue;
           
           const quotation = quotations.find(q => q.id === record.quotation_id);
@@ -386,7 +387,7 @@ const Team = () => {
 
         if (response.error) {
           // Clean up AWS record if auth creation fails
-          await awsApi.deleteTeam(memberId);
+          await awsApi.updateTeam(memberId, { status: 'deleted' });
           throw new Error(response.error.message || 'Failed to create login account');
         }
 
@@ -475,8 +476,8 @@ const Team = () => {
 
   const handleRemoveMemberFromProject = async (assignmentId: string) => {
     try {
-      // Delete assignment from AWS using deleteTeam
-      const result = await awsApi.deleteTeam(assignmentId);
+      // AWS does NOT support DELETE. Soft-delete the assignment via PUT /teams/:id
+      const result = await awsApi.updateTeam(assignmentId, { status: 'deleted' });
       if (!result.success) throw new Error(result.error);
 
       toast.success("Member removed from project");
@@ -488,8 +489,8 @@ const Team = () => {
 
   const handleDeleteMember = async (id: string) => {
     try {
-      // Delete from AWS using deleteTeam
-      const result = await awsApi.deleteTeam(id);
+      // AWS does NOT support DELETE. Soft-delete the member via PUT /teams/:id
+      const result = await awsApi.updateTeam(id, { status: 'deleted' });
       if (!result.success) throw new Error(result.error);
 
       toast.success("Team member deleted");
