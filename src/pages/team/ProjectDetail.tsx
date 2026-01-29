@@ -138,29 +138,20 @@ const ProjectDetail = () => {
   };
 
   const fetchMembers = async () => {
-    if (!projectId) return;
+    if (!projectId || !user) return;
     
     try {
-      const result = await awsApi.listTeamAssignmentsByProject(projectId);
+      // Fetch all team records for this project using listTeamsByProject
+      const result = await awsApi.listTeamsByProject(projectId);
       if (result.success && result.data) {
-        // Need to get member details for each assignment
-        const membersList: TeamMember[] = [];
-        
-        for (const assignment of result.data) {
-          try {
-            const memberResult = await awsApi.getTeamMember(assignment.team_member_id);
-            if (memberResult.success && memberResult.data) {
-              membersList.push({
-                id: memberResult.data.member_id,
-                name: memberResult.data.name,
-                work_type: memberResult.data.work_type,
-                assignmentId: assignment.assignment_id,
-              });
-            }
-          } catch (e) {
-            console.error('Error fetching member:', e);
-          }
-        }
+        const membersList: TeamMember[] = result.data
+          .filter((r: any) => r.quotation_id === projectId && r.role === 'assignment')
+          .map((r: any) => ({
+            id: r.team_id,
+            name: r.name,
+            work_type: r.work_type,
+            assignmentId: r.team_id,
+          }));
         
         setMembers(membersList);
       }
@@ -232,8 +223,8 @@ const ProjectDetail = () => {
       const taskId = editingTask?.id || `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       if (editingTask) {
-        // Update in AWS
-        const result = await awsApi.updateTask(taskId, {
+        // Update task in AWS using updateTeam
+        const result = await awsApi.updateTeam(taskId, {
           title: taskForm.title,
           description: taskForm.description || undefined,
           priority: taskForm.priority,
@@ -244,17 +235,22 @@ const ProjectDetail = () => {
         if (!result.success) throw new Error(result.error);
         toast.success("Task updated");
       } else {
-        // Create in AWS
-        const result = await awsApi.createTask({
-          task_id: taskId,
+        // Create task in AWS using createTeam
+        const result = await awsApi.createTeam({
+          team_id: taskId,
           company_id: user.id,
-          quotation_id: projectId,
+          name: taskForm.title,
+          email: '',
+          work_type: '',
+          role: 'task',
+          task_id: taskId,
           title: taskForm.title,
           description: taskForm.description || undefined,
           priority: taskForm.priority,
           due_date: taskForm.due_date || undefined,
           assigned_to: taskForm.assigned_to || undefined,
           status: 'pending',
+          quotation_id: projectId,
         });
 
         if (!result.success) throw new Error(result.error);
@@ -272,7 +268,8 @@ const ProjectDetail = () => {
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      const result = await awsApi.deleteTask(taskId);
+      // Delete task in AWS using deleteTeam
+      const result = await awsApi.deleteTeam(taskId);
       if (!result.success) throw new Error(result.error);
       
       toast.success("Task deleted");
@@ -291,7 +288,8 @@ const ProjectDetail = () => {
         updates.completed_at = undefined;
       }
 
-      const result = await awsApi.updateTask(taskId, updates);
+      // Update task status in AWS using updateTeam
+      const result = await awsApi.updateTeam(taskId, updates);
       if (!result.success) throw new Error(result.error);
       
       fetchTasks();
