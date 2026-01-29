@@ -450,76 +450,30 @@ export const createClientBehavior = async (payload: ClientBehaviorPayload): Prom
 
 // ==================== TEAMS ====================
 
-// Team entity (company-level team definition)
+/**
+ * Team/Team Member entity - stored in intorza_teams table
+ * Each team member is a row in the teams table, accessed via POST/PUT /teams
+ */
 export interface TeamPayload {
   team_id: string;
   company_id: string;
   name: string;
-  role: string;
-  permissions?: any;
-  status?: string;
-}
-
-export const createTeam = async (payload: TeamPayload): Promise<ApiResponse> => {
-  return apiRequest("/teams", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const updateTeam = async (teamId: string, payload: Partial<TeamPayload>): Promise<ApiResponse> => {
-  return apiRequest(`/teams/${teamId}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const getTeam = async (teamId: string): Promise<ApiResponse<TeamPayload>> => {
-  return apiRequest(`/teams/${teamId}`, {
-    method: "GET",
-  });
-};
-
-export const listTeams = async (companyId: string): Promise<ApiResponse<TeamPayload[]>> => {
-  return apiRequest(`/teams?company_id=${companyId}`, {
-    method: "GET",
-  });
-};
-
-export const deleteTeam = async (teamId: string): Promise<ApiResponse> => {
-  return apiRequest(`/teams/${teamId}`, {
-    method: "DELETE",
-  });
-};
-
-// Team Members
-export interface TeamMemberPayload {
-  member_id: string;
-  company_id: string;
-  user_id?: string;
-  name: string;
   email: string;
   phone?: string;
   work_type: string;
-  status: string;
+  role: string;
+  status?: string;
   daily_rate?: number;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface TeamProjectAssignmentPayload {
-  assignment_id: string;
-  company_id: string;
-  team_member_id: string;
-  quotation_id: string;
+  user_id?: string;
+  permissions?: any;
+  // Assignment data (optional - for project assignments)
+  quotation_id?: string;
   assigned_at?: string;
-}
-
-export interface AttendancePayload {
-  attendance_id: string;
-  company_id: string;
-  team_member_id: string;
-  clock_in: string;
+  assigned_to?: string;
+  // Attendance data (optional - for attendance records)
+  attendance_id?: string;
+  team_member_id?: string;
+  clock_in?: string;
   clock_out?: string;
   clock_in_location?: {
     lat: number;
@@ -531,16 +485,10 @@ export interface AttendancePayload {
     lng: number;
     address?: string;
   };
-}
-
-export interface TaskPayload {
-  task_id: string;
-  company_id: string;
-  quotation_id?: string;
-  assigned_to?: string;
-  title: string;
+  // Task data (optional - for task records)
+  task_id?: string;
+  title?: string;
   description?: string;
-  status: string;
   priority?: string;
   due_date?: string;
   completed_at?: string;
@@ -548,153 +496,113 @@ export interface TaskPayload {
   updated_at?: string;
 }
 
-// Team Members
-export const createTeamMember = async (payload: TeamMemberPayload): Promise<ApiResponse> => {
-  return apiRequest("/teams/members", {
+/**
+ * Create a new team member - POST /teams
+ */
+export const createTeam = async (payload: TeamPayload): Promise<ApiResponse> => {
+  return apiRequest("/teams", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 };
 
-export const updateTeamMember = async (memberId: string, payload: Partial<TeamMemberPayload>): Promise<ApiResponse> => {
-  return apiRequest(`/teams/members/${memberId}`, {
+/**
+ * Update an existing team member - PUT /teams/:id
+ */
+export const updateTeam = async (teamId: string, payload: Partial<TeamPayload>): Promise<ApiResponse> => {
+  return apiRequest(`/teams/${teamId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 };
 
-export const getTeamMember = async (memberId: string): Promise<ApiResponse<TeamMemberPayload>> => {
-  return apiRequest(`/teams/members/${memberId}`, {
+/**
+ * Get a specific team member - GET /teams/:id
+ */
+export const getTeam = async (teamId: string): Promise<ApiResponse<TeamPayload>> => {
+  return apiRequest(`/teams/${teamId}`, {
     method: "GET",
   });
 };
 
-export const getTeamMemberByUserId = async (userId: string): Promise<ApiResponse<TeamMemberPayload>> => {
-  return apiRequest(`/teams/members/user/${userId}`, {
+/**
+ * List all team members for a company - GET /teams?company_id=xxx
+ */
+export const listTeams = async (companyId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?company_id=${companyId}`, {
     method: "GET",
   });
 };
 
-export const listTeamMembers = async (companyId: string): Promise<ApiResponse<TeamMemberPayload[]>> => {
-  return apiRequest(`/teams/members?company_id=${companyId}`, {
-    method: "GET",
-  });
-};
-
-export const deleteTeamMember = async (memberId: string): Promise<ApiResponse> => {
-  return apiRequest(`/teams/members/${memberId}`, {
+/**
+ * Delete a team member - DELETE /teams/:id
+ */
+export const deleteTeam = async (teamId: string): Promise<ApiResponse> => {
+  return apiRequest(`/teams/${teamId}`, {
     method: "DELETE",
   });
 };
 
-// Project Assignments
-export const createTeamAssignment = async (payload: TeamProjectAssignmentPayload): Promise<ApiResponse> => {
-  return apiRequest("/teams/assignments", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const listTeamAssignments = async (companyId: string): Promise<ApiResponse<TeamProjectAssignmentPayload[]>> => {
-  return apiRequest(`/teams/assignments?company_id=${companyId}`, {
+/**
+ * Get team member by user_id - GET /teams?user_id=xxx
+ */
+export const getTeamByUserId = async (userId: string): Promise<ApiResponse<TeamPayload>> => {
+  return apiRequest(`/teams?user_id=${userId}`, {
     method: "GET",
   });
 };
 
-export const listTeamAssignmentsByMember = async (memberId: string): Promise<ApiResponse<TeamProjectAssignmentPayload[]>> => {
-  return apiRequest(`/teams/assignments/member/${memberId}`, {
+/**
+ * List team members assigned to a project - GET /teams?quotation_id=xxx
+ */
+export const listTeamsByProject = async (quotationId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?quotation_id=${quotationId}`, {
     method: "GET",
   });
 };
 
-export const listTeamAssignmentsByProject = async (quotationId: string): Promise<ApiResponse<TeamProjectAssignmentPayload[]>> => {
-  return apiRequest(`/teams/assignments/project/${quotationId}`, {
-    method: "GET",
-  });
-};
-
-export const deleteTeamAssignment = async (assignmentId: string): Promise<ApiResponse> => {
-  return apiRequest(`/teams/assignments/${assignmentId}`, {
-    method: "DELETE",
-  });
-};
-
-// Attendance
-export const createAttendance = async (payload: AttendancePayload): Promise<ApiResponse> => {
-  return apiRequest("/teams/attendance", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const updateAttendance = async (attendanceId: string, payload: Partial<AttendancePayload>): Promise<ApiResponse> => {
-  return apiRequest(`/teams/attendance/${attendanceId}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const getTodayAttendance = async (memberId: string): Promise<ApiResponse<AttendancePayload>> => {
-  const today = new Date().toISOString().split('T')[0];
-  return apiRequest(`/teams/attendance/member/${memberId}/today?date=${today}`, {
-    method: "GET",
-  });
-};
-
-export const listAttendanceByMember = async (memberId: string, days: number = 7): Promise<ApiResponse<AttendancePayload[]>> => {
-  return apiRequest(`/teams/attendance/member/${memberId}?days=${days}`, {
-    method: "GET",
-  });
-};
-
-export const listAttendanceByCompany = async (companyId: string, date?: string): Promise<ApiResponse<AttendancePayload[]>> => {
+/**
+ * List attendance records for a company - GET /teams?company_id=xxx&type=attendance
+ */
+export const listAttendanceByCompany = async (companyId: string, date?: string): Promise<ApiResponse<TeamPayload[]>> => {
   const queryDate = date || new Date().toISOString().split('T')[0];
-  return apiRequest(`/teams/attendance?company_id=${companyId}&date=${queryDate}`, {
+  return apiRequest(`/teams?company_id=${companyId}&type=attendance&date=${queryDate}`, {
     method: "GET",
   });
 };
 
-export const listAttendanceByMembers = async (memberIds: string[], days: number = 7): Promise<ApiResponse<AttendancePayload[]>> => {
-  return apiRequest(`/teams/attendance/members?member_ids=${memberIds.join(',')}&days=${days}`, {
+/**
+ * List attendance records for specific members - GET /teams?member_ids=xxx&type=attendance
+ */
+export const listAttendanceByMembers = async (memberIds: string[], days: number = 7): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?member_ids=${memberIds.join(',')}&type=attendance&days=${days}`, {
     method: "GET",
   });
 };
 
-// Tasks
-export const createTask = async (payload: TaskPayload): Promise<ApiResponse> => {
-  return apiRequest("/teams/tasks", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const updateTask = async (taskId: string, payload: Partial<TaskPayload>): Promise<ApiResponse> => {
-  return apiRequest(`/teams/tasks/${taskId}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
-  });
-};
-
-export const getTask = async (taskId: string): Promise<ApiResponse<TaskPayload>> => {
-  return apiRequest(`/teams/tasks/${taskId}`, {
+/**
+ * List tasks for a member - GET /teams?member_id=xxx&type=tasks
+ */
+export const listTasksByMember = async (memberId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?member_id=${memberId}&type=tasks`, {
     method: "GET",
   });
 };
 
-export const listTasksByMember = async (memberId: string): Promise<ApiResponse<TaskPayload[]>> => {
-  return apiRequest(`/teams/tasks/member/${memberId}`, {
+/**
+ * List tasks for a project - GET /teams?quotation_id=xxx&type=tasks
+ */
+export const listTasksByProject = async (quotationId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?quotation_id=${quotationId}&type=tasks`, {
     method: "GET",
   });
 };
 
-export const listTasksByProject = async (quotationId: string): Promise<ApiResponse<TaskPayload[]>> => {
-  return apiRequest(`/teams/tasks/project/${quotationId}`, {
-    method: "GET",
-  });
-};
-
-export const listTasksByCompany = async (companyId: string): Promise<ApiResponse<TaskPayload[]>> => {
-  return apiRequest(`/teams/tasks?company_id=${companyId}`, {
+/**
+ * List all tasks for a company - GET /teams?company_id=xxx&type=tasks
+ */
+export const listTasksByCompany = async (companyId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?company_id=${companyId}&type=tasks`, {
     method: "GET",
   });
 };

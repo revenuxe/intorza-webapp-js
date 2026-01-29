@@ -79,40 +79,44 @@ const TeamDashboard = () => {
       return;
     }
 
-    // Get team member profile from AWS
+    // Get team member profile from AWS using getTeamByUserId
     try {
-      const awsResult = await awsApi.getTeamMemberByUserId(user.id);
+      const awsResult = await awsApi.getTeamByUserId(user.id);
       if (awsResult.success && awsResult.data) {
-        const member = {
-          id: awsResult.data.member_id,
-          name: awsResult.data.name,
-          email: awsResult.data.email,
-          work_type: awsResult.data.work_type,
-          company_id: awsResult.data.company_id,
-        };
-        setTeamMember(member);
+        // Could be array or single object depending on API response
+        const memberData = Array.isArray(awsResult.data) ? awsResult.data[0] : awsResult.data;
+        if (memberData) {
+          const member = {
+            id: memberData.team_id,
+            name: memberData.name,
+            email: memberData.email,
+            work_type: memberData.work_type,
+            company_id: memberData.company_id,
+          };
+          setTeamMember(member);
 
-        // Get company name from Supabase profiles (auth-related metadata only)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_name')
-          .eq('id', member.company_id)
-          .single();
-        
-        if (profile?.company_name) {
-          setCompanyName(profile.company_name);
+          // Get company name from Supabase profiles (auth-related metadata only)
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('company_name')
+            .eq('id', member.company_id)
+            .single();
+          
+          if (profile?.company_name) {
+            setCompanyName(profile.company_name);
+          }
+
+          await Promise.all([
+            fetchTodayAttendance(member.id),
+            fetchRecentAttendance(member.id),
+            fetchTasks(member.id),
+            fetchAssignedProjects(member.id),
+            fetchSiteMeasurementProjects(member.id, member.company_id),
+          ]);
+
+          setLoading(false);
+          return;
         }
-
-        await Promise.all([
-          fetchTodayAttendance(member.id),
-          fetchRecentAttendance(member.id),
-          fetchTasks(member.id),
-          fetchAssignedProjects(member.id),
-          fetchSiteMeasurementProjects(member.id, member.company_id),
-        ]);
-
-        setLoading(false);
-        return;
       }
     } catch (error) {
       console.error('Error fetching team member from AWS:', error);
@@ -123,20 +127,25 @@ const TeamDashboard = () => {
     navigate('/team/login');
   };
 
-  // Fetch assigned projects from AWS
+  // Fetch assigned projects from AWS using listTeamsByProject (filtered by member)
   const fetchAssignedProjects = async (memberId: string) => {
     try {
-      const result = await awsApi.listTeamAssignmentsByMember(memberId);
+      // We need to get all team records for this member that have quotation_id
+      const result = await awsApi.listTeams(teamMember?.company_id || '');
       if (result.success && result.data) {
-        // Need to fetch quotation details for each assignment
+        // Filter for assignments related to this member (by team_id pattern or name match)
+        const assignments = result.data.filter((r: any) => 
+          r.quotation_id && (r.team_id?.includes(memberId) || r.name === teamMember?.name)
+        );
+        
         const projectsWithDetails: ProjectAssignment[] = [];
         
-        for (const assignment of result.data) {
+        for (const assignment of assignments) {
           try {
             const quotationResult = await awsApi.getQuotation(assignment.quotation_id);
             if (quotationResult.success && quotationResult.data) {
               projectsWithDetails.push({
-                id: assignment.assignment_id,
+                id: assignment.team_id,
                 quotation_id: assignment.quotation_id,
                 quotations: {
                   project_name: quotationResult.data.quotation_title || '',
@@ -179,18 +188,27 @@ const TeamDashboard = () => {
     }
   };
 
-  // Fetch today's attendance from AWS
+  // Fetch today's attendance from AWS using listTeams with type=attendance
   const fetchTodayAttendance = async (memberId: string) => {
     try {
-      const result = await awsApi.getTodayAttendance(memberId);
+      const today = new Date().toISOString().split('T')[0];
+      const result = await awsApi.listAttendanceByCompany(teamMember?.company_id || '', today);
       if (result.success && result.data) {
-        setTodayAttendance({
-          id: result.data.attendance_id,
-          clock_in: result.data.clock_in,
-          clock_out: result.data.clock_out || null,
-          clock_in_location: result.data.clock_in_location || null,
-          clock_out_location: result.data.clock_out_location || null,
-        });
+        // Find attendance for this member today
+        const todayRecord = result.data.find((a: any) => 
+          a.team_member_id === memberId || a.team_id?.includes(memberId)
+        );
+        if (todayRecord) {
+          setTodayAttendance({
+            id: todayRecord.attendance_id || todayRecord.team_id,
+            clock_in: todayRecord.clock_in,
+            clock_out: todayRecord.clock_out || null,
+            clock_in_location: todayRecord.clock_in_location || null,
+            clock_out_location: todayRecord.clock_out_location || null,
+          });
+        } else {
+          setTodayAttendance(null);
+        }
       } else {
         setTodayAttendance(null);
       }
@@ -203,10 +221,10 @@ const TeamDashboard = () => {
   // Fetch recent attendance from AWS
   const fetchRecentAttendance = async (memberId: string) => {
     try {
-      const result = await awsApi.listAttendanceByMember(memberId, 7);
+      const result = await awsApi.listAttendanceByMembers([memberId], 7);
       if (result.success && result.data) {
         const mapped = result.data.map((a: any) => ({
-          id: a.attendance_id,
+          id: a.attendance_id || a.team_id,
           clock_in: a.clock_in,
           clock_out: a.clock_out || null,
           clock_in_location: a.clock_in_location || null,
@@ -219,13 +237,13 @@ const TeamDashboard = () => {
     }
   };
 
-  // Fetch tasks from AWS
+  // Fetch tasks from AWS using listTasksByMember
   const fetchTasks = async (memberId: string) => {
     try {
       const result = await awsApi.listTasksByMember(memberId);
       if (result.success && result.data) {
         const mapped = result.data.map((t: any) => ({
-          id: t.task_id,
+          id: t.task_id || t.team_id,
           title: t.title,
           description: t.description || null,
           status: t.status,
@@ -279,11 +297,15 @@ const TeamDashboard = () => {
 
       const attendanceId = `att_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Create in AWS only
-      const result = await awsApi.createAttendance({
-        attendance_id: attendanceId,
+      // Create attendance record in AWS using createTeam
+      const result = await awsApi.createTeam({
+        team_id: attendanceId,
         company_id: teamMember.company_id,
-        team_member_id: teamMember.id,
+        name: teamMember.name,
+        email: teamMember.email,
+        work_type: teamMember.work_type,
+        role: 'attendance',
+        attendance_id: attendanceId,
         clock_in: new Date().toISOString(),
         clock_in_location: location || undefined,
       });
@@ -313,8 +335,8 @@ const TeamDashboard = () => {
         console.log("Location not available:", locError);
       }
 
-      // Update in AWS only
-      const result = await awsApi.updateAttendance(todayAttendance.id, {
+      // Update attendance record in AWS using updateTeam
+      const result = await awsApi.updateTeam(todayAttendance.id, {
         clock_out: new Date().toISOString(),
         clock_out_location: location || undefined,
       });
@@ -346,8 +368,8 @@ const TeamDashboard = () => {
         updates.completed_at = undefined;
       }
 
-      // Update in AWS only
-      const result = await awsApi.updateTask(taskId, updates);
+      // Update task in AWS using updateTeam
+      const result = await awsApi.updateTeam(taskId, updates);
       if (!result.success) throw new Error(result.error);
 
       if (teamMember) {

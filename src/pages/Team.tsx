@@ -170,44 +170,50 @@ const Team = () => {
     }
   };
 
-  // Fetch team members from AWS
+  // Fetch team members from AWS using /teams endpoint
   const fetchTeamMembers = async () => {
     if (!user) return;
     try {
-      const result = await awsApi.listTeamMembers(user.id);
+      const result = await awsApi.listTeams(user.id);
       if (result.success && result.data) {
-        const mapped = result.data.map((m: any) => ({
-          id: m.member_id,
-          name: m.name,
-          email: m.email,
-          phone: m.phone || null,
-          work_type: m.work_type,
-          status: m.status || 'active',
-          daily_rate: m.daily_rate || null,
-          created_at: m.created_at || new Date().toISOString(),
-          user_id: m.user_id || null,
-        }));
-        setTeamMembers(mapped);
+        // Filter for team members (role = 'member' or by work_type presence)
+        const membersList = result.data
+          .filter((t: any) => t.work_type && !t.attendance_id && !t.task_id)
+          .map((m: any) => ({
+            id: m.team_id,
+            name: m.name,
+            email: m.email,
+            phone: m.phone || null,
+            work_type: m.work_type,
+            status: m.status || 'active',
+            daily_rate: m.daily_rate || null,
+            created_at: m.created_at || new Date().toISOString(),
+            user_id: m.user_id || null,
+          }));
+        setTeamMembers(membersList);
       }
     } catch (error) {
       console.error('Error fetching team members from AWS:', error);
     }
   };
 
-  // Fetch project teams (assignments) from AWS
+  // Fetch project teams (assignments) from AWS using /teams endpoint
   const fetchProjectTeams = async () => {
     if (!user) return;
     try {
-      const result = await awsApi.listTeamAssignments(user.id);
+      // Fetch all team records that have quotation_id (assignments)
+      const result = await awsApi.listTeams(user.id);
       if (result.success && result.data) {
-        // Group by project
+        // Group by project - look for records with quotation_id
         const teamsMap = new Map<string, ProjectTeam>();
         
-        for (const assignment of result.data) {
-          const quotation = quotations.find(q => q.id === assignment.quotation_id);
+        for (const record of result.data) {
+          if (!record.quotation_id) continue;
+          
+          const quotation = quotations.find(q => q.id === record.quotation_id);
           if (!quotation) continue;
           
-          const member = teamMembers.find(m => m.id === assignment.team_member_id);
+          const member = teamMembers.find(m => m.id === record.team_id || m.name === record.name);
           if (!member) continue;
           
           if (!teamsMap.has(quotation.id)) {
@@ -219,7 +225,7 @@ const Team = () => {
           
           teamsMap.get(quotation.id)!.members.push({
             ...member,
-            assignmentId: assignment.assignment_id,
+            assignmentId: record.team_id,
           });
         }
         
@@ -334,8 +340,8 @@ const Team = () => {
 
     try {
       if (editingMember) {
-        // Update in AWS only
-        const result = await awsApi.updateTeamMember(editingMember.id, {
+        // Update in AWS only using updateTeam
+        const result = await awsApi.updateTeam(editingMember.id, {
           name: memberForm.name,
           email: generatedEmail,
           phone: memberForm.phone || undefined,
@@ -349,14 +355,15 @@ const Team = () => {
         // Generate a new member ID
         const memberId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-        // Create in AWS first (primary)
-        const awsResult = await awsApi.createTeamMember({
-          member_id: memberId,
+        // Create in AWS first (primary) using createTeam
+        const awsResult = await awsApi.createTeam({
+          team_id: memberId,
           company_id: user.id,
           name: memberForm.name,
           email: generatedEmail,
           phone: memberForm.phone || undefined,
           work_type: memberForm.work_type,
+          role: 'member',
           status: 'active',
         });
 
@@ -379,25 +386,29 @@ const Team = () => {
 
         if (response.error) {
           // Clean up AWS record if auth creation fails
-          await awsApi.deleteTeamMember(memberId);
+          await awsApi.deleteTeam(memberId);
           throw new Error(response.error.message || 'Failed to create login account');
         }
 
         // Update AWS record with user_id from auth response
         if (response.data?.user_id) {
-          await awsApi.updateTeamMember(memberId, {
+          await awsApi.updateTeam(memberId, {
             user_id: response.data.user_id,
           });
         }
 
-        // If project selected, assign to project in AWS
+        // If project selected, create a separate assignment record
         if (memberForm.project_id) {
           const assignmentId = `assign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          await awsApi.createTeamAssignment({
-            assignment_id: assignmentId,
+          await awsApi.createTeam({
+            team_id: assignmentId,
             company_id: user.id,
-            team_member_id: memberId,
+            name: memberForm.name,
+            email: generatedEmail,
+            work_type: memberForm.work_type,
+            role: 'assignment',
             quotation_id: memberForm.project_id,
+            assigned_at: new Date().toISOString(),
           });
         }
 
@@ -430,14 +441,21 @@ const Team = () => {
     }
 
     try {
-      // Create assignments in AWS only
+      // Create assignment records in AWS using createTeam
       for (const memberId of teamForm.selectedMembers) {
+        const member = teamMembers.find(m => m.id === memberId);
+        if (!member) continue;
+        
         const assignmentId = `assign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const result = await awsApi.createTeamAssignment({
-          assignment_id: assignmentId,
+        const result = await awsApi.createTeam({
+          team_id: assignmentId,
           company_id: user.id,
-          team_member_id: memberId,
+          name: member.name,
+          email: member.email,
+          work_type: member.work_type,
+          role: 'assignment',
           quotation_id: teamForm.project_id,
+          assigned_at: new Date().toISOString(),
         });
         
         if (!result.success) {
@@ -457,8 +475,8 @@ const Team = () => {
 
   const handleRemoveMemberFromProject = async (assignmentId: string) => {
     try {
-      // Delete from AWS only
-      const result = await awsApi.deleteTeamAssignment(assignmentId);
+      // Delete assignment from AWS using deleteTeam
+      const result = await awsApi.deleteTeam(assignmentId);
       if (!result.success) throw new Error(result.error);
 
       toast.success("Member removed from project");
@@ -470,8 +488,8 @@ const Team = () => {
 
   const handleDeleteMember = async (id: string) => {
     try {
-      // Delete from AWS only
-      const result = await awsApi.deleteTeamMember(id);
+      // Delete from AWS using deleteTeam
+      const result = await awsApi.deleteTeam(id);
       if (!result.success) throw new Error(result.error);
 
       toast.success("Team member deleted");
