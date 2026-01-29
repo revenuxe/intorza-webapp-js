@@ -136,6 +136,7 @@ const Team = () => {
 
   const fetchCompanyName = async () => {
     if (!user) return;
+    // Company name fetch from Supabase profile (auth-related metadata only)
     const { data } = await supabase
       .from('profiles')
       .select('company_name')
@@ -333,7 +334,7 @@ const Team = () => {
 
     try {
       if (editingMember) {
-        // Update in AWS
+        // Update in AWS only
         const result = await awsApi.updateTeamMember(editingMember.id, {
           name: memberForm.name,
           email: generatedEmail,
@@ -342,38 +343,15 @@ const Team = () => {
         });
 
         if (!result.success) throw new Error(result.error || 'Failed to update member');
-        
-        // Also update in Supabase for auth lookup
-        await supabase
-          .from('team_members')
-          .update({
-            name: memberForm.name,
-            email: generatedEmail,
-            phone: memberForm.phone || null,
-            work_type: memberForm.work_type as any,
-          })
-          .eq('id', editingMember.id);
 
         toast.success("Team member updated");
       } else {
-        // Create member record in Supabase first (for auth)
-        const { data: newMember, error } = await supabase
-          .from('team_members')
-          .insert({
-            company_id: user.id,
-            name: memberForm.name,
-            email: generatedEmail,
-            phone: memberForm.phone || null,
-            work_type: memberForm.work_type as any,
-          })
-          .select()
-          .single();
+        // Generate a new member ID
+        const memberId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-        if (error) throw error;
-
-        // Create in AWS
+        // Create in AWS first (primary)
         const awsResult = await awsApi.createTeamMember({
-          member_id: newMember.id,
+          member_id: memberId,
           company_id: user.id,
           name: memberForm.name,
           email: generatedEmail,
@@ -383,12 +361,10 @@ const Team = () => {
         });
 
         if (!awsResult.success) {
-          // Rollback Supabase if AWS fails
-          await supabase.from('team_members').delete().eq('id', newMember.id);
           throw new Error(awsResult.error || 'Failed to create member in AWS');
         }
 
-        // Create auth account via edge function
+        // Create auth account via edge function (uses Supabase Auth admin API)
         const response = await supabase.functions.invoke('create-team-member-auth', {
           body: {
             email: generatedEmail,
@@ -397,34 +373,32 @@ const Team = () => {
             phone: memberForm.phone,
             work_type: memberForm.work_type,
             company_id: user.id,
-            team_member_id: newMember.id,
+            team_member_id: memberId,
           },
         });
 
         if (response.error) {
-          // Clean up records if auth creation fails
-          await supabase.from('team_members').delete().eq('id', newMember.id);
-          await awsApi.deleteTeamMember(newMember.id);
+          // Clean up AWS record if auth creation fails
+          await awsApi.deleteTeamMember(memberId);
           throw new Error(response.error.message || 'Failed to create login account');
         }
 
+        // Update AWS record with user_id from auth response
+        if (response.data?.user_id) {
+          await awsApi.updateTeamMember(memberId, {
+            user_id: response.data.user_id,
+          });
+        }
+
         // If project selected, assign to project in AWS
-        if (memberForm.project_id && newMember) {
+        if (memberForm.project_id) {
           const assignmentId = `assign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           await awsApi.createTeamAssignment({
             assignment_id: assignmentId,
             company_id: user.id,
-            team_member_id: newMember.id,
+            team_member_id: memberId,
             quotation_id: memberForm.project_id,
           });
-          
-          // Also create in Supabase for fallback
-          await supabase
-            .from('team_project_assignments')
-            .insert({
-              team_member_id: newMember.id,
-              quotation_id: memberForm.project_id,
-            });
         }
 
         toast.success("Team member added with login credentials");
@@ -456,26 +430,20 @@ const Team = () => {
     }
 
     try {
-      // Create assignments in AWS
+      // Create assignments in AWS only
       for (const memberId of teamForm.selectedMembers) {
         const assignmentId = `assign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        await awsApi.createTeamAssignment({
+        const result = await awsApi.createTeamAssignment({
           assignment_id: assignmentId,
           company_id: user.id,
           team_member_id: memberId,
           quotation_id: teamForm.project_id,
         });
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to create assignment');
+        }
       }
-      
-      // Also create in Supabase for fallback
-      const assignments = teamForm.selectedMembers.map(memberId => ({
-        team_member_id: memberId,
-        quotation_id: teamForm.project_id,
-      }));
-
-      await supabase
-        .from('team_project_assignments')
-        .insert(assignments);
 
       toast.success("Team created successfully");
       trackAction('team_created');
@@ -489,15 +457,9 @@ const Team = () => {
 
   const handleRemoveMemberFromProject = async (assignmentId: string) => {
     try {
-      // Delete from AWS
+      // Delete from AWS only
       const result = await awsApi.deleteTeamAssignment(assignmentId);
       if (!result.success) throw new Error(result.error);
-      
-      // Also delete from Supabase
-      await supabase
-        .from('team_project_assignments')
-        .delete()
-        .eq('id', assignmentId);
 
       toast.success("Member removed from project");
       fetchProjectTeams();
@@ -508,15 +470,9 @@ const Team = () => {
 
   const handleDeleteMember = async (id: string) => {
     try {
-      // Delete from AWS
+      // Delete from AWS only
       const result = await awsApi.deleteTeamMember(id);
       if (!result.success) throw new Error(result.error);
-      
-      // Also delete from Supabase
-      await supabase
-        .from('team_members')
-        .delete()
-        .eq('id', id);
 
       toast.success("Team member deleted");
       fetchTeamMembers();
@@ -1152,10 +1108,6 @@ const Team = () => {
               </div>
             </ScrollArea>
           )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setProjectDetailOpen(false)}>Close</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

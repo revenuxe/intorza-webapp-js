@@ -450,6 +450,49 @@ export const createClientBehavior = async (payload: ClientBehaviorPayload): Prom
 
 // ==================== TEAMS ====================
 
+// Team entity (company-level team definition)
+export interface TeamPayload {
+  team_id: string;
+  company_id: string;
+  name: string;
+  role: string;
+  permissions?: any;
+  status?: string;
+}
+
+export const createTeam = async (payload: TeamPayload): Promise<ApiResponse> => {
+  return apiRequest("/teams", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateTeam = async (teamId: string, payload: Partial<TeamPayload>): Promise<ApiResponse> => {
+  return apiRequest(`/teams/${teamId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+};
+
+export const getTeam = async (teamId: string): Promise<ApiResponse<TeamPayload>> => {
+  return apiRequest(`/teams/${teamId}`, {
+    method: "GET",
+  });
+};
+
+export const listTeams = async (companyId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?company_id=${companyId}`, {
+    method: "GET",
+  });
+};
+
+export const deleteTeam = async (teamId: string): Promise<ApiResponse> => {
+  return apiRequest(`/teams/${teamId}`, {
+    method: "DELETE",
+  });
+};
+
+// Team Members
 export interface TeamMemberPayload {
   member_id: string;
   company_id: string;
