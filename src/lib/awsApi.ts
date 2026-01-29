@@ -535,12 +535,11 @@ export const listTeams = async (companyId: string): Promise<ApiResponse<TeamPayl
 };
 
 /**
- * Delete a team member - DELETE /teams/:id
+ * Soft delete a team member - PUT /teams/:id with status='deleted'
+ * Note: AWS API does not support DELETE, use PUT with status change instead
  */
 export const deleteTeam = async (teamId: string): Promise<ApiResponse> => {
-  return apiRequest(`/teams/${teamId}`, {
-    method: "DELETE",
-  });
+  return updateTeam(teamId, { status: 'deleted' });
 };
 
 /**
@@ -607,10 +606,12 @@ export const listTasksByCompany = async (companyId: string): Promise<ApiResponse
   });
 };
 
+/**
+ * Soft delete a task - PUT /teams/:id with status='deleted'
+ * Note: AWS API does not support DELETE, use PUT with status change instead
+ */
 export const deleteTask = async (taskId: string): Promise<ApiResponse> => {
-  return apiRequest(`/teams/tasks/${taskId}`, {
-    method: "DELETE",
-  });
+  return updateTeam(taskId, { status: 'deleted' });
 };
 
 // ==================== FILES ====================
