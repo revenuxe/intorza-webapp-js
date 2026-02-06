@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { AWSMigrationWarning } from "@/components/AWSMigrationWarning";
 
 interface Project {
   id: string;
@@ -157,12 +158,13 @@ export default function MyProjects() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
+      <AWSMigrationWarning pageName="My Projects" />
+      
       {/* Header */}
       <div>
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">My Projects</h1>
         <p className="text-muted-foreground">All projects with quotations</p>
       </div>
-
       {projects.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
