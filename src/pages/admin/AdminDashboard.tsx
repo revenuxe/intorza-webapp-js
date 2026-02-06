@@ -9,12 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { 
   LogOut, Users, FileText, Receipt, Settings as SettingsIcon, MessageSquare, Star, 
-  TrendingUp, TrendingDown, Activity, Calendar, Ruler, UserCheck, Building2, 
-  AlertTriangle, Bug, ThumbsUp, RefreshCw, Eye, Clock, Crown, Cloud, CloudUpload
+  TrendingUp, Clock, Crown, CloudUpload, RefreshCw, Building2, AlertTriangle, Bug, ThumbsUp
 } from "lucide-react";
-import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { format } from "date-fns";
 import * as adminSync from "@/lib/adminDataSync";
-import * as awsApi from "@/lib/awsApi";
 
 interface User {
   id: string;
@@ -140,74 +138,8 @@ const AdminDashboard = () => {
     checkAdminAccess();
   }, []);
 
-  // Set up real-time subscriptions
-  useEffect(() => {
-    const channels: any[] = [];
-
-    // Subscribe to profiles changes
-    const profilesChannel = supabase
-      .channel('admin-profiles')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-        loadUsers();
-        loadStats();
-      })
-      .subscribe();
-    channels.push(profilesChannel);
-
-    // Subscribe to quotations changes
-    const quotationsChannel = supabase
-      .channel('admin-quotations')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotations' }, () => {
-        loadQuotations();
-        loadStats();
-      })
-      .subscribe();
-    channels.push(quotationsChannel);
-
-    // Subscribe to invoices changes
-    const invoicesChannel = supabase
-      .channel('admin-invoices')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        loadInvoices();
-        loadStats();
-      })
-      .subscribe();
-    channels.push(invoicesChannel);
-
-    // Subscribe to feedback changes
-    const feedbackChannel = supabase
-      .channel('admin-feedback')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'feedback' }, () => {
-        loadFeedback();
-        loadStats();
-      })
-      .subscribe();
-    channels.push(feedbackChannel);
-
-    // Subscribe to site measurements changes
-    const siteMeasurementsChannel = supabase
-      .channel('admin-site-measurements')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_measurement_projects' }, () => {
-        loadSiteMeasurements();
-        loadStats();
-      })
-      .subscribe();
-    channels.push(siteMeasurementsChannel);
-
-    // Subscribe to team members changes
-    const teamMembersChannel = supabase
-      .channel('admin-team-members')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members' }, () => {
-        loadTeamMembers();
-        loadStats();
-      })
-      .subscribe();
-    channels.push(teamMembersChannel);
-
-    return () => {
-      channels.forEach(channel => supabase.removeChannel(channel));
-    };
-  }, []);
+  // AWS-FIRST: No real-time Supabase subscriptions needed
+  // Data is refreshed manually via "Refresh" button or "Sync to AWS" button
 
   const checkAdminAccess = async () => {
     try {
@@ -227,15 +159,8 @@ const AdminDashboard = () => {
         return;
       }
 
-      await Promise.all([
-        loadUsers(), 
-        loadStats(), 
-        loadFeedback(), 
-        loadQuotations(), 
-        loadInvoices(),
-        loadSiteMeasurements(),
-        loadTeamMembers()
-      ]);
+      // AWS-FIRST: Load all data from AWS
+      await loadAllDataFromAWS();
     } catch (error) {
       console.error('Admin check error:', error);
       navigate("/admin/login");
@@ -244,249 +169,97 @@ const AdminDashboard = () => {
     }
   };
 
-  const loadUsers = async () => {
+  // AWS-FIRST: Load all admin data from AWS
+  const loadAllDataFromAWS = async () => {
     try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, company_name, phone, created_at, is_pro, pro_since, pro_expiry')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const awsData = await adminSync.loadAllAdminDataFromAWS();
       
-      // Get additional stats for each user
-      const usersWithStats = await Promise.all((profiles || []).map(async (profile) => {
-        const [quotationsRes, invoicesRes, teamRes] = await Promise.all([
-          supabase.from('quotations').select('id', { count: 'exact', head: true }).eq('user_id', profile.id),
-          supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('user_id', profile.id),
-          supabase.from('team_members').select('id', { count: 'exact', head: true }).eq('company_id', profile.id),
-        ]);
-        
-        return {
-          ...profile,
-          quotation_count: quotationsRes.count || 0,
-          invoice_count: invoicesRes.count || 0,
-          team_count: teamRes.count || 0,
-        };
-      }));
+      // Map AWS data to component state
+      if (awsData.users.length > 0) {
+        setUsers(awsData.users.map((u: any) => ({
+          id: u.user_id,
+          email: u.email,
+          full_name: u.full_name,
+          company_name: u.company_name,
+          phone: u.phone,
+          created_at: u.created_at,
+          quotation_count: u.quotation_count || 0,
+          invoice_count: u.invoice_count || 0,
+          team_count: u.team_count || 0,
+          is_pro: u.is_pro,
+          pro_since: u.pro_since,
+          pro_expiry: u.pro_expiry,
+        })));
+      }
 
-      setUsers(usersWithStats);
-    } catch (error) {
-      console.error('Error loading users:', error);
-    }
-  };
+      if (awsData.feedback.length > 0) {
+        setFeedback(awsData.feedback.map((f: any) => ({
+          id: f.feedback_id,
+          user_id: f.user_id,
+          user_email: f.user_email,
+          rating: f.rating,
+          message: f.message,
+          trigger_action: f.trigger_action,
+          feedback_type: f.feedback_type || 'feedback',
+          created_at: f.created_at,
+        })));
+      }
 
-  const loadQuotations = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('quotations')
-        .select('id, quotation_number, client_name, project_name, grand_total, status, created_at, user_id')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      if (awsData.quotations.length > 0) {
+        setQuotations(awsData.quotations);
+      }
 
-      if (error) throw error;
-      
-      const quotationsWithEmail = await Promise.all((data || []).map(async (q) => {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', q.user_id)
-          .single();
-        return { ...q, user_email: profile?.email || 'Unknown' };
-      }));
+      if (awsData.invoices.length > 0) {
+        setInvoices(awsData.invoices);
+      }
 
-      setQuotations(quotationsWithEmail);
-    } catch (error) {
-      console.error('Error loading quotations:', error);
-    }
-  };
+      if (awsData.measurements.length > 0) {
+        setSiteMeasurements(awsData.measurements);
+      }
 
-  const loadInvoices = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('id, invoice_number, client_name, project_name, total_amount, paid_amount, status, created_at, user_id')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      if (awsData.teamMembers.length > 0) {
+        setTeamMembers(awsData.teamMembers);
+      }
 
-      if (error) throw error;
-      
-      const invoicesWithEmail = await Promise.all((data || []).map(async (i) => {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', i.user_id)
-          .single();
-        return { ...i, user_email: profile?.email || 'Unknown' };
-      }));
+      if (awsData.stats) {
+        setStats({
+          totalUsers: awsData.stats.total_users || 0,
+          totalQuotations: awsData.stats.total_quotations || 0,
+          totalInvoices: awsData.stats.total_invoices || 0,
+          totalRevenue: awsData.stats.total_revenue || 0,
+          pendingRevenue: awsData.stats.pending_revenue || 0,
+          totalFeedback: awsData.stats.total_feedback || 0,
+          avgRating: awsData.stats.avg_rating || 0,
+          totalSiteMeasurements: awsData.stats.total_site_measurements || 0,
+          totalTeamMembers: awsData.stats.total_team_members || 0,
+          dailyActiveUsers: awsData.stats.daily_active_users || 0,
+          weeklyActiveUsers: awsData.stats.weekly_active_users || 0,
+          monthlyActiveUsers: awsData.stats.monthly_active_users || 0,
+          newUsersToday: awsData.stats.new_users_today || 0,
+          newUsersWeek: awsData.stats.new_users_week || 0,
+          returningUsers: awsData.stats.returning_users || 0,
+          bugReports: awsData.stats.bug_reports || 0,
+          issueReports: awsData.stats.issue_reports || 0,
+          quotationsToday: awsData.stats.quotations_today || 0,
+          invoicesToday: awsData.stats.invoices_today || 0,
+        });
+      }
 
-      setInvoices(invoicesWithEmail);
-    } catch (error) {
-      console.error('Error loading invoices:', error);
-    }
-  };
-
-  const loadSiteMeasurements = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('site_measurement_projects')
-        .select('id, client_name, site_location, room_count, total_area, status, created_at, user_id')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-      
-      const measurementsWithEmail = await Promise.all((data || []).map(async (m) => {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', m.user_id)
-          .single();
-        return { ...m, user_email: profile?.email || 'Unknown' };
-      }));
-
-      setSiteMeasurements(measurementsWithEmail);
-    } catch (error) {
-      console.error('Error loading site measurements:', error);
-    }
-  };
-
-  const loadTeamMembers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('team_members')
-        .select('id, name, email, work_type, status, company_id')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      const membersWithCompany = await Promise.all((data || []).map(async (m) => {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company_name')
-          .eq('id', m.company_id)
-          .single();
-        return { ...m, company_name: profile?.company_name || 'Unknown' };
-      }));
-
-      setTeamMembers(membersWithCompany);
-    } catch (error) {
-      console.error('Error loading team members:', error);
-    }
-  };
-
-  const loadFeedback = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('feedback')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      const feedbackWithEmails = await Promise.all((data || []).map(async (f) => {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', f.user_id)
-          .single();
-        return { ...f, user_email: profile?.email || 'Unknown', feedback_type: f.feedback_type || 'feedback' };
-      }));
-      
-      setFeedback(feedbackWithEmails);
-    } catch (error) {
-      console.error('Error loading feedback:', error);
-    }
-  };
-
-  const loadStats = async () => {
-    try {
-      const today = startOfDay(new Date());
-      const weekAgo = startOfDay(subDays(new Date(), 7));
-      const monthAgo = startOfDay(subDays(new Date(), 30));
-
-      // Get all counts
-      const [
-        { count: quotationsCount },
-        { count: invoicesCount },
-        { count: siteMeasurementsCount },
-        { count: teamMembersCount },
-        { data: invoiceData },
-        { data: feedbackData },
-        { data: profilesData },
-        { count: quotationsTodayCount },
-        { count: invoicesTodayCount },
-        { data: activityData },
-      ] = await Promise.all([
-        supabase.from('quotations').select('*', { count: 'exact', head: true }),
-        supabase.from('invoices').select('*', { count: 'exact', head: true }),
-        supabase.from('site_measurement_projects').select('*', { count: 'exact', head: true }),
-        supabase.from('team_members').select('*', { count: 'exact', head: true }),
-        supabase.from('invoices').select('paid_amount, remaining_amount'),
-        supabase.from('feedback').select('rating, feedback_type'),
-        supabase.from('profiles').select('created_at'),
-        supabase.from('quotations').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
-        supabase.from('invoices').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
-        supabase.from('user_activity').select('user_id, activity_date'),
-      ]);
-
-      const totalRevenue = invoiceData?.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0) || 0;
-      const pendingRevenue = invoiceData?.reduce((sum, inv) => sum + (inv.remaining_amount || 0), 0) || 0;
-      const totalFeedback = feedbackData?.length || 0;
-      const avgRating = totalFeedback > 0 
-        ? feedbackData!.reduce((sum, f) => sum + f.rating, 0) / totalFeedback 
-        : 0;
-      
-      const bugReports = feedbackData?.filter(f => f.feedback_type === 'bug').length || 0;
-      const issueReports = feedbackData?.filter(f => f.feedback_type === 'issue').length || 0;
-
-      // Calculate user activity
-      const todayStr = format(today, 'yyyy-MM-dd');
-      const weekAgoStr = format(weekAgo, 'yyyy-MM-dd');
-      const monthAgoStr = format(monthAgo, 'yyyy-MM-dd');
-
-      const dailyActiveUsers = new Set(activityData?.filter(a => a.activity_date === todayStr).map(a => a.user_id)).size;
-      const weeklyActiveUsers = new Set(activityData?.filter(a => a.activity_date >= weekAgoStr).map(a => a.user_id)).size;
-      const monthlyActiveUsers = new Set(activityData?.filter(a => a.activity_date >= monthAgoStr).map(a => a.user_id)).size;
-
-      // New users
-      const newUsersToday = profilesData?.filter(p => new Date(p.created_at) >= today).length || 0;
-      const newUsersWeek = profilesData?.filter(p => new Date(p.created_at) >= weekAgo).length || 0;
-
-      // Returning users (users who have activity on more than one day)
-      const userDays = new Map<string, Set<string>>();
-      activityData?.forEach(a => {
-        if (!userDays.has(a.user_id)) {
-          userDays.set(a.user_id, new Set());
-        }
-        userDays.get(a.user_id)!.add(a.activity_date);
-      });
-      const returningUsers = Array.from(userDays.values()).filter(days => days.size > 1).length;
-
-      setStats({
-        totalUsers: profilesData?.length || 0,
-        totalQuotations: quotationsCount || 0,
-        totalInvoices: invoicesCount || 0,
-        totalRevenue,
-        pendingRevenue,
-        totalFeedback,
-        avgRating,
-        totalSiteMeasurements: siteMeasurementsCount || 0,
-        totalTeamMembers: teamMembersCount || 0,
-        dailyActiveUsers,
-        weeklyActiveUsers,
-        monthlyActiveUsers,
-        newUsersToday,
-        newUsersWeek,
-        returningUsers,
-        bugReports,
-        issueReports,
-        quotationsToday: quotationsTodayCount || 0,
-        invoicesToday: invoicesTodayCount || 0,
+      console.log('Admin data loaded from AWS:', {
+        users: awsData.users.length,
+        feedback: awsData.feedback.length,
+        quotations: awsData.quotations.length,
+        invoices: awsData.invoices.length,
+        measurements: awsData.measurements.length,
+        teamMembers: awsData.teamMembers.length,
       });
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error('Error loading from AWS:', error);
+      toast.error('Failed to load admin data from AWS');
     }
   };
+
+  // Old Supabase loading functions removed - using AWS-first approach via loadAllDataFromAWS()
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -495,17 +268,9 @@ const AdminDashboard = () => {
   };
 
   const refreshData = async () => {
-    toast.info("Refreshing data...");
-    await Promise.all([
-      loadUsers(), 
-      loadStats(), 
-      loadFeedback(), 
-      loadQuotations(), 
-      loadInvoices(),
-      loadSiteMeasurements(),
-      loadTeamMembers()
-    ]);
-    toast.success("Data refreshed");
+    toast.info("Refreshing data from AWS...");
+    await loadAllDataFromAWS();
+    toast.success("Data refreshed from AWS");
   };
 
   const syncToAWS = async () => {

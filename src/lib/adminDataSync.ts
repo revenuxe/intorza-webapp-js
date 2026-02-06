@@ -1,16 +1,56 @@
 /**
  * Admin Data Sync Utilities
  * 
- * Provides functions to sync admin dashboard data from Supabase to AWS
- * and load data from AWS when available.
+ * AWS-FIRST ARCHITECTURE: All admin dashboard data is stored and retrieved from AWS.
+ * Supabase is only used for one-time migration of existing data.
  */
 
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, startOfDay } from "date-fns";
 import * as awsApi from "./awsApi";
 
+// ==================== AWS-FIRST DATA LOADING ====================
+
 /**
- * Fetch all users from Supabase and format for admin dashboard
+ * Load all admin data from AWS (primary source)
+ */
+export const loadAllAdminDataFromAWS = async () => {
+  const [
+    usersRes,
+    billingRes,
+    feedbackRes,
+    statsRes,
+    quotationsRes,
+    invoicesRes,
+    measurementsRes,
+    teamMembersRes,
+  ] = await Promise.all([
+    awsApi.listAdminUsers(),
+    awsApi.listAdminBilling(),
+    awsApi.listAdminFeedback(),
+    awsApi.getAdminStats(),
+    awsApi.listAdminQuotations(),
+    awsApi.listAdminInvoices(),
+    awsApi.listAdminMeasurements(),
+    awsApi.listAdminTeamMembers(),
+  ]);
+
+  return {
+    users: usersRes.success ? usersRes.data || [] : [],
+    billing: billingRes.success ? billingRes.data || [] : [],
+    feedback: feedbackRes.success ? feedbackRes.data || [] : [],
+    stats: statsRes.success ? statsRes.data : null,
+    quotations: quotationsRes.success ? quotationsRes.data || [] : [],
+    invoices: invoicesRes.success ? invoicesRes.data || [] : [],
+    measurements: measurementsRes.success ? measurementsRes.data || [] : [],
+    teamMembers: teamMembersRes.success ? teamMembersRes.data || [] : [],
+  };
+};
+
+// ==================== SUPABASE MIGRATION (ONE-TIME) ====================
+
+/**
+ * Fetch all users from Supabase for initial migration to AWS
  */
 export const fetchUsersFromSupabase = async (): Promise<awsApi.AdminUserData[]> => {
   const { data: profiles, error } = await supabase
