@@ -78,10 +78,10 @@ const CreateQuotation = () => {
       side: "A",
       productName: "",
       productDetails: "",
-      widthFt: 0,
-      heightFt: 0,
+      widthFt: "" as any,
+      heightFt: "" as any,
       sftArea: 0,
-      ratePerSft: 0,
+      ratePerSft: "" as any,
       amount: 0
     }]
   }]);
@@ -407,10 +407,10 @@ const CreateQuotation = () => {
         side: "A",
         productName: "",
         productDetails: "",
-        widthFt: 0,
-        heightFt: 0,
+        widthFt: "" as any,
+        heightFt: "" as any,
         sftArea: 0,
-        ratePerSft: 0,
+        ratePerSft: "" as any,
         amount: 0
       }]
     }]);
@@ -423,10 +423,10 @@ const CreateQuotation = () => {
         side: "A",
         productName: "",
         productDetails: "",
-        widthFt: 0,
-        heightFt: 0,
+        widthFt: "" as any,
+        heightFt: "" as any,
         sftArea: 0,
-        ratePerSft: 0,
+        ratePerSft: "" as any,
         amount: 0
       }]
     } : section));
@@ -749,10 +749,10 @@ const CreateQuotation = () => {
             side: "A",
             productName: "",
             productDetails: "",
-            widthFt: 0,
-            heightFt: 0,
+            widthFt: "" as any,
+            heightFt: "" as any,
             sftArea: 0,
-            ratePerSft: 0,
+            ratePerSft: "" as any,
             amount: 0
           }]
         }]);
@@ -1082,11 +1082,11 @@ const CreateQuotation = () => {
                         />
                         {customizeSettings.showProductDetails && <Textarea value={item.productDetails} onChange={e => updateItem(section.id, item.id, "productDetails", e.target.value)} placeholder="Detailed description..." className="resize-none h-9 min-h-[36px]" rows={1} />}
                         {customizeSettings.showDetailedSizeColumns && <>
-                            <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" className="h-9" />
-                            <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" className="h-9" />
-                            <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
+                            <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="" step="0.1" className="h-9" />
+                            <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="" step="0.1" className="h-9" />
+                            <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="" step="0.01" className="h-9" />
                           </>}
-                        <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
+                        <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="" step="0.01" className="h-9" />
                         <div className="h-9 flex items-center font-semibold tabular-nums">
                           {profile.currency_symbol}{item.amount.toLocaleString(profile.locale, {
                       minimumFractionDigits: 2
@@ -1131,22 +1131,22 @@ const CreateQuotation = () => {
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-2">
                             <Label>Width (Ft)</Label>
-                            <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" />
+                            <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="" step="0.1" />
                           </div>
                           <div className="space-y-2">
                             <Label>Height (Ft)</Label>
-                            <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" />
+                            <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="" step="0.1" />
                           </div>
                         </div>
                         <div className="space-y-2">
                           <Label>Sft Area</Label>
-                          <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" />
+                          <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="" step="0.01" />
                         </div>
                       </>}
 
                     <div className="space-y-2">
                       <Label>Rate/{profile.measurement_system === 'metric' ? 'Sqm' : 'Sft'} ({profile.currency_symbol})</Label>
-                      <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" />
+                      <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="" step="0.01" />
                     </div>
 
                     <div className="space-y-1 pt-2 border-t">
@@ -1250,7 +1250,7 @@ const CreateQuotation = () => {
                   <div className="space-y-2">
                     <Label htmlFor="discount">Discount % (Optional)</Label>
                     <div className="flex items-center gap-2">
-                      <Input id="discount" type="number" value={discountPercentage} onChange={e => setDiscountPercentage(parseFloat(e.target.value) || 0)} min="0" max="100" step="0.1" placeholder="0" className="h-8" />
+                      <Input id="discount" type="number" value={discountPercentage || ""} onChange={e => setDiscountPercentage(parseFloat(e.target.value) || 0)} min="0" max="100" step="0.1" placeholder="" className="h-8" />
                       <span className="text-sm text-muted-foreground">%</span>
                     </div>
                   </div>

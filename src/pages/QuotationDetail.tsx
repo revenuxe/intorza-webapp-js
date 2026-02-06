@@ -82,8 +82,8 @@ const QuotationDetail = () => {
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [loading, setLoading] = useState(true);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
-  const [invoiceAmount, setInvoiceAmount] = useState(0);
-  const [paidAmount, setPaidAmount] = useState(0);
+  const [invoiceAmount, setInvoiceAmount] = useState<number | string>("");
+  const [paidAmount, setPaidAmount] = useState<number | string>("");
   const [dueDate, setDueDate] = useState("");
   const [invoiceNotes, setInvoiceNotes] = useState("");
 
@@ -352,8 +352,10 @@ const QuotationDetail = () => {
 
       const invoiceId = crypto.randomUUID();
       const invoiceNumber = `INV-${Date.now()}`;
-      const remaining = invoiceAmount - paidAmount;
-      const invoiceStatus = remaining === 0 ? 'paid' : (paidAmount > 0 ? 'partially_paid' : 'unpaid');
+      const numInvoiceAmount = Number(invoiceAmount) || 0;
+      const numPaidAmount = Number(paidAmount) || 0;
+      const remaining = numInvoiceAmount - numPaidAmount;
+      const invoiceStatus = remaining === 0 ? 'paid' : (numPaidAmount > 0 ? 'partially_paid' : 'unpaid');
       const invoiceDate = new Date().toISOString().split('T')[0];
       const nowISO = new Date().toISOString();
 
@@ -395,8 +397,8 @@ const QuotationDetail = () => {
         invoice_number: invoiceNumber,
         client_name: quotation?.client_name || '',
         project_name: quotation?.project_name || '',
-        total_amount: invoiceAmount,
-        paid_amount: paidAmount,
+        total_amount: numInvoiceAmount,
+        paid_amount: numPaidAmount,
         remaining_amount: remaining,
         status: invoiceStatus,
         action: 'save',
@@ -428,8 +430,8 @@ const QuotationDetail = () => {
           invoice_number: invoiceNumber,
           client_name: quotation?.client_name || '',
           project_name: quotation?.project_name || '',
-          total_amount: invoiceAmount,
-          paid_amount: paidAmount,
+          total_amount: numInvoiceAmount,
+          paid_amount: numPaidAmount,
           remaining_amount: remaining,
           status: invoiceStatus,
           invoice_date: invoiceDate,
@@ -697,7 +699,7 @@ const QuotationDetail = () => {
               <div className="space-y-2">
                 <Label>Remaining Amount</Label>
                 <Input
-                  value={(invoiceAmount - paidAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  value={((Number(invoiceAmount) || 0) - (Number(paidAmount) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   disabled
                 />
               </div>
