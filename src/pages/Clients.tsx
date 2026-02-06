@@ -67,6 +67,7 @@ const Clients = () => {
 
       // Fetch clients from AWS
       const clientsResult = await awsApi.listClients(user.id);
+      console.log('AWS Clients Raw Response:', JSON.stringify(clientsResult, null, 2));
       
       // Fetch quotations from AWS for project count
       const quotationsResult = await awsApi.listQuotations(user.id);
@@ -74,7 +75,30 @@ const Clients = () => {
       // For invoice data, we still need AWS (or calculate from quotations)
       // Since invoices may not have a list endpoint, we'll use what we have
       
-      const awsClients = clientsResult.success ? (clientsResult.data || []) : [];
+      // Handle various AWS/DynamoDB response structures
+      let awsClients: any[] = [];
+      if (clientsResult.success && clientsResult.data) {
+        const data = clientsResult.data as any;
+        console.log('Client data type:', typeof data, 'isArray:', Array.isArray(data));
+        
+        // Check various response patterns
+        if (Array.isArray(data)) {
+          awsClients = data;
+        } else if (data.Items && Array.isArray(data.Items)) {
+          awsClients = data.Items;
+        } else if (data.items && Array.isArray(data.items)) {
+          awsClients = data.items;
+        } else if (data.clients && Array.isArray(data.clients)) {
+          awsClients = data.clients;
+        } else if (data.data && Array.isArray(data.data)) {
+          awsClients = data.data;
+        } else if (typeof data === 'object' && Object.keys(data).length > 0) {
+          // Maybe it's a single object or object with different keys
+          console.log('Client data keys:', Object.keys(data));
+        }
+      }
+      console.log('Final parsed clients count:', awsClients.length, awsClients);
+      
       const awsQuotations = quotationsResult.success ? (quotationsResult.data || []) : [];
 
       // Build client list with aggregated data
