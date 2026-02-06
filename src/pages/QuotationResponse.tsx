@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Check, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { updateQuotation, createClient, createClientBehavior } from "@/lib/awsApi";
 
 const QuotationResponse = () => {
   const [searchParams] = useSearchParams();
@@ -31,7 +32,7 @@ const QuotationResponse = () => {
         // Get quotation details first
         const { data: quotation, error: fetchError } = await supabase
           .from("quotations")
-          .select("quotation_number, status")
+          .select("quotation_number, status, user_id, client_name, client_address, client_id, place_of_project, project_type, subtotal, grand_total")
           .eq("id", quotationId)
           .single();
 
@@ -43,8 +44,9 @@ const QuotationResponse = () => {
 
         setQuotationNumber(quotation.quotation_number);
 
-        // Check if already responded
-        if (quotation.status === "accepted" || quotation.status === "rejected") {
+        // Check if already responded (case-insensitive)
+        const currentStatus = quotation.status?.toLowerCase();
+        if (currentStatus === "accepted" || currentStatus === "rejected") {
           setError(`This quotation has already been ${quotation.status}.`);
           setLoading(false);
           return;
@@ -52,6 +54,14 @@ const QuotationResponse = () => {
 
         // Update the quotation status
         const newStatus = action === "accept" ? "accepted" : "rejected";
+        
+        // AWS-FIRST: Update status in AWS
+        const awsResponse = await updateQuotation(quotationId, { status: newStatus });
+        if (!awsResponse.success) {
+          console.error('AWS update failed:', awsResponse.error);
+        }
+        
+        // Update Supabase
         const { error: updateError } = await supabase
           .from("quotations")
           .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -61,6 +71,35 @@ const QuotationResponse = () => {
           setError("Failed to update quotation. Please try again later.");
           setLoading(false);
           return;
+        }
+
+        // Auto-create client in AWS when quotation is accepted by client
+        if (newStatus === 'accepted' && quotation.client_name && quotation.user_id) {
+          try {
+            const clientId = quotation.client_id || crypto.randomUUID();
+            await createClient({
+              client_id: clientId,
+              company_id: quotation.user_id,
+              name: quotation.client_name,
+              address: quotation.client_address || undefined,
+            });
+            
+            // Record client behavior
+            await createClientBehavior({
+              behavior_id: `behavior_${Date.now()}`,
+              company_id: quotation.user_id,
+              client_id: clientId,
+              quotation_id: quotationId,
+              city: quotation.place_of_project || '',
+              category: quotation.project_type || 'general',
+              rate: quotation.subtotal || 0,
+              final_price: quotation.grand_total || 0,
+              won_or_lost: 'won',
+            });
+            console.log('Client auto-created from response page:', quotation.client_name);
+          } catch (clientError) {
+            console.error('Failed to auto-create client:', clientError);
+          }
         }
 
         setSuccess(true);
