@@ -10,9 +10,11 @@ import { toast } from "sonner";
 import { 
   LogOut, Users, FileText, Receipt, Settings as SettingsIcon, MessageSquare, Star, 
   TrendingUp, TrendingDown, Activity, Calendar, Ruler, UserCheck, Building2, 
-  AlertTriangle, Bug, ThumbsUp, RefreshCw, Eye, Clock, Crown
+  AlertTriangle, Bug, ThumbsUp, RefreshCw, Eye, Clock, Crown, Cloud, CloudUpload
 } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import * as adminSync from "@/lib/adminDataSync";
+import * as awsApi from "@/lib/awsApi";
 
 interface User {
   id: string;
@@ -104,6 +106,7 @@ interface Stats {
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
@@ -505,6 +508,24 @@ const AdminDashboard = () => {
     toast.success("Data refreshed");
   };
 
+  const syncToAWS = async () => {
+    setSyncing(true);
+    toast.info("Syncing data to AWS...");
+    try {
+      const result = await adminSync.syncAllDataToAWS();
+      if (result.success) {
+        toast.success("All admin data synced to AWS successfully");
+      } else {
+        toast.error(`Sync failed: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+      toast.error("Failed to sync data to AWS");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const renderStars = (rating: number) => {
     return (
       <div className="flex gap-0.5">
@@ -592,6 +613,16 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={syncToAWS} 
+              disabled={syncing}
+              className="h-8 px-2 sm:px-3"
+            >
+              <CloudUpload className={`h-4 w-4 sm:mr-1 ${syncing ? 'animate-pulse' : ''}`} />
+              <span className="hidden sm:inline">{syncing ? 'Syncing...' : 'Sync to AWS'}</span>
+            </Button>
             <Button variant="outline" size="icon" onClick={refreshData} className="h-8 w-8">
               <RefreshCw className="h-4 w-4" />
             </Button>
