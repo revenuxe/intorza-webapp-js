@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useFeedback } from "@/components/FeedbackProvider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as awsApi from "@/lib/awsApi";
+import { AWSMigrationWarning } from "@/components/AWSMigrationWarning";
 
 interface TeamMember {
   id: string;
@@ -554,6 +555,8 @@ const Team = () => {
 
   return (
     <div className="space-y-6 pb-20">
+      <AWSMigrationWarning pageName="Team Management" />
+      
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
