@@ -12,6 +12,73 @@ const AWS_SECRET_ACCESS_KEY = Deno.env.get("AWS_SECRET_ACCESS_KEY")!;
 const AWS_REGION = Deno.env.get("AWS_REGION") || "ap-south-1";
 const AWS_BUCKET = Deno.env.get("AWS_BUCKET") || "revenuxe-intorza-prod";
 
+// Allowed folders for S3 uploads - whitelist validation
+const ALLOWED_FOLDERS = new Set([
+  "logos",
+  "signatures", 
+  "qr-codes",
+  "room-photos",
+  "invoices",
+  "quotes",
+  "documents",
+  "uploads"
+]);
+
+// Allowed file extensions - prevent executable uploads
+const ALLOWED_EXTENSIONS = new Set([
+  "jpg", "jpeg", "png", "gif", "webp", "svg", // images
+  "pdf", "doc", "docx", "xls", "xlsx", // documents
+  "mp4", "mov", "avi", // videos
+  "mp3", "wav", // audio
+]);
+
+// Maximum file size: 50MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+/**
+ * Sanitize file path to prevent path traversal attacks
+ * Removes dangerous characters and sequences
+ */
+function sanitizeFileName(fileName: string): string {
+  // Remove path traversal sequences
+  let sanitized = fileName
+    .replace(/\.\./g, "") // Remove ..
+    .replace(/\/+/g, "/") // Collapse multiple slashes
+    .replace(/\\/g, "/") // Convert backslashes
+    .replace(/^\/+/, "") // Remove leading slashes
+    .replace(/[<>:"|?*]/g, ""); // Remove dangerous characters
+  
+  // Extract just the filename if a path was provided
+  const parts = sanitized.split("/");
+  sanitized = parts[parts.length - 1];
+  
+  // Ensure not empty
+  if (!sanitized || sanitized.length === 0) {
+    return `file_${Date.now()}`;
+  }
+  
+  return sanitized;
+}
+
+/**
+ * Validate folder is in the allowed list
+ */
+function validateFolder(folder: string): string {
+  const sanitized = folder.toLowerCase().trim().replace(/[^a-z0-9-]/g, "");
+  if (ALLOWED_FOLDERS.has(sanitized)) {
+    return sanitized;
+  }
+  return "uploads"; // Default to uploads if invalid
+}
+
+/**
+ * Validate file extension
+ */
+function validateFileExtension(fileName: string): boolean {
+  const ext = fileName.split(".").pop()?.toLowerCase() || "";
+  return ALLOWED_EXTENSIONS.has(ext);
+}
+
 // Helper to create AWS signature
 function getSignatureKey(key: string, dateStamp: string, regionName: string, serviceName: string): Promise<ArrayBuffer> {
   const enc = new TextEncoder();
@@ -217,7 +284,7 @@ serve(async (req) => {
       if (contentType.includes("multipart/form-data")) {
         const formData = await req.formData();
         const file = formData.get("file") as File | null;
-        folder = (formData.get("folder") as string) || "uploads";
+        const rawFolder = (formData.get("folder") as string) || "uploads";
         const customFileName = formData.get("fileName") as string | null;
 
         if (!file) {
@@ -230,9 +297,33 @@ serve(async (req) => {
         fileData = new Uint8Array(await file.arrayBuffer());
         fileContentType = file.type || "application/octet-stream";
         
-        // Generate unique filename
-        const ext = file.name.split(".").pop() || "bin";
-        fileName = customFileName || `${user.id}/${Date.now()}.${ext}`;
+        // SECURITY: Validate folder against whitelist
+        folder = validateFolder(rawFolder);
+        
+        // SECURITY: Validate file size
+        if (fileData.length > MAX_FILE_SIZE) {
+          return new Response(JSON.stringify({ error: "File too large. Maximum size is 50MB." }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
+        // Generate unique filename with sanitization
+        const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+        const sanitizedCustomName = customFileName ? sanitizeFileName(customFileName) : null;
+        
+        // SECURITY: Validate file extension
+        if (!ALLOWED_EXTENSIONS.has(ext)) {
+          return new Response(JSON.stringify({ error: `File type .${ext} is not allowed` }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
+        // SECURITY: Force user ID prefix to prevent overwriting other users' files
+        fileName = sanitizedCustomName 
+          ? `${user.id}/${sanitizeFileName(sanitizedCustomName)}`
+          : `${user.id}/${Date.now()}.${ext}`;
       } else {
         // JSON body with base64 data
         const body = await req.json();
@@ -248,8 +339,21 @@ serve(async (req) => {
         // Decode base64
         const base64Data = data.includes(",") ? data.split(",")[1] : data;
         fileData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-        fileName = name || `${user.id}/${Date.now()}`;
-        folder = f || "uploads";
+        
+        // SECURITY: Validate folder against whitelist
+        folder = validateFolder(f || "uploads");
+        
+        // SECURITY: Validate file size
+        if (fileData.length > MAX_FILE_SIZE) {
+          return new Response(JSON.stringify({ error: "File too large. Maximum size is 50MB." }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
+        // SECURITY: Sanitize fileName and force user ID prefix
+        const sanitizedName = name ? sanitizeFileName(name) : `${Date.now()}`;
+        fileName = `${user.id}/${sanitizedName}`;
         fileContentType = ct || "application/octet-stream";
       }
 
