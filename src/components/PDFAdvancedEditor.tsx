@@ -1,8 +1,6 @@
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   PDFEditorSettings, 
   defaultAdvancedSettings 
@@ -13,10 +11,6 @@ import {
   Type, 
   Maximize2, 
   RotateCcw,
-  Table,
-  PanelLeft,
-  AlignJustify,
-  Layers
 } from "lucide-react";
 import {
   Accordion,
@@ -28,9 +22,42 @@ import {
 interface PDFAdvancedEditorProps {
   settings: PDFEditorSettings;
   onUpdate: (updates: Partial<PDFEditorSettings>) => void;
+  onHighlight?: (element: string | null) => void;
 }
 
-export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps) => {
+// Highlightable control wrapper
+const HighlightableControl = ({ 
+  label, 
+  value, 
+  unit, 
+  elementName,
+  onHighlight,
+  children 
+}: { 
+  label: string; 
+  value: number; 
+  unit: string;
+  elementName: string;
+  onHighlight?: (element: string | null) => void;
+  children: React.ReactNode;
+}) => (
+  <div 
+    className="space-y-3 p-2 -mx-2 rounded-md transition-colors hover:bg-primary/5 cursor-pointer"
+    onMouseEnter={() => onHighlight?.(elementName)}
+    onMouseLeave={() => onHighlight?.(null)}
+  >
+    <div className="flex items-center justify-between">
+      <Label className="text-xs flex items-center gap-2">
+        {label}
+        <span className="w-1.5 h-1.5 rounded-full bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+      </Label>
+      <span className="text-xs text-muted-foreground font-mono">{value}{unit}</span>
+    </div>
+    {children}
+  </div>
+);
+
+export const PDFAdvancedEditor = ({ settings, onUpdate, onHighlight }: PDFAdvancedEditorProps) => {
   const advancedSettings = settings.advancedSettings || defaultAdvancedSettings;
 
   const updateAdvanced = (key: string, value: number) => {
@@ -78,7 +105,7 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
         <div>
           <Label className="text-sm font-semibold">Advanced Editor</Label>
           <p className="text-xs text-muted-foreground">
-            Fine-tune every aspect of your PDF
+            Hover controls to highlight in preview
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={resetAdvancedSettings}>
@@ -96,12 +123,14 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
               Border Thickness
             </div>
           </AccordionTrigger>
-          <AccordionContent className="space-y-4 pt-2">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Table Border</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.tableBorderWidth}px</span>
-              </div>
+          <AccordionContent className="space-y-2 pt-2">
+            <HighlightableControl 
+              label="Table Border" 
+              value={advancedSettings!.tableBorderWidth} 
+              unit="px"
+              elementName="Table Borders"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.tableBorderWidth * 10]}
                 onValueChange={([v]) => updateAdvanced('tableBorderWidth', v / 10)}
@@ -110,13 +139,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Card Border</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.cardBorderWidth}px</span>
-              </div>
+            <HighlightableControl 
+              label="Card Border" 
+              value={advancedSettings!.cardBorderWidth} 
+              unit="px"
+              elementName="Info Cards"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.cardBorderWidth * 10]}
                 onValueChange={([v]) => updateAdvanced('cardBorderWidth', v / 10)}
@@ -125,13 +156,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Page Border</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.pageBorderWidth}px</span>
-              </div>
+            <HighlightableControl 
+              label="Page Border" 
+              value={advancedSettings!.pageBorderWidth} 
+              unit="px"
+              elementName="Page Border"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.pageBorderWidth]}
                 onValueChange={([v]) => updateAdvanced('pageBorderWidth', v)}
@@ -140,7 +173,7 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={0.5}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
           </AccordionContent>
         </AccordionItem>
 
@@ -152,12 +185,14 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
               Spacing & Padding
             </div>
           </AccordionTrigger>
-          <AccordionContent className="space-y-4 pt-2">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Section Spacing</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.sectionSpacing}mm</span>
-              </div>
+          <AccordionContent className="space-y-2 pt-2">
+            <HighlightableControl 
+              label="Section Spacing" 
+              value={advancedSettings!.sectionSpacing} 
+              unit="mm"
+              elementName="Section Gaps"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.sectionSpacing]}
                 onValueChange={([v]) => updateAdvanced('sectionSpacing', v)}
@@ -166,13 +201,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Row Padding</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.rowPadding}mm</span>
-              </div>
+            <HighlightableControl 
+              label="Row Padding" 
+              value={advancedSettings!.rowPadding} 
+              unit="mm"
+              elementName="Table Row Padding"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.rowPadding]}
                 onValueChange={([v]) => updateAdvanced('rowPadding', v)}
@@ -181,13 +218,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={0.5}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Card Padding</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.cardPadding}mm</span>
-              </div>
+            <HighlightableControl 
+              label="Card Padding" 
+              value={advancedSettings!.cardPadding} 
+              unit="mm"
+              elementName="Card Inner Padding"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.cardPadding]}
                 onValueChange={([v]) => updateAdvanced('cardPadding', v)}
@@ -196,13 +235,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Highlight Padding</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.highlightPadding}px</span>
-              </div>
+            <HighlightableControl 
+              label="Highlight Padding" 
+              value={advancedSettings!.highlightPadding} 
+              unit="px"
+              elementName="Amount Highlights"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.highlightPadding]}
                 onValueChange={([v]) => updateAdvanced('highlightPadding', v)}
@@ -211,7 +252,7 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
           </AccordionContent>
         </AccordionItem>
 
@@ -223,16 +264,18 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
               Table Column Widths
             </div>
           </AccordionTrigger>
-          <AccordionContent className="space-y-4 pt-2">
+          <AccordionContent className="space-y-2 pt-2">
             <p className="text-[10px] text-muted-foreground mb-2">
               Adjust column widths in mm. Details column auto-adjusts.
             </p>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Side Column</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.columnWidths.side}mm</span>
-              </div>
+            <HighlightableControl 
+              label="Side Column" 
+              value={advancedSettings!.columnWidths.side} 
+              unit="mm"
+              elementName="Side Column"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.columnWidths.side]}
                 onValueChange={([v]) => updateColumnWidth('side', v)}
@@ -241,13 +284,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Product Column</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.columnWidths.product}mm</span>
-              </div>
+            <HighlightableControl 
+              label="Product Column" 
+              value={advancedSettings!.columnWidths.product} 
+              unit="mm"
+              elementName="Product Column"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.columnWidths.product]}
                 onValueChange={([v]) => updateColumnWidth('product', v)}
@@ -256,13 +301,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">W (Width) Column</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.columnWidths.width}mm</span>
-              </div>
+            <HighlightableControl 
+              label="W (Width) Column" 
+              value={advancedSettings!.columnWidths.width} 
+              unit="mm"
+              elementName="Width Column"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.columnWidths.width]}
                 onValueChange={([v]) => updateColumnWidth('width', v)}
@@ -271,13 +318,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">H (Height) Column</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.columnWidths.height}mm</span>
-              </div>
+            <HighlightableControl 
+              label="H (Height) Column" 
+              value={advancedSettings!.columnWidths.height} 
+              unit="mm"
+              elementName="Height Column"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.columnWidths.height]}
                 onValueChange={([v]) => updateColumnWidth('height', v)}
@@ -286,13 +335,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Area (Sq.Ft) Column</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.columnWidths.area}mm</span>
-              </div>
+            <HighlightableControl 
+              label="Area (Sq.Ft) Column" 
+              value={advancedSettings!.columnWidths.area} 
+              unit="mm"
+              elementName="Area Column"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.columnWidths.area]}
                 onValueChange={([v]) => updateColumnWidth('area', v)}
@@ -301,13 +352,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Rate Column</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.columnWidths.rate}mm</span>
-              </div>
+            <HighlightableControl 
+              label="Rate Column" 
+              value={advancedSettings!.columnWidths.rate} 
+              unit="mm"
+              elementName="Rate Column"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.columnWidths.rate]}
                 onValueChange={([v]) => updateColumnWidth('rate', v)}
@@ -316,13 +369,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Amount Column</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.columnWidths.amount}mm</span>
-              </div>
+            <HighlightableControl 
+              label="Amount Column" 
+              value={advancedSettings!.columnWidths.amount} 
+              unit="mm"
+              elementName="Amount Column"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.columnWidths.amount]}
                 onValueChange={([v]) => updateColumnWidth('amount', v)}
@@ -331,7 +386,7 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={1}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
           </AccordionContent>
         </AccordionItem>
 
@@ -343,12 +398,14 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
               Font Sizes
             </div>
           </AccordionTrigger>
-          <AccordionContent className="space-y-4 pt-2">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Section Title</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.fontSizes.sectionTitle}pt</span>
-              </div>
+          <AccordionContent className="space-y-2 pt-2">
+            <HighlightableControl 
+              label="Section Title" 
+              value={advancedSettings!.fontSizes.sectionTitle} 
+              unit="pt"
+              elementName="Section Titles"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.fontSizes.sectionTitle]}
                 onValueChange={([v]) => updateFontSize('sectionTitle', v)}
@@ -357,13 +414,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={0.5}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Table Header</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.fontSizes.tableHeader}pt</span>
-              </div>
+            <HighlightableControl 
+              label="Table Header" 
+              value={advancedSettings!.fontSizes.tableHeader} 
+              unit="pt"
+              elementName="Table Headers"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.fontSizes.tableHeader]}
                 onValueChange={([v]) => updateFontSize('tableHeader', v)}
@@ -372,13 +431,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={0.5}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Product Name</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.fontSizes.productName}pt</span>
-              </div>
+            <HighlightableControl 
+              label="Product Name" 
+              value={advancedSettings!.fontSizes.productName} 
+              unit="pt"
+              elementName="Product Names"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.fontSizes.productName]}
                 onValueChange={([v]) => updateFontSize('productName', v)}
@@ -387,13 +448,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={0.5}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Details Text</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.fontSizes.details}pt</span>
-              </div>
+            <HighlightableControl 
+              label="Details Text" 
+              value={advancedSettings!.fontSizes.details} 
+              unit="pt"
+              elementName="Product Details"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.fontSizes.details]}
                 onValueChange={([v]) => updateFontSize('details', v)}
@@ -402,13 +465,15 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={0.5}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Amounts</Label>
-                <span className="text-xs text-muted-foreground">{advancedSettings!.fontSizes.amounts}pt</span>
-              </div>
+            <HighlightableControl 
+              label="Amounts" 
+              value={advancedSettings!.fontSizes.amounts} 
+              unit="pt"
+              elementName="Amount Values"
+              onHighlight={onHighlight}
+            >
               <Slider
                 value={[advancedSettings!.fontSizes.amounts]}
                 onValueChange={([v]) => updateFontSize('amounts', v)}
@@ -417,7 +482,7 @@ export const PDFAdvancedEditor = ({ settings, onUpdate }: PDFAdvancedEditorProps
                 step={0.5}
                 className="w-full"
               />
-            </div>
+            </HighlightableControl>
           </AccordionContent>
         </AccordionItem>
       </Accordion>
