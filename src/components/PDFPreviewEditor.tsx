@@ -723,6 +723,56 @@ export const PDFPreviewEditor = ({
               </RadioGroup>
             </div>
 
+            {/* Header Info Columns */}
+            <div className="space-y-3 pt-4 border-t">
+              <Label className="text-sm font-semibold">Header Info Layout</Label>
+              <p className="text-xs text-muted-foreground">
+                Choose how Quotation & Project details are displayed
+              </p>
+              <RadioGroup
+                value={String(editorSettings.headerInfoColumns || 2)}
+                onValueChange={(v) => updateSettings({ headerInfoColumns: Number(v) as 1 | 2 | 3 })}
+                className="grid grid-cols-3 gap-2"
+              >
+                {[
+                  { value: '1', label: 'Single Row', desc: 'All info in one row' },
+                  { value: '2', label: 'Two Cards', desc: 'Client + Project side-by-side' },
+                  { value: '3', label: 'Three Cards', desc: 'Client + Project + Extra' },
+                ].map((opt) => (
+                  <div key={opt.value}>
+                    <RadioGroupItem value={opt.value} id={`cols-${opt.value}`} className="peer sr-only" />
+                    <Label
+                      htmlFor={`cols-${opt.value}`}
+                      className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer text-center"
+                    >
+                      <div className="w-full h-6 border rounded mb-1 flex items-center gap-0.5 px-0.5">
+                        {Array.from({ length: Number(opt.value) }).map((_, i) => (
+                          <div key={i} className="flex-1 h-4 bg-muted-foreground/20 rounded-sm" />
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-medium">{opt.label}</span>
+                    </Label>
+                  </div>
+                ))}
+              </RadioGroup>
+            </div>
+
+            {/* Accept/Reject Toggle */}
+            <div className="space-y-3 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium">Accept / Reject Buttons</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Show action buttons in PDF for client response
+                  </p>
+                </div>
+                <Switch
+                  checked={editorSettings.showAcceptRejectButtons ?? true}
+                  onCheckedChange={(v) => updateSettings({ showAcceptRejectButtons: v })}
+                />
+              </div>
+            </div>
+
             <div className="space-y-3 pt-4 border-t">
               <Label className="text-sm font-semibold">Layout Options</Label>
               <div className="space-y-3">

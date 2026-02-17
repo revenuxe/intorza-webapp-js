@@ -390,74 +390,230 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- 2. Info Cards (Client & Project) ---
   if (settings.showProjectDetails) {
-    const cardHeight = 48; // Increased height for better spacing
-    const gap = 12; // Increased gap to prevent borders touching
-    const cardWidth = (contentWidth - gap) / 2;
-  
-    // Left Card: Client Info
-    doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
-    doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-    doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, 'FD'); // Fill & Draw
-    
-    let cardY = yPosition + 10; // Increased top padding
-    const cardPadding = 8; // Increased padding
-    const cardContentX = margin + cardPadding;
-    
-    setHeadingFont('bold');
-    doc.setFontSize(8);
-    doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-    doc.text('QUOTATION FOR', cardContentX, cardY);
-    
-    cardY += 7; // Increased spacing
-    setHeadingFont('bold');
-    doc.setFontSize(11);
-    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-    doc.text(data.clientName, cardContentX, cardY);
-    
-    cardY += 6; // Increased spacing
-    setBodyFont('normal');
-    doc.setFontSize(9);
-    doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-    const clientAddr = doc.splitTextToSize(data.clientAddress, cardWidth - (cardPadding * 2));
-    doc.text(clientAddr, cardContentX, cardY);
+    const headerColumns = editorSettings?.headerInfoColumns || 2;
+    const gap = 8;
 
-    // Right Card: Project Meta
-    const rightCardX = margin + cardWidth + gap;
-    doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
-    doc.roundedRect(rightCardX, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
-    
-    let metaY = yPosition + 10; // Increased top padding
-    const metaContentX = rightCardX + cardPadding;
-    const metaLabelX = metaContentX;
-    const metaValueX = metaContentX + 32; // Align values with more space
-    
-    setHeadingFont('bold');
-    doc.setFontSize(8);
-    doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-    doc.text('PROJECT DETAILS', metaContentX, metaY);
-    metaY += 7; // Increased spacing
+    if (headerColumns === 1) {
+      // Single row: Quotation For + Project Details side-by-side in one card
+      const cardHeight = 48;
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+      doc.roundedRect(margin, yPosition, contentWidth, cardHeight, 2, 2, 'FD');
 
-    const addMeta = (label: string, value: string) => {
+      const halfWidth = contentWidth / 2;
+      const cardPadding = 8;
+      let leftY = yPosition + 10;
+      const leftX = margin + cardPadding;
+
+      // Left half: Client info
+      setHeadingFont('bold');
+      doc.setFontSize(8);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('QUOTATION FOR', leftX, leftY);
+      leftY += 7;
+      setHeadingFont('bold');
+      doc.setFontSize(11);
+      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+      doc.text(data.clientName, leftX, leftY);
+      leftY += 6;
       setBodyFont('normal');
       doc.setFontSize(9);
       doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-      doc.text(label, metaLabelX, metaY);
-      
-      setBodyFont('bold');
+      const clientAddr1 = doc.splitTextToSize(data.clientAddress, halfWidth - (cardPadding * 2));
+      doc.text(clientAddr1, leftX, leftY);
+
+      // Right half: Project details
+      let rightY = yPosition + 10;
+      const rightX = margin + halfWidth + cardPadding;
+      const metaValueOffset = 32;
+
+      setHeadingFont('bold');
+      doc.setFontSize(8);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('PROJECT DETAILS', rightX, rightY);
+      rightY += 7;
+
+      const addMetaSingle = (label: string, value: string) => {
+        setBodyFont('normal');
+        doc.setFontSize(9);
+        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+        doc.text(label, rightX, rightY);
+        setBodyFont('bold');
+        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+        doc.text(value, rightX + metaValueOffset, rightY);
+        rightY += 6;
+      };
+
+      addMetaSingle('Date:', data.dateOfProposal);
+      addMetaSingle('Valid Till:', data.quotationValidTill);
+      addMetaSingle('Project:', data.quotationTitle.substring(0, 20));
+      addMetaSingle('Warranty:', `${data.warranty} Years`);
+
+      // Vertical divider
+      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+      doc.setLineWidth(0.3);
+      doc.line(margin + halfWidth, yPosition + 6, margin + halfWidth, yPosition + cardHeight - 6);
+
+      yPosition += cardHeight + 10;
+
+    } else if (headerColumns === 3) {
+      // Three cards
+      const cardHeight = 48;
+      const cardWidth = (contentWidth - gap * 2) / 3;
+      const cardPadding = 6;
+
+      // Card 1: Client Info
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+      doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+
+      let c1Y = yPosition + 10;
+      const c1X = margin + cardPadding;
+      setHeadingFont('bold');
+      doc.setFontSize(7);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('QUOTATION FOR', c1X, c1Y);
+      c1Y += 6;
+      setHeadingFont('bold');
+      doc.setFontSize(10);
       doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-      doc.text(value, metaValueX, metaY);
-      metaY += 6; // Increased line spacing
-    };
+      doc.text(data.clientName.substring(0, 18), c1X, c1Y);
+      c1Y += 5;
+      setBodyFont('normal');
+      doc.setFontSize(8);
+      doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+      const addr3 = doc.splitTextToSize(data.clientAddress, cardWidth - cardPadding * 2);
+      doc.text(addr3.slice(0, 3), c1X, c1Y);
 
-    addMeta('Date:', data.dateOfProposal);
-    addMeta('Valid Till:', data.quotationValidTill);
-    addMeta('Project:', data.quotationTitle.substring(0, 20)); // Truncate if too long
-    addMeta('Warranty:', `${data.warranty} Years`);
-    if (data.projectDeadline) {
-      addMeta('Deadline:', data.projectDeadline);
+      // Card 2: Project Details
+      const c2X = margin + cardWidth + gap;
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.roundedRect(c2X, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+
+      let c2Y = yPosition + 10;
+      const c2ContentX = c2X + cardPadding;
+      setHeadingFont('bold');
+      doc.setFontSize(7);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('PROJECT DETAILS', c2ContentX, c2Y);
+      c2Y += 6;
+
+      const addMeta3 = (label: string, value: string) => {
+        setBodyFont('normal');
+        doc.setFontSize(8);
+        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+        doc.text(label, c2ContentX, c2Y);
+        setBodyFont('bold');
+        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+        doc.text(value, c2ContentX + 24, c2Y);
+        c2Y += 5.5;
+      };
+
+      addMeta3('Date:', data.dateOfProposal);
+      addMeta3('Valid:', data.quotationValidTill);
+      addMeta3('Project:', data.quotationTitle.substring(0, 14));
+
+      // Card 3: Extra Details
+      const c3X = margin + (cardWidth + gap) * 2;
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.roundedRect(c3X, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+
+      let c3Y = yPosition + 10;
+      const c3ContentX = c3X + cardPadding;
+      setHeadingFont('bold');
+      doc.setFontSize(7);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('ADDITIONAL INFO', c3ContentX, c3Y);
+      c3Y += 6;
+
+      const addMeta3c = (label: string, value: string) => {
+        setBodyFont('normal');
+        doc.setFontSize(8);
+        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+        doc.text(label, c3ContentX, c3Y);
+        setBodyFont('bold');
+        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+        doc.text(value, c3ContentX + 24, c3Y);
+        c3Y += 5.5;
+      };
+
+      addMeta3c('Warranty:', `${data.warranty} Yrs`);
+      if (data.projectType) addMeta3c('Type:', data.projectType.substring(0, 14));
+      if (data.placeOfProject) addMeta3c('Place:', data.placeOfProject.substring(0, 14));
+      if (data.projectDeadline) addMeta3c('Deadline:', data.projectDeadline);
+
+      yPosition += cardHeight + 10;
+
+    } else {
+      // Default: Two cards (existing behavior)
+      const cardHeight = 48;
+      const cardWidth = (contentWidth - gap) / 2;
+
+      // Left Card: Client Info
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+      doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+      
+      let cardY = yPosition + 10;
+      const cardPadding = 8;
+      const cardContentX = margin + cardPadding;
+      
+      setHeadingFont('bold');
+      doc.setFontSize(8);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('QUOTATION FOR', cardContentX, cardY);
+      
+      cardY += 7;
+      setHeadingFont('bold');
+      doc.setFontSize(11);
+      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+      doc.text(data.clientName, cardContentX, cardY);
+      
+      cardY += 6;
+      setBodyFont('normal');
+      doc.setFontSize(9);
+      doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+      const clientAddr = doc.splitTextToSize(data.clientAddress, cardWidth - (cardPadding * 2));
+      doc.text(clientAddr, cardContentX, cardY);
+
+      // Right Card: Project Meta
+      const rightCardX = margin + cardWidth + gap;
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.roundedRect(rightCardX, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+      
+      let metaY = yPosition + 10;
+      const metaContentX = rightCardX + cardPadding;
+      const metaLabelX = metaContentX;
+      const metaValueX = metaContentX + 32;
+      
+      setHeadingFont('bold');
+      doc.setFontSize(8);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('PROJECT DETAILS', metaContentX, metaY);
+      metaY += 7;
+
+      const addMeta = (label: string, value: string) => {
+        setBodyFont('normal');
+        doc.setFontSize(9);
+        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+        doc.text(label, metaLabelX, metaY);
+        
+        setBodyFont('bold');
+        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+        doc.text(value, metaValueX, metaY);
+        metaY += 6;
+      };
+
+      addMeta('Date:', data.dateOfProposal);
+      addMeta('Valid Till:', data.quotationValidTill);
+      addMeta('Project:', data.quotationTitle.substring(0, 20));
+      addMeta('Warranty:', `${data.warranty} Years`);
+      if (data.projectDeadline) {
+        addMeta('Deadline:', data.projectDeadline);
+      }
+
+      yPosition += cardHeight + 10;
     }
-
-    yPosition += cardHeight + 10;
   }
 
   // --- 3. Product Sections (Enhanced Cards) ---
@@ -1162,7 +1318,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   // --- Accept/Reject Links Section ---
-  if (data.quotationId) {
+  const showAcceptReject = editorSettings?.showAcceptRejectButtons ?? true;
+  if (data.quotationId && showAcceptReject) {
     if (yPosition > pageHeight - 45) {
       doc.addPage();
       yPosition = 15;
