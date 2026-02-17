@@ -968,6 +968,9 @@ export interface PDFEditorSettings {
   showPageBorder: boolean;
   showCornerOrnaments: boolean;
   showSectionDividers: boolean;
+  // Layout settings
+  headerInfoColumns: 1 | 2 | 3;
+  showAcceptRejectButtons: boolean;
   customColors?: {
     primary?: string;
     accent?: string;
@@ -1066,6 +1069,8 @@ export const defaultEditorSettings: PDFEditorSettings = {
   showPageBorder: true,
   showCornerOrnaments: true,
   showSectionDividers: true,
+  headerInfoColumns: 2,
+  showAcceptRejectButtons: true,
   useBrandColors: false,
   advancedSettings: defaultAdvancedSettings,
 };

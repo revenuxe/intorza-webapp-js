@@ -249,6 +249,8 @@ export default function PDFPreviewQA() {
         showPageBorder: false,
         showCornerOrnaments: false,
         showSectionDividers: false,
+        headerInfoColumns: 2 as const,
+        showAcceptRejectButtons: true,
         useBrandColors: false,
       };
 
@@ -309,6 +311,8 @@ export default function PDFPreviewQA() {
               showPageBorder: false,
               showCornerOrnaments: false,
               showSectionDividers: false,
+              headerInfoColumns: 2 as const,
+              showAcceptRejectButtons: true,
               useBrandColors: false,
             };
 
