@@ -140,7 +140,6 @@ export const PDFPreviewEditor = ({
   useEffect(() => {
     if (open) {
       const savedSettings = getEditorSettings();
-      // Apply saved font preferences from database and include brand colors if available
       setEditorSettings({
         ...savedSettings,
         headingFont: fontPreferences.headingFont || savedSettings.headingFont || 'times',
@@ -150,12 +149,16 @@ export const PDFPreviewEditor = ({
       setShowEditor(false);
     } else {
       // Cleanup blob URL when closing
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
-        setPdfBlobUrl(null);
+      if (prevBlobUrlRef.current) {
+        URL.revokeObjectURL(prevBlobUrlRef.current);
+        prevBlobUrlRef.current = null;
       }
+      setPdfBlobUrl(null);
     }
   }, [open, fontPreferences, brandColors]);
+
+  // Track previous blob URL for cleanup without causing re-renders
+  const prevBlobUrlRef = useRef<string | null>(null);
 
   // Generate live PDF preview with debouncing
   const generateLivePdf = useCallback(async () => {
@@ -241,10 +244,8 @@ export const PDFPreviewEditor = ({
         companyLogo: quotationData.companyLogo,
         companyName: quotationData.companyName || 'Your Company',
         companyAddress: 'Company Address',
-        // Include settings in the data object as expected by the generator
         settings: pdfSettings,
         editorSettings: currentEditorSettings,
-        // Preview mode - don't save the file, just return the doc
         previewOnly: true,
       };
 
@@ -255,18 +256,19 @@ export const PDFPreviewEditor = ({
       const blob = doc.output('blob');
       
       // Revoke previous blob URL
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
+      if (prevBlobUrlRef.current) {
+        URL.revokeObjectURL(prevBlobUrlRef.current);
       }
       
       const newBlobUrl = URL.createObjectURL(blob);
+      prevBlobUrlRef.current = newBlobUrl;
       setPdfBlobUrl(newBlobUrl);
     } catch (error) {
       console.error('Error generating live PDF preview:', error);
     } finally {
       setIsGeneratingPdf(false);
     }
-  }, [editorSettings, customizeSettings, quotationData, brandColors, pdfBlobUrl]);
+  }, [editorSettings, customizeSettings, quotationData, brandColors]);
 
   // Debounced PDF generation effect
   useEffect(() => {
@@ -280,14 +282,14 @@ export const PDFPreviewEditor = ({
     // Debounce PDF generation to avoid too many updates
     pdfGenerationTimer.current = setTimeout(() => {
       generateLivePdf();
-    }, 300);
+    }, 500);
 
     return () => {
       if (pdfGenerationTimer.current) {
         clearTimeout(pdfGenerationTimer.current);
       }
     };
-  }, [open, editorSettings, customizeSettings, generateLivePdf]);
+  }, [open, generateLivePdf]);
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
     const newSettings = { ...editorSettings, ...updates };
@@ -1018,18 +1020,18 @@ export const PDFPreviewEditor = ({
   const PreviewPanel = () => (
     <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
       {/* Zoom Controls */}
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-background/50 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-background/80 backdrop-blur-sm gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5">
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7 shrink-0"
             onClick={() => setPreviewZoom(Math.max(25, previewZoom - 25))}
             disabled={previewZoom <= 25}
           >
-            <ZoomOut className="h-4 w-4" />
+            <ZoomOut className="h-3.5 w-3.5" />
           </Button>
-          <div className="flex items-center gap-2 w-32">
+          <div className="flex items-center w-20 sm:w-28">
             <Slider
               value={[previewZoom]}
               onValueChange={([v]) => setPreviewZoom(v)}
@@ -1042,35 +1044,35 @@ export const PDFPreviewEditor = ({
           <Button
             variant="outline"
             size="icon"
-            className="h-8 w-8"
+            className="h-7 w-7 shrink-0"
             onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))}
             disabled={previewZoom >= 200}
           >
-            <ZoomIn className="h-4 w-4" />
+            <ZoomIn className="h-3.5 w-3.5" />
           </Button>
-          <span className="text-xs text-muted-foreground w-12 text-center">{previewZoom}%</span>
+          <span className="text-[10px] text-muted-foreground w-9 text-center">{previewZoom}%</span>
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2"
+            className="h-7 px-2"
             onClick={() => setPreviewZoom(100)}
           >
             <Maximize className="h-3 w-3 mr-1" />
-            <span className="text-xs">Reset</span>
+            <span className="text-[10px]">Fit</span>
           </Button>
         </div>
         {highlightedElement && (
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            Highlighting: {highlightedElement}
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px]">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            {highlightedElement}
           </div>
         )}
       </div>
 
       {/* PDF Preview */}
-      <div className="flex-1 overflow-auto p-4 md:p-6">
+      <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
         {isGeneratingPdf && !pdfBlobUrl ? (
-          <div className="h-full flex items-center justify-center">
+          <div className="h-full flex items-center justify-center min-h-[300px]">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
               <p className="text-sm text-muted-foreground">Generating preview...</p>
@@ -1078,27 +1080,26 @@ export const PDFPreviewEditor = ({
           </div>
         ) : pdfBlobUrl ? (
           <div 
-            className="relative mx-auto transition-transform duration-200 origin-top"
+            className="relative mx-auto"
             style={{ 
-              width: `${595 * (previewZoom / 100)}px`,
-              height: `${842 * (previewZoom / 100)}px`,
+              width: `min(100%, ${595 * (previewZoom / 100)}px)`,
+              aspectRatio: '595 / 842',
             }}
           >
             {isGeneratingPdf && (
-              <div className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-2 shadow-sm">
+              <div className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm rounded-full px-2.5 py-1 flex items-center gap-1.5 shadow-sm">
                 <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                <span className="text-xs text-muted-foreground">Updating...</span>
+                <span className="text-[10px] text-muted-foreground">Updating...</span>
               </div>
             )}
             <iframe
-              src={pdfBlobUrl}
+              src={`${pdfBlobUrl}#toolbar=0&navpanes=0`}
               className="w-full h-full rounded-lg shadow-lg border bg-white"
               title="PDF Preview"
-              style={{ transform: `scale(1)`, transformOrigin: 'top left' }}
             />
           </div>
         ) : (
-          <div className="h-full flex items-center justify-center">
+          <div className="h-full flex items-center justify-center min-h-[300px]">
             <p className="text-sm text-muted-foreground">Failed to generate preview</p>
           </div>
         )}
