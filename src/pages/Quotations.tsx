@@ -9,7 +9,6 @@ import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
 import { ListSkeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { deleteQuotation as deleteQuotationFromAws, createQuotation, buildQuotationPayload, logAdminAction } from "@/lib/awsApi";
 
 interface Quotation {
   id: string;
@@ -82,8 +81,6 @@ const Quotations = () => {
     try {
       setDeletingId(quotationId);
       
-      const { data: { user } } = await supabase.auth.getUser();
-      
       // First get all sections for this quotation
       const { data: sections } = await supabase
         .from('quotation_sections')
@@ -105,23 +102,13 @@ const Quotations = () => {
           .eq('quotation_id', quotationId);
       }
       
-      // Finally delete the quotation from Supabase
+      // Finally delete the quotation
       const { error } = await supabase
         .from('quotations')
         .delete()
         .eq('id', quotationId);
       
       if (error) throw error;
-
-      // Sync delete to AWS (best-effort)
-      try {
-        await deleteQuotationFromAws(quotationId);
-        if (user) {
-          await logAdminAction(user.id, user.id, 'delete_quotation', 'quotation', quotationId);
-        }
-      } catch (awsError) {
-        console.error('AWS delete sync failed:', awsError);
-      }
       
       toast({
         title: "Quotation Deleted",
@@ -155,66 +142,11 @@ const Quotations = () => {
 
       if (fetchError || !original) throw fetchError;
 
-      // Get sections and items for AWS payload
-      const { data: sections } = await supabase
-        .from('quotation_sections')
-        .select('*, quotation_items(*)')
-        .eq('quotation_id', quotationId)
-        .order('sort_order');
-
-      // Create new quotation - AWS First approach
+      // Create new quotation with copied data
       const newQuotationNumber = `QT-${Date.now()}`;
-      const newQuotationId = crypto.randomUUID();
-      
-      // Build sections for AWS payload
-      const awsSections = sections?.map(section => ({
-        id: crypto.randomUUID(),
-        title: section.section_name,
-        items: (section.quotation_items || []).map((item: any) => ({
-          side: item.side || '',
-          productName: item.product_name,
-          productDetails: item.product_details || '',
-          widthFt: item.width_ft || 0,
-          heightFt: item.height_ft || 0,
-          sftArea: item.sft_area || 0,
-          ratePerSft: item.rate_per_sft || 0,
-          amount: item.amount || 0,
-        })),
-      })) || [];
-
-      // Build AWS payload
-      const awsPayload = buildQuotationPayload(newQuotationId, user.id, {
-        quotationNumber: newQuotationNumber,
-        quotationTitle: original.quotation_title ? `${original.quotation_title} (Copy)` : 'Copy',
-        clientName: original.client_name,
-        clientAddress: original.client_address || '',
-        dateOfProposal: new Date().toISOString().split('T')[0],
-        validTill: original.valid_till || '',
-        projectDeadline: original.project_deadline || undefined,
-        placeOfProject: original.place_of_project || '',
-        warranty: original.warranty || '',
-        projectType: original.project_type || '',
-        status: 'draft',
-        gstEnabled: original.gst_enabled || false,
-        gstPercentage: original.gst_percentage || 0,
-        gstAmount: original.gst_amount || 0,
-        discountAmount: original.discount_amount || 0,
-        subtotal: original.subtotal || 0,
-        grandTotal: original.grand_total || 0,
-        sections: awsSections,
-      });
-
-      // Send to AWS first (source of truth)
-      const awsResponse = await createQuotation(awsPayload);
-      if (!awsResponse.success) {
-        throw new Error(awsResponse.error || 'Failed to save quotation to AWS');
-      }
-
-      // After AWS success, store minimal data in Supabase
       const { data: newQuotation, error: insertError } = await supabase
         .from('quotations')
         .insert({
-          id: newQuotationId,
           user_id: user.id,
           quotation_number: newQuotationNumber,
           quotation_title: original.quotation_title ? `${original.quotation_title} (Copy)` : 'Copy',
@@ -240,7 +172,13 @@ const Quotations = () => {
 
       if (insertError || !newQuotation) throw insertError;
 
-      // Copy sections and items to Supabase for UI queries
+      // Copy sections and items
+      const { data: sections } = await supabase
+        .from('quotation_sections')
+        .select('*, quotation_items(*)')
+        .eq('quotation_id', quotationId)
+        .order('sort_order');
+
       if (sections) {
         for (const section of sections) {
           const { data: newSection } = await supabase

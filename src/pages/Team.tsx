@@ -15,8 +15,6 @@ import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, User
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useFeedback } from "@/components/FeedbackProvider";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import * as awsApi from "@/lib/awsApi";
-import { AWSMigrationWarning } from "@/components/AWSMigrationWarning";
 
 interface TeamMember {
   id: string;
@@ -137,7 +135,6 @@ const Team = () => {
 
   const fetchCompanyName = async () => {
     if (!user) return;
-    // Company name fetch from Supabase profile (auth-related metadata only)
     const { data } = await supabase
       .from('profiles')
       .select('company_name')
@@ -148,119 +145,92 @@ const Team = () => {
     }
   };
 
-  // Fetch quotations from AWS
   const fetchQuotations = async () => {
     if (!user) return;
-    try {
-      const result = await awsApi.listQuotations(user.id);
-      if (result.success && result.data) {
-        const mapped = result.data.map((q: any) => ({
-          id: q.quotation_id,
-          project_name: q.quotation_title || q.project_name || '',
-          client_name: q.client_name || '',
-          client_address: q.client_address || null,
-          place_of_project: q.place_of_project || q.city || null,
-          status: q.status || 'draft',
-          project_deadline: q.project_deadline || null,
-          grand_total: q.grand_total || null,
-        }));
-        setQuotations(mapped);
-      }
-    } catch (error) {
-      console.error('Error fetching quotations from AWS:', error);
-    }
+    const { data } = await supabase
+      .from('quotations')
+      .select('id, project_name, client_name, client_address, place_of_project, status, project_deadline, grand_total')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    
+    setQuotations(data || []);
   };
 
-  // Fetch team members from AWS using /teams endpoint
   const fetchTeamMembers = async () => {
     if (!user) return;
-    try {
-      const result = await awsApi.listTeams(user.id);
-      if (result.success && result.data) {
-        // Filter for team members (role = 'member' or by work_type presence)
-        const membersList = result.data
-          .filter((t: any) => t.work_type && !t.attendance_id && !t.task_id && t.status !== 'deleted')
-          .map((m: any) => ({
-            id: m.team_id,
-            name: m.name,
-            email: m.email,
-            phone: m.phone || null,
-            work_type: m.work_type,
-            status: m.status || 'active',
-            daily_rate: m.daily_rate || null,
-            created_at: m.created_at || new Date().toISOString(),
-            user_id: m.user_id || null,
-          }));
-        setTeamMembers(membersList);
-      }
-    } catch (error) {
-      console.error('Error fetching team members from AWS:', error);
+    
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('*')
+      .eq('company_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error(error);
+    } else {
+      setTeamMembers(data || []);
     }
   };
 
-  // Fetch project teams (assignments) from AWS using /teams endpoint
   const fetchProjectTeams = async () => {
     if (!user) return;
-    try {
-      // Fetch all team records that have quotation_id (assignments)
-      const result = await awsApi.listTeams(user.id);
-      if (result.success && result.data) {
-        // Group by project - look for records with quotation_id
-        const teamsMap = new Map<string, ProjectTeam>();
+    
+    const { data: assignments } = await supabase
+      .from('team_project_assignments')
+      .select(`
+        id,
+        quotation_id,
+        team_member_id,
+        quotations:quotation_id(id, project_name, client_name, client_address, place_of_project, status, project_deadline, grand_total)
+      `);
+
+    if (assignments) {
+      // Group by project
+      const teamsMap = new Map<string, ProjectTeam>();
+      
+      for (const assignment of assignments) {
+        const quotation = assignment.quotations as unknown as Quotation;
+        if (!quotation) continue;
         
-        for (const record of result.data) {
-          if (record.status === 'deleted') continue;
-          if (!record.quotation_id) continue;
-          
-          const quotation = quotations.find(q => q.id === record.quotation_id);
-          if (!quotation) continue;
-          
-          const member = teamMembers.find(m => m.id === record.team_id || m.name === record.name);
-          if (!member) continue;
-          
-          if (!teamsMap.has(quotation.id)) {
-            teamsMap.set(quotation.id, {
-              quotation,
-              members: [],
-            });
-          }
-          
-          teamsMap.get(quotation.id)!.members.push({
-            ...member,
-            assignmentId: record.team_id,
+        const member = teamMembers.find(m => m.id === assignment.team_member_id);
+        if (!member) continue;
+        
+        if (!teamsMap.has(quotation.id)) {
+          teamsMap.set(quotation.id, {
+            quotation,
+            members: [],
           });
         }
         
-        setProjectTeams(Array.from(teamsMap.values()));
+        teamsMap.get(quotation.id)!.members.push({
+          ...member,
+          assignmentId: assignment.id,
+        });
       }
-    } catch (error) {
-      console.error('Error fetching project teams from AWS:', error);
+      
+      setProjectTeams(Array.from(teamsMap.values()));
     }
   };
 
   useEffect(() => {
-    if (teamMembers.length > 0 && quotations.length > 0) {
+    if (teamMembers.length > 0) {
       fetchProjectTeams();
     }
-  }, [teamMembers, quotations]);
+  }, [teamMembers]);
 
-  // Fetch today's attendance from AWS
   const fetchTodayAttendance = async () => {
     if (!user) return;
-    try {
-      const result = await awsApi.listAttendanceByCompany(user.id);
-      if (result.success && result.data) {
-        const mapped = result.data.map((a: any) => ({
-          team_member_id: a.team_member_id,
-          clock_in: a.clock_in,
-          clock_out: a.clock_out || null,
-          clock_in_location: a.clock_in_location || null,
-          clock_out_location: a.clock_out_location || null,
-        }));
-        setTodayAttendance(mapped);
-      }
-    } catch (error) {
-      console.error('Error fetching attendance from AWS:', error);
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const { data } = await supabase
+      .from('attendance')
+      .select('team_member_id, clock_in, clock_out, clock_in_location, clock_out_location')
+      .gte('clock_in', today.toISOString());
+
+    if (data) {
+      setTodayAttendance(data as TodayAttendance[]);
     }
   };
 
@@ -268,24 +238,20 @@ const Team = () => {
     setSelectedProject(team);
     setProjectDetailOpen(true);
     
-    // Fetch attendance for all members in this project from AWS
+    // Fetch attendance for all members in this project
     const memberIds = team.members.map(m => m.id);
-    try {
-      const result = await awsApi.listAttendanceByMembers(memberIds, 7);
-      if (result.success && result.data) {
-        const mapped = result.data.map((a: any) => ({
-          id: a.attendance_id,
-          clock_in: a.clock_in,
-          clock_out: a.clock_out || null,
-          clock_in_location: a.clock_in_location || null,
-          clock_out_location: a.clock_out_location || null,
-          team_member_id: a.team_member_id,
-        }));
-        setProjectAttendance(mapped);
-      }
-    } catch (error) {
-      console.error('Error fetching project attendance from AWS:', error);
-    }
+    
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const { data } = await supabase
+      .from('attendance')
+      .select('*')
+      .in('team_member_id', memberIds)
+      .gte('clock_in', sevenDaysAgo.toISOString())
+      .order('clock_in', { ascending: false });
+
+    setProjectAttendance((data || []) as MemberAttendance[]);
   };
 
   const formatLocationAddress = (location: any) => {
@@ -342,38 +308,36 @@ const Team = () => {
 
     try {
       if (editingMember) {
-        // Update in AWS only using updateTeam
-        const result = await awsApi.updateTeam(editingMember.id, {
-          name: memberForm.name,
-          email: generatedEmail,
-          phone: memberForm.phone || undefined,
-          work_type: memberForm.work_type,
-        });
+        const { error } = await supabase
+          .from('team_members')
+          .update({
+            name: memberForm.name,
+            email: generatedEmail,
+            phone: memberForm.phone || null,
+            work_type: memberForm.work_type as any,
+          })
+          .eq('id', editingMember.id);
 
-        if (!result.success) throw new Error(result.error || 'Failed to update member');
-
+        if (error) throw error;
         toast.success("Team member updated");
       } else {
-        // Generate a new member ID
-        const memberId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        // Create member record first
+        const { data: newMember, error } = await supabase
+          .from('team_members')
+          .insert({
+            company_id: user.id,
+            name: memberForm.name,
+            email: generatedEmail,
+            phone: memberForm.phone || null,
+            work_type: memberForm.work_type as any,
+          })
+          .select()
+          .single();
 
-        // Create in AWS first (primary) using createTeam
-        const awsResult = await awsApi.createTeam({
-          team_id: memberId,
-          company_id: user.id,
-          name: memberForm.name,
-          email: generatedEmail,
-          phone: memberForm.phone || undefined,
-          work_type: memberForm.work_type,
-          role: 'member',
-          status: 'active',
-        });
+        if (error) throw error;
 
-        if (!awsResult.success) {
-          throw new Error(awsResult.error || 'Failed to create member in AWS');
-        }
-
-        // Create auth account via edge function (uses Supabase Auth admin API)
+        // Create auth account via edge function
+        const { data: session } = await supabase.auth.getSession();
         const response = await supabase.functions.invoke('create-team-member-auth', {
           body: {
             email: generatedEmail,
@@ -382,36 +346,24 @@ const Team = () => {
             phone: memberForm.phone,
             work_type: memberForm.work_type,
             company_id: user.id,
-            team_member_id: memberId,
+            team_member_id: newMember.id,
           },
         });
 
         if (response.error) {
-          // Clean up AWS record if auth creation fails
-          await awsApi.updateTeam(memberId, { status: 'deleted' });
+          // Clean up the team member record if auth creation fails
+          await supabase.from('team_members').delete().eq('id', newMember.id);
           throw new Error(response.error.message || 'Failed to create login account');
         }
 
-        // Update AWS record with user_id from auth response
-        if (response.data?.user_id) {
-          await awsApi.updateTeam(memberId, {
-            user_id: response.data.user_id,
-          });
-        }
-
-        // If project selected, create a separate assignment record
-        if (memberForm.project_id) {
-          const assignmentId = `assign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          await awsApi.createTeam({
-            team_id: assignmentId,
-            company_id: user.id,
-            name: memberForm.name,
-            email: generatedEmail,
-            work_type: memberForm.work_type,
-            role: 'assignment',
-            quotation_id: memberForm.project_id,
-            assigned_at: new Date().toISOString(),
-          });
+        // If project selected, assign to project
+        if (memberForm.project_id && newMember) {
+          await supabase
+            .from('team_project_assignments')
+            .insert({
+              team_member_id: newMember.id,
+              quotation_id: memberForm.project_id,
+            });
         }
 
         toast.success("Team member added with login credentials");
@@ -430,8 +382,6 @@ const Team = () => {
   };
 
   const handleCreateTeam = async () => {
-    if (!user) return;
-    
     if (!teamForm.project_id) {
       toast.error("Please select a project");
       return;
@@ -443,27 +393,16 @@ const Team = () => {
     }
 
     try {
-      // Create assignment records in AWS using createTeam
-      for (const memberId of teamForm.selectedMembers) {
-        const member = teamMembers.find(m => m.id === memberId);
-        if (!member) continue;
-        
-        const assignmentId = `assign_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const result = await awsApi.createTeam({
-          team_id: assignmentId,
-          company_id: user.id,
-          name: member.name,
-          email: member.email,
-          work_type: member.work_type,
-          role: 'assignment',
-          quotation_id: teamForm.project_id,
-          assigned_at: new Date().toISOString(),
-        });
-        
-        if (!result.success) {
-          throw new Error(result.error || 'Failed to create assignment');
-        }
-      }
+      const assignments = teamForm.selectedMembers.map(memberId => ({
+        team_member_id: memberId,
+        quotation_id: teamForm.project_id,
+      }));
+
+      const { error } = await supabase
+        .from('team_project_assignments')
+        .insert(assignments);
+
+      if (error) throw error;
 
       toast.success("Team created successfully");
       trackAction('team_created');
@@ -476,28 +415,30 @@ const Team = () => {
   };
 
   const handleRemoveMemberFromProject = async (assignmentId: string) => {
-    try {
-      // AWS does NOT support DELETE. Soft-delete the assignment via PUT /teams/:id
-      const result = await awsApi.updateTeam(assignmentId, { status: 'deleted' });
-      if (!result.success) throw new Error(result.error);
+    const { error } = await supabase
+      .from('team_project_assignments')
+      .delete()
+      .eq('id', assignmentId);
 
+    if (error) {
+      toast.error("Error removing member");
+    } else {
       toast.success("Member removed from project");
       fetchProjectTeams();
-    } catch (error: any) {
-      toast.error("Error removing member");
     }
   };
 
   const handleDeleteMember = async (id: string) => {
-    try {
-      // AWS does NOT support DELETE. Soft-delete the member via PUT /teams/:id
-      const result = await awsApi.updateTeam(id, { status: 'deleted' });
-      if (!result.success) throw new Error(result.error);
+    const { error } = await supabase
+      .from('team_members')
+      .delete()
+      .eq('id', id);
 
+    if (error) {
+      toast.error("Error deleting team member");
+    } else {
       toast.success("Team member deleted");
       fetchTeamMembers();
-    } catch (error: any) {
-      toast.error("Error deleting team member");
     }
   };
 
@@ -555,8 +496,6 @@ const Team = () => {
 
   return (
     <div className="space-y-6 pb-20">
-      <AWSMigrationWarning pageName="Team Management" />
-      
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -1130,6 +1069,10 @@ const Team = () => {
               </div>
             </ScrollArea>
           )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProjectDetailOpen(false)}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

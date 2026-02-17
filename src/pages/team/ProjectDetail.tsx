@@ -16,7 +16,6 @@ import {
   ArrowLeft, Calendar, MapPin, Users, Clock, Plus, CheckCircle2, 
   Circle, AlertCircle, Trash2, Edit, Target, TrendingUp
 } from "lucide-react";
-import * as awsApi from "@/lib/awsApi";
 
 interface Quotation {
   id: string;
@@ -94,6 +93,22 @@ const ProjectDetail = () => {
 
   useEffect(() => {
     checkAuthAndFetch();
+    
+    // Set up real-time subscription for tasks
+    const tasksChannel = supabase
+      .channel('project-tasks')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'tasks',
+      }, () => {
+        if (projectId) fetchTasks();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tasksChannel);
+    };
   }, [projectId]);
 
   const checkAuthAndFetch = async () => {
@@ -103,110 +118,75 @@ const ProjectDetail = () => {
       return;
     }
     setUser(user);
-    await fetchProjectData(user.id);
+    await fetchProjectData();
     setLoading(false);
   };
 
-  const fetchProjectData = async (companyId: string) => {
+  const fetchProjectData = async () => {
     if (!projectId) return;
 
-    // Fetch quotation from AWS
-    try {
-      const quotationResult = await awsApi.getQuotation(projectId);
-      if (quotationResult.success && quotationResult.data) {
-        const q = quotationResult.data;
-        setQuotation({
-          id: q.quotation_id,
-          project_name: q.quotation_title || '',
-          client_name: q.client_name || '',
-          client_address: q.client_address || null,
-          place_of_project: q.place_of_project || null,
-          status: q.status || 'draft',
-          project_deadline: q.project_deadline || null,
-          grand_total: q.grand_total || null,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching quotation:', error);
+    // Fetch quotation
+    const { data: quotationData } = await supabase
+      .from('quotations')
+      .select('*')
+      .eq('id', projectId)
+      .single();
+
+    if (quotationData) {
+      setQuotation(quotationData);
     }
 
-    // Fetch assigned members from AWS
-    await fetchMembers();
-    
-    // Fetch tasks from AWS
+    // Fetch assigned members
+    const { data: assignments } = await supabase
+      .from('team_project_assignments')
+      .select(`
+        id,
+        team_member_id,
+        team_members:team_member_id(id, name, work_type)
+      `)
+      .eq('quotation_id', projectId);
+
+    if (assignments) {
+      const membersList = assignments
+        .filter(a => a.team_members)
+        .map(a => ({
+          ...(a.team_members as any),
+          assignmentId: a.id,
+        }));
+      setMembers(membersList);
+    }
+
     await fetchTasks();
-  };
-
-  const fetchMembers = async () => {
-    if (!projectId || !user) return;
-    
-    try {
-      // Fetch all team records for this project using listTeamsByProject
-      const result = await awsApi.listTeamsByProject(projectId);
-      if (result.success && result.data) {
-        const membersList: TeamMember[] = result.data
-          .filter((r: any) => r.quotation_id === projectId && r.role === 'assignment' && r.status !== 'deleted')
-          .map((r: any) => ({
-            id: r.team_id,
-            name: r.name,
-            work_type: r.work_type,
-            assignmentId: r.team_id,
-          }));
-        
-        setMembers(membersList);
-      }
-    } catch (error) {
-      console.error('Error fetching members:', error);
-    }
+    await fetchAttendance();
   };
 
   const fetchTasks = async () => {
     if (!projectId) return;
 
-    try {
-      const result = await awsApi.listTasksByProject(projectId);
-      if (result.success && result.data) {
-        const mapped = result.data
-          .filter((t: any) => t.status !== 'deleted')
-          .map((t: any) => ({
-          id: t.task_id,
-          title: t.title,
-          description: t.description || null,
-          status: t.status,
-          priority: t.priority || null,
-          due_date: t.due_date || null,
-          assigned_to: t.assigned_to || null,
-          completed_at: t.completed_at || null,
-          created_at: t.created_at || new Date().toISOString(),
-        }));
-        setTasks(mapped);
-      }
-    } catch (error) {
-      console.error('Error fetching tasks:', error);
-    }
+    const { data } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('quotation_id', projectId)
+      .order('created_at', { ascending: false });
+
+    setTasks(data || []);
   };
 
   const fetchAttendance = async () => {
     if (!projectId || members.length === 0) return;
 
     const memberIds = members.map(m => m.id);
-    
-    try {
-      const result = await awsApi.listAttendanceByMembers(memberIds, 7);
-      if (result.success && result.data) {
-        const mapped = result.data.map((a: any) => ({
-          id: a.attendance_id,
-          clock_in: a.clock_in,
-          clock_out: a.clock_out || null,
-          clock_in_location: a.clock_in_location || null,
-          clock_out_location: a.clock_out_location || null,
-          team_member_id: a.team_member_id,
-        }));
-        setAttendance(mapped);
-      }
-    } catch (error) {
-      console.error('Error fetching attendance:', error);
-    }
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data } = await supabase
+      .from('attendance')
+      .select('*')
+      .in('team_member_id', memberIds)
+      .gte('clock_in', sevenDaysAgo.toISOString())
+      .order('clock_in', { ascending: false });
+
+    setAttendance(data || []);
   };
 
   useEffect(() => {
@@ -222,40 +202,34 @@ const ProjectDetail = () => {
     }
 
     try {
-      const taskId = editingTask?.id || `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
       if (editingTask) {
-        // Update task in AWS using updateTeam
-        const result = await awsApi.updateTeam(taskId, {
-          title: taskForm.title,
-          description: taskForm.description || undefined,
-          priority: taskForm.priority,
-          due_date: taskForm.due_date || undefined,
-          assigned_to: taskForm.assigned_to || undefined,
-        });
+        const { error } = await supabase
+          .from('tasks')
+          .update({
+            title: taskForm.title,
+            description: taskForm.description || null,
+            priority: taskForm.priority,
+            due_date: taskForm.due_date || null,
+            assigned_to: taskForm.assigned_to || null,
+          })
+          .eq('id', editingTask.id);
 
-        if (!result.success) throw new Error(result.error);
+        if (error) throw error;
         toast.success("Task updated");
       } else {
-        // Create task in AWS using createTeam
-        const result = await awsApi.createTeam({
-          team_id: taskId,
-          company_id: user.id,
-          name: taskForm.title,
-          email: '',
-          work_type: '',
-          role: 'task',
-          task_id: taskId,
-          title: taskForm.title,
-          description: taskForm.description || undefined,
-          priority: taskForm.priority,
-          due_date: taskForm.due_date || undefined,
-          assigned_to: taskForm.assigned_to || undefined,
-          status: 'pending',
-          quotation_id: projectId,
-        });
+        const { error } = await supabase
+          .from('tasks')
+          .insert({
+            title: taskForm.title,
+            description: taskForm.description || null,
+            priority: taskForm.priority,
+            due_date: taskForm.due_date || null,
+            assigned_to: taskForm.assigned_to || null,
+            company_id: user.id,
+            quotation_id: projectId,
+          });
 
-        if (!result.success) throw new Error(result.error);
+        if (error) throw error;
         toast.success("Task created");
       }
 
@@ -269,34 +243,32 @@ const ProjectDetail = () => {
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    try {
-      // AWS does NOT support DELETE. Soft-delete the task via PUT /teams/:id
-      const result = await awsApi.updateTeam(taskId, { status: 'deleted' });
-      if (!result.success) throw new Error(result.error);
-      
+    const { error } = await supabase.from('tasks').delete().eq('id', taskId);
+    if (error) {
+      toast.error("Error deleting task");
+    } else {
       toast.success("Task deleted");
       fetchTasks();
-    } catch (error: any) {
-      toast.error("Error deleting task");
     }
   };
 
   const handleUpdateTaskStatus = async (taskId: string, status: string) => {
-    try {
-      const updates: any = { status };
-      if (status === 'completed') {
-        updates.completed_at = new Date().toISOString();
-      } else {
-        updates.completed_at = undefined;
-      }
+    const updates: any = { status };
+    if (status === 'completed') {
+      updates.completed_at = new Date().toISOString();
+    } else {
+      updates.completed_at = null;
+    }
 
-      // Update task status in AWS using updateTeam
-      const result = await awsApi.updateTeam(taskId, updates);
-      if (!result.success) throw new Error(result.error);
-      
-      fetchTasks();
-    } catch (error: any) {
+    const { error } = await supabase
+      .from('tasks')
+      .update(updates)
+      .eq('id', taskId);
+
+    if (error) {
       toast.error("Error updating task");
+    } else {
+      fetchTasks();
     }
   };
 
@@ -527,20 +499,18 @@ const ProjectDetail = () => {
         {/* Progress Bar */}
         <Card>
           <CardContent className="pt-4">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Project Progress</span>
-                <span className="font-medium">{progressPercentage}%</span>
-              </div>
-              <Progress value={progressPercentage} className="h-2" />
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium">Project Progress</p>
+              <p className="text-sm text-muted-foreground">{progressPercentage}%</p>
             </div>
+            <Progress value={progressPercentage} className="h-3" />
           </CardContent>
         </Card>
 
-        {/* Project Info */}
+        {/* Project Details */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Project Details</CardTitle>
+            <CardTitle className="text-base">Project Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {quotation.place_of_project && (
@@ -561,31 +531,41 @@ const ProjectDetail = () => {
                 <span>Value: ₹{quotation.grand_total.toLocaleString()}</span>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">{quotation.status}</Badge>
-            </div>
+            <Badge variant="outline">{quotation.status}</Badge>
           </CardContent>
         </Card>
 
         {/* Tasks */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center justify-between">
-              <span>Tasks ({tasks.length})</span>
+            <CardTitle className="text-base flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                Tasks ({tasks.length})
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             {tasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No tasks yet. Add your first task!</p>
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No tasks yet. Create your first task to get started.
+              </p>
             ) : (
               <div className="space-y-3">
                 {tasks.map((task) => {
                   const assignedMember = members.find(m => m.id === task.assigned_to);
-                  
                   return (
-                    <div key={task.id} className="p-3 border rounded-lg">
+                    <div 
+                      key={task.id} 
+                      className={`p-4 rounded-lg border transition-colors ${
+                        task.status === 'completed' ? 'bg-green-50/50 border-green-200' : 'bg-muted/30'
+                      }`}
+                    >
                       <div className="flex items-start gap-3">
-                        <button onClick={() => handleUpdateTaskStatus(task.id, task.status === 'completed' ? 'pending' : 'completed')}>
+                        <button onClick={() => handleUpdateTaskStatus(
+                          task.id, 
+                          task.status === 'completed' ? 'pending' : 'completed'
+                        )}>
                           {getStatusIcon(task.status)}
                         </button>
                         <div className="flex-1 min-w-0">
@@ -593,33 +573,35 @@ const ProjectDetail = () => {
                             {task.title}
                           </p>
                           {task.description && (
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
+                            <p className="text-sm text-muted-foreground mt-1">{task.description}</p>
                           )}
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {task.priority && (
-                              <Badge variant="outline" className={`text-xs ${getPriorityColor(task.priority)}`}>
-                                {task.priority}
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            <Badge variant="outline" className={getPriorityColor(task.priority)}>
+                              {task.priority || 'medium'}
+                            </Badge>
+                            {task.due_date && (
+                              <Badge variant="outline" className="text-xs">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                {formatDate(task.due_date)}
                               </Badge>
                             )}
-                            {task.due_date && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {formatDate(task.due_date)}
-                              </span>
-                            )}
                             {assignedMember && (
-                              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Users className="h-3 w-3" />
+                              <Badge variant="secondary" className="text-xs">
                                 {assignedMember.name}
-                              </span>
+                              </Badge>
                             )}
                           </div>
                         </div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditTask(task)}>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => openEditTask(task)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteTask(task.id)}>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-destructive"
+                            onClick={() => handleDeleteTask(task.id)}
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -635,68 +617,85 @@ const ProjectDetail = () => {
         {/* Team Members */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Team Members ({members.length})</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Team ({members.length})
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {members.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No team members assigned</p>
-            ) : (
-              <div className="space-y-2">
-                {members.map((member) => (
-                  <div key={member.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+            <div className="space-y-3">
+              {members.map((member) => {
+                const memberTodayAtt = attendance.find(a => {
+                  const today = new Date().toDateString();
+                  return a.team_member_id === member.id && 
+                    new Date(a.clock_in).toDateString() === today;
+                });
+                const isWorking = memberTodayAtt && !memberTodayAtt.clock_out;
+
+                return (
+                  <div key={member.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                     <div>
                       <p className="font-medium text-sm">{member.name}</p>
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="secondary" className="text-xs mt-1">
                         {workTypes[member.work_type] || member.work_type}
                       </Badge>
                     </div>
+                    <div className="text-right">
+                      {isWorking ? (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Working
+                        </Badge>
+                      ) : memberTodayAtt ? (
+                        <p className="text-xs text-muted-foreground">
+                          {formatTime(memberTodayAtt.clock_in)} - {formatTime(memberTodayAtt.clock_out!)}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Not clocked in</p>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
 
         {/* Recent Attendance */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
               <Clock className="h-4 w-4" />
               Recent Attendance
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-64">
+            <ScrollArea className="h-[300px]">
               {attendance.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">No attendance records</p>
               ) : (
                 <div className="space-y-2">
-                  {attendance.map((record) => {
+                  {attendance.slice(0, 20).map((record) => {
                     const member = members.find(m => m.id === record.team_member_id);
-                    
                     return (
                       <div key={record.id} className="p-3 bg-muted/30 rounded-lg">
                         <div className="flex items-center justify-between mb-1">
                           <p className="font-medium text-sm">{member?.name || 'Unknown'}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(record.clock_in)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(record.clock_in).toLocaleDateString()}
+                          </p>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                           <div>
                             <p>In: {formatTime(record.clock_in)}</p>
                             {record.clock_in_location && (
-                              <p className="flex items-center gap-1 mt-0.5 truncate">
-                                <MapPin className="h-3 w-3 flex-shrink-0" />
-                                <span className="truncate">{formatLocationAddress(record.clock_in_location)}</span>
-                              </p>
+                              <p className="truncate">{formatLocationAddress(record.clock_in_location)}</p>
                             )}
                           </div>
                           <div>
                             <p>Out: {record.clock_out ? formatTime(record.clock_out) : 'Working'}</p>
                             {record.clock_out_location && (
-                              <p className="flex items-center gap-1 mt-0.5 truncate">
-                                <MapPin className="h-3 w-3 flex-shrink-0" />
-                                <span className="truncate">{formatLocationAddress(record.clock_out_location)}</span>
-                              </p>
+                              <p className="truncate">{formatLocationAddress(record.clock_out_location)}</p>
                             )}
                           </div>
                         </div>

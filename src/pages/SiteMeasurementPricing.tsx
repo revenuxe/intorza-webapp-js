@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, FileText } from "lucide-react";
 import { toast } from "sonner";
-import { createQuotation, buildQuotationPayload } from "@/lib/awsApi";
 
 interface Room {
   id: string;
@@ -133,57 +132,17 @@ export default function SiteMeasurementPricing() {
       }
 
       // Generate quotation number
-      const quotationNumber = `QT-${Date.now()}`;
-      const newQuotationId = crypto.randomUUID();
+      const { count } = await supabase
+        .from('quotations')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
 
-      // Build sections for AWS payload
-      const awsSections = [{
-        id: crypto.randomUUID(),
-        title: 'Site Measurements',
-        items: rooms.map(room => ({
-          side: '',
-          productName: room.room_name || room.room_type,
-          productDetails: `Area: ${room.area_sqft?.toFixed(1)} sq.ft`,
-          widthFt: Math.sqrt(room.area_sqft || 0),
-          heightFt: Math.sqrt(room.area_sqft || 0),
-          sftArea: room.area_sqft || 0,
-          ratePerSft: room.pricing_mode === 'per_sqft' ? (room.rate_per_sqft || 0) : 0,
-          amount: skipAmounts ? 0 : (room.final_amount || 0),
-        })),
-      }];
+      const quotationNumber = `QT-${String((count || 0) + 1).padStart(4, '0')}`;
 
-      // Build AWS payload
-      const awsPayload = buildQuotationPayload(newQuotationId, user.id, {
-        quotationNumber,
-        quotationTitle: project.client_name,
-        clientName: project.client_name,
-        clientAddress: project.site_location || '',
-        dateOfProposal: new Date().toISOString().split('T')[0],
-        validTill: '',
-        placeOfProject: project.site_location || '',
-        warranty: '',
-        projectType: 'Site Measurement',
-        status: createAsDraft ? 'draft' : 'pending',
-        gstEnabled: false,
-        gstPercentage: 0,
-        gstAmount: 0,
-        discountAmount: 0,
-        subtotal: skipAmounts ? 0 : getTotalAmount(),
-        grandTotal: skipAmounts ? 0 : getTotalAmount(),
-        sections: awsSections,
-      });
-
-      // Send to AWS first (source of truth)
-      const awsResponse = await createQuotation(awsPayload);
-      if (!awsResponse.success) {
-        throw new Error(awsResponse.error || 'Failed to save quotation to AWS');
-      }
-
-      // After AWS success, store minimal data in Supabase
+      // Create quotation
       const { data: quotation, error: quotationError } = await supabase
         .from('quotations')
         .insert({
-          id: newQuotationId,
           user_id: user.id,
           quotation_number: quotationNumber,
           project_name: project.client_name,
@@ -198,10 +157,10 @@ export default function SiteMeasurementPricing() {
         .single();
 
       if (quotationError || !quotation) {
-        throw new Error('Failed to create quotation in Supabase');
+        throw new Error('Failed to create quotation');
       }
 
-      // Create a section for measurements in Supabase (for UI queries)
+      // Create a section for measurements
       const { data: section, error: sectionError } = await supabase
         .from('quotation_sections')
         .insert({
@@ -216,7 +175,7 @@ export default function SiteMeasurementPricing() {
         throw new Error('Failed to create section');
       }
 
-      // Create items for each room in Supabase (for UI queries)
+      // Create items for each room
       for (let i = 0; i < rooms.length; i++) {
         const room = rooms[i];
         await supabase

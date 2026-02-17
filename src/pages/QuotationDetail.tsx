@@ -11,11 +11,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { downloadQuotationPDF } from "@/lib/pdfGenerator";
+import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getEditorSettings } from "@/lib/pdfThemes";
 import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
-import { updateQuotation, getQuotation, createInvoice as createInvoiceInAws, createClientBehavior, logAdminAction, InvoicePayload, QuotationPayload } from "@/lib/awsApi";
 
 interface Quotation {
   id: string;
@@ -39,21 +38,6 @@ interface Quotation {
   project_type: string;
   project_deadline: string | null;
   created_at: string;
-  // AWS data - sections with items
-  sections?: Array<{
-    id?: string;
-    title: string;
-    items: Array<{
-      productName: string;
-      productDetails: string;
-      side: string;
-      widthFt: number;
-      heightFt: number;
-      sftArea: number;
-      ratePerSft: number;
-      amount: number;
-    }>;
-  }>;
 }
 
 const getStatusColor = (status: string) => {
@@ -82,8 +66,8 @@ const QuotationDetail = () => {
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [loading, setLoading] = useState(true);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
-  const [invoiceAmount, setInvoiceAmount] = useState<number | string>("");
-  const [paidAmount, setPaidAmount] = useState<number | string>("");
+  const [invoiceAmount, setInvoiceAmount] = useState(0);
+  const [paidAmount, setPaidAmount] = useState(0);
   const [dueDate, setDueDate] = useState("");
   const [invoiceNotes, setInvoiceNotes] = useState("");
 
@@ -96,49 +80,20 @@ const QuotationDetail = () => {
   const loadQuotation = async () => {
     try {
       setLoading(true);
-      
-      // Fetch full quotation data from AWS (source of truth)
-      const awsResponse = await getQuotation(id!);
-      
-      if (!awsResponse.success || !awsResponse.data) {
-        throw new Error(awsResponse.error || 'Failed to fetch quotation from AWS');
-      }
+      const { data, error } = await supabase
+        .from('quotations')
+        .select('*')
+        .eq('id', id)
+        .single();
 
-      const awsData = awsResponse.data;
-      
-      // Map AWS data to Quotation interface
-      const quotationData: Quotation = {
-        id: awsData.quotation_id || id!,
-        quotation_number: awsData.quotation_number || '',
-        quotation_title: awsData.quotation_title || '',
-        project_name: awsData.quotation_title || '',
-        client_name: awsData.client_name || '',
-        client_address: awsData.client_address || '',
-        client_id: awsData.client_id || null,
-        grand_total: awsData.grand_total || awsData.total || 0,
-        subtotal: awsData.subtotal || 0,
-        gst_amount: awsData.gst_amount || 0,
-        discount_amount: awsData.discount_amount || 0,
-        gst_enabled: awsData.gst_enabled || false,
-        gst_percentage: awsData.gst_percentage || 18,
-        status: awsData.status || 'pending',
-        date_of_proposal: awsData.date_of_proposal || '',
-        valid_till: awsData.valid_till || '',
-        place_of_project: awsData.place_of_project || '',
-        warranty: awsData.warranty || '',
-        project_type: awsData.project_type || '',
-        project_deadline: awsData.project_deadline || null,
-        created_at: awsData.date_of_proposal || '',
-        sections: awsData.sections || [],
-      };
-
-      setQuotation(quotationData);
-      setInvoiceAmount(quotationData.grand_total || 0);
+      if (error) throw error;
+      setQuotation(data);
+      setInvoiceAmount(data?.grand_total || 0);
     } catch (error) {
-      console.error('Error loading quotation from AWS:', error);
+      console.error('Error loading quotation:', error);
       toast({
         title: "Error",
-        description: "Failed to load quotation details from AWS",
+        description: "Failed to load quotation details",
         variant: "destructive",
       });
     } finally {
@@ -161,6 +116,12 @@ const QuotationDetail = () => {
         .select('*')
         .single();
 
+      const { data: sections } = await supabase
+        .from('quotation_sections')
+        .select('*, quotation_items(*)')
+        .eq('quotation_id', quotation.id)
+        .order('sort_order');
+
       // Fetch latest templates from My Library
       const { data: { user } } = await supabase.auth.getUser();
       let paymentStages = profile?.payment_stages;
@@ -174,7 +135,7 @@ const QuotationDetail = () => {
           .select('stages')
           .eq('user_id', user.id)
           .eq('is_default', true)
-          .maybeSingle();
+          .single();
         
         if (paymentTemplate?.stages) {
           paymentStages = paymentTemplate.stages;
@@ -187,7 +148,7 @@ const QuotationDetail = () => {
           .eq('user_id', user.id)
           .eq('is_default', true)
           .eq('template_type', 'quotation')
-          .maybeSingle();
+          .single();
         
         if (termsTemplate?.content) {
           termsConditions = termsTemplate.content;
@@ -199,7 +160,7 @@ const QuotationDetail = () => {
           .select('*')
           .eq('user_id', user.id)
           .eq('is_default', true)
-          .maybeSingle();
+          .single();
         
         if (bankTemplate) {
           bankDetails = {
@@ -217,22 +178,7 @@ const QuotationDetail = () => {
       const editorSettings = getEditorSettings();
       const customizeSettings = getQuotationSettings();
 
-      // Use sections from AWS data (already loaded in quotation state)
-      const pdfSections = quotation.sections?.map(s => ({
-        title: s.title,
-        items: s.items.map((item: any) => ({
-          productName: item.productName || item.product_name || '',
-          productDetails: item.productDetails || item.product_details || '',
-          side: item.side || '',
-          widthFt: item.widthFt || item.width_ft || 0,
-          heightFt: item.heightFt || item.height_ft || 0,
-          sftArea: item.sftArea || item.sft_area || 0,
-          ratePerSft: item.ratePerSft || item.rate_per_sft || 0,
-          amount: item.amount || 0
-        }))
-      })) || [];
-
-      await downloadQuotationPDF({
+      await generateQuotationPDF({
         quotationId: quotation.id,
         quotationTitle: quotation.quotation_title || quotation.project_name,
         dateOfProposal: quotation.date_of_proposal,
@@ -243,7 +189,19 @@ const QuotationDetail = () => {
         placeOfProject: quotation.place_of_project,
         warranty: quotation.warranty,
         projectType: quotation.project_type,
-        sections: pdfSections,
+        sections: sections?.map(s => ({
+          title: s.section_name,
+          items: s.quotation_items.map((item: any) => ({
+            productName: item.product_name,
+            productDetails: item.product_details,
+            side: item.side,
+            widthFt: item.width_ft,
+            heightFt: item.height_ft,
+            sftArea: item.sft_area,
+            ratePerSft: item.rate_per_sft,
+            amount: item.amount
+          }))
+        })) || [],
         subtotal: quotation.subtotal,
         discount: quotation.discount_amount,
         gstEnabled: quotation.gst_enabled,
@@ -286,64 +244,18 @@ const QuotationDetail = () => {
 
   const handleMarkStatus = async (status: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // AWS-FIRST: Update status in AWS before Supabase
-      const awsResponse = await updateQuotation(id!, { status });
-      
-      if (!awsResponse.success) {
-        throw new Error(awsResponse.error || 'Failed to update status in AWS');
-      }
-      
-      // After AWS success, update Supabase
       const { error } = await supabase
         .from('quotations')
         .update({ status })
         .eq('id', id);
 
-      if (error) {
-        console.error('Supabase status update failed (AWS succeeded):', error);
-        // Don't throw - AWS is the source of truth
-      }
+      if (error) throw error;
 
       setQuotation(prev => prev ? { ...prev, status } : null);
       toast({
         title: "Status Updated",
         description: `Quotation marked as ${status}`,
       });
-
-      // Record client behavior and create client in AWS when accepted
-      if (user && quotation && (status === 'accepted' || status === 'rejected')) {
-        try {
-          await createClientBehavior({
-            behavior_id: `behavior_${Date.now()}`,
-            company_id: user.id,
-            client_id: quotation.client_id || undefined,
-            quotation_id: quotation.id,
-            city: quotation.place_of_project || '',
-            category: quotation.project_type || 'general',
-            rate: quotation.subtotal || 0,
-            final_price: quotation.grand_total || 0,
-            won_or_lost: status === 'accepted' ? 'won' : 'lost',
-          });
-          await logAdminAction(user.id, user.id, `mark_quotation_${status}`, 'quotation', id!);
-          
-          // Auto-create client in AWS when quotation is accepted
-          if (status === 'accepted' && quotation.client_name) {
-            const { createClient } = await import('@/lib/awsApi');
-            const clientId = quotation.client_id || crypto.randomUUID();
-            await createClient({
-              client_id: clientId,
-              company_id: user.id,
-              name: quotation.client_name,
-              address: quotation.client_address || undefined,
-            });
-            console.log('Client auto-created in AWS:', quotation.client_name);
-          }
-        } catch (awsError) {
-          console.error('Failed to record client behavior or create client:', awsError);
-        }
-      }
 
       if (status === 'accepted') {
         setConvertDialogOpen(true);
@@ -352,7 +264,7 @@ const QuotationDetail = () => {
       console.error('Error updating status:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update status",
+        description: "Failed to update status",
         variant: "destructive",
       });
     }
@@ -363,99 +275,30 @@ const QuotationDetail = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const invoiceId = crypto.randomUUID();
       const invoiceNumber = `INV-${Date.now()}`;
-      const numInvoiceAmount = Number(invoiceAmount) || 0;
-      const numPaidAmount = Number(paidAmount) || 0;
-      const remaining = numInvoiceAmount - numPaidAmount;
-      const invoiceStatus = remaining === 0 ? 'paid' : (numPaidAmount > 0 ? 'partially_paid' : 'unpaid');
-      const invoiceDate = new Date().toISOString().split('T')[0];
-      const nowISO = new Date().toISOString();
+      const remaining = invoiceAmount - paidAmount;
 
-      // Use sections from AWS data (already loaded in quotation state)
-      const invoiceSections = quotation?.sections?.map(s => ({
-        title: s.title,
-        items: s.items.map((item: any) => ({
-          productName: item.productName || item.product_name || '',
-          productDetails: item.productDetails || item.product_details || '',
-          side: item.side || '',
-          widthFt: item.widthFt || item.width_ft || 0,
-          heightFt: item.heightFt || item.height_ft || 0,
-          sftArea: item.sftArea || item.sft_area || 0,
-          ratePerSft: item.ratePerSft || item.rate_per_sft || 0,
-          amount: item.amount || 0
-        }))
-      })) || [];
-
-      const invoiceItems = quotation?.sections?.flatMap(s => 
-        s.items.map((item: any) => ({
-          productName: item.productName || item.product_name || '',
-          productDetails: item.productDetails || item.product_details || '',
-          side: item.side || '',
-          widthFt: item.widthFt || item.width_ft || 0,
-          heightFt: item.heightFt || item.height_ft || 0,
-          sftArea: item.sftArea || item.sft_area || 0,
-          ratePerSft: item.ratePerSft || item.rate_per_sft || 0,
-          amount: item.amount || 0
-        }))
-      ) || [];
-
-      // AWS-FIRST: Call AWS API with full invoice payload
-      const awsPayload: InvoicePayload = {
-        invoice_id: invoiceId,
-        company_id: user.id,
-        user_id: user.id,
-        quotation_id: quotation?.id,
-        client_id: quotation?.client_id || undefined,
-        invoice_number: invoiceNumber,
-        client_name: quotation?.client_name || '',
-        project_name: quotation?.project_name || '',
-        total_amount: numInvoiceAmount,
-        paid_amount: numPaidAmount,
-        remaining_amount: remaining,
-        status: invoiceStatus,
-        action: 'save',
-        invoice_date: invoiceDate,
-        due_date: dueDate || undefined,
-        notes: invoiceNotes,
-        sections: invoiceSections,
-        items: invoiceItems,
-        timestamps: {
-          created_at: nowISO,
-          saved_at: nowISO,
-        }
-      };
-
-      const awsResponse = await createInvoiceInAws(awsPayload);
-      
-      if (!awsResponse.success) {
-        throw new Error(awsResponse.error || 'Failed to create invoice in AWS');
-      }
-
-      // After AWS success, save minimal metadata to Supabase
-      const { error } = await supabase
+      const { data: invoice, error } = await supabase
         .from('invoices')
         .insert({
-          id: invoiceId,
           user_id: user.id,
           quotation_id: quotation?.id,
           client_id: quotation?.client_id || null,
           invoice_number: invoiceNumber,
           client_name: quotation?.client_name || '',
           project_name: quotation?.project_name || '',
-          total_amount: numInvoiceAmount,
-          paid_amount: numPaidAmount,
+          total_amount: invoiceAmount,
+          paid_amount: paidAmount,
           remaining_amount: remaining,
-          status: invoiceStatus,
-          invoice_date: invoiceDate,
+          status: remaining === 0 ? 'paid' : (paidAmount > 0 ? 'partially_paid' : 'unpaid'),
+          invoice_date: new Date().toISOString().split('T')[0],
           due_date: dueDate || null,
           notes: invoiceNotes
-        });
+        })
+        .select()
+        .single();
 
-      if (error) {
-        console.error('Supabase insert failed (AWS succeeded):', error);
-        // Don't throw - AWS is the source of truth
-      }
+      if (error) throw error;
 
       // Update quotation status to converted
       await supabase
@@ -463,30 +306,18 @@ const QuotationDetail = () => {
         .update({ status: 'converted' })
         .eq('id', quotation?.id);
 
-      // Sync quotation status to AWS
-      try {
-        await updateQuotation(quotation?.id!, { status: 'converted' });
-        
-        await logAdminAction(user.id, user.id, 'convert_to_invoice', 'quotation', quotation?.id!, {
-          invoice_id: invoiceId,
-          invoice_number: invoiceNumber,
-        });
-      } catch (awsError) {
-        console.error('AWS quotation status sync failed:', awsError);
-      }
-
       toast({
         title: "Invoice Created",
         description: "Quotation has been converted to invoice successfully",
       });
 
       setConvertDialogOpen(false);
-      navigate(`/invoices/${invoiceId}`);
+      navigate(`/invoices/${invoice.id}`);
     } catch (error) {
       console.error('Error converting to invoice:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to convert to invoice",
+        description: "Failed to convert to invoice",
         variant: "destructive",
       });
     }
@@ -544,11 +375,11 @@ const QuotationDetail = () => {
         </div>
 
         {/* Action Buttons */}
-        {quotation.status?.toLowerCase() !== 'converted' && (
+        {quotation.status !== 'converted' && (
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row gap-3">
-                {quotation.status?.toLowerCase() !== 'accepted' && quotation.status?.toLowerCase() !== 'rejected' && (
+                {quotation.status !== 'accepted' && quotation.status !== 'rejected' && (
                   <>
                     <Button 
                       onClick={() => checkProFeature('Mark as Accepted', () => handleMarkStatus('accepted'))}
@@ -568,7 +399,7 @@ const QuotationDetail = () => {
                     </Button>
                   </>
                 )}
-                {quotation.status?.toLowerCase() === 'accepted' && (
+                {quotation.status === 'accepted' && (
                   <Button 
                     onClick={() => checkProFeature('Convert to Invoice', () => setConvertDialogOpen(true))}
                     className="flex-1"
@@ -712,7 +543,7 @@ const QuotationDetail = () => {
               <div className="space-y-2">
                 <Label>Remaining Amount</Label>
                 <Input
-                  value={((Number(invoiceAmount) || 0) - (Number(paidAmount) || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  value={(invoiceAmount - paidAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   disabled
                 />
               </div>

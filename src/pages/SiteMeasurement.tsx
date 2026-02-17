@@ -21,7 +21,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { AWSMigrationWarning } from "@/components/AWSMigrationWarning";
 
 interface SiteMeasurementProject {
   id: string;
@@ -132,7 +131,7 @@ export default function SiteMeasurement() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      <AWSMigrationWarning pageName="Site Measurement" />
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Site Measurement</h1>

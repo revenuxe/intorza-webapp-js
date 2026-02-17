@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Camera, X, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { uploadToS3, deleteFromS3 } from "@/lib/s3Upload";
 
 const ROOM_TYPES = [
   "Kitchen",
@@ -124,8 +123,27 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
       .order('created_at');
     
     if (data) {
-      // S3 URLs are already public, no need for signed URLs
-      setPhotos(data);
+      // Generate signed URLs for each photo
+      const photosWithSignedUrls = await Promise.all(
+        data.map(async (photo) => {
+          // Extract file path from stored URL
+          const urlParts = photo.photo_url.split('/room-photos/');
+          const filePath = urlParts[1]?.split('?')[0]; // Remove any existing query params
+          
+          if (filePath) {
+            const { data: signedData } = await supabase.storage
+              .from('room-photos')
+              .createSignedUrl(filePath, 3600); // 1 hour expiry
+            
+            return {
+              ...photo,
+              photo_url: signedData?.signedUrl || photo.photo_url
+            };
+          }
+          return photo;
+        })
+      );
+      setPhotos(photosWithSignedUrls);
     }
   };
 
@@ -163,19 +181,30 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
         const compressedBlob = await compressImage(file);
         const fileName = `${room.id}/${Date.now()}.webp`;
 
-        // Upload to S3
-        const { url: publicUrl } = await uploadToS3(compressedBlob, {
-          folder: "room-photos",
-          fileName,
-          contentType: "image/webp",
-        });
+        // Upload to Supabase storage
+        const { error: uploadError } = await supabase.storage
+          .from('room-photos')
+          .upload(fileName, compressedBlob, {
+            contentType: 'image/webp',
+            cacheControl: '3600'
+          });
 
-        // Save to room_photos table with the S3 URL
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          toast.error(`Failed to upload ${file.name}`);
+          continue;
+        }
+
+        // Store the file path reference (not the full URL)
+        // We'll generate signed URLs when fetching
+        const storedPath = `${supabase.storage.from('room-photos').getPublicUrl(fileName).data.publicUrl}`;
+
+        // Save to room_photos table with the path reference
         const { data: photoData, error: dbError } = await supabase
           .from('room_photos')
           .insert({
             room_id: room.id,
-            photo_url: publicUrl,
+            photo_url: storedPath, // Store the path for reference
           })
           .select()
           .single();
@@ -186,7 +215,15 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
           continue;
         }
 
-        setPhotos(prev => [...prev, photoData]);
+        // Generate signed URL for immediate display
+        const { data: signedData } = await supabase.storage
+          .from('room-photos')
+          .createSignedUrl(fileName, 3600);
+
+        setPhotos(prev => [...prev, { 
+          ...photoData, 
+          photo_url: signedData?.signedUrl || storedPath 
+        }]);
       }
       
       toast.success('Photos uploaded successfully');
@@ -203,10 +240,16 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
 
   const handleDeletePhoto = async (photo: RoomPhoto) => {
     try {
-      // Delete from S3
-      await deleteFromS3(photo.photo_url);
+      // Extract file path from URL
+      const urlParts = photo.photo_url.split('/room-photos/');
+      const filePath = urlParts[1];
 
-      // Delete from database
+      if (filePath) {
+        await supabase.storage
+          .from('room-photos')
+          .remove([filePath]);
+      }
+
       await supabase
         .from('room_photos')
         .delete()
@@ -273,7 +316,7 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
               <Input
                 type="number"
                 inputMode="decimal"
-                placeholder=""
+                placeholder="0"
                 value={widthFt}
                 onChange={(e) => setWidthFt(e.target.value)}
               />
@@ -283,7 +326,7 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
               <Input
                 type="number"
                 inputMode="decimal"
-                placeholder=""
+                placeholder="0"
                 value={lengthFt}
                 onChange={(e) => setLengthFt(e.target.value)}
               />
@@ -295,7 +338,7 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
             <Input
               type="number"
               inputMode="decimal"
-              placeholder=""
+              placeholder="0"
               value={heightFt}
               onChange={(e) => setHeightFt(e.target.value)}
             />

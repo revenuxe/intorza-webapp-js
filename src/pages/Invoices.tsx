@@ -9,7 +9,6 @@ import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
 import { ListSkeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { deleteInvoice as deleteInvoiceInAws, logAdminAction } from "@/lib/awsApi";
 
 interface Invoice {
   id: string;
@@ -87,38 +86,19 @@ const Invoices = () => {
     try {
       setDeletingId(invoiceId);
       
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // AWS-FIRST: Delete from AWS before Supabase
-      const awsResponse = await deleteInvoiceInAws(invoiceId);
-      if (!awsResponse.success) {
-        throw new Error(awsResponse.error || 'Failed to delete invoice from AWS');
-      }
-      
-      // After AWS success, delete from Supabase
+      // First delete all payments
       await supabase
         .from('payments')
         .delete()
         .eq('invoice_id', invoiceId);
       
+      // Then delete the invoice
       const { error } = await supabase
         .from('invoices')
         .delete()
         .eq('id', invoiceId);
       
-      if (error) {
-        console.error('Supabase delete failed (AWS succeeded):', error);
-        // Don't throw - AWS is the source of truth
-      }
-      
-      // Log admin action
-      if (user) {
-        try {
-          await logAdminAction(user.id, user.id, 'delete_invoice', 'invoice', invoiceId);
-        } catch (logError) {
-          console.error('Failed to log admin action:', logError);
-        }
-      }
+      if (error) throw error;
       
       toast({
         title: "Invoice Deleted",
@@ -130,7 +110,7 @@ const Invoices = () => {
       console.error('Error deleting invoice:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete invoice",
+        description: "Failed to delete invoice",
         variant: "destructive",
       });
     } finally {

@@ -715,15 +715,7 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
   doc.text("This invoice is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
 
-  // Return the document for external handling
-  return doc;
-};
-
-/**
- * Download invoice PDF locally
- */
-export const downloadInvoicePDF = async (data: InvoiceData) => {
-  const doc = await generateInvoicePDF(data);
+  // Generate PDF and handle sharing + download
   const fileName = `Invoice_${data.invoiceNumber}.pdf`;
   const pdfBlob = doc.output('blob');
   
@@ -748,50 +740,4 @@ export const downloadInvoicePDF = async (data: InvoiceData) => {
       }
     }
   }
-  
-  return doc;
-};
-
-/**
- * Upload invoice PDF to S3 and return the URL
- */
-export const uploadInvoicePDFToS3 = async (
-  data: InvoiceData,
-  options?: { downloadLocally?: boolean }
-): Promise<{ url: string; blob: Blob }> => {
-  const { uploadToS3 } = await import('./s3Upload');
-  
-  const doc = await generateInvoicePDF(data);
-  const fileName = `Invoice_${data.invoiceNumber}_${Date.now()}.pdf`;
-  const pdfBlob = doc.output('blob');
-  
-  // Upload to S3
-  const result = await uploadToS3(new File([pdfBlob], fileName, { type: 'application/pdf' }), {
-    folder: 'invoices',
-    fileName: fileName,
-    contentType: 'application/pdf'
-  });
-  
-  // Optionally download locally as well
-  if (options?.downloadLocally) {
-    doc.save(fileName);
-    
-    // Try Web Share API
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-        const shareData = { files: [file], title: `Invoice ${data.invoiceNumber}` };
-        if (navigator.canShare && navigator.canShare(shareData)) {
-          await navigator.share(shareData);
-        }
-      } catch (err) {
-        const error = err as Error;
-        if (error.name !== 'AbortError') {
-          console.log('Share failed:', error.message);
-        }
-      }
-    }
-  }
-  
-  return { url: result.url, blob: pdfBlob };
 };

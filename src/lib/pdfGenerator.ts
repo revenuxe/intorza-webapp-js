@@ -388,139 +388,74 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- 2. Info Cards (Client & Project) ---
   if (settings.showProjectDetails) {
-    const headerLayout = editorSettings?.headerLayout || 'unified';
+    const cardHeight = 48; // Increased height for better spacing
+    const gap = 12; // Increased gap to prevent borders touching
+    const cardWidth = (contentWidth - gap) / 2;
+  
+    // Left Card: Client Info
+    doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+    doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+    doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, 'FD'); // Fill & Draw
     
-    if (headerLayout === 'unified') {
-      // UNIFIED LAYOUT: Single box with "QUOTATION DETAILS" header
-      const boxHeight = 38;
-      const boxPadding = 8;
-      
-      // Draw the unified box
-      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
-      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-      doc.roundedRect(margin, yPosition, contentWidth, boxHeight, 2, 2, 'FD');
-      
-      // Header: QUOTATION DETAILS
-      let headerY = yPosition + 8;
-      setHeadingFont('bold');
-      doc.setFontSize(8);
-      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-      doc.text('QUOTATION DETAILS', margin + boxPadding, headerY);
-      
-      // Content row - two columns
-      const contentStartY = headerY + 6;
-      const leftColX = margin + boxPadding;
-      const rightColX = margin + (contentWidth / 2) + 5;
-      const labelWidth = 32;
-      
-      // Left column: Project Name, Client Name, Client Address
-      let leftY = contentStartY;
-      const addLeftMeta = (label: string, value: string) => {
-        setBodyFont('normal');
-        doc.setFontSize(9);
-        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-        doc.text(label, leftColX, leftY);
-        setBodyFont('bold');
-        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-        const maxValWidth = (contentWidth / 2) - labelWidth - boxPadding - 10;
-        const truncatedVal = value.length > 25 ? value.substring(0, 25) + '...' : value;
-        doc.text(truncatedVal, leftColX + labelWidth, leftY);
-        leftY += 5;
-      };
-      
-      addLeftMeta('Project Name:', data.quotationTitle || 'N/A');
-      addLeftMeta('Client Name:', data.clientName || 'N/A');
-      addLeftMeta('Client Address:', data.clientAddress || 'N/A');
-      
-      // Right column: Date of Proposal, Valid Till, Place of Project
-      let rightY = contentStartY;
-      const addRightMeta = (label: string, value: string) => {
-        setBodyFont('normal');
-        doc.setFontSize(9);
-        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-        doc.text(label, rightColX, rightY);
-        setBodyFont('bold');
-        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-        doc.text(value, rightColX + labelWidth, rightY);
-        rightY += 5;
-      };
-      
-      addRightMeta('Date of Proposal:', data.dateOfProposal || 'N/A');
-      addRightMeta('Valid Till:', data.quotationValidTill || 'N/A');
-      addRightMeta('Place of Project:', data.placeOfProject || 'N/A');
-      
-      yPosition += boxHeight + 8;
-    } else {
-      // CARDS LAYOUT: Two separate cards (original layout)
-      const cardHeight = 48;
-      const gap = 12;
-      const cardWidth = (contentWidth - gap) / 2;
+    let cardY = yPosition + 10; // Increased top padding
+    const cardPadding = 8; // Increased padding
+    const cardContentX = margin + cardPadding;
     
-      // Left Card: Client Info
-      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
-      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-      doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
-      
-      let cardY = yPosition + 10;
-      const cardPadding = 8;
-      const cardContentX = margin + cardPadding;
-      
-      setHeadingFont('bold');
-      doc.setFontSize(8);
-      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-      doc.text('QUOTATION FOR', cardContentX, cardY);
-      
-      cardY += 7;
-      setHeadingFont('bold');
-      doc.setFontSize(11);
-      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-      doc.text(data.clientName, cardContentX, cardY);
-      
-      cardY += 6;
+    setHeadingFont('bold');
+    doc.setFontSize(8);
+    doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+    doc.text('QUOTATION FOR', cardContentX, cardY);
+    
+    cardY += 7; // Increased spacing
+    setHeadingFont('bold');
+    doc.setFontSize(11);
+    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+    doc.text(data.clientName, cardContentX, cardY);
+    
+    cardY += 6; // Increased spacing
+    setBodyFont('normal');
+    doc.setFontSize(9);
+    doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+    const clientAddr = doc.splitTextToSize(data.clientAddress, cardWidth - (cardPadding * 2));
+    doc.text(clientAddr, cardContentX, cardY);
+
+    // Right Card: Project Meta
+    const rightCardX = margin + cardWidth + gap;
+    doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+    doc.roundedRect(rightCardX, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+    
+    let metaY = yPosition + 10; // Increased top padding
+    const metaContentX = rightCardX + cardPadding;
+    const metaLabelX = metaContentX;
+    const metaValueX = metaContentX + 32; // Align values with more space
+    
+    setHeadingFont('bold');
+    doc.setFontSize(8);
+    doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+    doc.text('PROJECT DETAILS', metaContentX, metaY);
+    metaY += 7; // Increased spacing
+
+    const addMeta = (label: string, value: string) => {
       setBodyFont('normal');
       doc.setFontSize(9);
       doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-      const clientAddr = doc.splitTextToSize(data.clientAddress, cardWidth - (cardPadding * 2));
-      doc.text(clientAddr, cardContentX, cardY);
-
-      // Right Card: Project Meta
-      const rightCardX = margin + cardWidth + gap;
-      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
-      doc.roundedRect(rightCardX, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+      doc.text(label, metaLabelX, metaY);
       
-      let metaY = yPosition + 10;
-      const metaContentX = rightCardX + cardPadding;
-      const metaLabelX = metaContentX;
-      const metaValueX = metaContentX + 32;
-      
-      setHeadingFont('bold');
-      doc.setFontSize(8);
-      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-      doc.text('PROJECT DETAILS', metaContentX, metaY);
-      metaY += 7;
+      setBodyFont('bold');
+      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+      doc.text(value, metaValueX, metaY);
+      metaY += 6; // Increased line spacing
+    };
 
-      const addMeta = (label: string, value: string) => {
-        setBodyFont('normal');
-        doc.setFontSize(9);
-        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-        doc.text(label, metaLabelX, metaY);
-        
-        setBodyFont('bold');
-        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-        doc.text(value, metaValueX, metaY);
-        metaY += 6;
-      };
-
-      addMeta('Date:', data.dateOfProposal);
-      addMeta('Valid Till:', data.quotationValidTill);
-      addMeta('Project:', data.quotationTitle.substring(0, 20));
-      addMeta('Warranty:', `${data.warranty} Years`);
-      if (data.projectDeadline) {
-        addMeta('Deadline:', data.projectDeadline);
-      }
-
-      yPosition += cardHeight + 10;
+    addMeta('Date:', data.dateOfProposal);
+    addMeta('Valid Till:', data.quotationValidTill);
+    addMeta('Project:', data.quotationTitle.substring(0, 20)); // Truncate if too long
+    addMeta('Warranty:', `${data.warranty} Years`);
+    if (data.projectDeadline) {
+      addMeta('Deadline:', data.projectDeadline);
     }
+
+    yPosition += cardHeight + 10;
   }
 
   // --- 3. Product Sections (Enhanced Cards) ---
@@ -1225,8 +1160,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   // --- Accept/Reject Links Section ---
-  const showAcceptReject = data.editorSettings?.showAcceptRejectButtons !== false;
-  if (data.quotationId && showAcceptReject) {
+  if (data.quotationId) {
     if (yPosition > pageHeight - 45) {
       doc.addPage();
       yPosition = 15;
@@ -1303,15 +1237,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
   doc.text("This quotation is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
 
-  // Return the document for external handling
-  return doc;
-};
-
-/**
- * Download quotation PDF locally
- */
-export const downloadQuotationPDF = async (data: QuotationData & { settings?: QuotationPdfSettings; editorSettings?: PDFEditorSettings }) => {
-  const doc = await generateQuotationPDF(data);
+  // Generate PDF and handle sharing + download
   const fileName = `Quotation_${data.clientName.replace(/\s+/g, '_')}.pdf`;
   const pdfBlob = doc.output('blob');
   
@@ -1336,50 +1262,4 @@ export const downloadQuotationPDF = async (data: QuotationData & { settings?: Qu
       }
     }
   }
-  
-  return doc;
-};
-
-/**
- * Upload quotation PDF to S3 and return the URL
- */
-export const uploadQuotationPDFToS3 = async (
-  data: QuotationData & { settings?: QuotationPdfSettings; editorSettings?: PDFEditorSettings },
-  options?: { downloadLocally?: boolean }
-): Promise<{ url: string; blob: Blob }> => {
-  const { uploadToS3 } = await import('./s3Upload');
-  
-  const doc = await generateQuotationPDF(data);
-  const fileName = `Quotation_${data.clientName.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
-  const pdfBlob = doc.output('blob');
-  
-  // Upload to S3
-  const result = await uploadToS3(new File([pdfBlob], fileName, { type: 'application/pdf' }), {
-    folder: 'quotes',
-    fileName: fileName,
-    contentType: 'application/pdf'
-  });
-  
-  // Optionally download locally as well
-  if (options?.downloadLocally) {
-    doc.save(fileName);
-    
-    // Try Web Share API
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-        const shareData = { files: [file], title: `Quotation for ${data.clientName}` };
-        if (navigator.canShare && navigator.canShare(shareData)) {
-          await navigator.share(shareData);
-        }
-      } catch (err) {
-        const error = err as Error;
-        if (error.name !== 'AbortError') {
-          console.log('Share failed:', error.message);
-        }
-      }
-    }
-  }
-  
-  return { url: result.url, blob: pdfBlob };
 };

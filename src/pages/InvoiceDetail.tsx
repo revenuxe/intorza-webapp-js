@@ -13,10 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { downloadInvoicePDF } from "@/lib/invoicePdfGenerator";
+import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
 import { InvoicePreviewEditor } from "@/components/InvoicePreviewEditor";
 import { PDFEditorSettings, InvoiceSettings, getEditorSettings, getInvoiceSettings } from "@/lib/pdfThemes";
-import { updateInvoice as updateInvoiceInAws, deleteInvoice as deleteInvoiceInAws, logAdminAction, InvoicePayload } from "@/lib/awsApi";
 
 interface Invoice {
   id: string;
@@ -85,12 +84,12 @@ const InvoiceDetail = () => {
   };
   
   // Payment form state
-  const [paymentAmount, setPaymentAmount] = useState<number | string>("");
+  const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentNotes, setPaymentNotes] = useState("");
   const [nextPaymentDue, setNextPaymentDue] = useState("");
-  const [nextPaymentAmount, setNextPaymentAmount] = useState<number | string>("");
+  const [nextPaymentAmount, setNextPaymentAmount] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -188,22 +187,21 @@ const InvoiceDetail = () => {
     try {
       setDeleting(true);
       
-      const { data: { user } } = await supabase.auth.getUser();
+      // First delete all payments associated with this invoice
+      const { error: paymentsError } = await supabase
+        .from('payments')
+        .delete()
+        .eq('invoice_id', id);
       
-      // AWS-FIRST: Delete from AWS before Supabase
-      const awsResponse = await deleteInvoiceInAws(id!);
-      if (!awsResponse.success) {
-        throw new Error(awsResponse.error || 'Failed to delete invoice from AWS');
-      }
+      if (paymentsError) throw paymentsError;
       
-      // After AWS success, delete from Supabase
-      await supabase.from('payments').delete().eq('invoice_id', id);
-      await supabase.from('invoices').delete().eq('id', id);
+      // Then delete the invoice
+      const { error: invoiceError } = await supabase
+        .from('invoices')
+        .delete()
+        .eq('id', id);
       
-      // Log admin action
-      if (user) {
-        await logAdminAction(user.id, user.id, 'delete_invoice', 'invoice', id!);
-      }
+      if (invoiceError) throw invoiceError;
       
       toast({
         title: "Invoice Deleted",
@@ -215,7 +213,7 @@ const InvoiceDetail = () => {
       console.error('Error deleting invoice:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete invoice",
+        description: "Failed to delete invoice",
         variant: "destructive",
       });
     } finally {
@@ -235,10 +233,7 @@ const InvoiceDetail = () => {
         return;
       }
 
-      const numPaymentAmount = Number(paymentAmount) || 0;
-      const numNextPaymentAmount = Number(nextPaymentAmount) || 0;
-      
-      if (numPaymentAmount <= 0) {
+      if (paymentAmount <= 0) {
         toast({
           title: "Invalid Amount",
           description: "Please enter a valid payment amount",
@@ -249,75 +244,31 @@ const InvoiceDetail = () => {
 
       // Create payment notes with next payment info if provided
       let finalNotes = paymentNotes || '';
-      if (nextPaymentDue && numNextPaymentAmount > 0) {
-        finalNotes = finalNotes ? `${finalNotes} | Next due: ${nextPaymentDue} - ₹${numNextPaymentAmount}` : `Next due: ${nextPaymentDue} - ₹${numNextPaymentAmount}`;
+      if (nextPaymentDue && nextPaymentAmount > 0) {
+        finalNotes = finalNotes ? `${finalNotes} | Next due: ${nextPaymentDue} - ₹${nextPaymentAmount}` : `Next due: ${nextPaymentDue} - ₹${nextPaymentAmount}`;
       }
 
-      const newPaidAmount = (invoice?.paid_amount || 0) + numPaymentAmount;
-      const newRemainingAmount = (invoice?.total_amount || 0) - newPaidAmount;
-      const newStatus = newRemainingAmount <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partially_paid' : 'unpaid');
-      const nowISO = new Date().toISOString();
-
-      // Build full payment record
-      const newPayment = {
-        amount: numPaymentAmount,
-        payment_date: paymentDate,
-        payment_method: paymentMethod,
-        notes: finalNotes || undefined
-      };
-
-      // AWS-FIRST: Update invoice in AWS with full payload
-      const awsPayload: Partial<InvoicePayload> = {
-        invoice_id: id!,
-        company_id: user.id,
-        user_id: user.id,
-        quotation_id: invoice?.quotation_id || undefined,
-        invoice_number: invoice?.invoice_number,
-        client_name: invoice?.client_name,
-        project_name: invoice?.project_name,
-        total_amount: invoice?.total_amount,
-        paid_amount: newPaidAmount,
-        remaining_amount: Math.max(0, newRemainingAmount),
-        status: newStatus,
-        action: 'payment',
-        invoice_date: invoice?.invoice_date,
-        due_date: nextPaymentDue || invoice?.due_date || undefined,
-        notes: invoice?.notes,
-        payments: [...payments.map(p => ({
-          amount: p.amount,
-          payment_date: p.payment_date,
-          payment_method: p.payment_method,
-          notes: p.notes
-        })), newPayment],
-        timestamps: {
-          updated_at: nowISO,
-          paid_at: newStatus === 'paid' ? nowISO : undefined,
-        }
-      };
-
-      const awsResponse = await updateInvoiceInAws(id!, awsPayload);
-      
-      if (!awsResponse.success) {
-        throw new Error(awsResponse.error || 'Failed to update invoice in AWS');
-      }
-
-      // After AWS success, update Supabase (payment record)
       const { error: paymentError } = await supabase
         .from('payments')
         .insert({
           invoice_id: id,
-          amount: numPaymentAmount,
+          amount: paymentAmount,
           payment_method: paymentMethod,
           payment_date: paymentDate,
           notes: finalNotes || null
         });
 
       if (paymentError) {
-        console.error('Payment insert error (AWS succeeded):', paymentError);
-        // Don't throw - AWS is the source of truth
+        console.error('Payment insert error:', paymentError);
+        throw paymentError;
       }
 
-      // Update invoice in Supabase with minimal data
+      const newPaidAmount = (invoice?.paid_amount || 0) + paymentAmount;
+      const newRemainingAmount = (invoice?.total_amount || 0) - newPaidAmount;
+      // Use underscore format to match database constraint
+      const newStatus = newRemainingAmount <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partially_paid' : 'unpaid');
+
+      // Update invoice with new due date if provided
       const updateData: any = {
         paid_amount: newPaidAmount,
         remaining_amount: Math.max(0, newRemainingAmount),
@@ -334,19 +285,8 @@ const InvoiceDetail = () => {
         .eq('id', id);
 
       if (invoiceError) {
-        console.error('Invoice update error (AWS succeeded):', invoiceError);
-        // Don't throw - AWS is the source of truth
-      }
-
-      // Log admin action
-      try {
-        await logAdminAction(user.id, user.id, 'add_payment', 'invoice', id!, {
-          amount: paymentAmount,
-          payment_method: paymentMethod,
-          new_status: newStatus,
-        });
-      } catch (logError) {
-        console.error('Failed to log admin action:', logError);
+        console.error('Invoice update error:', invoiceError);
+        throw invoiceError;
       }
 
       toast({
@@ -365,7 +305,7 @@ const InvoiceDetail = () => {
       console.error('Error adding payment:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add payment",
+        description: "Failed to add payment",
         variant: "destructive",
       });
     }
@@ -380,7 +320,7 @@ const InvoiceDetail = () => {
       let nextDue = invoice.due_date ? formatDate(invoice.due_date) : undefined;
       let nextAmount = invoice.remaining_amount;
 
-      await downloadInvoicePDF({
+      await generateInvoicePDF({
         invoiceNumber: invoice.invoice_number,
         invoiceDate: formatDate(invoice.invoice_date),
         dueDate: invoice.due_date ? formatDate(invoice.due_date) : undefined,
@@ -431,7 +371,7 @@ const InvoiceDetail = () => {
     if (!invoice) return;
     
     try {
-      await downloadInvoicePDF({
+      await generateInvoicePDF({
         invoiceNumber: `${invoice.invoice_number}-R${payments.indexOf(payment) + 1}`,
         invoiceDate: formatDate(payment.payment_date),
         clientName: invoice.client_name,
@@ -473,59 +413,6 @@ const InvoiceDetail = () => {
   };
 
   const handleShareInvoice = async () => {
-    if (!invoice) return;
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      const nowISO = new Date().toISOString();
-      
-      // AWS-FIRST: Sync share action to AWS
-      const awsPayload: Partial<InvoicePayload> = {
-        invoice_id: invoice.id,
-        company_id: user.id,
-        user_id: user.id,
-        quotation_id: invoice.quotation_id || undefined,
-        invoice_number: invoice.invoice_number,
-        client_name: invoice.client_name,
-        project_name: invoice.project_name,
-        total_amount: invoice.total_amount,
-        paid_amount: invoice.paid_amount,
-        remaining_amount: invoice.remaining_amount,
-        status: invoice.status === 'unpaid' ? 'sent' : invoice.status,
-        action: 'share',
-        invoice_date: invoice.invoice_date,
-        due_date: invoice.due_date || undefined,
-        notes: invoice.notes,
-        timestamps: {
-          shared_at: nowISO,
-          updated_at: nowISO,
-        }
-      };
-
-      await updateInvoiceInAws(invoice.id, awsPayload);
-      
-      // Update status to 'sent' if currently unpaid
-      if (invoice.status === 'unpaid') {
-        await supabase
-          .from('invoices')
-          .update({ status: 'sent' })
-          .eq('id', invoice.id);
-        setInvoice(prev => prev ? { ...prev, status: 'sent' } : null);
-      }
-      
-      // Log admin action
-      try {
-        await logAdminAction(user.id, user.id, 'share_invoice', 'invoice', invoice.id);
-      } catch (logError) {
-        console.error('Failed to log admin action:', logError);
-      }
-    } catch (error) {
-      console.error('Error syncing share to AWS:', error);
-      // Don't block the share operation
-    }
-    
     await handleDownloadPDF();
   };
 
