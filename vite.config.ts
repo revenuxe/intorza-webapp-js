@@ -18,6 +18,7 @@ export default defineConfig(({ mode }) => ({
       includeAssets: ["custom-favicon.ico", "icons/*.webp"],
       manifest: false, // Using existing manifest.json in public folder
       workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MiB
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff,woff2}"],
         runtimeCaching: [
           {

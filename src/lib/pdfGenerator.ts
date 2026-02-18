@@ -255,13 +255,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   const contentWidth = pageWidth - (margin * 2);
   let yPosition = 15;
 
-  // --- Draw Page Decorations (borders, corners, watermarks) ---
-  if (editorSettings) {
-    drawAllDecorations(doc, theme, editorSettings);
-    // Adjust starting position if page border is enabled
-    if (editorSettings.showDecorations && editorSettings.showPageBorder && theme.decorations.pageBorderInset > 0) {
-      yPosition = theme.decorations.pageBorderInset + 5;
-    }
+  // --- Decorations are now applied to ALL pages at the end of generation ---
+  // Adjust starting position if page border is enabled
+  if (editorSettings && editorSettings.showDecorations && editorSettings.showPageBorder && theme.decorations.pageBorderInset > 0) {
+    yPosition = theme.decorations.pageBorderInset + 5;
   }
 
   // --- Design System Colors (from theme) ---
@@ -1391,10 +1388,23 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     doc.textWithLink(rejectUrl, pageWidth / 2, yPosition, { url: rejectUrl, align: 'center' });
   }
 
-  // Footer
-  doc.setFontSize(7);
-  doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-  doc.text("This quotation is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
+  // --- Apply decorations to ALL pages ---
+  if (editorSettings) {
+    const totalPages = doc.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      drawAllDecorations(doc, theme, editorSettings, p, totalPages);
+    }
+  }
+
+  // Footer on all pages
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7);
+    doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+    doc.text("This quotation is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
+  }
 
   // If previewOnly is set, just return the doc without saving
   if (data.previewOnly) {
