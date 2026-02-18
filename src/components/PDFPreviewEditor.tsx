@@ -35,6 +35,7 @@ import { QuotationSettings } from "./CustomizeFieldsDrawer";
 import { CustomThemeBuilder } from "./CustomThemeBuilder";
 import { FontPreviewPanel } from "./FontPreviewPanel";
 import { PDFAdvancedEditor } from "./PDFAdvancedEditor";
+import { PDFCanvasPreview } from "./PDFCanvasPreview";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -1078,30 +1079,12 @@ export const PDFPreviewEditor = ({
               <p className="text-sm text-muted-foreground">Generating preview...</p>
             </div>
           </div>
-        ) : pdfBlobUrl ? (
-          <div 
-            className="relative mx-auto"
-            style={{ 
-              width: `min(100%, ${595 * (previewZoom / 100)}px)`,
-              aspectRatio: '595 / 842',
-            }}
-          >
-            {isGeneratingPdf && (
-              <div className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm rounded-full px-2.5 py-1 flex items-center gap-1.5 shadow-sm">
-                <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                <span className="text-[10px] text-muted-foreground">Updating...</span>
-              </div>
-            )}
-            <iframe
-              src={`${pdfBlobUrl}#toolbar=0&navpanes=0`}
-              className="w-full h-full rounded-lg shadow-lg border bg-white"
-              title="PDF Preview"
-            />
-          </div>
         ) : (
-          <div className="h-full flex items-center justify-center min-h-[300px]">
-            <p className="text-sm text-muted-foreground">Failed to generate preview</p>
-          </div>
+          <PDFCanvasPreview
+            pdfBlobUrl={pdfBlobUrl}
+            zoom={previewZoom}
+            isGenerating={isGeneratingPdf}
+          />
         )}
       </div>
     </div>
