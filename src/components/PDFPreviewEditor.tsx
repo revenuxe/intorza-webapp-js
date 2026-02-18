@@ -271,19 +271,18 @@ export const PDFPreviewEditor = ({
     }
   }, [editorSettings, customizeSettings, quotationData, brandColors]);
 
-  // Debounced PDF generation effect
+  // Debounced PDF generation effect - longer debounce for smooth slider interaction
   useEffect(() => {
     if (!open) return;
     
-    // Clear any pending generation
     if (pdfGenerationTimer.current) {
       clearTimeout(pdfGenerationTimer.current);
     }
     
-    // Debounce PDF generation to avoid too many updates
+    // Use longer debounce (800ms) to avoid regenerating while user is actively dragging sliders
     pdfGenerationTimer.current = setTimeout(() => {
       generateLivePdf();
-    }, 500);
+    }, 800);
 
     return () => {
       if (pdfGenerationTimer.current) {

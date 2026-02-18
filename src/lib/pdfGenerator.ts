@@ -251,15 +251,15 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
+  
+  // Calculate margin & insets based on decoration settings
+  const hasBorderDecoration = editorSettings?.showDecorations && editorSettings?.showPageBorder && theme.decorations.pageBorderInset > 0;
+  const borderInset = hasBorderDecoration ? theme.decorations.pageBorderInset : 0;
+  const margin = Math.max(15, borderInset + 5);
   const contentWidth = pageWidth - (margin * 2);
-  let yPosition = 15;
-
-  // --- Decorations are now applied to ALL pages at the end of generation ---
-  // Adjust starting position if page border is enabled
-  if (editorSettings && editorSettings.showDecorations && editorSettings.showPageBorder && theme.decorations.pageBorderInset > 0) {
-    yPosition = theme.decorations.pageBorderInset + 5;
-  }
+  const pageTopY = hasBorderDecoration ? borderInset + 8 : 15;
+  const pageBottomY = hasBorderDecoration ? pageHeight - borderInset - 8 : pageHeight - 15;
+  let yPosition = pageTopY;
 
   // --- Design System Colors (from theme) ---
   const getHighlightColor = (): [number, number, number] => {
@@ -619,9 +619,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   for (const section of data.sections) {
     // Check page break
-    if (yPosition > pageHeight - 50) {
+    if (yPosition > pageBottomY - 35) {
       doc.addPage();
-      yPosition = 15;
+      yPosition = pageTopY;
     }
 
     // Section Header "Card"
@@ -698,7 +698,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           // Amount column - reduced width
           4: { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' }
         },
-        margin: { left: margin, right: margin },
+        margin: { left: margin, right: margin, top: pageTopY },
         didDrawPage: (d) => {
           if (d.cursor) yPosition = d.cursor.y;
         }
@@ -842,7 +842,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           valign: 'middle',
         },
         columnStyles: columnStyles as any,
-        margin: { left: margin, right: margin },
+        margin: { left: margin, right: margin, top: pageTopY },
         didDrawPage: (d) => {
           if (d.cursor) yPosition = d.cursor.y;
         }
@@ -912,9 +912,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   // --- 4. Payment Summary ---
-  if (yPosition > pageHeight - 120) {
+  if (yPosition > pageBottomY - 105) {
     doc.addPage();
-    yPosition = 15;
+    yPosition = pageTopY;
   }
 
   // Calculations
@@ -1111,9 +1111,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- 6. Terms & Conditions ---
   if (settings.showTermsConditions) {
-    if (yPosition > pageHeight - 60) {
+    if (yPosition > pageBottomY - 45) {
       doc.addPage();
-      yPosition = 15;
+      yPosition = pageTopY;
     }
 
   setHeadingFont('bold');
@@ -1127,9 +1127,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   
   // Helper to add titled blocks with points
   const addBlock = (title: string, points: string[]) => {
-    if (yPosition > pageHeight - 40) {
+    if (yPosition > pageBottomY - 25) {
       doc.addPage();
-      yPosition = 15;
+      yPosition = pageTopY;
     }
     if (title) {
         setBodyFont('bold');
@@ -1149,9 +1149,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const splitText = doc.splitTextToSize(point, contentWidth - 5);
       
       splitText.forEach((line: string, lineIndex: number) => {
-        if (yPosition > pageHeight - 20) {
+        if (yPosition > pageBottomY - 5) {
           doc.addPage();
-          yPosition = 15;
+          yPosition = pageTopY;
         }
         
         // Add bullet only on first line of each point
@@ -1223,9 +1223,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const hasBankInfo = bank.bankName || bank.accountNumber || bank.ifscCode || bank.upiId;
     
     if (hasBankInfo) {
-      if (yPosition > pageHeight - 80) {
+      if (yPosition > pageBottomY - 65) {
         doc.addPage();
-        yPosition = 15;
+        yPosition = pageTopY;
       }
 
       setHeadingFont('bold');
@@ -1279,9 +1279,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   if (settings.showSignatureArea) {
-    if (yPosition > pageHeight - 50) {
+    if (yPosition > pageBottomY - 35) {
       doc.addPage();
-      yPosition = pageHeight - 60;
+      yPosition = pageBottomY - 45;
     } else {
       yPosition += 10;
     }
@@ -1317,9 +1317,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // --- Accept/Reject Links Section ---
   const showAcceptReject = editorSettings?.showAcceptRejectButtons ?? true;
   if (data.quotationId && showAcceptReject) {
-    if (yPosition > pageHeight - 45) {
+    if (yPosition > pageBottomY - 30) {
       doc.addPage();
-      yPosition = 15;
+      yPosition = pageTopY;
     } else {
       yPosition += 15;
     }
@@ -1388,22 +1388,25 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     doc.textWithLink(rejectUrl, pageWidth / 2, yPosition, { url: rejectUrl, align: 'center' });
   }
 
-  // --- Apply decorations to ALL pages ---
-  if (editorSettings) {
-    const totalPages = doc.getNumberOfPages();
-    for (let p = 1; p <= totalPages; p++) {
-      doc.setPage(p);
-      drawAllDecorations(doc, theme, editorSettings, p, totalPages);
-    }
-  }
-
-  // Footer on all pages
-  const totalPages = doc.getNumberOfPages();
-  for (let p = 1; p <= totalPages; p++) {
+  // --- Apply decorations & footer to ALL pages ---
+  const totalPagesCount = doc.getNumberOfPages();
+  const footerY = hasBorderDecoration ? pageHeight - borderInset - 3 : pageHeight - 10;
+  
+  for (let p = 1; p <= totalPagesCount; p++) {
     doc.setPage(p);
+    
+    // Draw decorations
+    if (editorSettings) {
+      drawAllDecorations(doc, theme, editorSettings, p, totalPagesCount);
+    }
+    
+    // Footer
     doc.setFontSize(7);
     doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-    doc.text("This quotation is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
+    doc.text("This quotation is computer-generated.", pageWidth / 2, footerY, { align: 'center' });
+    
+    // Page number
+    doc.text(`Page ${p} of ${totalPagesCount}`, pageWidth - margin, footerY, { align: 'right' });
   }
 
   // If previewOnly is set, just return the doc without saving

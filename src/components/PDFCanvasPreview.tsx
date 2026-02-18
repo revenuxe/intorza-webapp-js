@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Loader2 } from 'lucide-react';
 
@@ -11,20 +11,23 @@ interface PDFCanvasPreviewProps {
   isGenerating?: boolean;
 }
 
-export const PDFCanvasPreview = ({ pdfBlobUrl, zoom, isGenerating }: PDFCanvasPreviewProps) => {
+export const PDFCanvasPreview = memo(({ pdfBlobUrl, zoom, isGenerating }: PDFCanvasPreviewProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [pages, setPages] = useState<HTMLCanvasElement[]>([]);
+  const [pageDataUrls, setPageDataUrls] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const renderTaskRef = useRef<number>(0);
 
   useEffect(() => {
     if (!pdfBlobUrl) {
-      setPages([]);
+      setPageDataUrls([]);
       return;
     }
 
     const taskId = ++renderTaskRef.current;
-    setLoading(true);
+    // Only show loading spinner if we have no pages yet
+    if (pageDataUrls.length === 0) {
+      setLoading(true);
+    }
 
     const renderPdf = async () => {
       try {
@@ -32,10 +35,10 @@ export const PDFCanvasPreview = ({ pdfBlobUrl, zoom, isGenerating }: PDFCanvasPr
         const arrayBuffer = await response.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-        if (taskId !== renderTaskRef.current) return; // stale
+        if (taskId !== renderTaskRef.current) return;
 
-        const canvases: HTMLCanvasElement[] = [];
-        const scale = 2; // retina quality
+        const dataUrls: string[] = [];
+        const scale = 1.5; // good quality without being too heavy
 
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
@@ -48,11 +51,11 @@ export const PDFCanvasPreview = ({ pdfBlobUrl, zoom, isGenerating }: PDFCanvasPr
           const ctx = canvas.getContext('2d')!;
 
           await page.render({ canvasContext: ctx, viewport }).promise;
-          canvases.push(canvas);
+          dataUrls.push(canvas.toDataURL('image/jpeg', 0.92));
         }
 
         if (taskId === renderTaskRef.current) {
-          setPages(canvases);
+          setPageDataUrls(dataUrls);
         }
       } catch (err) {
         console.error('PDF render error:', err);
@@ -66,7 +69,7 @@ export const PDFCanvasPreview = ({ pdfBlobUrl, zoom, isGenerating }: PDFCanvasPr
     renderPdf();
   }, [pdfBlobUrl]);
 
-  if (loading && pages.length === 0) {
+  if (loading && pageDataUrls.length === 0) {
     return (
       <div className="h-full flex items-center justify-center min-h-[300px]">
         <div className="flex flex-col items-center gap-3">
@@ -77,7 +80,7 @@ export const PDFCanvasPreview = ({ pdfBlobUrl, zoom, isGenerating }: PDFCanvasPr
     );
   }
 
-  if (pages.length === 0) {
+  if (pageDataUrls.length === 0) {
     return (
       <div className="h-full flex items-center justify-center min-h-[300px]">
         <p className="text-sm text-muted-foreground">No preview available</p>
@@ -93,32 +96,19 @@ export const PDFCanvasPreview = ({ pdfBlobUrl, zoom, isGenerating }: PDFCanvasPr
           <span className="text-[10px] text-muted-foreground">Updating...</span>
         </div>
       )}
-      {pages.map((canvas, i) => (
-        <CanvasPage key={i} canvas={canvas} zoom={zoom} />
+      {pageDataUrls.map((src, i) => (
+        <img
+          key={`page-${i}-${src.slice(-20)}`}
+          src={src}
+          alt={`PDF page ${i + 1}`}
+          className="rounded-lg shadow-lg border bg-white"
+          style={{
+            width: `min(100%, ${595 * (zoom / 100)}px)`,
+          }}
+        />
       ))}
     </div>
   );
-};
+});
 
-function CanvasPage({ canvas, zoom }: { canvas: HTMLCanvasElement; zoom: number }) {
-  const imgRef = useRef<HTMLImageElement>(null);
-  const [src, setSrc] = useState('');
-
-  useEffect(() => {
-    setSrc(canvas.toDataURL('image/png'));
-  }, [canvas]);
-
-  if (!src) return null;
-
-  return (
-    <img
-      ref={imgRef}
-      src={src}
-      alt="PDF page"
-      className="rounded-lg shadow-lg border bg-white"
-      style={{
-        width: `min(100%, ${595 * (zoom / 100)}px)`,
-      }}
-    />
-  );
-}
+PDFCanvasPreview.displayName = 'PDFCanvasPreview';
