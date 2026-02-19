@@ -85,12 +85,12 @@ const InvoiceDetail = () => {
   };
   
   // Payment form state
-  const [paymentAmount, setPaymentAmount] = useState<number | string>("");
+  const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentNotes, setPaymentNotes] = useState("");
   const [nextPaymentDue, setNextPaymentDue] = useState("");
-  const [nextPaymentAmount, setNextPaymentAmount] = useState<number | string>("");
+  const [nextPaymentAmount, setNextPaymentAmount] = useState(0);
 
   useEffect(() => {
     if (id) {
@@ -235,10 +235,7 @@ const InvoiceDetail = () => {
         return;
       }
 
-      const numPaymentAmount = Number(paymentAmount) || 0;
-      const numNextPaymentAmount = Number(nextPaymentAmount) || 0;
-      
-      if (numPaymentAmount <= 0) {
+      if (paymentAmount <= 0) {
         toast({
           title: "Invalid Amount",
           description: "Please enter a valid payment amount",
@@ -249,18 +246,18 @@ const InvoiceDetail = () => {
 
       // Create payment notes with next payment info if provided
       let finalNotes = paymentNotes || '';
-      if (nextPaymentDue && numNextPaymentAmount > 0) {
-        finalNotes = finalNotes ? `${finalNotes} | Next due: ${nextPaymentDue} - ₹${numNextPaymentAmount}` : `Next due: ${nextPaymentDue} - ₹${numNextPaymentAmount}`;
+      if (nextPaymentDue && nextPaymentAmount > 0) {
+        finalNotes = finalNotes ? `${finalNotes} | Next due: ${nextPaymentDue} - ₹${nextPaymentAmount}` : `Next due: ${nextPaymentDue} - ₹${nextPaymentAmount}`;
       }
 
-      const newPaidAmount = (invoice?.paid_amount || 0) + numPaymentAmount;
+      const newPaidAmount = (invoice?.paid_amount || 0) + paymentAmount;
       const newRemainingAmount = (invoice?.total_amount || 0) - newPaidAmount;
       const newStatus = newRemainingAmount <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partially_paid' : 'unpaid');
       const nowISO = new Date().toISOString();
 
       // Build full payment record
       const newPayment = {
-        amount: numPaymentAmount,
+        amount: paymentAmount,
         payment_date: paymentDate,
         payment_method: paymentMethod,
         notes: finalNotes || undefined
@@ -306,7 +303,7 @@ const InvoiceDetail = () => {
         .from('payments')
         .insert({
           invoice_id: id,
-          amount: numPaymentAmount,
+          amount: paymentAmount,
           payment_method: paymentMethod,
           payment_date: paymentDate,
           notes: finalNotes || null

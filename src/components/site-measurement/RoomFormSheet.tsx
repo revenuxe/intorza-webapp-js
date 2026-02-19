@@ -273,7 +273,7 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
               <Input
                 type="number"
                 inputMode="decimal"
-                placeholder=""
+                placeholder="0"
                 value={widthFt}
                 onChange={(e) => setWidthFt(e.target.value)}
               />
@@ -283,7 +283,7 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
               <Input
                 type="number"
                 inputMode="decimal"
-                placeholder=""
+                placeholder="0"
                 value={lengthFt}
                 onChange={(e) => setLengthFt(e.target.value)}
               />
@@ -295,7 +295,7 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
             <Input
               type="number"
               inputMode="decimal"
-              placeholder=""
+              placeholder="0"
               value={heightFt}
               onChange={(e) => setHeightFt(e.target.value)}
             />
