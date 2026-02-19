@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import * as awsApi from "@/lib/awsApi";
+import { createClient, updateClient, ClientPayload, logAdminAction } from "@/lib/awsApi";
 
 interface Client {
   id: string;
@@ -65,59 +65,45 @@ const Clients = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch clients from AWS
-      const clientsResult = await awsApi.listClients(user.id);
-      console.log('AWS Clients Raw Response:', JSON.stringify(clientsResult, null, 2));
-      
-      // Fetch quotations from AWS for project count
-      const quotationsResult = await awsApi.listQuotations(user.id);
-      
-      // For invoice data, we still need AWS (or calculate from quotations)
-      // Since invoices may not have a list endpoint, we'll use what we have
-      
-      // Handle various AWS/DynamoDB response structures
-      let awsClients: any[] = [];
-      if (clientsResult.success && clientsResult.data) {
-        const data = clientsResult.data as any;
-        console.log('Client data type:', typeof data, 'isArray:', Array.isArray(data));
-        
-        // Check various response patterns
-        if (Array.isArray(data)) {
-          awsClients = data;
-        } else if (data.Items && Array.isArray(data.Items)) {
-          awsClients = data.Items;
-        } else if (data.items && Array.isArray(data.items)) {
-          awsClients = data.items;
-        } else if (data.clients && Array.isArray(data.clients)) {
-          awsClients = data.clients;
-        } else if (data.data && Array.isArray(data.data)) {
-          awsClients = data.data;
-        } else if (typeof data === 'object' && Object.keys(data).length > 0) {
-          // Maybe it's a single object or object with different keys
-          console.log('Client data keys:', Object.keys(data));
-        }
-      }
-      console.log('Final parsed clients count:', awsClients.length, awsClients);
-      
-      const awsQuotations = quotationsResult.success ? (quotationsResult.data || []) : [];
+      // Fetch clients from Supabase
+      const { data: clientsData, error: clientsError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (clientsError) throw clientsError;
+
+      // Fetch quotations for project count
+      const { data: quotations, error: quotationsError } = await supabase
+        .from('quotations')
+        .select('client_id, grand_total')
+        .eq('user_id', user.id);
+
+      if (quotationsError) throw quotationsError;
+
+      // Fetch invoices with payment info
+      const { data: invoices, error: invoicesError } = await supabase
+        .from('invoices')
+        .select('client_id, total_amount, paid_amount, remaining_amount')
+        .eq('user_id', user.id);
+
+      if (invoicesError) throw invoicesError;
 
       // Build client list with aggregated data
-      const clientList: Client[] = awsClients.map((c: any) => {
-        const clientQuotes = awsQuotations.filter((q: any) => q.client_id === c.client_id) || [];
-        
-        // Calculate totals from quotations (since invoices are linked to quotations)
-        const totalFromQuotes = clientQuotes.reduce((sum: number, q: any) => sum + (q.grand_total || 0), 0);
+      const clientList: Client[] = (clientsData || []).map((c) => {
+        const clientQuotes = quotations?.filter(q => q.client_id === c.id) || [];
+        const clientInvoices = invoices?.filter(inv => inv.client_id === c.id) || [];
         
         return {
-          id: c.client_id,
+          id: c.id,
           name: c.name,
           address: c.address || undefined,
           email: c.email || undefined,
           phone: c.phone || undefined,
           projects: clientQuotes.length,
-          totalAmount: totalFromQuotes,
-          paidAmount: 0, // Would need invoice data from AWS
-          outstanding: totalFromQuotes, // Would need invoice data from AWS
+          totalAmount: clientInvoices.reduce((sum, inv) => sum + (inv.total_amount || 0), 0),
+          paidAmount: clientInvoices.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0),
+          outstanding: clientInvoices.reduce((sum, inv) => sum + (inv.remaining_amount || 0), 0),
         };
       });
 
@@ -163,8 +149,8 @@ const Clients = () => {
 
       const clientId = editingClient?.id || crypto.randomUUID();
 
-      // AWS-first: Create/update in AWS
-      const awsPayload: awsApi.ClientPayload = {
+      // AWS-first: Create/update in AWS first
+      const awsPayload: ClientPayload = {
         client_id: clientId,
         company_id: user.id,
         name: formData.name.trim(),
@@ -174,22 +160,50 @@ const Clients = () => {
       };
 
       if (editingClient) {
-        // Update existing client in AWS
-        const awsResult = await awsApi.updateClient(clientId, awsPayload);
+        // Update existing client
+        const awsResult = await updateClient(clientId, awsPayload);
         if (!awsResult.success) {
           throw new Error(awsResult.error || "Failed to update client in AWS");
         }
 
-        await awsApi.logAdminAction(user.id, user.id, "update", "client", clientId);
+        // Update in Supabase after AWS success
+        const { error } = await supabase
+          .from('clients')
+          .update({
+            name: formData.name.trim(),
+            address: formData.address.trim() || null,
+            email: formData.email.trim() || null,
+            phone: formData.phone.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', clientId);
+
+        if (error) throw error;
+
+        await logAdminAction(user.id, user.id, "update", "client", clientId);
         toast({ title: "Client updated successfully" });
       } else {
-        // Create new client in AWS
-        const awsResult = await awsApi.createClient(awsPayload);
+        // Create new client
+        const awsResult = await createClient(awsPayload);
         if (!awsResult.success) {
           throw new Error(awsResult.error || "Failed to create client in AWS");
         }
 
-        await awsApi.logAdminAction(user.id, user.id, "create", "client", clientId);
+        // Insert in Supabase after AWS success
+        const { error } = await supabase
+          .from('clients')
+          .insert({
+            id: clientId,
+            user_id: user.id,
+            name: formData.name.trim(),
+            address: formData.address.trim() || null,
+            email: formData.email.trim() || null,
+            phone: formData.phone.trim() || null,
+          });
+
+        if (error) throw error;
+
+        await logAdminAction(user.id, user.id, "create", "client", clientId);
         toast({ title: "Client created successfully" });
       }
 
@@ -212,13 +226,16 @@ const Clients = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Delete from AWS
-      const result = await awsApi.deleteClient(clientId);
-      if (!result.success) {
-        throw new Error(result.error || "Failed to delete client");
-      }
+      // Note: AWS delete endpoint would be called here if available
+      // For now, we just delete from Supabase
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('id', clientId);
 
-      await awsApi.logAdminAction(user.id, user.id, "delete", "client", clientId);
+      if (error) throw error;
+
+      await logAdminAction(user.id, user.id, "delete", "client", clientId);
       toast({ title: "Client deleted" });
       loadClients();
     } catch (error: any) {
