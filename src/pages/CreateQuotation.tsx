@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { generateQuotationPDF } from "@/lib/pdfGenerator";
+import { downloadQuotationPDF } from "@/lib/pdfGenerator";
 import { useSearchParams } from "react-router-dom";
 import { useAuthAction } from "@/hooks/useAuthAction";
 import { useQuotationAutomation } from "@/hooks/useQuotationAutomation";
@@ -20,6 +20,7 @@ import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
 import { ClientSelector } from "@/components/quotation/ClientSelector";
 import { ProductNameInput } from "@/components/quotation/ProductNameInput";
 import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
+import { createQuotation, updateQuotation, getQuotation, buildQuotationPayload, logAdminAction } from "@/lib/awsApi";
 interface LineItem {
   id: string;
   side: string;
@@ -77,10 +78,10 @@ const CreateQuotation = () => {
       side: "A",
       productName: "",
       productDetails: "",
-      widthFt: 0,
-      heightFt: 0,
+      widthFt: "" as any,
+      heightFt: "" as any,
       sftArea: 0,
-      ratePerSft: 0,
+      ratePerSft: "" as any,
       amount: 0
     }]
   }]);
@@ -334,15 +335,17 @@ const CreateQuotation = () => {
   };
   const loadQuotation = async (id: string) => {
     try {
-      // Load quotation data
-      const {
-        data: quotation,
-        error: quotationError
-      } = await supabase.from('quotations').select('*').eq('id', id).single();
-      if (quotationError) throw quotationError;
+      // Fetch quotation from AWS (source of truth)
+      const awsResponse = await getQuotation(id);
+      
+      if (!awsResponse.success || !awsResponse.data) {
+        throw new Error(awsResponse.error || 'Failed to fetch quotation from AWS');
+      }
 
-      // Pre-fill form fields - use quotation_title or project_name as fallback
-      setProjectTitle(quotation.quotation_title || quotation.project_name || "");
+      const quotation = awsResponse.data;
+
+      // Pre-fill form fields from AWS data
+      setProjectTitle(quotation.quotation_title || "");
       setClientName(quotation.client_name || "");
       setClientAddress(quotation.client_address || "");
       setDateOfProposal(quotation.date_of_proposal || "");
@@ -362,49 +365,35 @@ const CreateQuotation = () => {
         setDiscountPercentage(0);
       }
 
-      // Load sections
-      const {
-        data: sectionsData,
-        error: sectionsError
-      } = await supabase.from('quotation_sections').select('*').eq('quotation_id', id).order('sort_order');
-      if (sectionsError) throw sectionsError;
-
-      // Load items for each section
-      const loadedSections: Section[] = [];
-      for (const section of sectionsData || []) {
-        const {
-          data: itemsData,
-          error: itemsError
-        } = await supabase.from('quotation_items').select('*').eq('section_id', section.id).order('sort_order');
-        if (itemsError) throw itemsError;
-        loadedSections.push({
-          id: section.id,
-          title: section.section_name,
-          items: (itemsData || []).map(item => ({
-            id: item.id,
+      // Load sections from AWS data
+      if (quotation.sections && quotation.sections.length > 0) {
+        const loadedSections: Section[] = quotation.sections.map((section: any, sectionIndex: number) => ({
+          id: section.id || `section-${sectionIndex + 1}`,
+          title: section.title || "",
+          items: (section.items || []).map((item: any, itemIndex: number) => ({
+            id: item.id || `item-${sectionIndex}-${itemIndex}`,
             side: item.side || "A",
-            productName: item.product_name || "",
-            productDetails: item.product_details || "",
-            widthFt: item.width_ft || 0,
-            heightFt: item.height_ft || 0,
-            sftArea: item.sft_area || 0,
-            ratePerSft: item.rate_per_sft || 0,
+            productName: item.productName || item.product_name || "",
+            productDetails: item.productDetails || item.product_details || "",
+            widthFt: item.widthFt || item.width_ft || 0,
+            heightFt: item.heightFt || item.height_ft || 0,
+            sftArea: item.sftArea || item.sft_area || 0,
+            ratePerSft: item.ratePerSft || item.rate_per_sft || 0,
             amount: item.amount || 0
           }))
-        });
-      }
-      if (loadedSections.length > 0) {
+        }));
         setSections(loadedSections);
       }
+
       toast({
         title: "Quotation loaded",
-        description: "Existing quotation data has been loaded for editing"
+        description: "Existing quotation data has been loaded from AWS for editing"
       });
     } catch (error) {
-      console.error('Error loading quotation:', error);
+      console.error('Error loading quotation from AWS:', error);
       toast({
         title: "Load failed",
-        description: "Failed to load quotation data",
+        description: "Failed to load quotation data from AWS",
         variant: "destructive"
       });
     }
@@ -418,10 +407,10 @@ const CreateQuotation = () => {
         side: "A",
         productName: "",
         productDetails: "",
-        widthFt: 0,
-        heightFt: 0,
+        widthFt: "" as any,
+        heightFt: "" as any,
         sftArea: 0,
-        ratePerSft: 0,
+        ratePerSft: "" as any,
         amount: 0
       }]
     }]);
@@ -434,10 +423,10 @@ const CreateQuotation = () => {
         side: "A",
         productName: "",
         productDetails: "",
-        widthFt: 0,
-        heightFt: 0,
+        widthFt: "" as any,
+        heightFt: "" as any,
         sftArea: 0,
-        ratePerSft: 0,
+        ratePerSft: "" as any,
         amount: 0
       }]
     } : section));
@@ -525,134 +514,141 @@ const CreateQuotation = () => {
       let savedQuotationId: string | null = null;
       
       if (quotationId) {
-        // Update existing quotation
-        const {
-          error: quotationError
-        } = await supabase.from('quotations').update({
-          quotation_title: projectTitle,
-          client_name: clientName,
-          client_address: clientAddress,
-          project_name: projectTitle,
-          date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
-          valid_till: quotationValidTill,
-          project_deadline: projectDeadline || null,
-          place_of_project: placeOfProject,
-          warranty: warranty,
-          project_type: projectType,
+        // Update existing quotation - AWS First approach
+        const awsPayload = buildQuotationPayload(quotationId, user.id, {
+          quotationNumber: `QT-${quotationId}`,
+          quotationTitle: projectTitle,
+          clientName,
+          clientAddress,
+          dateOfProposal: dateOfProposal || new Date().toISOString().split('T')[0],
+          validTill: quotationValidTill,
+          projectDeadline: projectDeadline || undefined,
+          placeOfProject,
+          warranty,
+          projectType,
+          status,
+          gstEnabled,
+          gstPercentage: parseFloat(gstRate),
+          gstAmount,
+          discountAmount,
+          subtotal,
+          grandTotal,
+          sections: sections.map(section => ({
+            id: section.id,
+            title: section.title,
+            items: section.items.map(item => ({
+              side: item.side,
+              productName: item.productName,
+              productDetails: item.productDetails,
+              widthFt: item.widthFt,
+              heightFt: item.heightFt,
+              sftArea: item.sftArea,
+              ratePerSft: item.ratePerSft,
+              amount: item.amount,
+            })),
+          })),
+        });
+
+        // Call AWS first
+        const awsResponse = await updateQuotation(quotationId, awsPayload);
+        if (!awsResponse.success) {
+          throw new Error(awsResponse.error || 'Failed to update quotation in AWS');
+        }
+
+        // After AWS success, update ONLY minimal data in Supabase
+        const { error: quotationError } = await supabase.from('quotations').update({
           status: status,
-          gst_enabled: gstEnabled,
-          gst_percentage: parseFloat(gstRate),
-          gst_amount: gstAmount,
-          discount_amount: discountAmount,
-          subtotal: subtotal,
           grand_total: grandTotal
         }).eq('id', quotationId);
         if (quotationError) throw quotationError;
-
-        // Delete existing sections and items
-        const {
-          error: deleteSectionsError
-        } = await supabase.from('quotation_sections').delete().eq('quotation_id', quotationId);
-        if (deleteSectionsError) throw deleteSectionsError;
-
-        // Insert updated sections and items
-        for (const section of sections) {
-          const {
-            data: sectionData,
-            error: sectionError
-          } = await supabase.from('quotation_sections').insert({
-            quotation_id: quotationId,
-            section_name: section.title,
-            sort_order: sections.indexOf(section)
-          }).select().single();
-          if (sectionError) throw sectionError;
-          const itemsToInsert = section.items.map((item, index) => ({
-            section_id: sectionData.id,
-            side: item.side,
-            product_name: item.productName,
-            product_details: item.productDetails,
-            width_ft: item.widthFt,
-            height_ft: item.heightFt,
-            sft_area: item.sftArea,
-            rate_per_sft: item.ratePerSft,
-            amount: item.amount,
-            sort_order: index
-          }));
-          const {
-            error: itemsError
-          } = await supabase.from('quotation_items').insert(itemsToInsert);
-          if (itemsError) throw itemsError;
-        }
+        
         toast({
           title: "Quotation updated",
           description: "Quotation has been updated successfully"
         });
         
-        // Return existing quotation ID for PDF generation
         savedQuotationId = quotationId;
       } else {
-        // Create new quotation
+        // Create new quotation - AWS First approach
         const quotationNumber = `QT-${Date.now()}`;
+        const newQuotationId = crypto.randomUUID();
+        
+        // Build AWS payload first
+        const awsPayload = buildQuotationPayload(newQuotationId, user.id, {
+          quotationNumber,
+          quotationTitle: projectTitle,
+          clientName,
+          clientAddress,
+          dateOfProposal: dateOfProposal || new Date().toISOString().split('T')[0],
+          validTill: quotationValidTill,
+          projectDeadline: projectDeadline || undefined,
+          placeOfProject,
+          warranty,
+          projectType,
+          status,
+          gstEnabled,
+          gstPercentage: parseFloat(gstRate),
+          gstAmount,
+          discountAmount,
+          subtotal,
+          grandTotal,
+          sections: sections.map(section => ({
+            id: section.id,
+            title: section.title,
+            items: section.items.map(item => ({
+              side: item.side,
+              productName: item.productName,
+              productDetails: item.productDetails,
+              widthFt: item.widthFt,
+              heightFt: item.heightFt,
+              sftArea: item.sftArea,
+              ratePerSft: item.ratePerSft,
+              amount: item.amount,
+            })),
+          })),
+        });
+
+        // Send to AWS first (source of truth)
+        const awsResponse = await createQuotation(awsPayload);
+        if (!awsResponse.success) {
+          throw new Error(awsResponse.error || 'Failed to save quotation to AWS');
+        }
+        
+        // After AWS success, store ONLY minimal data in Supabase (quotation_id, status, total)
+        const awsId = awsResponse.data?.id || newQuotationId;
         const {
-          data: quotationData,
           error: quotationError
         } = await supabase.from('quotations').insert({
+          id: awsId,
           user_id: user.id,
           quotation_number: quotationNumber,
-          quotation_title: projectTitle,
-          client_name: clientName,
-          client_address: clientAddress,
           project_name: projectTitle,
-          date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
-          valid_till: quotationValidTill,
-          project_deadline: projectDeadline || null,
-          place_of_project: placeOfProject,
-          warranty: warranty,
-          project_type: projectType,
+          client_name: clientName,
           status: status,
-          gst_enabled: gstEnabled,
-          gst_percentage: parseFloat(gstRate),
-          gst_amount: gstAmount,
-          discount_amount: discountAmount,
-          subtotal: subtotal,
           grand_total: grandTotal
-        }).select().single();
+        });
         if (quotationError) throw quotationError;
         
-        // Store the new quotation ID
-        savedQuotationId = quotationData.id;
+        savedQuotationId = awsId;
         
-        for (const section of sections) {
-          const {
-            data: sectionData,
-            error: sectionError
-          } = await supabase.from('quotation_sections').insert({
-            quotation_id: quotationData.id,
-            section_name: section.title,
-            sort_order: sections.indexOf(section)
-          }).select().single();
-          if (sectionError) throw sectionError;
-          const itemsToInsert = section.items.map((item, index) => ({
-            section_id: sectionData.id,
-            side: item.side,
-            product_name: item.productName,
-            product_details: item.productDetails,
-            width_ft: item.widthFt,
-            height_ft: item.heightFt,
-            sft_area: item.sftArea,
-            rate_per_sft: item.ratePerSft,
-            amount: item.amount,
-            sort_order: index
-          }));
-          const {
-            error: itemsError
-          } = await supabase.from('quotation_items').insert(itemsToInsert);
-          if (itemsError) throw itemsError;
-        }
         toast({
           title: "Quotation saved",
           description: `Quotation ${quotationNumber} has been saved successfully`
         });
+      }
+
+      // Log admin action
+      try {
+        await logAdminAction(
+          user.id,
+          user.id,
+          quotationId ? 'update_quotation' : 'create_quotation',
+          'quotation',
+          savedQuotationId!,
+          { status, grand_total: grandTotal }
+        );
+      } catch (logError) {
+        console.error('Admin log failed:', logError);
       }
 
       // Silently save last used preferences and track item usage
@@ -753,10 +749,10 @@ const CreateQuotation = () => {
             side: "A",
             productName: "",
             productDetails: "",
-            widthFt: 0,
-            heightFt: 0,
+            widthFt: "" as any,
+            heightFt: "" as any,
             sftArea: 0,
-            ratePerSft: 0,
+            ratePerSft: "" as any,
             amount: 0
           }]
         }]);
@@ -852,7 +848,7 @@ const CreateQuotation = () => {
         }
       }
       
-      await generateQuotationPDF({
+      await downloadQuotationPDF({
         quotationId: overrideQuotationId || quotationId || undefined,
         quotationTitle: projectTitle,
         clientName,
@@ -1086,11 +1082,11 @@ const CreateQuotation = () => {
                         />
                         {customizeSettings.showProductDetails && <Textarea value={item.productDetails} onChange={e => updateItem(section.id, item.id, "productDetails", e.target.value)} placeholder="Detailed description..." className="resize-none h-9 min-h-[36px]" rows={1} />}
                         {customizeSettings.showDetailedSizeColumns && <>
-                            <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" className="h-9" />
-                            <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" className="h-9" />
-                            <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
+                            <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="" step="0.1" className="h-9" />
+                            <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="" step="0.1" className="h-9" />
+                            <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="" step="0.01" className="h-9" />
                           </>}
-                        <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
+                        <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="" step="0.01" className="h-9" />
                         <div className="h-9 flex items-center font-semibold tabular-nums">
                           {profile.currency_symbol}{item.amount.toLocaleString(profile.locale, {
                       minimumFractionDigits: 2
@@ -1135,22 +1131,22 @@ const CreateQuotation = () => {
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-2">
                             <Label>Width (Ft)</Label>
-                            <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" />
+                            <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="" step="0.1" />
                           </div>
                           <div className="space-y-2">
                             <Label>Height (Ft)</Label>
-                            <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" />
+                            <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="" step="0.1" />
                           </div>
                         </div>
                         <div className="space-y-2">
                           <Label>Sft Area</Label>
-                          <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" />
+                          <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="" step="0.01" />
                         </div>
                       </>}
 
                     <div className="space-y-2">
                       <Label>Rate/{profile.measurement_system === 'metric' ? 'Sqm' : 'Sft'} ({profile.currency_symbol})</Label>
-                      <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" />
+                      <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="" step="0.01" />
                     </div>
 
                     <div className="space-y-1 pt-2 border-t">
@@ -1254,7 +1250,7 @@ const CreateQuotation = () => {
                   <div className="space-y-2">
                     <Label htmlFor="discount">Discount % (Optional)</Label>
                     <div className="flex items-center gap-2">
-                      <Input id="discount" type="number" value={discountPercentage} onChange={e => setDiscountPercentage(parseFloat(e.target.value) || 0)} min="0" max="100" step="0.1" placeholder="0" className="h-8" />
+                      <Input id="discount" type="number" value={discountPercentage || ""} onChange={e => setDiscountPercentage(parseFloat(e.target.value) || 0)} min="0" max="100" step="0.1" placeholder="" className="h-8" />
                       <span className="text-sm text-muted-foreground">%</span>
                     </div>
                   </div>

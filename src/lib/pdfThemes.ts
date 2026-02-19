@@ -953,6 +953,8 @@ export interface PDFEditorSettings {
   headingFont: string; // Font ID for titles/headings
   bodyFont: string; // Font ID for body text
   logoPlacement: 'left' | 'center' | 'right';
+  headerInfoColumns: 1 | 2 | 3; // Number of columns for header info section
+  headerLayout: 'cards' | 'unified'; // 'cards' = separate cards, 'unified' = single box with columns
   highlightAmounts: boolean;
   showBorders: boolean;
   compactMode: boolean;
@@ -962,6 +964,10 @@ export interface PDFEditorSettings {
   sectionStyle: 'standard' | 'card' | 'line' | 'minimal';
   summaryStyle: 'right' | 'center' | 'full-width';
   pageMargins: 'narrow' | 'normal' | 'wide';
+  // Accept/Reject buttons
+  showAcceptRejectButtons: boolean;
+  // Warranty section
+  showWarranty: boolean;
   // Decoration settings
   showDecorations: boolean;
   decorationIntensity: 'subtle' | 'medium' | 'bold';
@@ -981,7 +987,70 @@ export interface PDFEditorSettings {
     text?: string;
   };
   useBrandColors?: boolean;
+  // Advanced settings for granular control
+  advancedSettings?: {
+    // Border settings
+    tableBorderWidth: number; // 0.1 to 2
+    cardBorderWidth: number; // 0.5 to 3
+    pageBorderWidth: number; // 1 to 5
+    // Spacing settings
+    sectionSpacing: number; // 4 to 20
+    rowPadding: number; // 2 to 10
+    cardPadding: number; // 4 to 16
+    // Column width percentages (must total ~100)
+    columnWidths: {
+      side: number; // 5-15
+      product: number; // 15-40
+      details: number; // 0 = auto
+      width: number; // 5-15
+      height: number; // 5-15
+      area: number; // 8-20
+      rate: number; // 10-25
+      amount: number; // 10-30
+    };
+    // Font size overrides
+    fontSizes: {
+      sectionTitle: number; // 8-14
+      tableHeader: number; // 6-10
+      tableBody: number; // 6-10
+      productName: number; // 6-10
+      details: number; // 5-9
+      amounts: number; // 6-10
+    };
+    // Highlight settings
+    highlightPadding: number; // 2 to 8
+    highlightBorderRadius: number; // 0 to 6
+  };
 }
+
+export const defaultAdvancedSettings: PDFEditorSettings['advancedSettings'] = {
+  tableBorderWidth: 0.1,
+  cardBorderWidth: 0.5,
+  pageBorderWidth: 2,
+  sectionSpacing: 8,
+  rowPadding: 4,
+  cardPadding: 8,
+  columnWidths: {
+    side: 14,
+    product: 32,
+    details: 0, // auto
+    width: 16,
+    height: 16,
+    area: 18,
+    rate: 26,
+    amount: 28,
+  },
+  fontSizes: {
+    sectionTitle: 10,
+    tableHeader: 7,
+    tableBody: 7,
+    productName: 7,
+    details: 7,
+    amounts: 7,
+  },
+  highlightPadding: 6,
+  highlightBorderRadius: 2,
+};
 
 export const defaultEditorSettings: PDFEditorSettings = {
   theme: 'minimal-white',
@@ -989,6 +1058,8 @@ export const defaultEditorSettings: PDFEditorSettings = {
   headingFont: 'times',
   bodyFont: 'helvetica',
   logoPlacement: 'left',
+  headerInfoColumns: 2,
+  headerLayout: 'unified',
   highlightAmounts: true,
   showBorders: true,
   compactMode: false,
@@ -998,12 +1069,15 @@ export const defaultEditorSettings: PDFEditorSettings = {
   sectionStyle: 'standard',
   summaryStyle: 'right',
   pageMargins: 'normal',
+  showAcceptRejectButtons: true,
+  showWarranty: true,
   showDecorations: true,
   decorationIntensity: 'medium',
   showPageBorder: true,
   showCornerOrnaments: true,
   showSectionDividers: true,
   useBrandColors: false,
+  advancedSettings: defaultAdvancedSettings,
 };
 
 // Invoice Settings

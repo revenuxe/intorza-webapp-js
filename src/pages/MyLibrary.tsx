@@ -10,6 +10,7 @@ import { QuotationsLibraryTab } from "@/components/library/QuotationsLibraryTab"
 import { SectionTemplatesTab } from "@/components/library/SectionTemplatesTab";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { AWSMigrationWarning } from "@/components/AWSMigrationWarning";
 
 const MyLibrary = () => {
   const [activeTab, setActiveTab] = useState("items");
@@ -130,6 +131,8 @@ const MyLibrary = () => {
 
   return (
     <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8">
+      <AWSMigrationWarning pageName="My Library" />
+      
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">

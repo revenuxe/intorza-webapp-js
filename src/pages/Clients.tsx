@@ -1,12 +1,39 @@
 import { useState, useEffect } from "react";
-import { Users } from "lucide-react";
+import { Users, Plus, Pencil, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import * as awsApi from "@/lib/awsApi";
 
 interface Client {
+  id: string;
   name: string;
+  address?: string;
+  email?: string;
+  phone?: string;
   projects: number;
   totalAmount: number;
   paidAmount: number;
@@ -18,6 +45,15 @@ const Clients = () => {
   const { formatCurrency } = useLocalization();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    address: "",
+    email: "",
+    phone: "",
+  });
 
   useEffect(() => {
     loadClients();
@@ -29,58 +65,63 @@ const Clients = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch quotations
-      const { data: quotations, error: quotationsError } = await supabase
-        .from('quotations')
-        .select('client_name, grand_total')
-        .eq('user_id', user.id);
-
-      if (quotationsError) throw quotationsError;
-
-      // Fetch invoices with payment info
-      const { data: invoices, error: invoicesError } = await supabase
-        .from('invoices')
-        .select('client_name, total_amount, paid_amount, remaining_amount')
-        .eq('user_id', user.id);
-
-      if (invoicesError) throw invoicesError;
-
-      // Combine and group by client
-      const clientMap = new Map<string, Client>();
-
-      // Process quotations
-      quotations?.forEach((q) => {
-        if (!clientMap.has(q.client_name)) {
-          clientMap.set(q.client_name, {
-            name: q.client_name,
-            projects: 0,
-            totalAmount: 0,
-            paidAmount: 0,
-            outstanding: 0,
-          });
+      // Fetch clients from AWS
+      const clientsResult = await awsApi.listClients(user.id);
+      console.log('AWS Clients Raw Response:', JSON.stringify(clientsResult, null, 2));
+      
+      // Fetch quotations from AWS for project count
+      const quotationsResult = await awsApi.listQuotations(user.id);
+      
+      // For invoice data, we still need AWS (or calculate from quotations)
+      // Since invoices may not have a list endpoint, we'll use what we have
+      
+      // Handle various AWS/DynamoDB response structures
+      let awsClients: any[] = [];
+      if (clientsResult.success && clientsResult.data) {
+        const data = clientsResult.data as any;
+        console.log('Client data type:', typeof data, 'isArray:', Array.isArray(data));
+        
+        // Check various response patterns
+        if (Array.isArray(data)) {
+          awsClients = data;
+        } else if (data.Items && Array.isArray(data.Items)) {
+          awsClients = data.Items;
+        } else if (data.items && Array.isArray(data.items)) {
+          awsClients = data.items;
+        } else if (data.clients && Array.isArray(data.clients)) {
+          awsClients = data.clients;
+        } else if (data.data && Array.isArray(data.data)) {
+          awsClients = data.data;
+        } else if (typeof data === 'object' && Object.keys(data).length > 0) {
+          // Maybe it's a single object or object with different keys
+          console.log('Client data keys:', Object.keys(data));
         }
-        const client = clientMap.get(q.client_name)!;
-        client.projects += 1;
+      }
+      console.log('Final parsed clients count:', awsClients.length, awsClients);
+      
+      const awsQuotations = quotationsResult.success ? (quotationsResult.data || []) : [];
+
+      // Build client list with aggregated data
+      const clientList: Client[] = awsClients.map((c: any) => {
+        const clientQuotes = awsQuotations.filter((q: any) => q.client_id === c.client_id) || [];
+        
+        // Calculate totals from quotations (since invoices are linked to quotations)
+        const totalFromQuotes = clientQuotes.reduce((sum: number, q: any) => sum + (q.grand_total || 0), 0);
+        
+        return {
+          id: c.client_id,
+          name: c.name,
+          address: c.address || undefined,
+          email: c.email || undefined,
+          phone: c.phone || undefined,
+          projects: clientQuotes.length,
+          totalAmount: totalFromQuotes,
+          paidAmount: 0, // Would need invoice data from AWS
+          outstanding: totalFromQuotes, // Would need invoice data from AWS
+        };
       });
 
-      // Process invoices
-      invoices?.forEach((inv) => {
-        if (!clientMap.has(inv.client_name)) {
-          clientMap.set(inv.client_name, {
-            name: inv.client_name,
-            projects: 0,
-            totalAmount: 0,
-            paidAmount: 0,
-            outstanding: 0,
-          });
-        }
-        const client = clientMap.get(inv.client_name)!;
-        client.totalAmount += inv.total_amount || 0;
-        client.paidAmount += inv.paid_amount || 0;
-        client.outstanding += inv.remaining_amount || 0;
-      });
-
-      setClients(Array.from(clientMap.values()));
+      setClients(clientList);
     } catch (error) {
       console.error('Error loading clients:', error);
       toast({
@@ -92,6 +133,104 @@ const Clients = () => {
       setLoading(false);
     }
   };
+
+  const handleOpenDialog = (client?: Client) => {
+    if (client) {
+      setEditingClient(client);
+      setFormData({
+        name: client.name,
+        address: client.address || "",
+        email: client.email || "",
+        phone: client.phone || "",
+      });
+    } else {
+      setEditingClient(null);
+      setFormData({ name: "", address: "", email: "", phone: "" });
+    }
+    setDialogOpen(true);
+  };
+
+  const handleSaveClient = async () => {
+    if (!formData.name.trim()) {
+      toast({ title: "Name is required", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const clientId = editingClient?.id || crypto.randomUUID();
+
+      // AWS-first: Create/update in AWS
+      const awsPayload: awsApi.ClientPayload = {
+        client_id: clientId,
+        company_id: user.id,
+        name: formData.name.trim(),
+        address: formData.address.trim() || undefined,
+        email: formData.email.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
+      };
+
+      if (editingClient) {
+        // Update existing client in AWS
+        const awsResult = await awsApi.updateClient(clientId, awsPayload);
+        if (!awsResult.success) {
+          throw new Error(awsResult.error || "Failed to update client in AWS");
+        }
+
+        await awsApi.logAdminAction(user.id, user.id, "update", "client", clientId);
+        toast({ title: "Client updated successfully" });
+      } else {
+        // Create new client in AWS
+        const awsResult = await awsApi.createClient(awsPayload);
+        if (!awsResult.success) {
+          throw new Error(awsResult.error || "Failed to create client in AWS");
+        }
+
+        await awsApi.logAdminAction(user.id, user.id, "create", "client", clientId);
+        toast({ title: "Client created successfully" });
+      }
+
+      setDialogOpen(false);
+      loadClients();
+    } catch (error: any) {
+      console.error('Error saving client:', error);
+      toast({
+        title: "Error saving client",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteClient = async (clientId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Delete from AWS
+      const result = await awsApi.deleteClient(clientId);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to delete client");
+      }
+
+      await awsApi.logAdminAction(user.id, user.id, "delete", "client", clientId);
+      toast({ title: "Client deleted" });
+      loadClients();
+    } catch (error: any) {
+      console.error('Error deleting client:', error);
+      toast({
+        title: "Error deleting client",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="container max-w-6xl mx-auto p-4 md:p-6 lg:p-8">
       <div className="flex flex-col gap-6">
@@ -100,6 +239,66 @@ const Clients = () => {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Clients</h1>
             <p className="text-sm text-muted-foreground mt-1">Manage your client relationships</p>
           </div>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => handleOpenDialog()}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Client
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingClient ? "Edit Client" : "Add New Client"}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Name *</Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Client name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    placeholder="client@example.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    placeholder="+91 98765 43210"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="address">Address</Label>
+                  <Input
+                    id="address"
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    placeholder="Client address"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveClient} disabled={saving}>
+                  {saving ? "Saving..." : editingClient ? "Update" : "Create"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {loading ? (
@@ -111,13 +310,17 @@ const Clients = () => {
             <CardContent className="flex flex-col items-center justify-center py-12">
               <Users className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No clients yet</h3>
-              <p className="text-sm text-muted-foreground">Clients will appear here when you create quotations</p>
+              <p className="text-sm text-muted-foreground mb-4">Add your first client to get started</p>
+              <Button onClick={() => handleOpenDialog()}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Client
+              </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="flex flex-col gap-4">
-            {clients.map((client, index) => (
-              <Card key={index} className="hover:shadow-md transition-shadow">
+            {clients.map((client) => (
+              <Card key={client.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-3">
                     <div className="flex items-start justify-between">
@@ -128,7 +331,34 @@ const Clients = () => {
                         <div>
                           <h3 className="font-semibold text-foreground">{client.name}</h3>
                           <p className="text-xs text-muted-foreground">{client.projects} project{client.projects !== 1 ? 's' : ''}</p>
+                          {client.email && <p className="text-xs text-muted-foreground">{client.email}</p>}
                         </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(client)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Client</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete {client.name}? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteClient(client.id)}>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </div>
                     

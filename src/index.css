@@ -36,6 +36,10 @@ All colors MUST be HSL.
 
     --destructive: 0 84.2% 60.2%;
     
+    /* Warning amber */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
     /* Toast colors - Brand navy */
     --toast-bg: 215 47% 22%;
     --toast-foreground: 0 0% 100%;
