@@ -1,7 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize } from "lucide-react";
-import { generateQuotationPDF } from "@/lib/pdfGenerator";
-import { Slider } from "@/components/ui/slider";
+import { useState, useEffect, useRef } from "react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -17,7 +15,6 @@ import {
   getEditorSettings, 
   saveEditorSettings, 
   defaultEditorSettings,
-  defaultAdvancedSettings,
   getThemeById,
   getThemesByCategory,
   getAllThemes,
@@ -34,8 +31,6 @@ import {
 import { QuotationSettings } from "./CustomizeFieldsDrawer";
 import { CustomThemeBuilder } from "./CustomThemeBuilder";
 import { FontPreviewPanel } from "./FontPreviewPanel";
-import { PDFAdvancedEditor } from "./PDFAdvancedEditor";
-import { PDFCanvasPreview } from "./PDFCanvasPreview";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -101,12 +96,7 @@ export const PDFPreviewEditor = ({
   const [fontSearchQuery, setFontSearchQuery] = useState('');
   const [showThemeBuilder, setShowThemeBuilder] = useState(false);
   const [brandColors, setBrandColors] = useState<BrandColors | null>(null);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [previewZoom, setPreviewZoom] = useState(100);
-  const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const pdfGenerationTimer = useRef<NodeJS.Timeout | null>(null);
   
   // Load font preferences from database
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences, loading: fontLoading } = useFontPreferences();
@@ -141,6 +131,7 @@ export const PDFPreviewEditor = ({
   useEffect(() => {
     if (open) {
       const savedSettings = getEditorSettings();
+      // Apply saved font preferences from database and include brand colors if available
       setEditorSettings({
         ...savedSettings,
         headingFont: fontPreferences.headingFont || savedSettings.headingFont || 'times',
@@ -148,148 +139,8 @@ export const PDFPreviewEditor = ({
         brandColors: brandColors || savedSettings.brandColors,
       });
       setShowEditor(false);
-    } else {
-      // Cleanup blob URL when closing
-      if (prevBlobUrlRef.current) {
-        URL.revokeObjectURL(prevBlobUrlRef.current);
-        prevBlobUrlRef.current = null;
-      }
-      setPdfBlobUrl(null);
     }
   }, [open, fontPreferences, brandColors]);
-
-  // Track previous blob URL for cleanup without causing re-renders
-  const prevBlobUrlRef = useRef<string | null>(null);
-
-  // Generate live PDF preview with debouncing
-  const generateLivePdf = useCallback(async () => {
-    setIsGeneratingPdf(true);
-    try {
-      // Ensure brand colors are included if enabled
-      const currentEditorSettings: PDFEditorSettings = {
-        ...editorSettings,
-        brandColors: editorSettings.useBrandColors && brandColors ? brandColors : editorSettings.brandColors,
-      };
-
-      // Settings from customizeSettings
-      const pdfSettings = {
-        showCompanyLogo: customizeSettings.showCompanyLogo,
-        showCompanyAddress: customizeSettings.showCompanyAddress,
-        showProjectDetails: customizeSettings.showProjectDetails,
-        showDetailedSizeColumns: customizeSettings.showDetailedSizeColumns,
-        useSimpleItemLayout: customizeSettings.useSimpleItemLayout,
-        showSubtotal: customizeSettings.showSubtotal,
-        showTaxGst: customizeSettings.showTaxGst,
-        showGrandTotal: customizeSettings.showGrandTotal,
-        showPaymentStages: customizeSettings.showPaymentStages,
-        showTermsConditions: customizeSettings.showTermsConditions,
-        showSignatureArea: customizeSettings.showSignatureArea,
-        showClientName: customizeSettings.showClientName,
-        showClientAddress: customizeSettings.showClientAddress,
-        showDateOfProposal: customizeSettings.showDateOfProposal,
-        showQuotationValidTill: customizeSettings.showQuotationValidTill,
-        showProjectDeadline: customizeSettings.showProjectDeadline,
-        showPlaceOfProject: customizeSettings.showPlaceOfProject,
-        showWarranty: customizeSettings.showWarranty,
-        showProjectType: customizeSettings.showProjectType,
-        showSideColumn: customizeSettings.showSideColumn,
-        showProductDetails: customizeSettings.showProductDetails,
-        showDiscount: customizeSettings.showDiscount,
-        showSocialMediaDiscount: customizeSettings.showSocialMediaDiscount,
-        showBankDetails: customizeSettings.showBankDetails,
-        showQRCode: customizeSettings.showQRCode,
-        showProfessionalAdvantages: customizeSettings.showProfessionalAdvantages,
-        showQuotationNumber: customizeSettings.showQuotationNumber,
-      };
-
-      // Transform quotationData to match the generator's expected format with settings embedded
-      const pdfData = {
-        quotationTitle: quotationData.quotationTitle || 'Sample Quotation',
-        clientName: quotationData.clientName || 'Client Name',
-        clientAddress: quotationData.clientAddress || 'Client Address',
-        dateOfProposal: quotationData.dateOfProposal || new Date().toLocaleDateString(),
-        quotationValidTill: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        placeOfProject: 'Project Location',
-        warranty: '1 Year',
-        projectType: 'Interior',
-        sections: quotationData.sections.length > 0 ? quotationData.sections.map(s => ({
-          title: s.section_name || s.title || 'Section',
-          items: (s.items || []).map((item: any) => ({
-            side: item.side || '',
-            productName: item.product_name || item.productName || 'Product',
-            productDetails: item.product_details || item.productDetails || '',
-            widthFt: item.width_ft || item.widthFt || 0,
-            heightFt: item.height_ft || item.heightFt || 0,
-            sftArea: item.sft_area || item.sftArea || 0,
-            ratePerSft: item.rate_per_sft || item.ratePerSft || 0,
-            amount: item.amount || 0,
-          }))
-        })) : [{
-          title: 'Sample Section',
-          items: [{
-            side: 'Left',
-            productName: 'Sample Product',
-            productDetails: 'Product details here',
-            widthFt: 4,
-            heightFt: 8,
-            sftArea: 32,
-            ratePerSft: 850,
-            amount: 27200,
-          }]
-        }],
-        subtotal: quotationData.subtotal || 50000,
-        gstEnabled: true,
-        gstRate: 18,
-        gstAmount: (quotationData.subtotal || 50000) * 0.18,
-        grandTotal: quotationData.grandTotal || 55460,
-        companyLogo: quotationData.companyLogo,
-        companyName: quotationData.companyName || 'Your Company',
-        companyAddress: 'Company Address',
-        settings: pdfSettings,
-        editorSettings: currentEditorSettings,
-        previewOnly: true,
-      };
-
-      const doc = await generateQuotationPDF(pdfData as any);
-      if (!doc) {
-        throw new Error('Failed to generate PDF document');
-      }
-      const blob = doc.output('blob');
-      
-      // Revoke previous blob URL
-      if (prevBlobUrlRef.current) {
-        URL.revokeObjectURL(prevBlobUrlRef.current);
-      }
-      
-      const newBlobUrl = URL.createObjectURL(blob);
-      prevBlobUrlRef.current = newBlobUrl;
-      setPdfBlobUrl(newBlobUrl);
-    } catch (error) {
-      console.error('Error generating live PDF preview:', error);
-    } finally {
-      setIsGeneratingPdf(false);
-    }
-  }, [editorSettings, customizeSettings, quotationData, brandColors]);
-
-  // Debounced PDF generation effect - longer debounce for smooth slider interaction
-  useEffect(() => {
-    if (!open) return;
-    
-    if (pdfGenerationTimer.current) {
-      clearTimeout(pdfGenerationTimer.current);
-    }
-    
-    // Use longer debounce (800ms) to avoid regenerating while user is actively dragging sliders
-    pdfGenerationTimer.current = setTimeout(() => {
-      generateLivePdf();
-    }, 800);
-
-    return () => {
-      if (pdfGenerationTimer.current) {
-        clearTimeout(pdfGenerationTimer.current);
-      }
-    };
-  }, [open, generateLivePdf]);
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
     const newSettings = { ...editorSettings, ...updates };
@@ -381,7 +232,7 @@ export const PDFPreviewEditor = ({
   const EditorPanel = () => (
     <div className="flex flex-col h-full overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid grid-cols-5 m-4 flex-shrink-0">
+        <TabsList className="grid grid-cols-4 m-4 flex-shrink-0">
           <TabsTrigger value="themes" className="text-xs">
             <Palette className="h-3 w-3 mr-1" />
             Themes
@@ -397,10 +248,6 @@ export const PDFPreviewEditor = ({
           <TabsTrigger value="style" className="text-xs">
             <Eye className="h-3 w-3 mr-1" />
             Style
-          </TabsTrigger>
-          <TabsTrigger value="advanced" className="text-xs">
-            <Sliders className="h-3 w-3 mr-1" />
-            Edit
           </TabsTrigger>
         </TabsList>
 
@@ -725,56 +572,6 @@ export const PDFPreviewEditor = ({
               </RadioGroup>
             </div>
 
-            {/* Header Info Columns */}
-            <div className="space-y-3 pt-4 border-t">
-              <Label className="text-sm font-semibold">Header Info Layout</Label>
-              <p className="text-xs text-muted-foreground">
-                Choose how Quotation & Project details are displayed
-              </p>
-              <RadioGroup
-                value={String(editorSettings.headerInfoColumns || 2)}
-                onValueChange={(v) => updateSettings({ headerInfoColumns: Number(v) as 1 | 2 | 3 })}
-                className="grid grid-cols-3 gap-2"
-              >
-                {[
-                  { value: '1', label: 'Single Row', desc: 'All info in one row' },
-                  { value: '2', label: 'Two Cards', desc: 'Client + Project side-by-side' },
-                  { value: '3', label: 'Three Cards', desc: 'Client + Project + Extra' },
-                ].map((opt) => (
-                  <div key={opt.value}>
-                    <RadioGroupItem value={opt.value} id={`cols-${opt.value}`} className="peer sr-only" />
-                    <Label
-                      htmlFor={`cols-${opt.value}`}
-                      className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary cursor-pointer text-center"
-                    >
-                      <div className="w-full h-6 border rounded mb-1 flex items-center gap-0.5 px-0.5">
-                        {Array.from({ length: Number(opt.value) }).map((_, i) => (
-                          <div key={i} className="flex-1 h-4 bg-muted-foreground/20 rounded-sm" />
-                        ))}
-                      </div>
-                      <span className="text-[10px] font-medium">{opt.label}</span>
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            {/* Accept/Reject Toggle */}
-            <div className="space-y-3 pt-4 border-t">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label className="text-sm font-medium">Accept / Reject Buttons</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Show action buttons in PDF for client response
-                  </p>
-                </div>
-                <Switch
-                  checked={editorSettings.showAcceptRejectButtons ?? true}
-                  onCheckedChange={(v) => updateSettings({ showAcceptRejectButtons: v })}
-                />
-              </div>
-            </div>
-
             <div className="space-y-3 pt-4 border-t">
               <Label className="text-sm font-semibold">Layout Options</Label>
               <div className="space-y-3">
@@ -996,15 +793,6 @@ export const PDFPreviewEditor = ({
               </Select>
             </div>
           </TabsContent>
-
-          {/* ADVANCED TAB */}
-          <TabsContent value="advanced" className="mt-0">
-            <PDFAdvancedEditor 
-              settings={editorSettings} 
-              onUpdate={updateSettings}
-              onHighlight={setHighlightedElement}
-            />
-          </TabsContent>
         </div>
       </Tabs>
 
@@ -1016,75 +804,242 @@ export const PDFPreviewEditor = ({
     </div>
   );
 
-  // Preview Panel Component - Now shows actual PDF with zoom controls
+  // Preview Panel Component
   const PreviewPanel = () => (
-    <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
-      {/* Zoom Controls */}
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-background/80 backdrop-blur-sm gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 shrink-0"
-            onClick={() => setPreviewZoom(Math.max(25, previewZoom - 25))}
-            disabled={previewZoom <= 25}
-          >
-            <ZoomOut className="h-3.5 w-3.5" />
-          </Button>
-          <div className="flex items-center w-20 sm:w-28">
-            <Slider
-              value={[previewZoom]}
-              onValueChange={([v]) => setPreviewZoom(v)}
-              min={25}
-              max={200}
-              step={5}
-              className="w-full"
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 shrink-0"
-            onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))}
-            disabled={previewZoom >= 200}
-          >
-            <ZoomIn className="h-3.5 w-3.5" />
-          </Button>
-          <span className="text-[10px] text-muted-foreground w-9 text-center">{previewZoom}%</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2"
-            onClick={() => setPreviewZoom(100)}
-          >
-            <Maximize className="h-3 w-3 mr-1" />
-            <span className="text-[10px]">Fit</span>
-          </Button>
-        </div>
-        {highlightedElement && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px]">
-            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            {highlightedElement}
-          </div>
+    <div className="flex-1 min-h-0 bg-muted/30 overflow-y-auto p-4 md:p-6">
+      <div 
+        ref={previewRef}
+        className="bg-white shadow-lg mx-auto max-w-[595px] min-h-[600px] md:min-h-[842px] p-6 md:p-8 text-sm relative"
+        style={{
+          ...getPreviewStyles(),
+          ...(editorSettings.showDecorations && editorSettings.showPageBorder ? {
+            border: `${currentTheme.decorations.borderWidth * 2}px ${currentTheme.decorations.borderStyle === 'double' ? 'double' : currentTheme.decorations.borderStyle === 'dashed' ? 'dashed' : 'solid'} ${getDecorationColor()}`,
+          } : {})
+        }}
+      >
+        {/* Corner Ornaments (Preview) */}
+        {editorSettings.showDecorations && editorSettings.showCornerOrnaments && currentTheme.decorations.showCornerOrnaments && (
+          <>
+            {/* Top-left corner */}
+            <div 
+              className="absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2"
+              style={{ 
+                borderColor: getDecorationColor(),
+                borderRadius: currentTheme.decorations.cornerStyle === 'rounded' ? '4px 0 0 0' : '0',
+              }}
+            >
+              {currentTheme.decorations.cornerStyle === 'floral' && (
+                <Flower2 className="h-3 w-3 absolute -top-1.5 -left-1.5" style={{ color: getDecorationColor() }} />
+              )}
+            </div>
+            {/* Top-right corner */}
+            <div 
+              className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2"
+              style={{ 
+                borderColor: getDecorationColor(),
+                borderRadius: currentTheme.decorations.cornerStyle === 'rounded' ? '0 4px 0 0' : '0',
+              }}
+            >
+              {currentTheme.decorations.cornerStyle === 'floral' && (
+                <Flower2 className="h-3 w-3 absolute -top-1.5 -right-1.5" style={{ color: getDecorationColor() }} />
+              )}
+            </div>
+            {/* Bottom-left corner */}
+            <div 
+              className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2"
+              style={{ 
+                borderColor: getDecorationColor(),
+                borderRadius: currentTheme.decorations.cornerStyle === 'rounded' ? '0 0 0 4px' : '0',
+              }}
+            >
+              {currentTheme.decorations.cornerStyle === 'floral' && (
+                <Flower2 className="h-3 w-3 absolute -bottom-1.5 -left-1.5" style={{ color: getDecorationColor() }} />
+              )}
+            </div>
+            {/* Bottom-right corner */}
+            <div 
+              className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2"
+              style={{ 
+                borderColor: getDecorationColor(),
+                borderRadius: currentTheme.decorations.cornerStyle === 'rounded' ? '0 0 4px 0' : '0',
+              }}
+            >
+              {currentTheme.decorations.cornerStyle === 'floral' && (
+                <Flower2 className="h-3 w-3 absolute -bottom-1.5 -right-1.5" style={{ color: getDecorationColor() }} />
+              )}
+            </div>
+          </>
         )}
-      </div>
 
-      {/* PDF Preview */}
-      <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
-        {isGeneratingPdf && !pdfBlobUrl ? (
-          <div className="h-full flex items-center justify-center min-h-[300px]">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Generating preview...</p>
+        {/* Preview Header */}
+        <div 
+          className={`flex items-center mb-6 pb-4 ${
+            editorSettings.logoPlacement === 'center' ? 'flex-col text-center' : 
+            editorSettings.logoPlacement === 'right' ? 'flex-row-reverse' : 'flex-row'
+          }`}
+          style={{ borderBottom: editorSettings.showBorders ? `2px solid rgb(${currentTheme.colors.border.join(',')})` : 'none' }}
+        >
+          {customizeSettings.showCompanyLogo && (
+            <div 
+              className={`w-14 h-14 md:w-16 md:h-16 rounded flex items-center justify-center text-white text-xs font-bold ${
+                editorSettings.logoPlacement === 'center' ? 'mb-3' : ''
+              }`}
+              style={getHeaderStyle()}
+            >
+              {quotationData.companyLogo ? (
+                <img src={quotationData.companyLogo} alt="Logo" className="w-full h-full object-contain rounded" />
+              ) : 'LOGO'}
+            </div>
+          )}
+          <div className={`flex-1 ${editorSettings.logoPlacement === 'right' ? 'text-left' : editorSettings.logoPlacement === 'center' ? 'text-center' : 'text-right'}`}>
+            <h1 className="text-base md:text-lg font-bold" style={{ color: `rgb(${currentTheme.colors.text.join(',')})` }}>
+              {quotationData.companyName || 'Company Name'}
+            </h1>
+            {customizeSettings.showCompanyAddress && (
+              <p className="text-xs" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
+                Company Address & Contact
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Client & Project Cards */}
+        {customizeSettings.showProjectDetails && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            <div 
+              className="p-3 rounded"
+              style={{ ...getCardStyle(), border: editorSettings.showBorders ? '1px solid' : 'none' }}
+            >
+              <p className="text-[10px] font-medium mb-1" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
+                QUOTATION FOR
+              </p>
+              <p className="font-semibold text-xs">{quotationData.clientName || 'Client Name'}</p>
+              {customizeSettings.showClientAddress && (
+                <p className="text-[10px]" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
+                  {quotationData.clientAddress || 'Client Address'}
+                </p>
+              )}
+            </div>
+            <div 
+              className="p-3 rounded"
+              style={{ ...getCardStyle(), border: editorSettings.showBorders ? '1px solid' : 'none' }}
+            >
+              <p className="text-[10px] font-medium mb-1" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>
+                PROJECT DETAILS
+              </p>
+              <div className="space-y-1 text-[10px]">
+                {customizeSettings.showDateOfProposal && <p>Date: {quotationData.dateOfProposal || 'DD/MM/YYYY'}</p>}
+                <p>Project: {quotationData.quotationTitle || 'Project Name'}</p>
+              </div>
             </div>
           </div>
-        ) : (
-          <PDFCanvasPreview
-            pdfBlobUrl={pdfBlobUrl}
-            zoom={previewZoom}
-            isGenerating={isGeneratingPdf}
-          />
         )}
+
+        {/* Section Divider (Preview) */}
+        {editorSettings.showDecorations && editorSettings.showSectionDividers && (
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex-1 h-px" style={{ backgroundColor: getDecorationColor(), opacity: 0.5 }} />
+            {currentTheme.decorations.dividerStyle === 'diamonds' && (
+              <div className="w-2 h-2 rotate-45" style={{ backgroundColor: getDecorationColor() }} />
+            )}
+            {currentTheme.decorations.dividerStyle === 'hearts' && (
+              <span style={{ color: getDecorationColor() }}>♥</span>
+            )}
+            {currentTheme.decorations.dividerStyle === 'stars' && (
+              <span style={{ color: getDecorationColor() }}>★</span>
+            )}
+            {currentTheme.decorations.dividerStyle === 'leaves' && (
+              <span style={{ color: getDecorationColor() }}>🌿</span>
+            )}
+            <div className="flex-1 h-px" style={{ backgroundColor: getDecorationColor(), opacity: 0.5 }} />
+          </div>
+        )}
+
+        {/* Sample Table */}
+        <div className="mb-6">
+          <div 
+            className="text-xs font-bold mb-2 pb-1"
+            style={{ borderBottom: `2px solid rgb(${currentTheme.colors.accent.join(',')})` }}
+          >
+            SAMPLE SECTION
+          </div>
+          <table className="w-full text-[10px]" style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ backgroundColor: `rgb(${currentTheme.colors.cardBackground.join(',')})` }}>
+                {customizeSettings.showSideColumn && <th className="p-2 text-left border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>Side</th>}
+                <th className="p-2 text-left border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>Product</th>
+                {customizeSettings.showProductDetails && <th className="p-2 text-left border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>Details</th>}
+                {customizeSettings.showDetailedSizeColumns && (
+                  <>
+                    <th className="p-2 text-center border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>W</th>
+                    <th className="p-2 text-center border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>H</th>
+                  </>
+                )}
+                <th className="p-2 text-center border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>Area</th>
+                <th className="p-2 text-center border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>Rate</th>
+                <th className="p-2 text-right border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                {customizeSettings.showSideColumn && <td className="p-2 border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>Left</td>}
+                <td className="p-2 border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>Sample Item</td>
+                {customizeSettings.showProductDetails && <td className="p-2 border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>Details here</td>}
+                {customizeSettings.showDetailedSizeColumns && (
+                  <>
+                    <td className="p-2 text-center border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>4</td>
+                    <td className="p-2 text-center border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>8</td>
+                  </>
+                )}
+                <td className="p-2 text-center border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>32</td>
+                <td className="p-2 text-center border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>₹850</td>
+                <td className="p-2 text-right border" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}>
+                  <span style={getHighlightStyle()}>₹27,200</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Summary */}
+        <div className="flex justify-end mb-6">
+          <div 
+            className="w-48 md:w-56 p-3 rounded"
+            style={{ ...getCardStyle(), border: editorSettings.showBorders ? '1px solid' : 'none' }}
+          >
+            <div className="flex justify-between mb-1 text-xs">
+              <span>Subtotal</span>
+              <span style={getHighlightStyle()}>₹{quotationData.subtotal?.toLocaleString() || '50,000'}</span>
+            </div>
+            <div className="flex justify-between mb-1 text-xs">
+              <span>Discount</span>
+              <span>-₹3,000</span>
+            </div>
+            <div className="flex justify-between mb-1 text-xs">
+              <span>GST (18%)</span>
+              <span>₹8,460</span>
+            </div>
+            <div 
+              className="flex justify-between pt-2 mt-2 font-bold text-sm"
+              style={{ borderTop: `1px solid rgb(${currentTheme.colors.border.join(',')})` }}
+            >
+              <span>Grand Total</span>
+              <span style={getHighlightStyle()}>₹{quotationData.grandTotal?.toLocaleString() || '55,460'}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Signature Area */}
+        <div className="grid grid-cols-2 gap-4 mt-8 pt-4" style={{ borderTop: `1px solid rgb(${currentTheme.colors.border.join(',')})` }}>
+          <div className="text-center">
+            <div className="h-12 border-b mb-1" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}></div>
+            <p className="text-[9px]" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>Customer Signature</p>
+          </div>
+          <div className="text-center">
+            <div className="h-12 border-b mb-1" style={{ borderColor: `rgb(${currentTheme.colors.border.join(',')})` }}></div>
+            <p className="text-[9px]" style={{ color: `rgb(${currentTheme.colors.textSecondary.join(',')})` }}>Authorized Signature</p>
+          </div>
+        </div>
       </div>
     </div>
   );

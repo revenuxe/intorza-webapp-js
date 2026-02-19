@@ -152,7 +152,6 @@ const CreateQuotation = () => {
   const [customizeSettings, setCustomizeSettings] = useState<QuotationSettings>(getQuotationSettings());
   const [showPreview, setShowPreview] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [editLoading, setEditLoading] = useState(!!searchParams.get('id'));
 
   // Restore form data from sessionStorage after login
   useEffect(() => {
@@ -200,25 +199,10 @@ const CreateQuotation = () => {
   }, [automationLoading, quotationId, continueAction, getSmartDefaults]);
 
   useEffect(() => {
-    const init = async () => {
-      // Wait for auth session before loading data (important for RLS)
-      const { data: { session } } = await supabase.auth.getSession();
-      loadProfile();
-      if (quotationId && session) {
-        await loadQuotation(quotationId);
-      } else if (quotationId && !session) {
-        // Listen for auth state change if not yet authenticated
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-          if (newSession && quotationId) {
-            loadQuotation(quotationId);
-            subscription.unsubscribe();
-          }
-        });
-        // Cleanup after 10 seconds to avoid memory leaks
-        setTimeout(() => subscription.unsubscribe(), 10000);
-      }
-    };
-    init();
+    loadProfile();
+    if (quotationId) {
+      loadQuotation(quotationId);
+    }
   }, [quotationId]);
 
   // Handle continuing actions after login (wait for form to be restored and profile to be loaded)
@@ -350,7 +334,6 @@ const CreateQuotation = () => {
   };
   const loadQuotation = async (id: string) => {
     try {
-      setEditLoading(true);
       // Load quotation data
       const {
         data: quotation,
@@ -379,24 +362,25 @@ const CreateQuotation = () => {
         setDiscountPercentage(0);
       }
 
-      // Load sections with items in a single query
+      // Load sections
       const {
         data: sectionsData,
         error: sectionsError
-      } = await supabase
-        .from('quotation_sections')
-        .select('*, quotation_items(*)')
-        .eq('quotation_id', id)
-        .order('sort_order');
+      } = await supabase.from('quotation_sections').select('*').eq('quotation_id', id).order('sort_order');
       if (sectionsError) throw sectionsError;
 
-      // Map sections with their items
-      const loadedSections: Section[] = (sectionsData || []).map(section => ({
-        id: section.id,
-        title: section.section_name,
-        items: ((section.quotation_items as any[]) || [])
-          .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
-          .map((item: any) => ({
+      // Load items for each section
+      const loadedSections: Section[] = [];
+      for (const section of sectionsData || []) {
+        const {
+          data: itemsData,
+          error: itemsError
+        } = await supabase.from('quotation_items').select('*').eq('section_id', section.id).order('sort_order');
+        if (itemsError) throw itemsError;
+        loadedSections.push({
+          id: section.id,
+          title: section.section_name,
+          items: (itemsData || []).map(item => ({
             id: item.id,
             side: item.side || "A",
             productName: item.product_name || "",
@@ -407,8 +391,8 @@ const CreateQuotation = () => {
             ratePerSft: item.rate_per_sft || 0,
             amount: item.amount || 0
           }))
-      }));
-
+        });
+      }
       if (loadedSections.length > 0) {
         setSections(loadedSections);
       }
@@ -423,8 +407,6 @@ const CreateQuotation = () => {
         description: "Failed to load quotation data",
         variant: "destructive"
       });
-    } finally {
-      setEditLoading(false);
     }
   };
   const addSection = () => {
@@ -953,19 +935,6 @@ const CreateQuotation = () => {
     companyName: profile.company_name,
     companyLogo: profile.logo_url
   });
-  // Show loading overlay when editing existing quotation
-  if (editLoading) {
-    return (
-      <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8">
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-lg font-medium text-foreground">Loading quotation...</p>
-          <p className="text-sm text-muted-foreground">Fetching existing data for editing</p>
-        </div>
-      </div>
-    );
-  }
-
   return <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8 relative">
       {/* Download Loader Overlay */}
       {isDownloading && (
@@ -981,14 +950,8 @@ const CreateQuotation = () => {
         {/* Header Actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-              {quotationId ? 'Edit Quotation' : 'Create Quotation'}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              {quotationId 
-                ? `Editing: ${projectTitle || 'Untitled'} — ${clientName || 'No client'}`
-                : 'Fill in the details to create a new quotation'}
-            </p>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Create Quotation</h1>
+            <p className="text-sm text-muted-foreground mt-1">Fill in the details to create a new quotation</p>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
             <QuotationTemplates onSelectTemplate={(newSections) => setSections(newSections)} currentSections={sections} onSetQuotationTitle={(title) => setProjectTitle(title)} countryCode={profile.country_code} />
