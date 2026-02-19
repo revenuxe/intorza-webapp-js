@@ -286,16 +286,15 @@ const Quotations = () => {
                       </div>
                     </div>
                     <div className="flex gap-2 mt-2">
-                      {quotation.status === 'draft' ? (
-                        <Button 
-                          variant="outline" 
-                          className="flex-1"
-                          onClick={() => navigate(`/?id=${quotation.id}`)}
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Draft
-                        </Button>
-                      ) : (
+                      <Button 
+                        variant="outline" 
+                        className="flex-1"
+                        onClick={() => navigate(`/?id=${quotation.id}`)}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        {quotation.status === 'draft' ? 'Edit Draft' : 'Edit'}
+                      </Button>
+                      {quotation.status !== 'draft' && (
                         <Button 
                           variant="outline" 
                           className="flex-1"
