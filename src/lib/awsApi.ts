@@ -448,6 +448,172 @@ export const createClientBehavior = async (payload: ClientBehaviorPayload): Prom
   });
 };
 
+// ==================== TEAMS ====================
+
+/**
+ * Team/Team Member entity - stored in intorza_teams table
+ * Each team member is a row in the teams table, accessed via POST/PUT /teams
+ */
+export interface TeamPayload {
+  team_id: string;
+  company_id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  work_type: string;
+  role: string;
+  status?: string;
+  daily_rate?: number;
+  user_id?: string;
+  permissions?: any;
+  // Assignment data (optional - for project assignments)
+  quotation_id?: string;
+  assigned_at?: string;
+  assigned_to?: string;
+  // Attendance data (optional - for attendance records)
+  attendance_id?: string;
+  team_member_id?: string;
+  clock_in?: string;
+  clock_out?: string;
+  clock_in_location?: {
+    lat: number;
+    lng: number;
+    address?: string;
+  };
+  clock_out_location?: {
+    lat: number;
+    lng: number;
+    address?: string;
+  };
+  // Task data (optional - for task records)
+  task_id?: string;
+  title?: string;
+  description?: string;
+  priority?: string;
+  due_date?: string;
+  completed_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Create a new team member - POST /teams
+ */
+export const createTeam = async (payload: TeamPayload): Promise<ApiResponse> => {
+  return apiRequest("/teams", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+};
+
+/**
+ * Update an existing team member - PUT /teams/:id
+ */
+export const updateTeam = async (teamId: string, payload: Partial<TeamPayload>): Promise<ApiResponse> => {
+  return apiRequest(`/teams/${teamId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+};
+
+/**
+ * Get a specific team member - GET /teams/:id
+ */
+export const getTeam = async (teamId: string): Promise<ApiResponse<TeamPayload>> => {
+  return apiRequest(`/teams/${teamId}`, {
+    method: "GET",
+  });
+};
+
+/**
+ * List all team members for a company - GET /teams?company_id=xxx
+ */
+export const listTeams = async (companyId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?company_id=${companyId}`, {
+    method: "GET",
+  });
+};
+
+/**
+ * Soft delete a team member - PUT /teams/:id with status='deleted'
+ * Note: AWS API does not support DELETE, use PUT with status change instead
+ */
+export const deleteTeam = async (teamId: string): Promise<ApiResponse> => {
+  return updateTeam(teamId, { status: 'deleted' });
+};
+
+/**
+ * Get team member by user_id - GET /teams?user_id=xxx
+ */
+export const getTeamByUserId = async (userId: string): Promise<ApiResponse<TeamPayload>> => {
+  return apiRequest(`/teams?user_id=${userId}`, {
+    method: "GET",
+  });
+};
+
+/**
+ * List team members assigned to a project - GET /teams?quotation_id=xxx
+ */
+export const listTeamsByProject = async (quotationId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?quotation_id=${quotationId}`, {
+    method: "GET",
+  });
+};
+
+/**
+ * List attendance records for a company - GET /teams?company_id=xxx&type=attendance
+ */
+export const listAttendanceByCompany = async (companyId: string, date?: string): Promise<ApiResponse<TeamPayload[]>> => {
+  const queryDate = date || new Date().toISOString().split('T')[0];
+  return apiRequest(`/teams?company_id=${companyId}&type=attendance&date=${queryDate}`, {
+    method: "GET",
+  });
+};
+
+/**
+ * List attendance records for specific members - GET /teams?member_ids=xxx&type=attendance
+ */
+export const listAttendanceByMembers = async (memberIds: string[], days: number = 7): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?member_ids=${memberIds.join(',')}&type=attendance&days=${days}`, {
+    method: "GET",
+  });
+};
+
+/**
+ * List tasks for a member - GET /teams?member_id=xxx&type=tasks
+ */
+export const listTasksByMember = async (memberId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?member_id=${memberId}&type=tasks`, {
+    method: "GET",
+  });
+};
+
+/**
+ * List tasks for a project - GET /teams?quotation_id=xxx&type=tasks
+ */
+export const listTasksByProject = async (quotationId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?quotation_id=${quotationId}&type=tasks`, {
+    method: "GET",
+  });
+};
+
+/**
+ * List all tasks for a company - GET /teams?company_id=xxx&type=tasks
+ */
+export const listTasksByCompany = async (companyId: string): Promise<ApiResponse<TeamPayload[]>> => {
+  return apiRequest(`/teams?company_id=${companyId}&type=tasks`, {
+    method: "GET",
+  });
+};
+
+/**
+ * Soft delete a task - PUT /teams/:id with status='deleted'
+ * Note: AWS API does not support DELETE, use PUT with status change instead
+ */
+export const deleteTask = async (taskId: string): Promise<ApiResponse> => {
+  return updateTeam(taskId, { status: 'deleted' });
+};
+
 // ==================== FILES ====================
 
 export interface FilePayload {
