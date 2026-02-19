@@ -953,8 +953,6 @@ export interface PDFEditorSettings {
   headingFont: string; // Font ID for titles/headings
   bodyFont: string; // Font ID for body text
   logoPlacement: 'left' | 'center' | 'right';
-  headerInfoColumns: 1 | 2 | 3; // Number of columns for header info section
-  headerLayout: 'cards' | 'unified'; // 'cards' = separate cards, 'unified' = single box with columns
   highlightAmounts: boolean;
   showBorders: boolean;
   compactMode: boolean;
@@ -964,16 +962,15 @@ export interface PDFEditorSettings {
   sectionStyle: 'standard' | 'card' | 'line' | 'minimal';
   summaryStyle: 'right' | 'center' | 'full-width';
   pageMargins: 'narrow' | 'normal' | 'wide';
-  // Accept/Reject buttons
-  showAcceptRejectButtons: boolean;
-  // Warranty section
-  showWarranty: boolean;
   // Decoration settings
   showDecorations: boolean;
   decorationIntensity: 'subtle' | 'medium' | 'bold';
   showPageBorder: boolean;
   showCornerOrnaments: boolean;
   showSectionDividers: boolean;
+  // Layout settings
+  headerInfoColumns: 1 | 2 | 3;
+  showAcceptRejectButtons: boolean;
   customColors?: {
     primary?: string;
     accent?: string;
@@ -1058,8 +1055,6 @@ export const defaultEditorSettings: PDFEditorSettings = {
   headingFont: 'times',
   bodyFont: 'helvetica',
   logoPlacement: 'left',
-  headerInfoColumns: 2,
-  headerLayout: 'unified',
   highlightAmounts: true,
   showBorders: true,
   compactMode: false,
@@ -1069,13 +1064,13 @@ export const defaultEditorSettings: PDFEditorSettings = {
   sectionStyle: 'standard',
   summaryStyle: 'right',
   pageMargins: 'normal',
-  showAcceptRejectButtons: true,
-  showWarranty: true,
   showDecorations: true,
   decorationIntensity: 'medium',
   showPageBorder: true,
   showCornerOrnaments: true,
   showSectionDividers: true,
+  headerInfoColumns: 2,
+  showAcceptRejectButtons: true,
   useBrandColors: false,
   advancedSettings: defaultAdvancedSettings,
 };

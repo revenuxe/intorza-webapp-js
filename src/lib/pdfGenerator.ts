@@ -115,6 +115,8 @@ interface QuotationData {
   };
   settings?: QuotationPdfSettings;
   editorSettings?: PDFEditorSettings;
+  // Preview mode - if true, returns doc without saving
+  previewOnly?: boolean;
 }
 
 // --- Helpers ---
@@ -249,18 +251,15 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
+  
+  // Calculate margin & insets based on decoration settings
+  const hasBorderDecoration = editorSettings?.showDecorations && editorSettings?.showPageBorder && theme.decorations.pageBorderInset > 0;
+  const borderInset = hasBorderDecoration ? theme.decorations.pageBorderInset : 0;
+  const margin = Math.max(15, borderInset + 5);
   const contentWidth = pageWidth - (margin * 2);
-  let yPosition = 15;
-
-  // --- Draw Page Decorations (borders, corners, watermarks) ---
-  if (editorSettings) {
-    drawAllDecorations(doc, theme, editorSettings);
-    // Adjust starting position if page border is enabled
-    if (editorSettings.showDecorations && editorSettings.showPageBorder && theme.decorations.pageBorderInset > 0) {
-      yPosition = theme.decorations.pageBorderInset + 5;
-    }
-  }
+  const pageTopY = hasBorderDecoration ? borderInset + 8 : 15;
+  const pageBottomY = hasBorderDecoration ? pageHeight - borderInset - 8 : pageHeight - 15;
+  let yPosition = pageTopY;
 
   // --- Design System Colors (from theme) ---
   const getHighlightColor = (): [number, number, number] => {
@@ -388,74 +387,165 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- 2. Info Cards (Client & Project) ---
   if (settings.showProjectDetails) {
-    const headerLayout = editorSettings?.headerLayout || 'unified';
-    
-    if (headerLayout === 'unified') {
-      // UNIFIED LAYOUT: Single box with "QUOTATION DETAILS" header
-      const boxHeight = 38;
-      const boxPadding = 8;
-      
-      // Draw the unified box
+    const headerColumns = editorSettings?.headerInfoColumns || 2;
+    const gap = 8;
+
+    if (headerColumns === 1) {
+      // Single row: Quotation For + Project Details side-by-side in one card
+      const cardHeight = 48;
       doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
       doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-      doc.roundedRect(margin, yPosition, contentWidth, boxHeight, 2, 2, 'FD');
-      
-      // Header: QUOTATION DETAILS
-      let headerY = yPosition + 8;
+      doc.roundedRect(margin, yPosition, contentWidth, cardHeight, 2, 2, 'FD');
+
+      const halfWidth = contentWidth / 2;
+      const cardPadding = 8;
+      let leftY = yPosition + 10;
+      const leftX = margin + cardPadding;
+
+      // Left half: Client info
       setHeadingFont('bold');
       doc.setFontSize(8);
       doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-      doc.text('QUOTATION DETAILS', margin + boxPadding, headerY);
-      
-      // Content row - two columns
-      const contentStartY = headerY + 6;
-      const leftColX = margin + boxPadding;
-      const rightColX = margin + (contentWidth / 2) + 5;
-      const labelWidth = 32;
-      
-      // Left column: Project Name, Client Name, Client Address
-      let leftY = contentStartY;
-      const addLeftMeta = (label: string, value: string) => {
+      doc.text('QUOTATION FOR', leftX, leftY);
+      leftY += 7;
+      setHeadingFont('bold');
+      doc.setFontSize(11);
+      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+      doc.text(data.clientName, leftX, leftY);
+      leftY += 6;
+      setBodyFont('normal');
+      doc.setFontSize(9);
+      doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+      const clientAddr1 = doc.splitTextToSize(data.clientAddress, halfWidth - (cardPadding * 2));
+      doc.text(clientAddr1, leftX, leftY);
+
+      // Right half: Project details
+      let rightY = yPosition + 10;
+      const rightX = margin + halfWidth + cardPadding;
+      const metaValueOffset = 32;
+
+      setHeadingFont('bold');
+      doc.setFontSize(8);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('PROJECT DETAILS', rightX, rightY);
+      rightY += 7;
+
+      const addMetaSingle = (label: string, value: string) => {
         setBodyFont('normal');
         doc.setFontSize(9);
         doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-        doc.text(label, leftColX, leftY);
+        doc.text(label, rightX, rightY);
         setBodyFont('bold');
         doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-        const maxValWidth = (contentWidth / 2) - labelWidth - boxPadding - 10;
-        const truncatedVal = value.length > 25 ? value.substring(0, 25) + '...' : value;
-        doc.text(truncatedVal, leftColX + labelWidth, leftY);
-        leftY += 5;
+        doc.text(value, rightX + metaValueOffset, rightY);
+        rightY += 6;
       };
-      
-      addLeftMeta('Project Name:', data.quotationTitle || 'N/A');
-      addLeftMeta('Client Name:', data.clientName || 'N/A');
-      addLeftMeta('Client Address:', data.clientAddress || 'N/A');
-      
-      // Right column: Date of Proposal, Valid Till, Place of Project
-      let rightY = contentStartY;
-      const addRightMeta = (label: string, value: string) => {
-        setBodyFont('normal');
-        doc.setFontSize(9);
-        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-        doc.text(label, rightColX, rightY);
-        setBodyFont('bold');
-        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-        doc.text(value, rightColX + labelWidth, rightY);
-        rightY += 5;
-      };
-      
-      addRightMeta('Date of Proposal:', data.dateOfProposal || 'N/A');
-      addRightMeta('Valid Till:', data.quotationValidTill || 'N/A');
-      addRightMeta('Place of Project:', data.placeOfProject || 'N/A');
-      
-      yPosition += boxHeight + 8;
-    } else {
-      // CARDS LAYOUT: Two separate cards (original layout)
+
+      addMetaSingle('Date:', data.dateOfProposal);
+      addMetaSingle('Valid Till:', data.quotationValidTill);
+      addMetaSingle('Project:', data.quotationTitle.substring(0, 20));
+      addMetaSingle('Warranty:', `${data.warranty} Years`);
+
+      // Vertical divider
+      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+      doc.setLineWidth(0.3);
+      doc.line(margin + halfWidth, yPosition + 6, margin + halfWidth, yPosition + cardHeight - 6);
+
+      yPosition += cardHeight + 10;
+
+    } else if (headerColumns === 3) {
+      // Three cards
       const cardHeight = 48;
-      const gap = 12;
+      const cardWidth = (contentWidth - gap * 2) / 3;
+      const cardPadding = 6;
+
+      // Card 1: Client Info
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+      doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+
+      let c1Y = yPosition + 10;
+      const c1X = margin + cardPadding;
+      setHeadingFont('bold');
+      doc.setFontSize(7);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('QUOTATION FOR', c1X, c1Y);
+      c1Y += 6;
+      setHeadingFont('bold');
+      doc.setFontSize(10);
+      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+      doc.text(data.clientName.substring(0, 18), c1X, c1Y);
+      c1Y += 5;
+      setBodyFont('normal');
+      doc.setFontSize(8);
+      doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+      const addr3 = doc.splitTextToSize(data.clientAddress, cardWidth - cardPadding * 2);
+      doc.text(addr3.slice(0, 3), c1X, c1Y);
+
+      // Card 2: Project Details
+      const c2X = margin + cardWidth + gap;
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.roundedRect(c2X, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+
+      let c2Y = yPosition + 10;
+      const c2ContentX = c2X + cardPadding;
+      setHeadingFont('bold');
+      doc.setFontSize(7);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('PROJECT DETAILS', c2ContentX, c2Y);
+      c2Y += 6;
+
+      const addMeta3 = (label: string, value: string) => {
+        setBodyFont('normal');
+        doc.setFontSize(8);
+        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+        doc.text(label, c2ContentX, c2Y);
+        setBodyFont('bold');
+        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+        doc.text(value, c2ContentX + 24, c2Y);
+        c2Y += 5.5;
+      };
+
+      addMeta3('Date:', data.dateOfProposal);
+      addMeta3('Valid:', data.quotationValidTill);
+      addMeta3('Project:', data.quotationTitle.substring(0, 14));
+
+      // Card 3: Extra Details
+      const c3X = margin + (cardWidth + gap) * 2;
+      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+      doc.roundedRect(c3X, yPosition, cardWidth, cardHeight, 2, 2, 'FD');
+
+      let c3Y = yPosition + 10;
+      const c3ContentX = c3X + cardPadding;
+      setHeadingFont('bold');
+      doc.setFontSize(7);
+      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+      doc.text('ADDITIONAL INFO', c3ContentX, c3Y);
+      c3Y += 6;
+
+      const addMeta3c = (label: string, value: string) => {
+        setBodyFont('normal');
+        doc.setFontSize(8);
+        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+        doc.text(label, c3ContentX, c3Y);
+        setBodyFont('bold');
+        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+        doc.text(value, c3ContentX + 24, c3Y);
+        c3Y += 5.5;
+      };
+
+      addMeta3c('Warranty:', `${data.warranty} Yrs`);
+      if (data.projectType) addMeta3c('Type:', data.projectType.substring(0, 14));
+      if (data.placeOfProject) addMeta3c('Place:', data.placeOfProject.substring(0, 14));
+      if (data.projectDeadline) addMeta3c('Deadline:', data.projectDeadline);
+
+      yPosition += cardHeight + 10;
+
+    } else {
+      // Default: Two cards (existing behavior)
+      const cardHeight = 48;
       const cardWidth = (contentWidth - gap) / 2;
-    
+
       // Left Card: Client Info
       doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
       doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
@@ -529,9 +619,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   for (const section of data.sections) {
     // Check page break
-    if (yPosition > pageHeight - 50) {
+    if (yPosition > pageBottomY - 35) {
       doc.addPage();
-      yPosition = 15;
+      yPosition = pageTopY;
     }
 
     // Section Header "Card"
@@ -608,7 +698,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           // Amount column - reduced width
           4: { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' }
         },
-        margin: { left: margin, right: margin },
+        margin: { left: margin, right: margin, top: pageTopY },
         didDrawPage: (d) => {
           if (d.cursor) yPosition = d.cursor.y;
         }
@@ -752,7 +842,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           valign: 'middle',
         },
         columnStyles: columnStyles as any,
-        margin: { left: margin, right: margin },
+        margin: { left: margin, right: margin, top: pageTopY },
         didDrawPage: (d) => {
           if (d.cursor) yPosition = d.cursor.y;
         }
@@ -822,9 +912,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   // --- 4. Payment Summary ---
-  if (yPosition > pageHeight - 120) {
+  if (yPosition > pageBottomY - 105) {
     doc.addPage();
-    yPosition = 15;
+    yPosition = pageTopY;
   }
 
   // Calculations
@@ -1021,9 +1111,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- 6. Terms & Conditions ---
   if (settings.showTermsConditions) {
-    if (yPosition > pageHeight - 60) {
+    if (yPosition > pageBottomY - 45) {
       doc.addPage();
-      yPosition = 15;
+      yPosition = pageTopY;
     }
 
   setHeadingFont('bold');
@@ -1037,9 +1127,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   
   // Helper to add titled blocks with points
   const addBlock = (title: string, points: string[]) => {
-    if (yPosition > pageHeight - 40) {
+    if (yPosition > pageBottomY - 25) {
       doc.addPage();
-      yPosition = 15;
+      yPosition = pageTopY;
     }
     if (title) {
         setBodyFont('bold');
@@ -1059,9 +1149,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const splitText = doc.splitTextToSize(point, contentWidth - 5);
       
       splitText.forEach((line: string, lineIndex: number) => {
-        if (yPosition > pageHeight - 20) {
+        if (yPosition > pageBottomY - 5) {
           doc.addPage();
-          yPosition = 15;
+          yPosition = pageTopY;
         }
         
         // Add bullet only on first line of each point
@@ -1133,9 +1223,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const hasBankInfo = bank.bankName || bank.accountNumber || bank.ifscCode || bank.upiId;
     
     if (hasBankInfo) {
-      if (yPosition > pageHeight - 80) {
+      if (yPosition > pageBottomY - 65) {
         doc.addPage();
-        yPosition = 15;
+        yPosition = pageTopY;
       }
 
       setHeadingFont('bold');
@@ -1189,9 +1279,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   if (settings.showSignatureArea) {
-    if (yPosition > pageHeight - 50) {
+    if (yPosition > pageBottomY - 35) {
       doc.addPage();
-      yPosition = pageHeight - 60;
+      yPosition = pageBottomY - 45;
     } else {
       yPosition += 10;
     }
@@ -1225,11 +1315,11 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   // --- Accept/Reject Links Section ---
-  const showAcceptReject = data.editorSettings?.showAcceptRejectButtons !== false;
+  const showAcceptReject = editorSettings?.showAcceptRejectButtons ?? true;
   if (data.quotationId && showAcceptReject) {
-    if (yPosition > pageHeight - 45) {
+    if (yPosition > pageBottomY - 30) {
       doc.addPage();
-      yPosition = 15;
+      yPosition = pageTopY;
     } else {
       yPosition += 15;
     }
@@ -1298,20 +1388,33 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     doc.textWithLink(rejectUrl, pageWidth / 2, yPosition, { url: rejectUrl, align: 'center' });
   }
 
-  // Footer
-  doc.setFontSize(7);
-  doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-  doc.text("This quotation is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
+  // --- Apply decorations & footer to ALL pages ---
+  const totalPagesCount = doc.getNumberOfPages();
+  const footerY = hasBorderDecoration ? pageHeight - borderInset - 3 : pageHeight - 10;
+  
+  for (let p = 1; p <= totalPagesCount; p++) {
+    doc.setPage(p);
+    
+    // Draw decorations
+    if (editorSettings) {
+      drawAllDecorations(doc, theme, editorSettings, p, totalPagesCount);
+    }
+    
+    // Footer
+    doc.setFontSize(7);
+    doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+    doc.text("This quotation is computer-generated.", pageWidth / 2, footerY, { align: 'center' });
+    
+    // Page number
+    doc.text(`Page ${p} of ${totalPagesCount}`, pageWidth - margin, footerY, { align: 'right' });
+  }
 
-  // Return the document for external handling
-  return doc;
-};
+  // If previewOnly is set, just return the doc without saving
+  if (data.previewOnly) {
+    return doc;
+  }
 
-/**
- * Download quotation PDF locally
- */
-export const downloadQuotationPDF = async (data: QuotationData & { settings?: QuotationPdfSettings; editorSettings?: PDFEditorSettings }) => {
-  const doc = await generateQuotationPDF(data);
+  // Generate PDF and handle sharing + download
   const fileName = `Quotation_${data.clientName.replace(/\s+/g, '_')}.pdf`;
   const pdfBlob = doc.output('blob');
   
@@ -1338,48 +1441,4 @@ export const downloadQuotationPDF = async (data: QuotationData & { settings?: Qu
   }
   
   return doc;
-};
-
-/**
- * Upload quotation PDF to S3 and return the URL
- */
-export const uploadQuotationPDFToS3 = async (
-  data: QuotationData & { settings?: QuotationPdfSettings; editorSettings?: PDFEditorSettings },
-  options?: { downloadLocally?: boolean }
-): Promise<{ url: string; blob: Blob }> => {
-  const { uploadToS3 } = await import('./s3Upload');
-  
-  const doc = await generateQuotationPDF(data);
-  const fileName = `Quotation_${data.clientName.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
-  const pdfBlob = doc.output('blob');
-  
-  // Upload to S3
-  const result = await uploadToS3(new File([pdfBlob], fileName, { type: 'application/pdf' }), {
-    folder: 'quotes',
-    fileName: fileName,
-    contentType: 'application/pdf'
-  });
-  
-  // Optionally download locally as well
-  if (options?.downloadLocally) {
-    doc.save(fileName);
-    
-    // Try Web Share API
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
-        const shareData = { files: [file], title: `Quotation for ${data.clientName}` };
-        if (navigator.canShare && navigator.canShare(shareData)) {
-          await navigator.share(shareData);
-        }
-      } catch (err) {
-        const error = err as Error;
-        if (error.name !== 'AbortError') {
-          console.log('Share failed:', error.message);
-        }
-      }
-    }
-  }
-  
-  return { url: result.url, blob: pdfBlob };
 };

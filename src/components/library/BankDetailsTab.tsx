@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { uploadToS3 } from "@/lib/s3Upload";
 
 interface BankTemplate {
   id: string;
@@ -201,10 +200,17 @@ export const BankDetailsTab = () => {
       if (!user) return;
       
       const fileExt = file.name.split('.').pop();
-      const { url: publicUrl } = await uploadToS3(file, {
-        folder: "qr-codes",
-        fileName: `${user.id}/bank-qr-${Date.now()}.${fileExt}`,
-      });
+      const fileName = `${user.id}/bank-qr-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('company-logos')
+        .upload(fileName, file, { upsert: true });
+      
+      if (uploadError) throw uploadError;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('company-logos')
+        .getPublicUrl(fileName);
       
       setFormData({ ...formData, qr_code_url: publicUrl });
       toast({ title: "QR code uploaded" });

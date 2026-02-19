@@ -10,7 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { BillingSection } from "@/components/BillingSection";
 import { BrandColorExtractor } from "@/components/BrandColorExtractor";
-import { DataMigrationCard } from "@/components/DataMigrationCard";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Collapsible, 
@@ -23,7 +22,6 @@ import {
   getCountryByCode,
   type CountryConfig 
 } from "@/lib/countryConfig";
-import { uploadToS3, deleteFromS3 } from "@/lib/s3Upload";
 
 const Settings = () => {
   const { toast } = useToast();
@@ -149,17 +147,23 @@ const Settings = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      // Delete old logo from S3 if exists
-      if (profile.logo_url && profile.logo_url.includes('s3.')) {
-        await deleteFromS3(profile.logo_url);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/logo.${fileExt}`;
+
+      if (profile.logo_url) {
+        const oldPath = profile.logo_url.split('/').slice(-2).join('/');
+        await supabase.storage.from('company-logos').remove([oldPath]);
       }
 
-      // Upload to S3
-      const fileExt = file.name.split('.').pop();
-      const { url: publicUrl } = await uploadToS3(file, {
-        folder: "logos",
-        fileName: `${user.id}/logo.${fileExt}`,
-      });
+      const { error: uploadError } = await supabase.storage
+        .from('company-logos')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('company-logos')
+        .getPublicUrl(fileName);
 
       const { error: updateError } = await supabase
         .from('profiles')
@@ -203,17 +207,23 @@ const Settings = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
 
-      // Delete old signature from S3 if exists
-      if (profile.signature_url && profile.signature_url.includes('s3.')) {
-        await deleteFromS3(profile.signature_url);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/signature.${fileExt}`;
+
+      if (profile.signature_url) {
+        const oldPath = profile.signature_url.split('/').slice(-2).join('/');
+        await supabase.storage.from('company-logos').remove([oldPath]);
       }
 
-      // Upload to S3
-      const fileExt = file.name.split('.').pop();
-      const { url: publicUrl } = await uploadToS3(file, {
-        folder: "signatures",
-        fileName: `${user.id}/signature.${fileExt}`,
-      });
+      const { error: uploadError } = await supabase.storage
+        .from('company-logos')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('company-logos')
+        .getPublicUrl(fileName);
 
       const { error: updateError } = await supabase
         .from('profiles')
@@ -630,9 +640,6 @@ const Settings = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* AWS Data Migration */}
-        <DataMigrationCard />
 
         <div className="flex justify-end">
           <Button onClick={handleSave} disabled={loading} size="lg">
