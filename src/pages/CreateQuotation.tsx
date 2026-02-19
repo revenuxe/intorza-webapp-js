@@ -200,10 +200,25 @@ const CreateQuotation = () => {
   }, [automationLoading, quotationId, continueAction, getSmartDefaults]);
 
   useEffect(() => {
-    loadProfile();
-    if (quotationId) {
-      loadQuotation(quotationId);
-    }
+    const init = async () => {
+      // Wait for auth session before loading data (important for RLS)
+      const { data: { session } } = await supabase.auth.getSession();
+      loadProfile();
+      if (quotationId && session) {
+        await loadQuotation(quotationId);
+      } else if (quotationId && !session) {
+        // Listen for auth state change if not yet authenticated
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+          if (newSession && quotationId) {
+            loadQuotation(quotationId);
+            subscription.unsubscribe();
+          }
+        });
+        // Cleanup after 10 seconds to avoid memory leaks
+        setTimeout(() => subscription.unsubscribe(), 10000);
+      }
+    };
+    init();
   }, [quotationId]);
 
   // Handle continuing actions after login (wait for form to be restored and profile to be loaded)
