@@ -312,7 +312,7 @@ const QuotationDetail = () => {
         description: `Quotation marked as ${status}`,
       });
 
-      // Record client behavior and create client in AWS when accepted
+      // Record client behavior for learning
       if (user && quotation && (status === 'accepted' || status === 'rejected')) {
         try {
           await createClientBehavior({
@@ -327,21 +327,8 @@ const QuotationDetail = () => {
             won_or_lost: status === 'accepted' ? 'won' : 'lost',
           });
           await logAdminAction(user.id, user.id, `mark_quotation_${status}`, 'quotation', id!);
-          
-          // Auto-create client in AWS when quotation is accepted
-          if (status === 'accepted' && quotation.client_name) {
-            const { createClient } = await import('@/lib/awsApi');
-            const clientId = quotation.client_id || crypto.randomUUID();
-            await createClient({
-              client_id: clientId,
-              company_id: user.id,
-              name: quotation.client_name,
-              address: quotation.client_address || undefined,
-            });
-            console.log('Client auto-created in AWS:', quotation.client_name);
-          }
         } catch (awsError) {
-          console.error('Failed to record client behavior or create client:', awsError);
+          console.error('Failed to record client behavior:', awsError);
         }
       }
 
@@ -544,11 +531,11 @@ const QuotationDetail = () => {
         </div>
 
         {/* Action Buttons */}
-        {quotation.status?.toLowerCase() !== 'converted' && (
+        {quotation.status !== 'converted' && (
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-col sm:flex-row gap-3">
-                {quotation.status?.toLowerCase() !== 'accepted' && quotation.status?.toLowerCase() !== 'rejected' && (
+                {quotation.status !== 'accepted' && quotation.status !== 'rejected' && (
                   <>
                     <Button 
                       onClick={() => checkProFeature('Mark as Accepted', () => handleMarkStatus('accepted'))}
@@ -568,7 +555,7 @@ const QuotationDetail = () => {
                     </Button>
                   </>
                 )}
-                {quotation.status?.toLowerCase() === 'accepted' && (
+                {quotation.status === 'accepted' && (
                   <Button 
                     onClick={() => checkProFeature('Convert to Invoice', () => setConvertDialogOpen(true))}
                     className="flex-1"
