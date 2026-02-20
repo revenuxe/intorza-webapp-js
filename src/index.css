@@ -136,6 +136,16 @@ All colors MUST be HSL.
   }
 }
 
+/* Mobile-first compact form styling */
+@layer components {
+  /* Compact inputs on mobile */
+  @media (max-width: 639px) {
+    .sm\:p-6, [class*="DialogContent"], [class*="SheetContent"] {
+      --form-gap: 0.75rem;
+    }
+  }
+}
+
 /* Custom loader animations */
 @keyframes loader-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
