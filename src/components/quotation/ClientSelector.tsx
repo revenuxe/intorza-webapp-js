@@ -29,6 +29,11 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
 
+  // Sync internal state when parent value changes (e.g., loading existing quotation)
+  React.useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
   // Filter clients based on input
   const filteredClients = useMemo(() => {
     if (!inputValue) return clients.slice(0, 10);
