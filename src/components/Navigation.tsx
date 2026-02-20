@@ -147,15 +147,13 @@ export const Navigation = ({ mobile }: NavigationProps) => {
       })}
 
       {/* Give Feedback button - below Settings */}
-      {!mobile && (
-        <button
-          onClick={() => openFeedback()}
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors mt-1"
-        >
-          <MessageSquare className="h-5 w-5" />
-          <span className="flex-1">Give Feedback</span>
-        </button>
-      )}
+      <button
+        onClick={() => openFeedback()}
+        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 transition-colors mt-2"
+      >
+        <MessageSquare className="h-5 w-5" />
+        <span className="flex-1">Feedback</span>
+      </button>
     </nav>
   );
 };
