@@ -52,6 +52,7 @@ interface InvoiceData {
   };
   editorSettings?: PDFEditorSettings;
   invoiceSettings?: InvoiceSettings;
+  previewOnly?: boolean;
 }
 
 // Currency-safe font for numeric values
@@ -715,6 +716,11 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
   doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
   doc.text("This invoice is computer-generated.", pageWidth / 2, pageHeight - 10, { align: 'center' });
 
+  // If previewOnly, return doc without saving
+  if (data.previewOnly) {
+    return doc;
+  }
+
   // Generate PDF and handle sharing + download
   const fileName = `Invoice_${data.invoiceNumber}.pdf`;
   const pdfBlob = doc.output('blob');
@@ -728,12 +734,10 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       const shareData = { files: [file], title: `Invoice ${data.invoiceNumber}` };
       
-      // Check if file sharing is supported
       if (navigator.canShare && navigator.canShare(shareData)) {
         await navigator.share(shareData);
       }
     } catch (err) {
-      // User cancelled or share failed - file already downloaded
       const error = err as Error;
       if (error.name !== 'AbortError') {
         console.log('Share failed:', error.message);
