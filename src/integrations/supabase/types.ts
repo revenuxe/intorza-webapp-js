@@ -169,6 +169,13 @@ export type Database = {
             foreignKeyName: "feedback_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -294,6 +301,13 @@ export type Database = {
             foreignKeyName: "item_usage_patterns_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_usage_patterns_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -337,6 +351,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payment_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payment_logs_user_id_fkey"
             columns: ["user_id"]
@@ -695,6 +716,13 @@ export type Database = {
             foreignKeyName: "quotation_preferences_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: true
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -934,6 +962,13 @@ export type Database = {
             foreignKeyName: "section_templates_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "section_templates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1100,6 +1135,13 @@ export type Database = {
             foreignKeyName: "subscription_events_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1160,6 +1202,13 @@ export type Database = {
             foreignKeyName: "tasks_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -1168,6 +1217,66 @@ export type Database = {
             columns: ["quotation_id"]
             isOneToOne: false
             referencedRelation: "quotations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_member_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          docs_request_note: string | null
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          rejection_reason: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+          work_type: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          docs_request_note?: string | null
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          rejection_reason?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          work_type?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          docs_request_note?: string | null
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          rejection_reason?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          work_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_member_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_member_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1213,6 +1322,13 @@ export type Database = {
           work_type?: Database["public"]["Enums"]["work_type"]
         }
         Relationships: [
+          {
+            foreignKeyName: "team_members_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_public"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "team_members_company_id_fkey"
             columns: ["company_id"]
@@ -1380,7 +1496,21 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      companies_public: {
+        Row: {
+          company_name: string | null
+          id: string | null
+        }
+        Insert: {
+          company_name?: string | null
+          id?: string | null
+        }
+        Update: {
+          company_name?: string | null
+          id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {

@@ -40,20 +40,11 @@ const TeamLogin = () => {
     checkAuth();
   }, [navigate]);
 
-  // Check if email is valid team format
-  const isValidTeamEmail = (email: string) => {
-    return email.toLowerCase().endsWith('@intorza.com');
-  };
+  // No longer restricting to @intorza.com - any email can be a team member
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate email format for team members
-    if (!isValidTeamEmail(formData.email)) {
-      toast.error("Team members must use their @intorza.com email. For company/user login, go to /auth");
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -73,8 +64,24 @@ const TeamLogin = () => {
         .maybeSingle();
 
       if (teamError || !teamMember) {
+        // Check if there's a pending request
+        const { data: pendingRequest } = await supabase
+          .from('team_member_requests')
+          .select('status')
+          .eq('user_id', data.user.id)
+          .maybeSingle();
+        
         await supabase.auth.signOut();
-        toast.error("This account is not linked to a team member profile. Contact your employer.");
+        
+        if (pendingRequest?.status === 'pending') {
+          toast.error("Your request is still pending approval. Please wait for the organization to approve.");
+        } else if (pendingRequest?.status === 'rejected') {
+          toast.error("Your request was rejected. Contact the organization for details.");
+        } else if (pendingRequest?.status === 'docs_requested') {
+          toast.error("Additional documentation requested. Contact the organization for details.");
+        } else {
+          toast.error("No team membership found. Sign up first to request access.");
+        }
         setLoading(false);
         return;
       }
@@ -123,7 +130,7 @@ const TeamLogin = () => {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="yourcompany.yourname@intorza.com"
+                  placeholder="your.email@example.com"
                 />
               </div>
               <div className="space-y-2">
@@ -141,8 +148,14 @@ const TeamLogin = () => {
               </Button>
             </form>
 
-            <p className="mt-6 text-xs text-muted-foreground text-center">
-              Don't have login credentials? Contact your employer to get your account details.
+            <p className="mt-6 text-sm text-muted-foreground text-center">
+              Don't have an account?{' '}
+              <button
+                onClick={() => navigate('/team/signup')}
+                className="text-primary font-medium hover:underline"
+              >
+                Sign up here
+              </button>
             </p>
           </CardContent>
         </Card>
