@@ -11,10 +11,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Eye, Navigation, Calendar, ChevronRight } from "lucide-react";
+import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Eye, Navigation, Calendar, ChevronRight, CheckCircle, XCircle, FileQuestion, AlertCircle } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useFeedback } from "@/components/FeedbackProvider";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+
+interface TeamMemberRequest {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+  work_type: string;
+  company_id: string;
+  user_id: string | null;
+  status: string;
+  rejection_reason: string | null;
+  docs_request_note: string | null;
+  created_at: string;
+}
 
 interface TeamMember {
   id: string;
@@ -117,6 +132,13 @@ const Team = () => {
     selectedMembers: [] as string[],
   });
 
+  // Approval requests
+  const [memberRequests, setMemberRequests] = useState<TeamMemberRequest[]>([]);
+  const [actionNote, setActionNote] = useState('');
+  const [actionDialogOpen, setActionDialogOpen] = useState(false);
+  const [actionType, setActionType] = useState<'reject' | 'docs_requested'>('reject');
+  const [selectedRequest, setSelectedRequest] = useState<TeamMemberRequest | null>(null);
+
   useEffect(() => {
     if (user) {
       fetchAll();
@@ -129,8 +151,91 @@ const Team = () => {
       fetchTeamMembers(),
       fetchTodayAttendance(),
       fetchQuotations(),
+      fetchMemberRequests(),
     ]);
     setLoading(false);
+  };
+
+  const fetchMemberRequests = async () => {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('team_member_requests')
+      .select('*')
+      .eq('company_id', user.id)
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      setMemberRequests(data as TeamMemberRequest[]);
+    }
+  };
+
+  const handleApproveRequest = async (request: TeamMemberRequest) => {
+    if (!user) return;
+    try {
+      // Create team member from request
+      const { data: newMember, error: memberError } = await supabase
+        .from('team_members')
+        .insert({
+          company_id: user.id,
+          name: request.name,
+          email: request.email,
+          phone: request.phone,
+          work_type: request.work_type as any,
+          user_id: request.user_id,
+        })
+        .select()
+        .single();
+
+      if (memberError) throw memberError;
+
+      // Update request status
+      const { error: updateError } = await supabase
+        .from('team_member_requests')
+        .update({ status: 'approved' })
+        .eq('id', request.id);
+
+      if (updateError) throw updateError;
+
+      toast.success(`${request.name} approved and added to team!`);
+      fetchMemberRequests();
+      fetchTeamMembers();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to approve request");
+    }
+  };
+
+  const handleRejectOrDocsRequest = async () => {
+    if (!selectedRequest) return;
+    try {
+      const updateData: any = { status: actionType === 'reject' ? 'rejected' : 'docs_requested' };
+      if (actionType === 'reject') {
+        updateData.rejection_reason = actionNote;
+      } else {
+        updateData.docs_request_note = actionNote;
+      }
+
+      const { error } = await supabase
+        .from('team_member_requests')
+        .update(updateData)
+        .eq('id', selectedRequest.id);
+
+      if (error) throw error;
+
+      toast.success(actionType === 'reject' ? 'Request rejected' : 'Documentation requested');
+      setActionDialogOpen(false);
+      setActionNote('');
+      setSelectedRequest(null);
+      fetchMemberRequests();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update request");
+    }
+  };
+
+  const openActionDialog = (request: TeamMemberRequest, type: 'reject' | 'docs_requested') => {
+    setSelectedRequest(request);
+    setActionType(type);
+    setActionNote('');
+    setActionDialogOpen(true);
   };
 
   const fetchCompanyName = async () => {
@@ -576,7 +681,7 @@ const Team = () => {
             </DialogContent>
           </Dialog>
 
-          {/* Add Member Dialog */}
+          {/* Edit Member Dialog (triggered programmatically) */}
           <Dialog open={memberDialogOpen} onOpenChange={(open) => {
             setMemberDialogOpen(open);
             if (!open) {
@@ -584,12 +689,6 @@ const Team = () => {
               setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '', password: '' });
             }
           }}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add Member
-              </Button>
-            </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>{editingMember ? 'Edit' : 'Add'} Team Member</DialogTitle>
@@ -725,7 +824,15 @@ const Team = () => {
       <Tabs defaultValue="teams" className="space-y-4">
         <TabsList>
           <TabsTrigger value="teams">Project Teams</TabsTrigger>
-          <TabsTrigger value="members">All Members</TabsTrigger>
+          <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="approvals" className="relative">
+            Approvals
+            {memberRequests.filter(r => r.status === 'pending').length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs font-bold">
+                {memberRequests.filter(r => r.status === 'pending').length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="teams" className="space-y-4">
@@ -922,7 +1029,135 @@ const Team = () => {
             </div>
           )}
         </TabsContent>
+
+        {/* Approvals Tab */}
+        <TabsContent value="approvals" className="space-y-4">
+          {memberRequests.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6 text-center py-12">
+                <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No pending requests</p>
+                <p className="text-sm text-muted-foreground">When team members sign up and request to join, they'll appear here</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3">
+              {memberRequests.map((request) => {
+                const isPending = request.status === 'pending';
+                const statusColors: Record<string, string> = {
+                  pending: 'bg-amber-100 text-amber-800 border-amber-200',
+                  approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                  rejected: 'bg-red-100 text-red-800 border-red-200',
+                  docs_requested: 'bg-blue-100 text-blue-800 border-blue-200',
+                };
+                const statusIcons: Record<string, React.ReactNode> = {
+                  pending: <AlertCircle className="h-3 w-3" />,
+                  approved: <CheckCircle className="h-3 w-3" />,
+                  rejected: <XCircle className="h-3 w-3" />,
+                  docs_requested: <FileQuestion className="h-3 w-3" />,
+                };
+
+                return (
+                  <Card key={request.id}>
+                    <CardContent className="pt-4 pb-4">
+                      <div className="flex flex-col sm:flex-row justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <h3 className="font-semibold">{request.name}</h3>
+                            <Badge className={workTypes.find(t => t.value === request.work_type) ? getWorkTypeBadgeColor(request.work_type) : 'bg-muted text-muted-foreground'}>
+                              {workTypes.find(t => t.value === request.work_type)?.label || request.work_type}
+                            </Badge>
+                            <Badge variant="outline" className={statusColors[request.status] || ''}>
+                              <span className="flex items-center gap-1">
+                                {statusIcons[request.status]}
+                                {request.status === 'docs_requested' ? 'Docs Requested' : request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                              </span>
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              {request.email}
+                            </span>
+                            {request.phone && (
+                              <span className="flex items-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                {request.phone}
+                              </span>
+                            )}
+                            <span className="text-xs">
+                              {new Date(request.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          {request.rejection_reason && (
+                            <p className="text-xs text-destructive mt-1">Reason: {request.rejection_reason}</p>
+                          )}
+                          {request.docs_request_note && (
+                            <p className="text-xs text-blue-600 mt-1">Note: {request.docs_request_note}</p>
+                          )}
+                        </div>
+                        {isPending && (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button size="sm" variant="outline" className="text-destructive border-destructive/30" onClick={() => openActionDialog(request, 'reject')}>
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Reject
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => openActionDialog(request, 'docs_requested')}>
+                              <FileQuestion className="h-4 w-4 mr-1" />
+                              Request Docs
+                            </Button>
+                            <Button size="sm" onClick={() => handleApproveRequest(request)}>
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Approve
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
+
+      {/* Reject/Docs Request Dialog */}
+      <Dialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>
+              {actionType === 'reject' ? 'Reject Request' : 'Request Documentation'}
+            </DialogTitle>
+            <DialogDescription>
+              {actionType === 'reject' 
+                ? `Reject ${selectedRequest?.name}'s request to join your team.`
+                : `Ask ${selectedRequest?.name} for additional documentation.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>{actionType === 'reject' ? 'Reason (optional)' : 'What documents do you need?'}</Label>
+              <Textarea
+                value={actionNote}
+                onChange={(e) => setActionNote(e.target.value)}
+                placeholder={actionType === 'reject' ? 'Reason for rejection...' : 'Please provide ID proof, experience certificate...'}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setActionDialogOpen(false)}>Cancel</Button>
+            <Button 
+              variant={actionType === 'reject' ? 'destructive' : 'default'}
+              onClick={handleRejectOrDocsRequest}
+            >
+              {actionType === 'reject' ? 'Reject' : 'Send Request'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Project Detail Dialog */}
       <Dialog open={projectDetailOpen} onOpenChange={setProjectDetailOpen}>

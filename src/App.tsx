@@ -33,6 +33,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import PDFPreviewQA from "./pages/admin/PDFPreviewQA";
 import Team from "./pages/Team";
 import TeamLogin from "./pages/team/TeamLogin";
+import TeamSignup from "./pages/team/TeamSignup";
 import TeamDashboard from "./pages/team/TeamDashboard";
 import ProjectDetail from "./pages/team/ProjectDetail";
 import TermsAndConditions from "./pages/TermsAndConditions";
@@ -68,6 +69,7 @@ const App = () => (
                 
                 {/* Team member routes */}
                 <Route path="/team/login" element={<TeamLogin />} />
+                <Route path="/team/signup" element={<TeamSignup />} />
                 <Route path="/team/dashboard" element={<TeamDashboard />} />
                 
                 {/* Public routes with Layout - auth triggered on actions */}
