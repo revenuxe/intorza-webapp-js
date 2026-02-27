@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Eye, Navigation, Calendar, ChevronRight, CheckCircle, XCircle, FileQuestion, AlertCircle } from "lucide-react";
+import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Eye, Navigation, Calendar, ChevronRight, CheckCircle, XCircle, FileQuestion, AlertCircle, Hash, Copy, RefreshCw } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useFeedback } from "@/components/FeedbackProvider";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -116,6 +116,11 @@ const Team = () => {
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [companyName, setCompanyName] = useState("");
   
+  // Org code
+  const [orgCode, setOrgCode] = useState<string | null>(null);
+  const [orgCodeInput, setOrgCodeInput] = useState('');
+  const [orgCodeDialogOpen, setOrgCodeDialogOpen] = useState(false);
+  
   // Member form
   const [memberForm, setMemberForm] = useState({
     name: '',
@@ -126,7 +131,7 @@ const Team = () => {
   });
   const [creatingAuth, setCreatingAuth] = useState(false);
 
-  // Team form (create team = assign multiple members to project)
+  // Team form
   const [teamForm, setTeamForm] = useState({
     project_id: '',
     selectedMembers: [] as string[],
@@ -172,7 +177,6 @@ const Team = () => {
   const handleApproveRequest = async (request: TeamMemberRequest) => {
     if (!user) return;
     try {
-      // Create team member from request
       const { data: newMember, error: memberError } = await supabase
         .from('team_members')
         .insert({
@@ -188,7 +192,6 @@ const Team = () => {
 
       if (memberError) throw memberError;
 
-      // Update request status
       const { error: updateError } = await supabase
         .from('team_member_requests')
         .update({ status: 'approved' })
@@ -242,12 +245,13 @@ const Team = () => {
     if (!user) return;
     const { data } = await supabase
       .from('profiles')
-      .select('company_name')
+      .select('company_name, org_code')
       .eq('id', user.id)
       .single();
     if (data?.company_name) {
       setCompanyName(data.company_name);
     }
+    setOrgCode(data?.org_code || null);
   };
 
   const fetchQuotations = async () => {
@@ -290,7 +294,6 @@ const Team = () => {
       `);
 
     if (assignments) {
-      // Group by project
       const teamsMap = new Map<string, ProjectTeam>();
       
       for (const assignment of assignments) {
@@ -343,7 +346,6 @@ const Team = () => {
     setSelectedProject(team);
     setProjectDetailOpen(true);
     
-    // Fetch attendance for all members in this project
     const memberIds = team.members.map(m => m.id);
     
     const sevenDaysAgo = new Date();
@@ -387,6 +389,52 @@ const Team = () => {
     return `${cleanCompany}.${cleanName}@intorza.com`;
   };
 
+  // Org code handlers
+  const generateUniqueCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setOrgCodeInput(code);
+  };
+
+  const handleSaveOrgCode = async () => {
+    if (!user || !orgCodeInput.trim()) {
+      toast.error("Please enter a code");
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ org_code: orgCodeInput.trim().toUpperCase() })
+        .eq('id', user.id);
+
+      if (error) {
+        if (error.message.includes('unique') || error.message.includes('duplicate')) {
+          toast.error("This code is already taken. Try a different one.");
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      setOrgCode(orgCodeInput.trim().toUpperCase());
+      setOrgCodeDialogOpen(false);
+      toast.success("Organization code saved!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save code");
+    }
+  };
+
+  const copyOrgCode = () => {
+    if (orgCode) {
+      navigator.clipboard.writeText(orgCode);
+      toast.success("Code copied!");
+    }
+  };
+
   const handleAddMember = async () => {
     if (!user) {
       toast.error("Please login first");
@@ -426,7 +474,6 @@ const Team = () => {
         if (error) throw error;
         toast.success("Team member updated");
       } else {
-        // Create member record first
         const { data: newMember, error } = await supabase
           .from('team_members')
           .insert({
@@ -441,7 +488,6 @@ const Team = () => {
 
         if (error) throw error;
 
-        // Create auth account via edge function
         const { data: session } = await supabase.auth.getSession();
         const response = await supabase.functions.invoke('create-team-member-auth', {
           body: {
@@ -456,12 +502,10 @@ const Team = () => {
         });
 
         if (response.error) {
-          // Clean up the team member record if auth creation fails
           await supabase.from('team_members').delete().eq('id', newMember.id);
           throw new Error(response.error.message || 'Failed to create login account');
         }
 
-        // If project selected, assign to project
         if (memberForm.project_id && newMember) {
           await supabase
             .from('team_project_assignments')
@@ -554,7 +598,7 @@ const Team = () => {
       phone: member.phone || '',
       work_type: member.work_type,
       project_id: '',
-      password: '', // Password not shown when editing
+      password: '',
     });
     setMemberDialogOpen(true);
   };
@@ -589,6 +633,8 @@ const Team = () => {
     }));
   };
 
+  const pendingCount = memberRequests.filter(r => r.status === 'pending').length;
+
   if (!user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -600,326 +646,251 @@ const Team = () => {
   }
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-4 sm:space-y-6 pb-20">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Team Management</h1>
-          <p className="text-muted-foreground">Manage your team members and project assignments</p>
-        </div>
-        <div className="flex gap-2">
-          {/* Add Team Dialog */}
-          <Dialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <FolderPlus className="h-4 w-4 mr-2" />
-                Add Team
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create Project Team</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Select Project *</Label>
-                  <Select value={teamForm.project_id} onValueChange={(v) => setTeamForm({ ...teamForm, project_id: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {quotations.map((q) => (
-                        <SelectItem key={q.id} value={q.id}>
-                          {q.project_name} - {q.client_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Select Team Members *</Label>
-                  <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-                    {teamMembers.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">No members yet. Add members first.</p>
-                    ) : (
-                      teamMembers.map((member) => (
-                        <label
-                          key={member.id}
-                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                            teamForm.selectedMembers.includes(member.id)
-                              ? 'bg-primary/10 border border-primary/30'
-                              : 'hover:bg-muted'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={teamForm.selectedMembers.includes(member.id)}
-                            onChange={() => toggleMemberSelection(member.id)}
-                            className="rounded"
-                          />
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">{member.name}</p>
-                            <p className="text-xs text-muted-foreground">{member.email}</p>
-                          </div>
-                          <Badge className={getWorkTypeBadgeColor(member.work_type)} variant="secondary">
-                            {workTypes.find(t => t.value === member.work_type)?.label}
-                          </Badge>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                  {teamForm.selectedMembers.length > 0 && (
-                    <p className="text-xs text-muted-foreground">{teamForm.selectedMembers.length} member(s) selected</p>
-                  )}
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setTeamDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateTeam}>Create Team</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          {/* Edit Member Dialog (triggered programmatically) */}
-          <Dialog open={memberDialogOpen} onOpenChange={(open) => {
-            setMemberDialogOpen(open);
-            if (!open) {
-              setEditingMember(null);
-              setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '', password: '' });
-            }
-          }}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>{editingMember ? 'Edit' : 'Add'} Team Member</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Full Name *</Label>
-                  <Input
-                    value={memberForm.name}
-                    onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
-                    placeholder="Enter full name"
-                  />
-                  {memberForm.name && companyName && (
-                    <p className="text-xs text-muted-foreground">
-                      Login Email: <span className="font-medium text-foreground">{generateEmail(memberForm.name)}</span>
-                    </p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Phone Number</Label>
-                  <Input
-                    value={memberForm.phone}
-                    onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
-                    placeholder="Enter phone number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Work Type *</Label>
-                  <Select value={memberForm.work_type} onValueChange={(v) => setMemberForm({ ...memberForm, work_type: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {workTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {!editingMember && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Login Password *</Label>
-                      <Input
-                        type="password"
-                        value={memberForm.password}
-                        onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })}
-                        placeholder="Create login password (min 6 chars)"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Share this password with the team member to login at /team/login
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Assign to Project (Optional)</Label>
-                      <Select value={memberForm.project_id || "none"} onValueChange={(v) => setMemberForm({ ...memberForm, project_id: v === "none" ? "" : v })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select project" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No project</SelectItem>
-                          {quotations.map((q) => (
-                            <SelectItem key={q.id} value={q.id}>
-                              {q.project_name} - {q.client_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
-                )}
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setMemberDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleAddMember} disabled={creatingAuth}>
-                  {creatingAuth ? 'Creating...' : editingMember ? 'Update' : 'Add'} Member
+      <div className="flex flex-col gap-3">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold">Team Management</h1>
+            <p className="text-sm text-muted-foreground">Manage members & project assignments</p>
+          </div>
+          <div className="flex gap-1.5">
+            <Dialog open={teamDialogOpen} onOpenChange={setTeamDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="rounded-xl">
+                  <FolderPlus className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Add Team</span>
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto rounded-2xl">
+                <DialogHeader>
+                  <DialogTitle>Create Project Team</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Select Project *</Label>
+                    <Select value={teamForm.project_id} onValueChange={(v) => setTeamForm({ ...teamForm, project_id: v })}>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Choose a project" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {quotations.map((q) => (
+                          <SelectItem key={q.id} value={q.id}>
+                            {q.project_name} - {q.client_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Select Team Members *</Label>
+                    <div className="border rounded-xl p-3 max-h-60 overflow-y-auto space-y-2">
+                      {teamMembers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">No members yet. Add members first.</p>
+                      ) : (
+                        teamMembers.map((member) => (
+                          <label
+                            key={member.id}
+                            className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
+                              teamForm.selectedMembers.includes(member.id)
+                                ? 'bg-primary/10 border border-primary/30'
+                                : 'hover:bg-muted'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={teamForm.selectedMembers.includes(member.id)}
+                              onChange={() => toggleMemberSelection(member.id)}
+                              className="rounded"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{member.name}</p>
+                            </div>
+                            <Badge className={getWorkTypeBadgeColor(member.work_type)} variant="secondary">
+                              {workTypes.find(t => t.value === member.work_type)?.label}
+                            </Badge>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setTeamDialogOpen(false)} className="rounded-xl">Cancel</Button>
+                  <Button onClick={handleCreateTeam} className="rounded-xl">Create Team</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
+
+        {/* Org Code Card */}
+        <Card className="rounded-2xl">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Hash className="h-5 w-5 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Organization Code</p>
+                  {orgCode ? (
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold font-mono text-lg tracking-wider">{orgCode}</p>
+                      <button onClick={copyOrgCode} className="text-muted-foreground hover:text-foreground">
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Not set yet</p>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl shrink-0"
+                onClick={() => {
+                  setOrgCodeInput(orgCode || '');
+                  setOrgCodeDialogOpen(true);
+                }}
+              >
+                {orgCode ? 'Change' : 'Set Code'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="rounded-2xl">
+          <CardContent className="p-3">
             <div className="flex items-center gap-2">
               <Users className="h-5 w-5 text-primary" />
               <div>
-                <p className="text-2xl font-bold tabular-nums">{teamMembers.length}</p>
-                <p className="text-xs text-muted-foreground">Total Members</p>
+                <p className="text-xl font-bold tabular-nums">{teamMembers.length}</p>
+                <p className="text-[11px] text-muted-foreground">Members</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="rounded-2xl">
+          <CardContent className="p-3">
             <div className="flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-blue-600" />
               <div>
-                <p className="text-2xl font-bold tabular-nums">{projectTeams.length}</p>
-                <p className="text-xs text-muted-foreground">Active Teams</p>
+                <p className="text-xl font-bold tabular-nums">{projectTeams.length}</p>
+                <p className="text-[11px] text-muted-foreground">Teams</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="rounded-2xl">
+          <CardContent className="p-3">
             <div className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-green-600" />
               <div>
-                <p className="text-2xl font-bold tabular-nums">{todayAttendance.filter(a => a.clock_in && !a.clock_out).length}</p>
-                <p className="text-xs text-muted-foreground">Clocked In</p>
+                <p className="text-xl font-bold tabular-nums">{todayAttendance.filter(a => a.clock_in && !a.clock_out).length}</p>
+                <p className="text-[11px] text-muted-foreground">Clocked In</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
+        <Card className="rounded-2xl">
+          <CardContent className="p-3">
             <div className="flex items-center gap-2">
               <MapPin className="h-5 w-5 text-amber-600" />
               <div>
-                <p className="text-2xl font-bold tabular-nums">{todayAttendance.length}</p>
-                <p className="text-xs text-muted-foreground">Attended Today</p>
+                <p className="text-xl font-bold tabular-nums">{todayAttendance.length}</p>
+                <p className="text-[11px] text-muted-foreground">Attended</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tabs for Teams and Members */}
-      <Tabs defaultValue="teams" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="teams">Project Teams</TabsTrigger>
-          <TabsTrigger value="members">Members</TabsTrigger>
-          <TabsTrigger value="approvals" className="relative">
-            Approvals
-            {memberRequests.filter(r => r.status === 'pending').length > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-xs font-bold">
-                {memberRequests.filter(r => r.status === 'pending').length}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
+      {/* Tabs */}
+      <Tabs defaultValue="teams" className="space-y-3">
+        <div className="overflow-x-auto -mx-4 px-4">
+          <TabsList className="inline-flex w-max gap-1 p-1">
+            <TabsTrigger value="teams" className="text-xs sm:text-sm px-3">Teams</TabsTrigger>
+            <TabsTrigger value="members" className="text-xs sm:text-sm px-3">Members</TabsTrigger>
+            <TabsTrigger value="approvals" className="text-xs sm:text-sm px-3 relative">
+              Approvals
+              {pendingCount > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center h-5 w-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                  {pendingCount}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="teams" className="space-y-4">
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2].map((i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardContent className="pt-6 h-32 bg-muted/50" />
-                </Card>
-              ))}
-            </div>
-          ) : projectTeams.length === 0 ? (
-            <Card>
+        <TabsContent value="teams" className="space-y-3">
+          {projectTeams.length === 0 ? (
+            <Card className="rounded-2xl">
               <CardContent className="pt-6 text-center py-12">
                 <Briefcase className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No project teams yet</p>
-                <p className="text-sm text-muted-foreground mb-4">Create a team by assigning members to a project</p>
-                <Button variant="outline" onClick={() => setTeamDialogOpen(true)}>
+                <Button variant="outline" onClick={() => setTeamDialogOpen(true)} className="mt-4 rounded-xl">
                   <FolderPlus className="h-4 w-4 mr-2" />
                   Create First Team
                 </Button>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-3">
               {projectTeams.map((team) => {
-                const teamTodayAttendance = todayAttendance.filter(a => 
-                  team.members.some(m => m.id === a.team_member_id)
-                );
-                const activeCount = teamTodayAttendance.filter(a => a.clock_in && !a.clock_out).length;
+                const activeCount = todayAttendance.filter(a => 
+                  team.members.some(m => m.id === a.team_member_id) && a.clock_in && !a.clock_out
+                ).length;
                 
                 return (
                   <Card 
                     key={team.quotation.id} 
-                    className="cursor-pointer hover:shadow-md transition-shadow"
+                    className="cursor-pointer hover:shadow-md transition-shadow rounded-2xl"
                     onClick={() => navigate(`/team/project/${team.quotation.id}`)}
                   >
-                    <CardHeader className="pb-3">
+                    <CardHeader className="p-3 sm:p-4 pb-2">
                       <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg flex items-center gap-2">
-                            {team.quotation.project_name}
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base flex items-center gap-1.5">
+                            <span className="truncate">{team.quotation.project_name}</span>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                           </CardTitle>
-                          <p className="text-sm text-muted-foreground">{team.quotation.client_name}</p>
-                          {team.quotation.place_of_project && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                              <Navigation className="h-3 w-3" />
-                              {team.quotation.place_of_project}
-                            </p>
-                          )}
+                          <p className="text-xs text-muted-foreground truncate">{team.quotation.client_name}</p>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <Badge variant="outline">{team.members.length} members</Badge>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <Badge variant="outline" className="text-[10px]">{team.members.length} members</Badge>
                           {activeCount > 0 && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                              <Clock className="h-3 w-3 mr-1" />
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
                               {activeCount} working
                             </Badge>
                           )}
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent onClick={(e) => e.stopPropagation()}>
-                      <div className="flex flex-wrap gap-2">
-                        {team.members.slice(0, 5).map((member) => (
+                    <CardContent className="p-3 sm:p-4 pt-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-wrap gap-1.5">
+                        {team.members.slice(0, 4).map((member) => (
                           <div 
                             key={member.assignmentId}
-                            className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2"
+                            className="flex items-center gap-1.5 bg-muted/50 rounded-lg px-2.5 py-1.5"
                           >
-                            <div>
-                              <p className="text-sm font-medium">{member.name}</p>
-                              <Badge className={`${getWorkTypeBadgeColor(member.work_type)} text-xs`} variant="secondary">
-                                {workTypes.find(t => t.value === member.work_type)?.label}
-                              </Badge>
-                            </div>
+                            <p className="text-xs font-medium">{member.name}</p>
                             <button
                               onClick={() => handleRemoveMemberFromProject(member.assignmentId)}
-                              className="text-muted-foreground hover:text-destructive ml-2"
+                              className="text-muted-foreground hover:text-destructive"
                             >
                               ×
                             </button>
                           </div>
                         ))}
-                        {team.members.length > 5 && (
-                          <div className="flex items-center justify-center bg-muted/50 rounded-lg px-3 py-2">
-                            <p className="text-sm text-muted-foreground">+{team.members.length - 5} more</p>
+                        {team.members.length > 4 && (
+                          <div className="flex items-center bg-muted/50 rounded-lg px-2.5 py-1.5">
+                            <p className="text-xs text-muted-foreground">+{team.members.length - 4}</p>
                           </div>
                         )}
                       </div>
@@ -931,92 +902,74 @@ const Team = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="members" className="space-y-4">
-          {loading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardContent className="pt-6 h-24 bg-muted/50" />
-                </Card>
-              ))}
-            </div>
-          ) : teamMembers.length === 0 ? (
-            <Card>
+        <TabsContent value="members" className="space-y-3">
+          {teamMembers.length === 0 ? (
+            <Card className="rounded-2xl">
               <CardContent className="pt-6 text-center py-12">
                 <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No team members yet</p>
-                <p className="text-sm text-muted-foreground mb-4">Add your first team member to get started</p>
-                <Button onClick={() => setMemberDialogOpen(true)}>
+                <Button onClick={() => setMemberDialogOpen(true)} className="mt-4 rounded-xl">
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add First Member
                 </Button>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-3">
+            <div className="grid gap-2">
               {teamMembers.map((member) => {
                 const attendance = getMemberAttendance(member.id);
                 const isClockedIn = attendance && !attendance.clock_out;
                 
                 return (
-                  <Card key={member.id}>
-                    <CardContent className="pt-4 pb-4">
-                      <div className="flex flex-col sm:flex-row justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <h3 className="font-semibold">{member.name}</h3>
-                            <Badge className={getWorkTypeBadgeColor(member.work_type)}>
+                  <Card key={member.id} className="rounded-2xl">
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                            <h3 className="font-semibold text-sm">{member.name}</h3>
+                            <Badge className={`${getWorkTypeBadgeColor(member.work_type)} text-[10px]`}>
                               {workTypes.find(t => t.value === member.work_type)?.label}
                             </Badge>
                             {isClockedIn && (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                <Clock className="h-3 w-3 mr-1" />
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
+                                <Clock className="h-2.5 w-2.5 mr-0.5" />
                                 Working
                               </Badge>
                             )}
                           </div>
-                          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
+                          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-0.5">
                               <Mail className="h-3 w-3" />
-                              {member.email}
+                              <span className="truncate max-w-[140px] sm:max-w-none">{member.email}</span>
                             </span>
                             {member.phone && (
-                              <span className="flex items-center gap-1">
+                              <span className="flex items-center gap-0.5">
                                 <Phone className="h-3 w-3" />
                                 {member.phone}
                               </span>
                             )}
                           </div>
-                          {attendance && (
-                            <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                              <Clock className="h-3 w-3" />
-                              <span>In: {new Date(attendance.clock_in).toLocaleTimeString()}</span>
-                              {attendance.clock_out && (
-                                <span>Out: {new Date(attendance.clock_out).toLocaleTimeString()}</span>
-                              )}
-                            </div>
-                          )}
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleEditMember(member)}>
-                            <Edit className="h-4 w-4" />
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditMember(member)}>
+                            <Edit className="h-3.5 w-3.5" />
                           </Button>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="text-destructive">
-                                <Trash2 className="h-4 w-4" />
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent>
+                            <AlertDialogContent className="rounded-2xl">
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Team Member</AlertDialogTitle>
+                                <AlertDialogTitle>Delete {member.name}?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to delete {member.name}? This will also delete their attendance records.
+                                  This will also delete their attendance records.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteMember(member.id)}>Delete</AlertDialogAction>
+                                <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteMember(member.id)} className="rounded-xl">Delete</AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
                           </AlertDialog>
@@ -1030,25 +983,25 @@ const Team = () => {
           )}
         </TabsContent>
 
-        {/* Approvals Tab */}
-        <TabsContent value="approvals" className="space-y-4">
+        {/* Approvals Tab - Mobile-first */}
+        <TabsContent value="approvals" className="space-y-3">
           {memberRequests.length === 0 ? (
-            <Card>
+            <Card className="rounded-2xl">
               <CardContent className="pt-6 text-center py-12">
                 <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <p className="text-muted-foreground">No pending requests</p>
-                <p className="text-sm text-muted-foreground">When team members sign up and request to join, they'll appear here</p>
+                <p className="text-xs text-muted-foreground mt-1">When team members sign up, they'll appear here</p>
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-3">
+            <div className="grid gap-2">
               {memberRequests.map((request) => {
                 const isPending = request.status === 'pending';
-                const statusColors: Record<string, string> = {
-                  pending: 'bg-amber-100 text-amber-800 border-amber-200',
-                  approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-                  rejected: 'bg-red-100 text-red-800 border-red-200',
-                  docs_requested: 'bg-blue-100 text-blue-800 border-blue-200',
+                const statusStyles: Record<string, string> = {
+                  pending: 'bg-amber-100 text-amber-800',
+                  approved: 'bg-emerald-100 text-emerald-800',
+                  rejected: 'bg-red-100 text-red-800',
+                  docs_requested: 'bg-blue-100 text-blue-800',
                 };
                 const statusIcons: Record<string, React.ReactNode> = {
                   pending: <AlertCircle className="h-3 w-3" />,
@@ -1058,56 +1011,83 @@ const Team = () => {
                 };
 
                 return (
-                  <Card key={request.id}>
-                    <CardContent className="pt-4 pb-4">
-                      <div className="flex flex-col sm:flex-row justify-between gap-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <h3 className="font-semibold">{request.name}</h3>
-                            <Badge className={workTypes.find(t => t.value === request.work_type) ? getWorkTypeBadgeColor(request.work_type) : 'bg-muted text-muted-foreground'}>
-                              {workTypes.find(t => t.value === request.work_type)?.label || request.work_type}
-                            </Badge>
-                            <Badge variant="outline" className={statusColors[request.status] || ''}>
-                              <span className="flex items-center gap-1">
-                                {statusIcons[request.status]}
-                                {request.status === 'docs_requested' ? 'Docs Requested' : request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                              </span>
-                            </Badge>
+                  <Card key={request.id} className="rounded-2xl">
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="space-y-2.5">
+                        {/* Top row: name + status */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-sm">{request.name}</h3>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                              <Badge className={`${getWorkTypeBadgeColor(request.work_type)} text-[10px]`}>
+                                {workTypes.find(t => t.value === request.work_type)?.label || request.work_type}
+                              </Badge>
+                              <Badge className={`${statusStyles[request.status] || ''} text-[10px]`}>
+                                <span className="flex items-center gap-0.5">
+                                  {statusIcons[request.status]}
+                                  {request.status === 'docs_requested' ? 'Docs' : request.status}
+                                </span>
+                              </Badge>
+                            </div>
                           </div>
-                          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Mail className="h-3 w-3" />
-                              {request.email}
+                          <span className="text-[10px] text-muted-foreground shrink-0">
+                            {new Date(request.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+
+                        {/* Contact info */}
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-0.5">
+                            <Mail className="h-3 w-3" />
+                            <span className="truncate max-w-[160px]">{request.email}</span>
+                          </span>
+                          {request.phone && (
+                            <span className="flex items-center gap-0.5">
+                              <Phone className="h-3 w-3" />
+                              {request.phone}
                             </span>
-                            {request.phone && (
-                              <span className="flex items-center gap-1">
-                                <Phone className="h-3 w-3" />
-                                {request.phone}
-                              </span>
-                            )}
-                            <span className="text-xs">
-                              {new Date(request.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                          {request.rejection_reason && (
-                            <p className="text-xs text-destructive mt-1">Reason: {request.rejection_reason}</p>
-                          )}
-                          {request.docs_request_note && (
-                            <p className="text-xs text-blue-600 mt-1">Note: {request.docs_request_note}</p>
                           )}
                         </div>
+
+                        {/* Notes */}
+                        {request.rejection_reason && (
+                          <p className="text-xs text-destructive bg-destructive/5 rounded-lg px-2.5 py-1.5">
+                            Reason: {request.rejection_reason}
+                          </p>
+                        )}
+                        {request.docs_request_note && (
+                          <p className="text-xs text-blue-700 bg-blue-50 rounded-lg px-2.5 py-1.5">
+                            Note: {request.docs_request_note}
+                          </p>
+                        )}
+
+                        {/* Action buttons - full width on mobile */}
                         {isPending && (
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Button size="sm" variant="outline" className="text-destructive border-destructive/30" onClick={() => openActionDialog(request, 'reject')}>
-                              <XCircle className="h-4 w-4 mr-1" />
+                          <div className="flex gap-2 pt-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 rounded-xl text-xs text-destructive border-destructive/30 h-9"
+                              onClick={() => openActionDialog(request, 'reject')}
+                            >
+                              <XCircle className="h-3.5 w-3.5 mr-1" />
                               Reject
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => openActionDialog(request, 'docs_requested')}>
-                              <FileQuestion className="h-4 w-4 mr-1" />
-                              Request Docs
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 rounded-xl text-xs h-9"
+                              onClick={() => openActionDialog(request, 'docs_requested')}
+                            >
+                              <FileQuestion className="h-3.5 w-3.5 mr-1" />
+                              Docs
                             </Button>
-                            <Button size="sm" onClick={() => handleApproveRequest(request)}>
-                              <CheckCircle className="h-4 w-4 mr-1" />
+                            <Button
+                              size="sm"
+                              className="flex-1 rounded-xl text-xs h-9"
+                              onClick={() => handleApproveRequest(request)}
+                            >
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" />
                               Approve
                             </Button>
                           </div>
@@ -1122,36 +1102,127 @@ const Team = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Reject/Docs Request Dialog */}
+      {/* Edit Member Dialog */}
+      <Dialog open={memberDialogOpen} onOpenChange={(open) => {
+        setMemberDialogOpen(open);
+        if (!open) {
+          setEditingMember(null);
+          setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '', password: '' });
+        }
+      }}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{editingMember ? 'Edit' : 'Add'} Team Member</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Full Name *</Label>
+              <Input
+                value={memberForm.name}
+                onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })}
+                placeholder="Enter full name"
+                className="rounded-xl"
+              />
+              {memberForm.name && companyName && (
+                <p className="text-xs text-muted-foreground">
+                  Email: <span className="font-medium text-foreground">{generateEmail(memberForm.name)}</span>
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input
+                value={memberForm.phone}
+                onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
+                placeholder="Phone number"
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Work Type *</Label>
+              <Select value={memberForm.work_type} onValueChange={(v) => setMemberForm({ ...memberForm, work_type: v })}>
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {workTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {!editingMember && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Login Password *</Label>
+                  <Input
+                    type="password"
+                    value={memberForm.password}
+                    onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })}
+                    placeholder="Min 6 characters"
+                    className="rounded-xl"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Assign to Project</Label>
+                  <Select value={memberForm.project_id || "none"} onValueChange={(v) => setMemberForm({ ...memberForm, project_id: v === "none" ? "" : v })}>
+                    <SelectTrigger className="rounded-xl">
+                      <SelectValue placeholder="Select project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No project</SelectItem>
+                      {quotations.map((q) => (
+                        <SelectItem key={q.id} value={q.id}>
+                          {q.project_name} - {q.client_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMemberDialogOpen(false)} className="rounded-xl">Cancel</Button>
+            <Button onClick={handleAddMember} disabled={creatingAuth} className="rounded-xl">
+              {creatingAuth ? 'Creating...' : editingMember ? 'Update' : 'Add'} Member
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject/Docs Dialog */}
       <Dialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle>
               {actionType === 'reject' ? 'Reject Request' : 'Request Documentation'}
             </DialogTitle>
             <DialogDescription>
               {actionType === 'reject' 
-                ? `Reject ${selectedRequest?.name}'s request to join your team.`
-                : `Ask ${selectedRequest?.name} for additional documentation.`
+                ? `Reject ${selectedRequest?.name}'s request.`
+                : `Ask ${selectedRequest?.name} for documents.`
               }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>{actionType === 'reject' ? 'Reason (optional)' : 'What documents do you need?'}</Label>
+              <Label>{actionType === 'reject' ? 'Reason (optional)' : 'What documents?'}</Label>
               <Textarea
                 value={actionNote}
                 onChange={(e) => setActionNote(e.target.value)}
-                placeholder={actionType === 'reject' ? 'Reason for rejection...' : 'Please provide ID proof, experience certificate...'}
+                placeholder={actionType === 'reject' ? 'Reason for rejection...' : 'ID proof, experience certificate...'}
                 rows={3}
+                className="rounded-xl"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setActionDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setActionDialogOpen(false)} className="rounded-xl">Cancel</Button>
             <Button 
               variant={actionType === 'reject' ? 'destructive' : 'default'}
               onClick={handleRejectOrDocsRequest}
+              className="rounded-xl"
             >
               {actionType === 'reject' ? 'Reject' : 'Send Request'}
             </Button>
@@ -1159,9 +1230,51 @@ const Team = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Org Code Dialog */}
+      <Dialog open={orgCodeDialogOpen} onOpenChange={setOrgCodeDialogOpen}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Organization Code</DialogTitle>
+            <DialogDescription>
+              Set a unique code that team members can use to find your organization during signup.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Code</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={orgCodeInput}
+                  onChange={(e) => setOrgCodeInput(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+                  placeholder="e.g. MYORG23"
+                  className="font-mono tracking-wider rounded-xl"
+                  maxLength={8}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={generateUniqueCode}
+                  className="shrink-0 rounded-xl"
+                  title="Generate random code"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">3-8 characters, letters & numbers only</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrgCodeDialogOpen(false)} className="rounded-xl">Cancel</Button>
+            <Button onClick={handleSaveOrgCode} disabled={orgCodeInput.trim().length < 3} className="rounded-xl">
+              Save Code
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Project Detail Dialog */}
       <Dialog open={projectDetailOpen} onOpenChange={setProjectDetailOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col rounded-2xl">
           <DialogHeader>
             <DialogTitle>{selectedProject?.quotation.project_name}</DialogTitle>
             <DialogDescription>{selectedProject?.quotation.client_name}</DialogDescription>
@@ -1169,13 +1282,12 @@ const Team = () => {
           
           {selectedProject && (
             <ScrollArea className="flex-1 pr-4">
-              <div className="space-y-6">
-                {/* Project Info */}
-                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 p-3 bg-muted/30 rounded-xl">
                   {selectedProject.quotation.place_of_project && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Location</p>
-                      <p className="text-sm font-medium flex items-center gap-1">
+                      <p className="text-[10px] text-muted-foreground">Location</p>
+                      <p className="text-xs font-medium flex items-center gap-1">
                         <Navigation className="h-3 w-3" />
                         {selectedProject.quotation.place_of_project}
                       </p>
@@ -1183,67 +1295,49 @@ const Team = () => {
                   )}
                   {selectedProject.quotation.project_deadline && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Deadline</p>
-                      <p className="text-sm font-medium flex items-center gap-1">
+                      <p className="text-[10px] text-muted-foreground">Deadline</p>
+                      <p className="text-xs font-medium flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
                         {new Date(selectedProject.quotation.project_deadline).toLocaleDateString()}
                       </p>
                     </div>
                   )}
                   <div>
-                    <p className="text-xs text-muted-foreground">Status</p>
-                    <Badge variant="outline">{selectedProject.quotation.status}</Badge>
+                    <p className="text-[10px] text-muted-foreground">Status</p>
+                    <Badge variant="outline" className="text-[10px]">{selectedProject.quotation.status}</Badge>
                   </div>
                   {selectedProject.quotation.grand_total && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Project Value</p>
-                      <p className="text-sm font-medium tabular-nums">
+                      <p className="text-[10px] text-muted-foreground">Value</p>
+                      <p className="text-xs font-medium tabular-nums">
                         ₹{selectedProject.quotation.grand_total.toLocaleString()}
                       </p>
                     </div>
                   )}
                 </div>
 
-                {/* Team Members */}
                 <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <h3 className="font-semibold text-sm mb-2 flex items-center gap-1.5">
                     <Users className="h-4 w-4" />
-                    Team Members ({selectedProject.members.length})
+                    Members ({selectedProject.members.length})
                   </h3>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {selectedProject.members.map((member) => {
                       const memberAttToday = todayAttendance.find(a => a.team_member_id === member.id);
                       const isWorking = memberAttToday && !memberAttToday.clock_out;
                       
                       return (
-                        <div key={member.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div>
-                              <p className="font-medium text-sm">{member.name}</p>
-                              <div className="flex items-center gap-2">
-                                <Badge className={`${getWorkTypeBadgeColor(member.work_type)} text-xs`} variant="secondary">
-                                  {workTypes.find(t => t.value === member.work_type)?.label}
-                                </Badge>
-                                {isWorking && (
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
-                                    Working
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
+                        <div key={member.id} className="flex items-center justify-between p-2.5 bg-muted/30 rounded-xl">
+                          <div>
+                            <p className="font-medium text-xs">{member.name}</p>
+                            <Badge className={`${getWorkTypeBadgeColor(member.work_type)} text-[10px]`} variant="secondary">
+                              {workTypes.find(t => t.value === member.work_type)?.label}
+                            </Badge>
                           </div>
-                          {memberAttToday && (
-                            <div className="text-right text-xs text-muted-foreground">
-                              <p>In: {formatTime(memberAttToday.clock_in)}</p>
-                              {memberAttToday.clock_in_location && (
-                                <p className="flex items-center gap-1 justify-end">
-                                  <MapPin className="h-3 w-3" />
-                                  <span className="truncate max-w-[120px]">
-                                    {formatLocationAddress(memberAttToday.clock_in_location)}
-                                  </span>
-                                </p>
-                              )}
-                            </div>
+                          {isWorking && (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
+                              Working
+                            </Badge>
                           )}
                         </div>
                       );
@@ -1251,48 +1345,40 @@ const Team = () => {
                   </div>
                 </div>
 
-                {/* Recent Attendance */}
                 <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <h3 className="font-semibold text-sm mb-2 flex items-center gap-1.5">
                     <Clock className="h-4 w-4" />
-                    Recent Attendance (Last 7 Days)
+                    Attendance (7 Days)
                   </h3>
                   {projectAttendance.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">No attendance records</p>
+                    <p className="text-xs text-muted-foreground text-center py-4">No records</p>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {projectAttendance.slice(0, 15).map((record) => {
                         const member = selectedProject.members.find(m => m.id === record.team_member_id);
-                        
                         return (
-                          <div key={record.id} className="p-3 bg-muted/30 rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
+                          <div key={record.id} className="p-2.5 bg-muted/30 rounded-xl">
+                            <div className="flex items-center justify-between mb-1">
                               <div>
-                                <p className="font-medium text-sm">{member?.name || 'Unknown'}</p>
-                                <p className="text-xs text-muted-foreground">{formatDate(record.clock_in)}</p>
+                                <p className="font-medium text-xs">{member?.name || 'Unknown'}</p>
+                                <p className="text-[10px] text-muted-foreground">{formatDate(record.clock_in)}</p>
                               </div>
-                              <p className="text-sm font-medium tabular-nums">
+                              <p className="text-xs font-medium tabular-nums">
                                 {calculateDuration(record.clock_in, record.clock_out)}
                               </p>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                            <div className="grid grid-cols-2 gap-2 text-[10px] text-muted-foreground">
                               <div>
                                 <p>In: {formatTime(record.clock_in)}</p>
                                 {record.clock_in_location && (
-                                  <p className="flex items-center gap-1 mt-0.5">
-                                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                                  <p className="flex items-center gap-0.5 mt-0.5">
+                                    <MapPin className="h-2.5 w-2.5" />
                                     <span className="truncate">{formatLocationAddress(record.clock_in_location)}</span>
                                   </p>
                                 )}
                               </div>
                               <div>
                                 <p>Out: {record.clock_out ? formatTime(record.clock_out) : 'Working'}</p>
-                                {record.clock_out_location && (
-                                  <p className="flex items-center gap-1 mt-0.5">
-                                    <MapPin className="h-3 w-3 flex-shrink-0" />
-                                    <span className="truncate">{formatLocationAddress(record.clock_out_location)}</span>
-                                  </p>
-                                )}
                               </div>
                             </div>
                           </div>
@@ -1306,7 +1392,7 @@ const Team = () => {
           )}
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setProjectDetailOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setProjectDetailOpen(false)} className="rounded-xl">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
