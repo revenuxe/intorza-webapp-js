@@ -465,6 +465,7 @@ export type Database = {
           logo_url: string | null
           measurement_system: string | null
           number_format: string | null
+          org_code: string | null
           payment_provider: string | null
           payment_qr_url: string | null
           payment_stages: Json | null
@@ -512,6 +513,7 @@ export type Database = {
           logo_url?: string | null
           measurement_system?: string | null
           number_format?: string | null
+          org_code?: string | null
           payment_provider?: string | null
           payment_qr_url?: string | null
           payment_stages?: Json | null
@@ -559,6 +561,7 @@ export type Database = {
           logo_url?: string | null
           measurement_system?: string | null
           number_format?: string | null
+          org_code?: string | null
           payment_provider?: string | null
           payment_qr_url?: string | null
           payment_stages?: Json | null

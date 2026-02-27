@@ -1114,43 +1114,63 @@ const AdminDashboard = () => {
 
           <TabsContent value="teams" className="space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Team Members</CardTitle>
-                <CardDescription>All team members across companies</CardDescription>
+              <CardHeader className="p-3 sm:p-6">
+                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Teams Overview
+                </CardTitle>
+                <CardDescription className="text-xs sm:text-sm">
+                  All team members grouped by company ({teamMembers.length} total)
+                </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Company</TableHead>
-                        <TableHead>Work Type</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {teamMembers.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                            No team members found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        teamMembers.map((m) => (
-                          <TableRow key={m.id}>
-                            <TableCell className="font-medium">{m.name}</TableCell>
-                            <TableCell>{m.email}</TableCell>
-                            <TableCell>{m.company_name}</TableCell>
-                            <TableCell className="capitalize">{m.work_type?.replace('_', ' ')}</TableCell>
-                            <TableCell>{getStatusBadge(m.status || 'active')}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+              <CardContent className="p-3 sm:p-6 pt-0">
+                {(() => {
+                  // Group members by company
+                  const companyGroups = new Map<string, typeof teamMembers>();
+                  teamMembers.forEach(m => {
+                    const company = m.company_name || 'Unknown';
+                    if (!companyGroups.has(company)) {
+                      companyGroups.set(company, []);
+                    }
+                    companyGroups.get(company)!.push(m);
+                  });
+
+                  if (companyGroups.size === 0) {
+                    return (
+                      <p className="text-center text-muted-foreground py-8 text-sm">No team members found</p>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3">
+                      {Array.from(companyGroups.entries()).map(([company, members]) => (
+                        <div key={company} className="border rounded-2xl overflow-hidden">
+                          <div className="p-3 sm:p-4 bg-muted/30 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-4 w-4 text-primary" />
+                              <span className="font-semibold text-sm">{company}</span>
+                            </div>
+                            <Badge variant="outline" className="text-[10px]">{members.length} members</Badge>
+                          </div>
+                          <div className="divide-y">
+                            {members.map((m) => (
+                              <div key={m.id} className="p-3 flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="font-medium text-sm truncate">{m.name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <Badge className="text-[10px] capitalize">{m.work_type?.replace('_', ' ')}</Badge>
+                                  {getStatusBadge(m.status || 'active')}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
