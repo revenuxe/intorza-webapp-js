@@ -181,6 +181,60 @@ export type Database = {
           },
         ]
       }
+      gallery_images: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          file_size: number | null
+          filename: string
+          height: number | null
+          id: string
+          image_url: string
+          is_favorite: boolean | null
+          tags: string[] | null
+          title: string | null
+          updated_at: string
+          usage_count: number | null
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          file_size?: number | null
+          filename: string
+          height?: number | null
+          id?: string
+          image_url: string
+          is_favorite?: boolean | null
+          tags?: string[] | null
+          title?: string | null
+          updated_at?: string
+          usage_count?: number | null
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          file_size?: number | null
+          filename?: string
+          height?: number | null
+          id?: string
+          image_url?: string
+          is_favorite?: boolean | null
+          tags?: string[] | null
+          title?: string | null
+          updated_at?: string
+          usage_count?: number | null
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
       invoices: {
         Row: {
           client_id: string | null
@@ -584,6 +638,45 @@ export type Database = {
           upi_id?: string | null
         }
         Relationships: []
+      }
+      quotation_item_images: {
+        Row: {
+          created_at: string
+          gallery_image_id: string
+          id: string
+          quotation_item_id: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string
+          gallery_image_id: string
+          id?: string
+          quotation_item_id: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string
+          gallery_image_id?: string
+          id?: string
+          quotation_item_id?: string
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotation_item_images_gallery_image_id_fkey"
+            columns: ["gallery_image_id"]
+            isOneToOne: false
+            referencedRelation: "gallery_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotation_item_images_quotation_item_id_fkey"
+            columns: ["quotation_item_id"]
+            isOneToOne: false
+            referencedRelation: "quotation_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quotation_items: {
         Row: {

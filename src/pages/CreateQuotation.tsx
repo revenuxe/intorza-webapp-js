@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Plus, Trash2, Upload, Eye, Share2, Loader2 } from "lucide-react";
+import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon } from "lucide-react";
 import { getCountryByCode } from "@/lib/countryConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,8 @@ import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
 import { ClientSelector } from "@/components/quotation/ClientSelector";
 import { ProductNameInput } from "@/components/quotation/ProductNameInput";
 import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
+import { GalleryImagePicker } from "@/components/quotation/GalleryImagePicker";
+import { GalleryImage } from "@/hooks/useGallery";
 interface LineItem {
   id: string;
   side: string;
@@ -152,6 +154,10 @@ const CreateQuotation = () => {
   const [customizeSettings, setCustomizeSettings] = useState<QuotationSettings>(getQuotationSettings());
   const [showPreview, setShowPreview] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [itemImages, setItemImages] = useState<Record<string, GalleryImage[]>>({});
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [imagePickerItemId, setImagePickerItemId] = useState<string>("");
+  const [imagePickerProductName, setImagePickerProductName] = useState<string>("");
 
   // Restore form data from sessionStorage after login
   useEffect(() => {
@@ -1056,10 +1062,32 @@ const CreateQuotation = () => {
               {section.items.map((item, itemIndex) => <div key={item.id} className="p-4 border border-border rounded-lg space-y-4 bg-muted/30">
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-medium text-muted-foreground">Item {itemIndex + 1}</span>
-                    {section.items.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(section.id, item.id)} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>}
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => {
+                        setImagePickerItemId(item.id);
+                        setImagePickerProductName(item.productName);
+                        setImagePickerOpen(true);
+                      }} className="h-8 text-muted-foreground hover:text-primary">
+                        <ImageIcon className="h-4 w-4" />
+                        {itemImages[item.id]?.length ? <span className="text-xs ml-1">{itemImages[item.id].length}</span> : null}
+                      </Button>
+                      {section.items.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(section.id, item.id)} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>}
+                    </div>
                   </div>
+                  {/* Item images preview */}
+                  {itemImages[item.id]?.length > 0 && (
+                    <div className="flex gap-2 flex-wrap">
+                      {itemImages[item.id].map(img => (
+                        <div key={img.id} className="relative group">
+                          <img src={img.image_url} alt="" className="h-12 w-12 rounded-lg object-cover border border-border" />
+                          <button onClick={() => setItemImages(prev => ({...prev, [item.id]: prev[item.id].filter(i => i.id !== img.id)}))}
+                            className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Desktop Table Row */}
                   <div className="hidden md:block overflow-x-auto">
@@ -1310,6 +1338,27 @@ const CreateQuotation = () => {
 
         {/* PDF Preview Editor */}
         <PDFPreviewEditor open={showPreview} onClose={() => setShowPreview(false)} onDownload={settings => handleDownloadPDF(settings)} quotationData={getQuotationPreviewData()} customizeSettings={customizeSettings} />
+        
+        {/* Gallery Image Picker */}
+        <GalleryImagePicker
+          open={imagePickerOpen}
+          onOpenChange={setImagePickerOpen}
+          productName={imagePickerProductName}
+          selectedImageIds={itemImages[imagePickerItemId]?.map(i => i.id) || []}
+          onSelect={(selectedImages) => {
+            setItemImages(prev => ({ ...prev, [imagePickerItemId]: selectedImages }));
+            // Auto-tag: add product name as tag to selected images
+            if (imagePickerProductName) {
+              selectedImages.forEach(img => {
+                if (!img.tags.includes(imagePickerProductName)) {
+                  supabase.from('gallery_images').update({
+                    tags: [...img.tags, imagePickerProductName]
+                  }).eq('id', img.id).then(() => {});
+                }
+              });
+            }
+          }}
+        />
       </div>
     </div>;
 };
