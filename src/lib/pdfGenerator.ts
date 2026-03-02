@@ -36,6 +36,7 @@ export interface QuotationPdfSettings {
   showQRCode: boolean;
   showProfessionalAdvantages: boolean;
   showQuotationNumber: boolean;
+  showItemImages: boolean;
 }
 
 // --- Interfaces ---
@@ -222,6 +223,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     showQRCode: false,
     showProfessionalAdvantages: true,
     showQuotationNumber: true,
+    showItemImages: true,
     ...data.settings
   };
 
@@ -852,76 +854,66 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     
     yPosition = (doc as any).lastAutoTable.finalY + 2;
 
-    // --- Item Images Gallery ---
-    // Collect all images from items in this section
-    const sectionImages: { productName: string; urls: string[] }[] = [];
-    for (const item of section.items) {
-      if (item.imageUrls && item.imageUrls.length > 0) {
-        sectionImages.push({ productName: item.productName, urls: item.imageUrls });
-      }
-    }
-
-    if (sectionImages.length > 0) {
-      yPosition += 4;
+    // --- Inline Item Images (small thumbnails after each item row) ---
+    if (settings.showItemImages) {
+      const itemsWithImages = section.items.filter(item => item.imageUrls && item.imageUrls.length > 0);
       
-      for (const imgGroup of sectionImages) {
-        // Check page break
-        if (yPosition > pageBottomY - 45) {
-          doc.addPage();
-          yPosition = pageTopY;
-        }
-
-        // Item label
-        setBodyFont('bold');
-        doc.setFontSize(7);
-        doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-        doc.text(imgGroup.productName.toUpperCase(), margin, yPosition + 3);
-        yPosition += 6;
-
-        const imgSize = 28;
-        const imgGap = 4;
-        const maxPerRow = Math.floor((contentWidth + imgGap) / (imgSize + imgGap));
-        let imgX = margin;
-        let imagesInRow = 0;
-
-        for (const url of imgGroup.urls) {
-          try {
-            const compressed = await compressImage(url, 300, 300);
-            
-            // Check page break for image row
-            if (yPosition + imgSize > pageBottomY - 10) {
-              doc.addPage();
-              yPosition = pageTopY;
-              imgX = margin;
-              imagesInRow = 0;
-            }
-
-            // Draw image with border
-            doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-            doc.setLineWidth(0.3);
-            doc.roundedRect(imgX, yPosition, imgSize, imgSize, 1.5, 1.5, 'S');
-            doc.addImage(compressed, 'JPEG', imgX + 0.5, yPosition + 0.5, imgSize - 1, imgSize - 1, undefined, 'FAST');
-
-            imgX += imgSize + imgGap;
-            imagesInRow++;
-
-            if (imagesInRow >= maxPerRow) {
-              yPosition += imgSize + imgGap;
-              imgX = margin;
-              imagesInRow = 0;
-            }
-          } catch (e) {
-            console.error('Failed to add item image to PDF:', e);
+      if (itemsWithImages.length > 0) {
+        yPosition += 2;
+        
+        for (const item of itemsWithImages) {
+          if (!item.imageUrls || item.imageUrls.length === 0) continue;
+          
+          // Check page break
+          const imgSize = 14;
+          const imgGap = 3;
+          const rowHeight = imgSize + 6;
+          
+          if (yPosition + rowHeight > pageBottomY - 10) {
+            doc.addPage();
+            yPosition = pageTopY;
           }
-        }
 
-        // Move past the last row of images
-        if (imagesInRow > 0) {
-          yPosition += imgSize + imgGap;
+          // Item label inline
+          setBodyFont('bold');
+          doc.setFontSize(6);
+          doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+          doc.text(item.productName, margin + 1, yPosition + 3);
+
+          // Small thumbnails inline after the label
+          const labelWidth = doc.getTextWidth(item.productName) + 4;
+          let imgX = margin + labelWidth;
+          
+          for (const url of item.imageUrls) {
+            try {
+              const compressed = await compressImage(url, 150, 150);
+              
+              // Wrap to next line if overflows
+              if (imgX + imgSize > pageWidth - margin) {
+                yPosition += imgSize + 2;
+                imgX = margin + 1;
+                if (yPosition + imgSize > pageBottomY - 10) {
+                  doc.addPage();
+                  yPosition = pageTopY;
+                }
+              }
+
+              doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+              doc.setLineWidth(0.2);
+              doc.roundedRect(imgX, yPosition - 1, imgSize, imgSize, 1, 1, 'S');
+              doc.addImage(compressed, 'JPEG', imgX + 0.3, yPosition - 0.7, imgSize - 0.6, imgSize - 0.6, undefined, 'FAST');
+
+              imgX += imgSize + imgGap;
+            } catch (e) {
+              console.error('Failed to add item image to PDF:', e);
+            }
+          }
+
+          yPosition += imgSize + 2;
         }
+        
+        yPosition += 1;
       }
-      
-      yPosition += 2;
     }
 
     // Section Total - Right aligned with highlight (numeric-safe)

@@ -51,6 +51,7 @@ export interface QuotationSettings {
   showProductDetails: boolean;
   showItemNotes: boolean;
   showSerialNumbers: boolean;
+  showItemImages: boolean;
   // Totals & Summary
   showSubtotal: boolean;
   showTaxGst: boolean;
@@ -122,6 +123,7 @@ const defaultQuotationSettings: QuotationSettings = {
   showProductDetails: true,
   showItemNotes: false,
   showSerialNumbers: true,
+  showItemImages: true,
   showSubtotal: true,
   showTaxGst: true,
   showGrandTotal: true,
@@ -381,6 +383,11 @@ const QuotationCustomizeContent = ({
             label="Show serial numbers (S.No)" 
             checked={settings.showSerialNumbers}
             onCheckedChange={(v) => updateSetting('showSerialNumbers', v)}
+          />
+          <ToggleItem 
+            label="Show item images in PDF" 
+            checked={settings.showItemImages}
+            onCheckedChange={(v) => updateSetting('showItemImages', v)}
           />
         </div>
         <p className="text-xs text-muted-foreground mt-2">
