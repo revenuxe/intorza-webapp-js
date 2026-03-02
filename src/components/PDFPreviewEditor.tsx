@@ -223,6 +223,7 @@ export const PDFPreviewEditor = ({
             sftArea: item.sft_area || item.sftArea || 0,
             ratePerSft: item.rate_per_sft || item.ratePerSft || 0,
             amount: item.amount || 0,
+            imageUrls: item.imageUrls || [],
           }))
         })) : [{
           title: 'Sample Section',
