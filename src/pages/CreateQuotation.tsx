@@ -871,7 +871,10 @@ const CreateQuotation = () => {
         projectType,
         sections: sections.map(section => ({
           title: section.title,
-          items: section.items
+          items: section.items.map(item => ({
+            ...item,
+            imageUrls: (itemImages[item.id] || []).map(img => img.image_url),
+          }))
         })),
         subtotal,
         gstEnabled,
@@ -935,7 +938,13 @@ const CreateQuotation = () => {
     clientName,
     clientAddress,
     dateOfProposal,
-    sections,
+    sections: sections.map(section => ({
+      ...section,
+      items: section.items.map(item => ({
+        ...item,
+        imageUrls: (itemImages[item.id] || []).map(img => img.image_url),
+      }))
+    })),
     subtotal,
     grandTotal,
     companyName: profile.company_name,

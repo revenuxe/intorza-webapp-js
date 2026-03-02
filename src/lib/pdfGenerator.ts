@@ -48,6 +48,7 @@ interface LineItem {
   sftArea: number;
   ratePerSft: number;
   amount: number;
+  imageUrls?: string[];
 }
 
 interface Section {
@@ -850,6 +851,78 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     }
     
     yPosition = (doc as any).lastAutoTable.finalY + 2;
+
+    // --- Item Images Gallery ---
+    // Collect all images from items in this section
+    const sectionImages: { productName: string; urls: string[] }[] = [];
+    for (const item of section.items) {
+      if (item.imageUrls && item.imageUrls.length > 0) {
+        sectionImages.push({ productName: item.productName, urls: item.imageUrls });
+      }
+    }
+
+    if (sectionImages.length > 0) {
+      yPosition += 4;
+      
+      for (const imgGroup of sectionImages) {
+        // Check page break
+        if (yPosition > pageBottomY - 45) {
+          doc.addPage();
+          yPosition = pageTopY;
+        }
+
+        // Item label
+        setBodyFont('bold');
+        doc.setFontSize(7);
+        doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+        doc.text(imgGroup.productName.toUpperCase(), margin, yPosition + 3);
+        yPosition += 6;
+
+        const imgSize = 28;
+        const imgGap = 4;
+        const maxPerRow = Math.floor((contentWidth + imgGap) / (imgSize + imgGap));
+        let imgX = margin;
+        let imagesInRow = 0;
+
+        for (const url of imgGroup.urls) {
+          try {
+            const compressed = await compressImage(url, 300, 300);
+            
+            // Check page break for image row
+            if (yPosition + imgSize > pageBottomY - 10) {
+              doc.addPage();
+              yPosition = pageTopY;
+              imgX = margin;
+              imagesInRow = 0;
+            }
+
+            // Draw image with border
+            doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+            doc.setLineWidth(0.3);
+            doc.roundedRect(imgX, yPosition, imgSize, imgSize, 1.5, 1.5, 'S');
+            doc.addImage(compressed, 'JPEG', imgX + 0.5, yPosition + 0.5, imgSize - 1, imgSize - 1, undefined, 'FAST');
+
+            imgX += imgSize + imgGap;
+            imagesInRow++;
+
+            if (imagesInRow >= maxPerRow) {
+              yPosition += imgSize + imgGap;
+              imgX = margin;
+              imagesInRow = 0;
+            }
+          } catch (e) {
+            console.error('Failed to add item image to PDF:', e);
+          }
+        }
+
+        // Move past the last row of images
+        if (imagesInRow > 0) {
+          yPosition += imgSize + imgGap;
+        }
+      }
+      
+      yPosition += 2;
+    }
 
     // Section Total - Right aligned with highlight (numeric-safe)
     const sectionTotal = section.items.reduce((sum, item) => sum + item.amount, 0);

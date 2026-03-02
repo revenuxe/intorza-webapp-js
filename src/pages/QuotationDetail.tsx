@@ -189,19 +189,35 @@ const QuotationDetail = () => {
         placeOfProject: quotation.place_of_project,
         warranty: quotation.warranty,
         projectType: quotation.project_type,
-        sections: sections?.map(s => ({
-          title: s.section_name,
-          items: s.quotation_items.map((item: any) => ({
-            productName: item.product_name,
-            productDetails: item.product_details,
-            side: item.side,
-            widthFt: item.width_ft,
-            heightFt: item.height_ft,
-            sftArea: item.sft_area,
-            ratePerSft: item.rate_per_sft,
-            amount: item.amount
-          }))
-        })) || [],
+        sections: await Promise.all((sections || []).map(async (s) => {
+          // Fetch images for each item
+          const itemsWithImages = await Promise.all(s.quotation_items.map(async (item: any) => {
+            const { data: itemImagesData } = await supabase
+              .from('quotation_item_images')
+              .select('gallery_image_id, gallery_images(image_url)')
+              .eq('quotation_item_id', item.id)
+              .order('sort_order');
+            
+            return {
+              productName: item.product_name,
+              productDetails: item.product_details,
+              side: item.side,
+              widthFt: item.width_ft,
+              heightFt: item.height_ft,
+              sftArea: item.sft_area,
+              ratePerSft: item.rate_per_sft,
+              amount: item.amount,
+              imageUrls: (itemImagesData || [])
+                .map((img: any) => img.gallery_images?.image_url)
+                .filter(Boolean),
+            };
+          }));
+
+          return {
+            title: s.section_name,
+            items: itemsWithImages,
+          };
+        })),
         subtotal: quotation.subtotal,
         discount: quotation.discount_amount,
         gstEnabled: quotation.gst_enabled,
