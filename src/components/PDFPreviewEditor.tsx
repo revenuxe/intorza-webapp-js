@@ -105,6 +105,7 @@ export const PDFPreviewEditor = ({
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
   const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
+  const [showItemImages, setShowItemImages] = useState(customizeSettings.showItemImages);
   const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<NodeJS.Timeout | null>(null);
   
@@ -200,6 +201,7 @@ export const PDFPreviewEditor = ({
         showQRCode: customizeSettings.showQRCode,
         showProfessionalAdvantages: customizeSettings.showProfessionalAdvantages,
         showQuotationNumber: customizeSettings.showQuotationNumber,
+        showItemImages: showItemImages,
       };
 
       // Transform quotationData to match the generator's expected format with settings embedded
@@ -270,7 +272,7 @@ export const PDFPreviewEditor = ({
     } finally {
       setIsGeneratingPdf(false);
     }
-  }, [editorSettings, customizeSettings, quotationData, brandColors]);
+  }, [editorSettings, customizeSettings, quotationData, brandColors, showItemImages]);
 
   // Debounced PDF generation effect - longer debounce for smooth slider interaction
   useEffect(() => {
@@ -820,6 +822,20 @@ export const PDFPreviewEditor = ({
                   <Switch
                     checked={editorSettings.showBorders}
                     onCheckedChange={(v) => updateSettings({ showBorders: v })}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm">Show Item Images</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Display product images in table
+                    </p>
+                  </div>
+                  <Switch
+                    checked={showItemImages}
+                    onCheckedChange={(v) => {
+                      setShowItemImages(v);
+                    }}
                   />
                 </div>
               </div>
