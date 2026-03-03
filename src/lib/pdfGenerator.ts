@@ -765,12 +765,14 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const advSettings = editorSettings?.advancedSettings || defaultAdvancedSettings;
 
       // Dynamic column styles based on visible columns and advanced settings
+      // When images are shown, compress other columns slightly to make room
+      const imgCompact = hasAnyImages;
       const colStyles: any = {};
       let colIndex = 0;
       // Side column
       if (showSide) { 
         colStyles[colIndex++] = { 
-          cellWidth: advSettings!.columnWidths.side, 
+          cellWidth: imgCompact ? Math.min(advSettings!.columnWidths.side, 16) : advSettings!.columnWidths.side, 
           halign: 'center', 
           fontSize: 6, 
           valign: 'middle' 
@@ -778,7 +780,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       }
       // Product column
       colStyles[colIndex++] = { 
-        cellWidth: showDetails ? advSettings!.columnWidths.product : 42, 
+        cellWidth: imgCompact 
+          ? (showDetails ? Math.min(advSettings!.columnWidths.product, 28) : 36)
+          : (showDetails ? advSettings!.columnWidths.product : 42), 
         fontStyle: 'bold', 
         fontSize: advSettings!.fontSizes.productName, 
         valign: 'middle' 
@@ -791,10 +795,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           valign: 'middle' 
         }; 
       }
-      // Image column
+      // Image column - compact 14mm
       if (hasAnyImages) {
         colStyles[colIndex++] = {
-          cellWidth: 18,
+          cellWidth: 14,
           halign: 'center',
           valign: 'middle',
           cellPadding: { top: 1, right: 1, bottom: 1, left: 1 },
@@ -802,41 +806,27 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       }
       // Size columns
       if (showSizeColumns) {
-        colStyles[colIndex++] = { 
-          cellWidth: advSettings!.columnWidths.width, 
-          halign: 'center', 
-          fontSize: 6, 
-          valign: 'middle' 
-        }; // W
-        colStyles[colIndex++] = { 
-          cellWidth: advSettings!.columnWidths.height, 
-          halign: 'center', 
-          fontSize: 6, 
-          valign: 'middle' 
-        }; // H
-        colStyles[colIndex++] = { 
-          cellWidth: advSettings!.columnWidths.area, 
-          halign: 'center', 
-          fontSize: 6, 
-          valign: 'middle' 
-        }; // Sq.Ft
+        const wWidth = imgCompact ? Math.min(advSettings!.columnWidths.width, 16) : advSettings!.columnWidths.width;
+        const hWidth = imgCompact ? Math.min(advSettings!.columnWidths.height, 16) : advSettings!.columnWidths.height;
+        const aWidth = imgCompact ? Math.min(advSettings!.columnWidths.area, 18) : advSettings!.columnWidths.area;
+        colStyles[colIndex++] = { cellWidth: wWidth, halign: 'center', fontSize: 6, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: hWidth, halign: 'center', fontSize: 6, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: aWidth, halign: 'center', fontSize: 6, valign: 'middle' };
       }
       // Rate column
       colStyles[colIndex++] = { 
-        cellWidth: advSettings!.columnWidths.rate, 
+        cellWidth: imgCompact ? Math.min(advSettings!.columnWidths.rate, 26) : advSettings!.columnWidths.rate, 
         halign: 'right', 
         fontSize: advSettings!.fontSizes.amounts, 
         overflow: 'hidden' as const, 
-        minCellWidth: advSettings!.columnWidths.rate, 
         valign: 'middle' 
       };
       // Amount column
       colStyles[colIndex++] = { 
-        cellWidth: advSettings!.columnWidths.amount, 
+        cellWidth: imgCompact ? Math.min(advSettings!.columnWidths.amount, 28) : advSettings!.columnWidths.amount, 
         halign: 'right', 
         fontSize: advSettings!.fontSizes.amounts, 
         overflow: 'hidden' as const, 
-        minCellWidth: advSettings!.columnWidths.amount, 
         valign: 'middle' 
       };
 
@@ -871,7 +861,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           lineWidth: advSettings!.tableBorderWidth,
           cellPadding: { top: advSettings!.rowPadding, right: 4, bottom: advSettings!.rowPadding, left: 4 },
           valign: 'middle',
-          minCellHeight: hasAnyImages ? 14 : undefined,
+          minCellHeight: hasAnyImages ? 12 : undefined,
         },
         headStyles: {
           fillColor: [255, 255, 255],
@@ -892,7 +882,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
             const imgData = itemImageCache.get(rowIndex);
             if (imgData) {
               const cell = hookData.cell;
-              const imgSize = Math.min(cell.width - 2, cell.height - 2, 12);
+              const imgSize = Math.min(cell.width - 2, cell.height - 2, 10);
               const imgX = cell.x + (cell.width - imgSize) / 2;
               const imgY = cell.y + (cell.height - imgSize) / 2;
               doc.addImage(imgData, 'JPEG', imgX, imgY, imgSize, imgSize, undefined, 'FAST');
