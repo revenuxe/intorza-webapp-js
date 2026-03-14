@@ -110,7 +110,7 @@ export const InvoicePreviewEditor = ({
   });
   const [profile, setProfile] = useState<any>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const pdfGenerationTimer = useRef<NodeJS.Timeout | null>(null);
+  const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevBlobUrlRef = useRef<string | null>(null);
   
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences } = useFontPreferences();

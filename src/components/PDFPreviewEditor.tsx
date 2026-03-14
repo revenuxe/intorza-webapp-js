@@ -107,7 +107,7 @@ export const PDFPreviewEditor = ({
   const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
   const [showItemImages, setShowItemImages] = useState(customizeSettings.showItemImages);
   const previewRef = useRef<HTMLDivElement>(null);
-  const pdfGenerationTimer = useRef<NodeJS.Timeout | null>(null);
+  const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Load font preferences from database
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences, loading: fontLoading } = useFontPreferences();
