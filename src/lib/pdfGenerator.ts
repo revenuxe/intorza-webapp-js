@@ -630,7 +630,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     // Section Header "Card"
     // Clean underline style with bold text
     setHeadingFont('bold');
-    doc.setFontSize(10);
+    doc.setFontSize(8.5);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text(section.title.toUpperCase(), margin, yPosition + 4);
     
