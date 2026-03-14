@@ -859,9 +859,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
           lineWidth: advSettings!.tableBorderWidth,
-          cellPadding: { top: advSettings!.rowPadding, right: 4, bottom: advSettings!.rowPadding, left: 4 },
+          cellPadding: { top: Math.max(advSettings!.rowPadding, 3), right: 4, bottom: Math.max(advSettings!.rowPadding, 3), left: 4 },
           valign: 'middle',
-          minCellHeight: hasAnyImages ? 12 : undefined,
+          minCellHeight: hasAnyImages ? 12 : 8,
         },
         headStyles: {
           fillColor: [255, 255, 255],
