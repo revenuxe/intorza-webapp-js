@@ -410,9 +410,10 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       font: bodyFont,
       lineColor: COLORS.BORDER,
       lineWidth: 0.1,
-      cellPadding: { top: 6, right: 12, bottom: 6, left: 12 },
-      fontSize: 10,
+      cellPadding: { top: 5, right: 10, bottom: 5, left: 10 },
+      fontSize: 8,
       valign: 'middle',
+      minCellHeight: 8,
     },
     columnStyles: {
       0: { 
@@ -420,16 +421,17 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         halign: 'left', 
         fontStyle: 'bold', 
         textColor: COLORS.TEXT_SECONDARY, 
-        fontSize: 9,
+        fontSize: 8,
         valign: 'middle',
       },
       1: { 
         cellWidth: amountColumnWidth, 
         halign: 'right',
-        fontStyle: 'normal', 
+        font: NUMERIC_FONT,
+        fontStyle: 'bold', 
         textColor: COLORS.TEXT_PRIMARY, 
-        fontSize: 9,
-        minCellWidth: 55,
+        fontSize: 8,
+        minCellWidth: 50,
         overflow: 'hidden' as const,
         valign: 'middle',
       }
@@ -439,17 +441,20 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
       const row = hookData.row?.raw as any[] | undefined;
       const label = String(row?.[0] ?? '');
 
-      // Make the main Total Amount slightly larger
       if (label.toLowerCase().startsWith('total amount')) {
         if (hookData.column.index === 0) {
-          hookData.cell.styles.fontSize = 10;
+          hookData.cell.styles.fontSize = 9;
           hookData.cell.styles.fontStyle = 'bold';
         }
         if (hookData.column.index === 1) {
-          hookData.cell.styles.font = 'helvetica';
-          hookData.cell.styles.fontSize = 11;
+          hookData.cell.styles.font = NUMERIC_FONT;
+          hookData.cell.styles.fontSize = 9;
           hookData.cell.styles.fontStyle = 'bold';
         }
+      }
+      // Use numeric font for all amount cells
+      if (hookData.column.index === 1) {
+        hookData.cell.styles.font = NUMERIC_FONT;
       }
     },
     willDrawCell: (cellData) => {
@@ -518,23 +523,30 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         fontSize: 7,
         cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
         valign: 'middle',
+        minCellHeight: 8,
       },
       headStyles: {
-        fillColor: COLORS.BG_CARD,
+        fillColor: [255, 255, 255],
         textColor: COLORS.TEXT_PRIMARY,
         fontStyle: 'bold',
         lineColor: COLORS.BORDER,
         lineWidth: 0.1,
         fontSize: 7,
+        halign: 'center',
         valign: 'middle',
       },
       columnStyles: {
-        0: { cellWidth: 12, halign: 'center', fontSize: 8, valign: 'middle' },
-        1: { cellWidth: 30, fontSize: 8, valign: 'middle' },
-        2: { cellWidth: 28, halign: 'center', fontSize: 8, valign: 'middle' },
-        // Amount column - fixed width, right-aligned, default font
-        3: { cellWidth: 42, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 42, valign: 'middle' },
+        0: { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' },
+        1: { cellWidth: 30, fontSize: 7, valign: 'middle' },
+        2: { cellWidth: 28, halign: 'center', fontSize: 7, valign: 'middle' },
+        3: { cellWidth: 42, halign: 'right', fontSize: 8, font: NUMERIC_FONT, fontStyle: 'bold', overflow: 'hidden' as const, minCellWidth: 42, valign: 'middle' },
         4: { cellWidth: 'auto', fontSize: 7, valign: 'middle' }
+      },
+      didParseCell: (hookData) => {
+        // Use numeric font for amount column
+        if (hookData.column.index === 3) {
+          hookData.cell.styles.font = NUMERIC_FONT;
+        }
       },
       willDrawCell: (cellData) => {
         if (highlightAmounts && cellData.column.index === 3 && cellData.section === 'body') {
