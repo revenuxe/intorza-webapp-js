@@ -523,23 +523,30 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
         fontSize: 7,
         cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
         valign: 'middle',
+        minCellHeight: 8,
       },
       headStyles: {
-        fillColor: COLORS.BG_CARD,
+        fillColor: [255, 255, 255],
         textColor: COLORS.TEXT_PRIMARY,
         fontStyle: 'bold',
         lineColor: COLORS.BORDER,
         lineWidth: 0.1,
         fontSize: 7,
+        halign: 'center',
         valign: 'middle',
       },
       columnStyles: {
-        0: { cellWidth: 12, halign: 'center', fontSize: 8, valign: 'middle' },
-        1: { cellWidth: 30, fontSize: 8, valign: 'middle' },
-        2: { cellWidth: 28, halign: 'center', fontSize: 8, valign: 'middle' },
-        // Amount column - fixed width, right-aligned, default font
-        3: { cellWidth: 42, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 42, valign: 'middle' },
+        0: { cellWidth: 12, halign: 'center', fontSize: 7, valign: 'middle' },
+        1: { cellWidth: 30, fontSize: 7, valign: 'middle' },
+        2: { cellWidth: 28, halign: 'center', fontSize: 7, valign: 'middle' },
+        3: { cellWidth: 42, halign: 'right', fontSize: 8, font: NUMERIC_FONT, fontStyle: 'bold', overflow: 'hidden' as const, minCellWidth: 42, valign: 'middle' },
         4: { cellWidth: 'auto', fontSize: 7, valign: 'middle' }
+      },
+      didParseCell: (hookData) => {
+        // Use numeric font for amount column
+        if (hookData.column.index === 3) {
+          hookData.cell.styles.font = NUMERIC_FONT;
+        }
       },
       willDrawCell: (cellData) => {
         if (highlightAmounts && cellData.column.index === 3 && cellData.section === 'body') {
