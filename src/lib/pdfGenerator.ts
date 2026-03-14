@@ -711,6 +711,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const showSizeColumns = settings.showDetailedSizeColumns;
       const showSide = settings.showSideColumn;
       const showDetails = settings.showProductDetails;
+      const hasAnyImages = settings.showItemImages && section.items.some(item => item.imageUrls && item.imageUrls.length > 0);
       
       // Get localization for table headers
       const areaShort = data.localization?.areaUnitShort || 'Sq.Ft';
@@ -721,6 +722,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       if (showSide) headerCols.push('Side');
       headerCols.push('Product');
       if (showDetails) headerCols.push('Details');
+      if (hasAnyImages) headerCols.push('Image');
       if (showSizeColumns) {
         headerCols.push(`W (${lengthShort})`, `H (${lengthShort})`, areaShort);
       }
@@ -728,12 +730,23 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       
       const tableHead = [headerCols];
       
+      // Track which column index is the image column
+      let imageColIndex = -1;
+      {
+        let ci = 0;
+        if (showSide) ci++;
+        ci++; // product
+        if (showDetails) ci++;
+        if (hasAnyImages) { imageColIndex = ci; ci++; }
+      }
+      
       // Build dynamic body rows
       const tableBody = section.items.map(item => {
         const row: string[] = [];
         if (showSide) row.push(item.side || '-');
         row.push(item.productName);
         if (showDetails) row.push(item.productDetails || '-');
+        if (hasAnyImages) row.push(''); // placeholder for image cell
         if (showSizeColumns) {
           row.push(item.widthFt.toFixed(1), item.heightFt.toFixed(1), item.sftArea.toFixed(2));
         }
@@ -752,12 +765,14 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const advSettings = editorSettings?.advancedSettings || defaultAdvancedSettings;
 
       // Dynamic column styles based on visible columns and advanced settings
+      // When images are shown, compress other columns slightly to make room
+      const imgCompact = hasAnyImages;
       const colStyles: any = {};
       let colIndex = 0;
       // Side column
       if (showSide) { 
         colStyles[colIndex++] = { 
-          cellWidth: advSettings!.columnWidths.side, 
+          cellWidth: imgCompact ? Math.min(advSettings!.columnWidths.side, 16) : advSettings!.columnWidths.side, 
           halign: 'center', 
           fontSize: 6, 
           valign: 'middle' 
@@ -765,7 +780,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       }
       // Product column
       colStyles[colIndex++] = { 
-        cellWidth: showDetails ? advSettings!.columnWidths.product : 42, 
+        cellWidth: imgCompact 
+          ? (showDetails ? Math.min(advSettings!.columnWidths.product, 28) : 36)
+          : (showDetails ? advSettings!.columnWidths.product : 42), 
         fontStyle: 'bold', 
         fontSize: advSettings!.fontSizes.productName, 
         valign: 'middle' 
@@ -778,47 +795,58 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           valign: 'middle' 
         }; 
       }
+      // Image column - compact 14mm
+      if (hasAnyImages) {
+        colStyles[colIndex++] = {
+          cellWidth: 14,
+          halign: 'center',
+          valign: 'middle',
+          cellPadding: { top: 1, right: 1, bottom: 1, left: 1 },
+        };
+      }
       // Size columns
       if (showSizeColumns) {
-        colStyles[colIndex++] = { 
-          cellWidth: advSettings!.columnWidths.width, 
-          halign: 'center', 
-          fontSize: 6, 
-          valign: 'middle' 
-        }; // W
-        colStyles[colIndex++] = { 
-          cellWidth: advSettings!.columnWidths.height, 
-          halign: 'center', 
-          fontSize: 6, 
-          valign: 'middle' 
-        }; // H
-        colStyles[colIndex++] = { 
-          cellWidth: advSettings!.columnWidths.area, 
-          halign: 'center', 
-          fontSize: 6, 
-          valign: 'middle' 
-        }; // Sq.Ft
+        const wWidth = imgCompact ? Math.min(advSettings!.columnWidths.width, 16) : advSettings!.columnWidths.width;
+        const hWidth = imgCompact ? Math.min(advSettings!.columnWidths.height, 16) : advSettings!.columnWidths.height;
+        const aWidth = imgCompact ? Math.min(advSettings!.columnWidths.area, 18) : advSettings!.columnWidths.area;
+        colStyles[colIndex++] = { cellWidth: wWidth, halign: 'center', fontSize: 6, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: hWidth, halign: 'center', fontSize: 6, valign: 'middle' };
+        colStyles[colIndex++] = { cellWidth: aWidth, halign: 'center', fontSize: 6, valign: 'middle' };
       }
       // Rate column
       colStyles[colIndex++] = { 
-        cellWidth: advSettings!.columnWidths.rate, 
+        cellWidth: imgCompact ? Math.min(advSettings!.columnWidths.rate, 26) : advSettings!.columnWidths.rate, 
         halign: 'right', 
         fontSize: advSettings!.fontSizes.amounts, 
         overflow: 'hidden' as const, 
-        minCellWidth: advSettings!.columnWidths.rate, 
         valign: 'middle' 
       };
       // Amount column
       colStyles[colIndex++] = { 
-        cellWidth: advSettings!.columnWidths.amount, 
+        cellWidth: imgCompact ? Math.min(advSettings!.columnWidths.amount, 28) : advSettings!.columnWidths.amount, 
         halign: 'right', 
         fontSize: advSettings!.fontSizes.amounts, 
         overflow: 'hidden' as const, 
-        minCellWidth: advSettings!.columnWidths.amount, 
         valign: 'middle' 
       };
 
       const columnStyles = colStyles;
+
+      // Pre-load images for the image column
+      const itemImageCache: Map<number, string> = new Map();
+      if (hasAnyImages) {
+        for (let i = 0; i < section.items.length; i++) {
+          const item = section.items[i];
+          if (item.imageUrls && item.imageUrls.length > 0) {
+            try {
+              const compressed = await compressImage(item.imageUrls[0], 120, 120);
+              itemImageCache.set(i, compressed);
+            } catch (e) {
+              console.error('Failed to load item image:', e);
+            }
+          }
+        }
+      }
 
       autoTable(doc, {
         startY: yPosition,
@@ -833,6 +861,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           lineWidth: advSettings!.tableBorderWidth,
           cellPadding: { top: advSettings!.rowPadding, right: 4, bottom: advSettings!.rowPadding, left: 4 },
           valign: 'middle',
+          minCellHeight: hasAnyImages ? 12 : undefined,
         },
         headStyles: {
           fillColor: [255, 255, 255],
@@ -846,6 +875,20 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         },
         columnStyles: columnStyles as any,
         margin: { left: margin, right: margin, top: pageTopY },
+        didDrawCell: (hookData) => {
+          // Draw image in the image column
+          if (hasAnyImages && hookData.section === 'body' && hookData.column.index === imageColIndex) {
+            const rowIndex = hookData.row.index;
+            const imgData = itemImageCache.get(rowIndex);
+            if (imgData) {
+              const cell = hookData.cell;
+              const imgSize = Math.min(cell.width - 2, cell.height - 2, 10);
+              const imgX = cell.x + (cell.width - imgSize) / 2;
+              const imgY = cell.y + (cell.height - imgSize) / 2;
+              doc.addImage(imgData, 'JPEG', imgX, imgY, imgSize, imgSize, undefined, 'FAST');
+            }
+          }
+        },
         didDrawPage: (d) => {
           if (d.cursor) yPosition = d.cursor.y;
         }
@@ -854,67 +897,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     
     yPosition = (doc as any).lastAutoTable.finalY + 2;
 
-    // --- Inline Item Images (small thumbnails after each item row) ---
-    if (settings.showItemImages) {
-      const itemsWithImages = section.items.filter(item => item.imageUrls && item.imageUrls.length > 0);
-      
-      if (itemsWithImages.length > 0) {
-        yPosition += 2;
-        
-        for (const item of itemsWithImages) {
-          if (!item.imageUrls || item.imageUrls.length === 0) continue;
-          
-          // Check page break
-          const imgSize = 14;
-          const imgGap = 3;
-          const rowHeight = imgSize + 6;
-          
-          if (yPosition + rowHeight > pageBottomY - 10) {
-            doc.addPage();
-            yPosition = pageTopY;
-          }
 
-          // Item label inline
-          setBodyFont('bold');
-          doc.setFontSize(6);
-          doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-          doc.text(item.productName, margin + 1, yPosition + 3);
-
-          // Small thumbnails inline after the label
-          const labelWidth = doc.getTextWidth(item.productName) + 4;
-          let imgX = margin + labelWidth;
-          
-          for (const url of item.imageUrls) {
-            try {
-              const compressed = await compressImage(url, 150, 150);
-              
-              // Wrap to next line if overflows
-              if (imgX + imgSize > pageWidth - margin) {
-                yPosition += imgSize + 2;
-                imgX = margin + 1;
-                if (yPosition + imgSize > pageBottomY - 10) {
-                  doc.addPage();
-                  yPosition = pageTopY;
-                }
-              }
-
-              doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-              doc.setLineWidth(0.2);
-              doc.roundedRect(imgX, yPosition - 1, imgSize, imgSize, 1, 1, 'S');
-              doc.addImage(compressed, 'JPEG', imgX + 0.3, yPosition - 0.7, imgSize - 0.6, imgSize - 0.6, undefined, 'FAST');
-
-              imgX += imgSize + imgGap;
-            } catch (e) {
-              console.error('Failed to add item image to PDF:', e);
-            }
-          }
-
-          yPosition += imgSize + 2;
-        }
-        
-        yPosition += 1;
-      }
-    }
 
     // Section Total - Right aligned with highlight (numeric-safe)
     const sectionTotal = section.items.reduce((sum, item) => sum + item.amount, 0);
