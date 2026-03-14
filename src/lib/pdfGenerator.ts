@@ -722,7 +722,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       if (showSide) headerCols.push('Side');
       headerCols.push('Product');
       if (showDetails) headerCols.push('Details');
-      if (hasAnyImages) headerCols.push('Image');
+      if (hasAnyImages) headerCols.push('Img');
       if (showSizeColumns) {
         headerCols.push(`W (${lengthShort})`, `H (${lengthShort})`, areaShort);
       }
