@@ -348,6 +348,7 @@ const CreateQuotation = () => {
       if (quotationError) throw quotationError;
 
       // Pre-fill form fields - use quotation_title or project_name as fallback
+      console.log('[Quotation Edit] Loaded quotation:', { place_of_project: quotation.place_of_project, project_type: quotation.project_type, warranty: quotation.warranty });
       setProjectTitle(quotation.quotation_title || quotation.project_name || "");
       setClientName(quotation.client_name || "");
       setClientAddress(quotation.client_address || "");
