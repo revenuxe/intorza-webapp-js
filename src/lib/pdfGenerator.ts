@@ -864,22 +864,35 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
           lineWidth: advSettings!.tableBorderWidth,
-          cellPadding: { top: Math.max(advSettings!.rowPadding, 3), right: 4, bottom: Math.max(advSettings!.rowPadding, 3), left: 4 },
+          cellPadding: { top: Math.max(advSettings!.rowPadding, 3), right: 5, bottom: Math.max(advSettings!.rowPadding, 3), left: 5 },
           valign: 'middle',
-          minCellHeight: hasAnyImages ? 12 : 8,
+          minCellHeight: hasAnyImages ? 13 : 9,
         },
         headStyles: {
-          fillColor: [255, 255, 255],
-          textColor: COLORS.TEXT_PRIMARY,
+          fillColor: COLORS.HEADER_BG,
+          textColor: COLORS.HEADER_TEXT,
           fontStyle: 'bold',
           fontSize: advSettings!.fontSizes.tableHeader,
           lineWidth: advSettings!.tableBorderWidth,
           lineColor: COLORS.BORDER,
           halign: 'center',
           valign: 'middle',
+          cellPadding: { top: 4, right: 5, bottom: 4, left: 5 },
+          minCellHeight: 10,
         },
         columnStyles: columnStyles as any,
         margin: { left: margin, right: margin, top: pageTopY },
+        didParseCell: (hookData) => {
+          // Ensure numeric columns use the safe font
+          if (hookData.section === 'body') {
+            const totalCols = hookData.table.columns.length;
+            // Last 2 columns are Rate and Amount - use numeric font
+            if (hookData.column.index >= totalCols - 2) {
+              hookData.cell.styles.font = NUMERIC_FONT;
+              hookData.cell.styles.fontStyle = 'bold';
+            }
+          }
+        },
         didDrawCell: (hookData) => {
           // Draw image in the image column
           if (hasAnyImages && hookData.section === 'body' && hookData.column.index === imageColIndex) {
