@@ -330,7 +330,7 @@ const InvoiceDetail = () => {
         projectName: invoice.project_name,
         totalAmount: invoice.total_amount,
         paidAmount: invoice.paid_amount || 0,
-        remainingAmount: invoice.remaining_amount || 0,
+        remainingAmount: Math.max(0, invoice.total_amount - (invoice.paid_amount || 0)),
         status: invoice.status || 'unpaid',
         notes: invoice.notes,
         payments: payments.map(p => ({
@@ -776,7 +776,7 @@ const InvoiceDetail = () => {
           projectName: invoice.project_name,
           totalAmount: invoice.total_amount,
           paidAmount: invoice.paid_amount || 0,
-          remainingAmount: invoice.remaining_amount || 0,
+          remainingAmount: Math.max(0, invoice.total_amount - (invoice.paid_amount || 0)),
           status: invoice.status || 'unpaid',
           companyName: profile?.company_name,
           companyLogo: profile?.logo_url
