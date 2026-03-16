@@ -245,7 +245,8 @@ const InvoiceDetail = () => {
       // Create payment notes with next payment info if provided
       let finalNotes = paymentNotes || '';
       if (nextPaymentDue && nextPaymentAmount > 0) {
-        finalNotes = finalNotes ? `${finalNotes} | Next due: ${nextPaymentDue} - ₹${nextPaymentAmount}` : `Next due: ${nextPaymentDue} - ₹${nextPaymentAmount}`;
+        const currCode = profile?.currency_code || 'INR';
+        finalNotes = finalNotes ? `${finalNotes} | Next due: ${nextPaymentDue} - ${currCode} ${nextPaymentAmount.toLocaleString()}` : `Next due: ${nextPaymentDue} - ${currCode} ${nextPaymentAmount.toLocaleString()}`;
       }
 
       const { error: paymentError } = await supabase
