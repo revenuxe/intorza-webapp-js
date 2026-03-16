@@ -627,24 +627,29 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       yPosition = pageTopY;
     }
 
-    // Section Header "Card"
-    // Clean underline style with bold text
-    setHeadingFont('bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-    doc.text(section.title.toUpperCase(), margin, yPosition + 4);
+    // Section Header - Professional styled bar
+    const sectionTitleText = section.title.toUpperCase();
+    const sectionBarHeight = 8;
     
-    // Draw a thick accent line below title
-    doc.setDrawColor(COLORS.ACCENT[0], COLORS.ACCENT[1], COLORS.ACCENT[2]);
-    doc.setLineWidth(0.7);
-    doc.line(margin, yPosition + 7, margin + 20, yPosition + 7); // Short accent line
+    // Draw accent-colored left bar + section title
+    doc.setFillColor(COLORS.ACCENT[0], COLORS.ACCENT[1], COLORS.ACCENT[2]);
+    doc.rect(margin, yPosition, 3, sectionBarHeight, 'F');
     
-    // Draw a thin full-width line
+    // Light background strip behind title
+    doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
+    doc.rect(margin + 3, yPosition, contentWidth - 3, sectionBarHeight, 'F');
+    
+    // Bottom border line
     doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-    doc.setLineWidth(0.2);
-    doc.line(margin, yPosition + 7, pageWidth - margin, yPosition + 7);
+    doc.setLineWidth(0.3);
+    doc.line(margin, yPosition + sectionBarHeight, pageWidth - margin, yPosition + sectionBarHeight);
+    
+    setHeadingFont('bold');
+    doc.setFontSize(9);
+    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+    doc.text(sectionTitleText, margin + 6, yPosition + 5.5);
 
-    yPosition += 12;
+    yPosition += sectionBarHeight + 4;
 
     // Calculate SFT
     section.items.forEach(item => totalSFT += item.sftArea);
