@@ -417,8 +417,7 @@ const InvoiceDetail = () => {
     await handleDownloadPDF();
   };
 
-  const computedRemaining = invoice ? Math.max(0, invoice.total_amount - (invoice.paid_amount || 0)) : 0;
-  const isFullyPaid = invoice && computedRemaining <= 0;
+  const isFullyPaid = invoice && (invoice.remaining_amount || 0) <= 0;
 
   if (loading) {
     return (
@@ -560,7 +559,7 @@ const InvoiceDetail = () => {
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Remaining</span>
                   <span className="font-bold text-xl text-primary tabular-nums">
-                    {formatCurrency(computedRemaining)}
+                    {formatCurrency(invoice.remaining_amount || 0)}
                   </span>
                 </div>
               </div>
@@ -570,11 +569,11 @@ const InvoiceDetail = () => {
             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
               <div 
                 className="bg-green-500 h-full transition-all duration-500"
-                style={{ width: `${Math.min(100, invoice.total_amount > 0 ? ((invoice.paid_amount || 0) / invoice.total_amount) * 100 : 0)}%` }}
+                style={{ width: `${Math.min(100, ((invoice.paid_amount || 0) / invoice.total_amount) * 100)}%` }}
               />
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              {invoice.total_amount > 0 ? Math.round(((invoice.paid_amount || 0) / invoice.total_amount) * 100) : 0}% paid
+              {Math.round(((invoice.paid_amount || 0) / invoice.total_amount) * 100)}% paid
             </p>
           </div>
 

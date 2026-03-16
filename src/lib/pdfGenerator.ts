@@ -627,29 +627,24 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       yPosition = pageTopY;
     }
 
-    // Section Header - Professional styled bar
-    const sectionTitleText = section.title.toUpperCase();
-    const sectionBarHeight = 8;
-    
-    // Draw accent-colored left bar + section title
-    doc.setFillColor(COLORS.ACCENT[0], COLORS.ACCENT[1], COLORS.ACCENT[2]);
-    doc.rect(margin, yPosition, 3, sectionBarHeight, 'F');
-    
-    // Light background strip behind title
-    doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
-    doc.rect(margin + 3, yPosition, contentWidth - 3, sectionBarHeight, 'F');
-    
-    // Bottom border line
-    doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-    doc.setLineWidth(0.3);
-    doc.line(margin, yPosition + sectionBarHeight, pageWidth - margin, yPosition + sectionBarHeight);
-    
+    // Section Header "Card"
+    // Clean underline style with bold text
     setHeadingFont('bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-    doc.text(sectionTitleText, margin + 6, yPosition + 5.5);
+    doc.text(section.title.toUpperCase(), margin, yPosition + 4);
+    
+    // Draw a thick accent line below title
+    doc.setDrawColor(COLORS.ACCENT[0], COLORS.ACCENT[1], COLORS.ACCENT[2]);
+    doc.setLineWidth(0.7);
+    doc.line(margin, yPosition + 7, margin + 20, yPosition + 7); // Short accent line
+    
+    // Draw a thin full-width line
+    doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+    doc.setLineWidth(0.2);
+    doc.line(margin, yPosition + 7, pageWidth - margin, yPosition + 7);
 
-    yPosition += sectionBarHeight + 4;
+    yPosition += 12;
 
     // Calculate SFT
     section.items.forEach(item => totalSFT += item.sftArea);
@@ -680,32 +675,31 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         theme: 'grid',
         styles: {
           font: bodyFont,
-          fontSize: 7.5,
+          fontSize: 7,
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
           lineWidth: 0.1,
-          cellPadding: { top: 4, right: 5, bottom: 4, left: 5 },
+          cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
           valign: 'middle',
-          minCellHeight: 9,
         },
         headStyles: {
-          fillColor: COLORS.HEADER_BG,
-          textColor: COLORS.HEADER_TEXT,
+          fillColor: [255, 255, 255],
+          textColor: COLORS.TEXT_PRIMARY,
           fontStyle: 'bold',
-          fontSize: 7.5,
+          fontSize: 7,
           lineWidth: 0.1,
           lineColor: COLORS.BORDER,
-          halign: 'center',
+          halign: 'left',
           valign: 'middle',
-          cellPadding: { top: 4, right: 5, bottom: 4, left: 5 },
-          minCellHeight: 10,
         },
         columnStyles: {
-          0: { cellWidth: 34, fontStyle: 'bold', fontSize: 8, valign: 'middle' },
-          1: { cellWidth: 'auto', fontSize: 7.5, valign: 'middle' },
+          0: { cellWidth: 32, fontStyle: 'bold', fontSize: 8, valign: 'middle' },
+          1: { cellWidth: 'auto', fontSize: 7, valign: 'middle' }, // Details - auto expands
           2: { cellWidth: 18, halign: 'center', fontSize: 8, valign: 'middle' },
-          3: { cellWidth: 30, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 28, valign: 'middle' },
-          4: { cellWidth: 34, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' }
+          // Rate column - reduced width
+          3: { cellWidth: 28, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 28, valign: 'middle' },
+          // Amount column - reduced width
+          4: { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' }
         },
         margin: { left: margin, right: margin, top: pageTopY },
         didDrawPage: (d) => {
@@ -865,35 +859,22 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
           lineWidth: advSettings!.tableBorderWidth,
-          cellPadding: { top: Math.max(advSettings!.rowPadding, 3), right: 5, bottom: Math.max(advSettings!.rowPadding, 3), left: 5 },
+          cellPadding: { top: Math.max(advSettings!.rowPadding, 3), right: 4, bottom: Math.max(advSettings!.rowPadding, 3), left: 4 },
           valign: 'middle',
-          minCellHeight: hasAnyImages ? 13 : 9,
+          minCellHeight: hasAnyImages ? 12 : 8,
         },
         headStyles: {
-          fillColor: COLORS.HEADER_BG,
-          textColor: COLORS.HEADER_TEXT,
+          fillColor: [255, 255, 255],
+          textColor: COLORS.TEXT_PRIMARY,
           fontStyle: 'bold',
           fontSize: advSettings!.fontSizes.tableHeader,
           lineWidth: advSettings!.tableBorderWidth,
           lineColor: COLORS.BORDER,
           halign: 'center',
           valign: 'middle',
-          cellPadding: { top: 4, right: 5, bottom: 4, left: 5 },
-          minCellHeight: 10,
         },
         columnStyles: columnStyles as any,
         margin: { left: margin, right: margin, top: pageTopY },
-        didParseCell: (hookData) => {
-          // Ensure numeric columns use the safe font
-          if (hookData.section === 'body') {
-            const totalCols = hookData.table.columns.length;
-            // Last 2 columns are Rate and Amount - use numeric font
-            if (hookData.column.index >= totalCols - 2) {
-              hookData.cell.styles.font = NUMERIC_FONT;
-              hookData.cell.styles.fontStyle = 'bold';
-            }
-          }
-        },
         didDrawCell: (hookData) => {
           // Draw image in the image column
           if (hasAnyImages && hookData.section === 'body' && hookData.column.index === imageColIndex) {
