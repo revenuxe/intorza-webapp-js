@@ -417,7 +417,8 @@ const InvoiceDetail = () => {
     await handleDownloadPDF();
   };
 
-  const isFullyPaid = invoice && (invoice.remaining_amount || 0) <= 0;
+  const computedRemaining = invoice ? Math.max(0, invoice.total_amount - (invoice.paid_amount || 0)) : 0;
+  const isFullyPaid = invoice && computedRemaining <= 0;
 
   if (loading) {
     return (
