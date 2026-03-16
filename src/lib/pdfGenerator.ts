@@ -680,31 +680,32 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         theme: 'grid',
         styles: {
           font: bodyFont,
-          fontSize: 7,
+          fontSize: 7.5,
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
           lineWidth: 0.1,
-          cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+          cellPadding: { top: 4, right: 5, bottom: 4, left: 5 },
           valign: 'middle',
+          minCellHeight: 9,
         },
         headStyles: {
-          fillColor: [255, 255, 255],
-          textColor: COLORS.TEXT_PRIMARY,
+          fillColor: COLORS.HEADER_BG,
+          textColor: COLORS.HEADER_TEXT,
           fontStyle: 'bold',
-          fontSize: 7,
+          fontSize: 7.5,
           lineWidth: 0.1,
           lineColor: COLORS.BORDER,
-          halign: 'left',
+          halign: 'center',
           valign: 'middle',
+          cellPadding: { top: 4, right: 5, bottom: 4, left: 5 },
+          minCellHeight: 10,
         },
         columnStyles: {
-          0: { cellWidth: 32, fontStyle: 'bold', fontSize: 8, valign: 'middle' },
-          1: { cellWidth: 'auto', fontSize: 7, valign: 'middle' }, // Details - auto expands
+          0: { cellWidth: 34, fontStyle: 'bold', fontSize: 8, valign: 'middle' },
+          1: { cellWidth: 'auto', fontSize: 7.5, valign: 'middle' },
           2: { cellWidth: 18, halign: 'center', fontSize: 8, valign: 'middle' },
-          // Rate column - reduced width
-          3: { cellWidth: 28, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 28, valign: 'middle' },
-          // Amount column - reduced width
-          4: { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' }
+          3: { cellWidth: 30, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 28, valign: 'middle' },
+          4: { cellWidth: 34, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' }
         },
         margin: { left: margin, right: margin, top: pageTopY },
         didDrawPage: (d) => {
