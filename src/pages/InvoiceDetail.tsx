@@ -560,7 +560,7 @@ const InvoiceDetail = () => {
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Remaining</span>
                   <span className="font-bold text-xl text-primary tabular-nums">
-                    {formatCurrency(invoice.remaining_amount || 0)}
+                    {formatCurrency(computedRemaining)}
                   </span>
                 </div>
               </div>
