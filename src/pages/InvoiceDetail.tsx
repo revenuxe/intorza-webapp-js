@@ -570,11 +570,11 @@ const InvoiceDetail = () => {
             <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
               <div 
                 className="bg-green-500 h-full transition-all duration-500"
-                style={{ width: `${Math.min(100, ((invoice.paid_amount || 0) / invoice.total_amount) * 100)}%` }}
+                style={{ width: `${Math.min(100, invoice.total_amount > 0 ? ((invoice.paid_amount || 0) / invoice.total_amount) * 100 : 0)}%` }}
               />
             </div>
             <p className="text-xs text-muted-foreground text-center">
-              {Math.round(((invoice.paid_amount || 0) / invoice.total_amount) * 100)}% paid
+              {invoice.total_amount > 0 ? Math.round(((invoice.paid_amount || 0) / invoice.total_amount) * 100) : 0}% paid
             </p>
           </div>
 
