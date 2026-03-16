@@ -502,13 +502,18 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     doc.text("PAYMENT HISTORY", margin, yPosition);
     yPosition += 6;
 
-    const paymentRows = data.payments.map((payment, index) => [
-      String(index + 1),
-      payment.payment_date,
-      (payment.payment_method || '-').toUpperCase(),
-      fmtCurrency(payment.amount),
-      payment.notes || '-',
-    ]);
+    const paymentRows = data.payments.map((payment, index) => {
+      // Sanitize notes: replace raw ₹ symbol with currency code for safe PDF rendering
+      const currCode = (data.localization?.currencyCode || 'INR').toUpperCase();
+      const sanitizedNotes = (payment.notes || '-').replace(/₹/g, currCode + ' ');
+      return [
+        String(index + 1),
+        payment.payment_date,
+        (payment.payment_method || '-').toUpperCase(),
+        fmtCurrency(payment.amount),
+        sanitizedNotes,
+      ];
+    });
 
     autoTable(doc, {
       startY: yPosition,
