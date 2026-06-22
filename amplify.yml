@@ -1,22 +1,48 @@
+# Use Amplify monorepo config so frontend (Vite) and backend (Lambda) deploy
+# from the same repo. The backend uses Amplify Gen 2 / custom build that
+# packages backend/ as a Lambda Function URL or behind API Gateway.
 version: 1
-frontend:
-  phases:
-    preBuild:
-      commands:
-        - nvm use 20 || nvm install 20
-        - npm ci --legacy-peer-deps
-    build:
-      commands:
-        - npm run build
-  artifacts:
-    baseDirectory: dist
-    files:
-      - '**/*'
-  cache:
-    paths:
-      - node_modules/**/*
-  customHeaders:
-    - pattern: '**/*'
-      headers:
-        - key: 'Cache-Control'
-          value: 'no-cache'
+applications:
+  - appRoot: .
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - nvm use 20 || nvm install 20
+            - npm ci --legacy-peer-deps
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+      customHeaders:
+        - pattern: '**/*'
+          headers:
+            - key: 'Cache-Control'
+              value: 'no-cache'
+
+  - appRoot: backend
+    backend:
+      phases:
+        preBuild:
+          commands:
+            - nvm use 20 || nvm install 20
+            - npm ci
+        build:
+          commands:
+            - echo "Lambda package built from backend/src"
+      artifacts:
+        baseDirectory: .
+        files:
+          - 'src/**/*'
+          - 'package.json'
+          - 'package-lock.json'
+          - 'node_modules/**/*'
+      cache:
+        paths:
+          - node_modules/**/*
