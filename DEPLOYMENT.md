@@ -192,3 +192,65 @@ To hit the local backend from the Vite dev server, set in the project root
 ```
 VITE_API_BASE_URL=http://localhost:4000
 ```
+
+---
+
+## Deploying the Backend (Express → AWS Lambda)
+
+The Express app in `backend/` is wrapped with `serverless-http` and deployed as a single Lambda fronted by API Gateway (HTTP API) at `api.intorza.com`.
+
+### 1. Required Amplify / Lambda environment variables
+
+Set these in the **Amplify console** (Backend env) — or directly on the Lambda if you deploy it standalone:
+
+| Var | Purpose |
+|-----|---------|
+| `DATABASE_URL` | `postgres://USER:PASS@HOST:5432/intorza?sslmode=require` |
+| `SUPABASE_URL` | Used to verify auth JWTs via JWKS |
+| `SUPABASE_JWT_AUD` | `authenticated` |
+| `S3_BUCKET` | The bucket name you just added in Amplify |
+| `S3_REGION` | e.g. `ap-south-1` |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | Optional — only if not using a Lambda execution role with S3 access |
+| `CORS_ORIGINS` | `https://intorza.com,https://www.intorza.com` |
+
+### 2. Package & deploy
+
+```bash
+cd backend
+npm ci --omit=dev
+zip -r ../backend-lambda.zip . -x "*.git*" "node_modules/aws-sdk/*"
+
+aws lambda update-function-code \
+  --function-name intorza-api \
+  --zip-file fileb://../backend-lambda.zip
+```
+
+Lambda handler entry: `src/lambda.handler` (created if missing — wraps Express with `serverless-http`).
+
+### 3. API Gateway → Lambda
+
+- HTTP API with **proxy integration** to the Lambda.
+- Custom domain `api.intorza.com` → API Gateway stage.
+- Route: `ANY /{proxy+}` and `ANY /`.
+
+### 4. Frontend env (Amplify Hosting)
+
+```
+VITE_API_BASE_URL=https://api.intorza.com
+```
+
+Without this, `src/lib/api.ts` falls back to `''` (same-origin) and calls fail in production.
+
+### 5. Wiring the quotation module to RDS
+
+Once the Lambda answers `GET https://api.intorza.com/api/quotations` with a 200:
+
+1. Replace `supabase.from('quotations')…` calls in:
+   - `src/pages/Quotations.tsx`
+   - `src/pages/QuotationDetail.tsx`
+   - `src/pages/CreateQuotation.tsx`
+   with `quotationsApi.list/get/create/update/delete` from `src/lib/api.ts`.
+2. Run `node backend/scripts/migrate-data.js quotations quotation_items quotation_sections quotation_item_images` once.
+3. Cutover one user at a time using a feature flag (`localStorage.setItem('use_rds_quotations', '1')`) if needed.
+
+The same pattern applies to invoices, clients, payments, etc. — each route handler already exists under `backend/src/routes/`.
