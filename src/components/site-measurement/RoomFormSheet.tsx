@@ -179,25 +179,19 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
 
         // Compress to WebP
         const compressedBlob = await compressImage(file);
-        const fileName = `${room.id}/${Date.now()}.webp`;
+        const fileName = `${room.id}-${Date.now()}.webp`;
 
-        // Upload to Supabase storage
-        const { error: uploadError } = await supabase.storage
-          .from('room-photos')
-          .upload(fileName, compressedBlob, {
-            contentType: 'image/webp',
-            cacheControl: '3600'
-          });
-
-        if (uploadError) {
+        // Upload to S3
+        let storedPath: string;
+        try {
+          const { uploadToS3 } = await import('@/lib/s3Upload');
+          const { url } = await uploadToS3(compressedBlob, 'room', fileName);
+          storedPath = url;
+        } catch (uploadError: any) {
           console.error('Upload error:', uploadError);
           toast.error(`Failed to upload ${file.name}`);
           continue;
         }
-
-        // Store the file path reference (not the full URL)
-        // We'll generate signed URLs when fetching
-        const storedPath = `${supabase.storage.from('room-photos').getPublicUrl(fileName).data.publicUrl}`;
 
         // Save to room_photos table with the path reference
         const { data: photoData, error: dbError } = await supabase
