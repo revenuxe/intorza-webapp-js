@@ -565,9 +565,30 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  // --- 6. Terms & Conditions ---
+  // --- 6. Terms & Conditions (kept on a single page together with signature) ---
   if (invoiceSettings.showTermsConditions && data.profile.invoice_terms_conditions && data.profile.invoice_terms_conditions.length > 0) {
-    if (yPosition > pageHeight - 60) {
+    const termsLineHeight = 3.2;
+    const titleGap = 3.5;
+    const blockGap = 1.5;
+    const headerGap = 6;
+    const signatureBlockHeight = invoiceSettings.showSignatureArea ? 35 : 0;
+
+    // Estimate total height for terms + signature so they stay on one page
+    let estimatedHeight = headerGap + 4;
+    data.profile.invoice_terms_conditions.forEach(term => {
+      if (!term || !term.title || !term.points) return;
+      estimatedHeight += titleGap;
+      term.points.forEach((p) => {
+        if (!p || !p.trim()) return;
+        const lines = doc.splitTextToSize(p, contentWidth - 5);
+        estimatedHeight += lines.length * termsLineHeight;
+      });
+      estimatedHeight += blockGap;
+    });
+    estimatedHeight += signatureBlockHeight;
+
+    const availableSpace = pageHeight - 20 - yPosition;
+    if (estimatedHeight > availableSpace) {
       doc.addPage();
       yPosition = 15;
     }
@@ -576,48 +597,37 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
     doc.setFontSize(10);
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text("TERMS & CONDITIONS", margin, yPosition);
-    yPosition += 8;
+    yPosition += headerGap;
 
     setBodyFont('normal');
     doc.setFontSize(7);
 
     const addBlock = (title: string, points: string[]) => {
-      if (yPosition > pageHeight - 40) {
-        doc.addPage();
-        yPosition = 15;
-      }
       if (title) {
         setBodyFont('bold');
         doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
         doc.text(title, margin, yPosition);
-        yPosition += 4;
+        yPosition += titleGap;
       }
       setBodyFont('normal');
       doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-      
+
       if (!points || !Array.isArray(points)) return;
-      
+
       points.forEach((point) => {
         if (!point || !point.trim()) return;
-        
         const splitText = doc.splitTextToSize(point, contentWidth - 5);
-        
         splitText.forEach((line: string, lineIndex: number) => {
-          if (yPosition > pageHeight - 20) {
-            doc.addPage();
-            yPosition = 15;
-          }
-          
           if (lineIndex === 0) {
             doc.text("•", margin, yPosition);
             doc.text(line, margin + 5, yPosition);
           } else {
             doc.text(line, margin + 5, yPosition);
           }
-          yPosition += 3.5;
+          yPosition += termsLineHeight;
         });
       });
-      yPosition += 2;
+      yPosition += blockGap;
     };
 
     data.profile.invoice_terms_conditions.forEach(term => {
