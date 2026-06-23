@@ -225,7 +225,7 @@ aws lambda update-function-code \
   --zip-file fileb://../backend-lambda.zip
 ```
 
-Lambda handler entry: `src/lambda.handler` (created if missing — wraps Express with `serverless-http`).
+Lambda handler entry: `src/index.handler` (created if missing — wraps Express with `serverless-http`).
 
 ### 3. API Gateway → Lambda
 
