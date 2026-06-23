@@ -701,11 +701,11 @@ export const generateInvoicePDF = async (data: InvoiceData) => {
 
   // --- 7. Signature & Footer ---
   if (invoiceSettings.showSignatureArea) {
-    if (yPosition > pageHeight - 50) {
+    if (yPosition > pageHeight - 35) {
       doc.addPage();
-      yPosition = pageHeight - 60;
+      yPosition = 15;
     } else {
-      yPosition += 10;
+      yPosition += 8;
     }
 
     const signBoxWidth = 70;
