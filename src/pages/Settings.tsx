@@ -196,22 +196,10 @@ const Settings = () => {
       if (!user) throw new Error('No user found');
 
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/signature.${fileExt}`;
+      const fileName = `signature-${Date.now()}.${fileExt}`;
 
-      if (profile.signature_url) {
-        const oldPath = profile.signature_url.split('/').slice(-2).join('/');
-        await supabase.storage.from('company-logos').remove([oldPath]);
-      }
-
-      const { error: uploadError } = await supabase.storage
-        .from('company-logos')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('company-logos')
-        .getPublicUrl(fileName);
+      const { uploadToS3 } = await import('@/lib/s3Upload');
+      const { url: publicUrl } = await uploadToS3(file, 'signature', fileName);
 
       const { error: updateError } = await supabase
         .from('profiles')
