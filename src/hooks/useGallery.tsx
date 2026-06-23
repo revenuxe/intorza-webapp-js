@@ -55,15 +55,10 @@ export const useGallery = () => {
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('gallery-images')
-        .upload(fileName, file, { upsert: true });
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from('gallery-images').getPublicUrl(fileName);
-      const imageUrl = urlData.publicUrl;
+      const { uploadToS3 } = await import('@/lib/s3Upload');
+      const { url: imageUrl } = await uploadToS3(file, 'gallery', fileName);
 
       // Get image dimensions
       const dims = await getImageDimensions(file);
