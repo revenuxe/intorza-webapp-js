@@ -1,59 +1,69 @@
-# Intorza Backend (AWS Amplify Functions + RDS PostgreSQL)
+# Intorza — AWS RDS Migration (Quick Start)
 
-Express-based Lambda API. Supabase is used **only** for issuing JWTs; this
-backend verifies them and owns all data in AWS RDS PostgreSQL.
+Supabase stays for **Auth only**. All application data lives in **AWS RDS PostgreSQL**.
 
-## Layout
+## 1. Set credentials
 
-```
-backend/
-├── src/
-│   ├── index.js          # Lambda handler (serverless-http wrapper)
-│   ├── server.js         # Express app + route registration
-│   ├── db.js             # pg Pool (SSL, env-driven)
-│   ├── auth.js           # Supabase JWT verification middleware
-│   ├── errors.js         # Async wrapper + error handler
-│   └── routes/
-│       ├── quotations.js # Full reference implementation
-│       ├── invoices.js
-│       ├── clients.js
-│       ├── tasks.js
-│       ├── team.js
-│       ├── library.js
-│       ├── profile.js
-│       └── ...           # one file per resource
-├── scripts/
-│   ├── migrate-schema.sh # pg_dump from Supabase → schema.sql
-│   ├── migrate-data.js   # row-by-row Supabase → RDS copy
-│   └── apply-schema.sh   # psql schema.sql into RDS
-├── schema.sql            # Canonical RDS schema (generated, committed)
-└── package.json
+`backend/.env` (copy from `.env.example`):
+
+```bash
+DB_HOST=intorza-prod.xxxx.ap-south-1.rds.amazonaws.com
+DB_PORT=5432
+DB_NAME=intorza
+DB_USER=intorza_app
+DB_PASSWORD=********
+DB_SSL=true
+
+SUPABASE_URL=https://gclsgkhtwqurniitfeir.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...   # service-role, ONLY for one-off migration
 ```
 
-## Environment variables (Amplify Console → Environment variables)
+> The same `DB_*` vars must be set in your AWS Amplify Function / Lambda env.
 
-| Name | Purpose |
-|---|---|
-| `DB_HOST` | RDS endpoint |
-| `DB_PORT` | usually 5432 |
-| `DB_NAME` | database name |
-| `DB_USER` | RDS user |
-| `DB_PASSWORD` | RDS password |
-| `DB_SSL` | `true` (required on RDS) |
-| `SUPABASE_URL` | https://gclsgkhtwqurniitfeir.supabase.co |
-| `SUPABASE_JWKS_URL` | `${SUPABASE_URL}/auth/v1/.well-known/jwks.json` |
-| `SUPABASE_JWT_AUDIENCE` | `authenticated` |
-| `CORS_ORIGIN` | `https://app.intorza.com` (comma-separated for multiple) |
-
-## Local dev
+## 2. Apply schema to RDS
 
 ```bash
 cd backend
 npm install
-cp .env.example .env   # fill in
-npm run dev            # http://localhost:4000
+DATABASE_URL="postgres://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" \
+  npm run migrate:apply
+npm run db:test
 ```
 
-## Deploy to Amplify
+`db:test` confirms the connection and lists all `public.*` tables.
 
-See `../DEPLOYMENT.md`.
+## 3. Copy data from Supabase → RDS
+
+```bash
+npm run migrate:data              # all tables
+npm run migrate:data quotations   # single table
+```
+
+The script is idempotent (`ON CONFLICT (id) DO NOTHING`) — safe to re-run.
+
+## What the schema mirrors
+
+Exact 1:1 mirror of the Supabase `public` schema, including:
+
+- **Core**: `profiles`, `clients`, `user_roles`
+- **Quotations**: `quotations`, `quotation_sections`, `quotation_items`,
+  `quotation_item_images`, `quotation_preferences`, `quotation_templates`,
+  `section_templates`
+- **Invoices & Payments**: `invoices`, `payments`, `payment_logs`,
+  `payment_templates`, `bank_detail_templates`
+- **Teams**: `team_members`, `team_member_requests`, `team_project_assignments`,
+  `attendance`, `tasks`
+- **Site measurement**: `site_measurement_projects`, `site_measurement_rooms`,
+  `room_photos`
+- **Library**: `gallery_images`, `item_usage_patterns`, `terms_templates`,
+  `warranty_templates`
+- **Meta**: `feedback`, `user_activity`, `subscription_events`
+
+All foreign keys (e.g. `quotation_sections → quotations`,
+`quotation_items → quotation_sections`, `payments → invoices`,
+`invoices → quotations/clients`) and PostgreSQL enums (`app_role`,
+`team_member_status`, `work_type`) are recreated. `user_id` columns reference
+Supabase Auth and intentionally have no FK in RDS.
+
+A generic `updated_at` trigger is auto-attached to every table that has the
+column.
