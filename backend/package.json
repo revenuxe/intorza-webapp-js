@@ -8,7 +8,8 @@
     "start": "node src/dev.js",
     "migrate:schema": "bash scripts/migrate-schema.sh",
     "migrate:apply": "bash scripts/apply-schema.sh",
-    "migrate:data": "node scripts/migrate-data.js"
+    "migrate:data": "node scripts/migrate-data.js",
+    "db:test": "node scripts/test-connection.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
