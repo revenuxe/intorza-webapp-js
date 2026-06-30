@@ -1,3 +1,4 @@
-// clients — STUB. Copy backend/src/routes/quotations.js as the reference pattern.
-const { makeStub } = require('./_stub');
-module.exports = makeStub('clients');
+module.exports = require('../crud').crudRouter({
+  table: 'clients',
+  columns: ['name', 'email', 'phone', 'address', 'company', 'notes'],
+});

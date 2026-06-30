@@ -1,3 +1,7 @@
-// tasks — STUB. Copy backend/src/routes/quotations.js as the reference pattern.
-const { makeStub } = require('./_stub');
-module.exports = makeStub('tasks');
+module.exports = require('../crud').crudRouter({
+  table: 'tasks',
+  columns: [
+    'title', 'description', 'status', 'priority', 'due_date',
+    'assigned_to', 'project_id', 'quotation_id', 'metadata', 'completed_at',
+  ],
+});
