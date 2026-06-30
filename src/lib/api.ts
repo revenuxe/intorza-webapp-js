@@ -1,11 +1,6 @@
 /**
- * Intorza API client — talks to the AWS Amplify Functions backend.
- *
- * Auth model: every request attaches the **Supabase access token** as a
- * Bearer Authorization header. The backend verifies it against Supabase's
- * JWKS. Database operations are NOT performed via the Supabase JS client
- * anymore — only auth (signIn / signUp / session / signOut) still uses
- * Supabase directly.
+ * Intorza API client — single entry point to the AWS-hosted backend.
+ * Supabase is used ONLY for auth (the access token is forwarded as a Bearer).
  */
 import { supabase } from '@/integrations/supabase/client';
 
@@ -42,22 +37,18 @@ async function request<T>(
     ...(await authHeader()),
     ...((init?.headers as Record<string, string>) || {}),
   };
-
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-
   if (res.status === 204) return undefined as T;
-
   const text = await res.text();
   const json = text ? safeJson(text) : null;
-
   if (!res.ok) {
     const message =
-      (json && typeof json === 'object' && 'error' in json && String(json.error)) ||
+      (json && typeof json === 'object' && 'error' in json && String((json as any).error)) ||
       `HTTP ${res.status}`;
     throw new ApiError(res.status, message, json);
   }
@@ -76,16 +67,69 @@ export const api = {
   delete: <T = unknown>(path: string)                 => request<T>('DELETE', path),
 };
 
-// ---------- Typed resource helpers ----------
-// Add one of these per resource as you port the corresponding screens off
-// supabase.from(...). Keep response shape `{ data: T }` to match the backend.
-
 export interface Envelope<T> { data: T }
 
+// ---- Generic CRUD factory matching backend/src/crud.js ----
+function crud<T = any>(base: string) {
+  return {
+    list:   () => api.get<Envelope<T[]>>(base),
+    get:    (id: string) => api.get<Envelope<T>>(`${base}/${id}`),
+    create: (body: Partial<T>) => api.post<Envelope<T>>(base, body),
+    update: (id: string, body: Partial<T>) => api.patch<Envelope<T>>(`${base}/${id}`, body),
+    remove: (id: string) => api.delete<void>(`${base}/${id}`),
+  };
+}
+
+// ---- Resources ----
 export const quotationsApi = {
-  list:   () => api.get<Envelope<any[]>>('/api/quotations'),
-  get:    (id: string) => api.get<Envelope<any>>(`/api/quotations/${id}`),
-  create: (body: any)  => api.post<Envelope<any>>('/api/quotations', body),
-  update: (id: string, body: any) => api.put<Envelope<any>>(`/api/quotations/${id}`, body),
-  remove: (id: string) => api.delete<void>(`/api/quotations/${id}`),
+  ...crud('/api/quotations'),
+};
+export const invoicesApi = {
+  ...crud('/api/invoices'),
+};
+export const paymentsApi = {
+  list:   (invoiceId?: string) =>
+    api.get<Envelope<any[]>>(`/api/payments${invoiceId ? `?invoice_id=${invoiceId}` : ''}`),
+  create: (body: any) => api.post<Envelope<any>>('/api/payments', body),
+  remove: (id: string) => api.delete<void>(`/api/payments/${id}`),
+};
+export const clientsApi          = crud('/api/clients');
+export const tasksApi            = crud('/api/tasks');
+export const galleryApi          = crud('/api/gallery');
+
+export const profileApi = {
+  me:     () => api.get<Envelope<any>>('/api/profile/me'),
+  update: (body: any) => api.patch<Envelope<any>>('/api/profile/me', body),
+};
+
+export const libraryApi = {
+  terms:               crud('/api/library/terms'),
+  warranty:            crud('/api/library/warranty'),
+  paymentStages:       crud('/api/library/payment-stages'),
+  bankDetails:         crud('/api/library/bank-details'),
+  quotationTemplates:  crud('/api/library/quotation-templates'),
+  sectionTemplates:    crud('/api/library/section-templates'),
+  items:               crud('/api/library/items'),
+  preferences:         crud('/api/library/preferences'),
+};
+
+export const teamApi = {
+  members:     crud('/api/team/members'),
+  requests:    crud('/api/team/requests'),
+  assignments: crud('/api/team/assignments'),
+  attendance:  crud('/api/team/attendance'),
+};
+
+export const siteApi = {
+  projects: crud('/api/site-measurements/projects'),
+  rooms:    crud('/api/site-measurements/rooms'),
+  photos:   crud('/api/site-measurements/photos'),
+};
+
+export const filesApi = {
+  signUpload:   (body: { kind: string; filename?: string; contentType?: string; size?: number }) =>
+    api.post<Envelope<{ uploadUrl: string; method: 'PUT'; headers: Record<string, string>; key: string; bucket: string; url: string; expiresIn: number }>>(
+      '/api/files/sign-upload', body),
+  signDownload: (key: string) =>
+    api.post<Envelope<{ url: string; expiresIn: number }>>('/api/files/sign-download', { key }),
 };

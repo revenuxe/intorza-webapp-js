@@ -1,12 +1,7 @@
-import { supabase } from "@/integrations/supabase/client";
+import { filesApi } from "@/lib/api";
 
 export type S3UploadKind =
-  | "logo"
-  | "signature"
-  | "gallery"
-  | "room"
-  | "qr"
-  | "generic";
+  | "logo" | "signature" | "gallery" | "room" | "qr" | "invoice" | "quotation" | "generic";
 
 export interface S3UploadResult {
   key: string;
@@ -15,30 +10,36 @@ export interface S3UploadResult {
 }
 
 /**
- * Upload a file/blob to AWS S3 via the `s3-upload` Supabase edge function.
- * Returns the public S3 URL.
+ * Direct-to-S3 upload via backend-issued presigned PUT URL.
+ * No Supabase storage and no edge functions involved.
  */
 export async function uploadToS3(
   file: File | Blob,
   kind: S3UploadKind = "generic",
   filename?: string,
 ): Promise<S3UploadResult> {
-  const form = new FormData();
   const f =
     file instanceof File
       ? file
       : new File([file], filename ?? `upload-${Date.now()}`, {
           type: (file as Blob).type || "application/octet-stream",
         });
-  form.append("file", f);
-  form.append("kind", kind);
-  if (filename) form.append("filename", filename);
 
-  const { data, error } = await supabase.functions.invoke("s3-upload", {
-    body: form,
+  const { data: signed } = await filesApi.signUpload({
+    kind,
+    filename: f.name,
+    contentType: f.type || "application/octet-stream",
+    size: f.size,
   });
 
-  if (error) throw error;
-  if (!data?.url) throw new Error("S3 upload failed: missing url");
-  return data as S3UploadResult;
+  const putRes = await fetch(signed.uploadUrl, {
+    method: "PUT",
+    headers: signed.headers,
+    body: f,
+  });
+  if (!putRes.ok) {
+    throw new Error(`S3 upload failed: ${putRes.status} ${putRes.statusText}`);
+  }
+
+  return { key: signed.key, url: signed.url, bucket: signed.bucket };
 }
