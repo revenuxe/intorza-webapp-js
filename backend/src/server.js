@@ -40,6 +40,7 @@ app.use('/api/profile', require('./routes/profile'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/gallery', require('./routes/gallery'));
 app.use('/api/site-measurements', require('./routes/site-measurements'));
+app.use('/api/files', require('./routes/files'));
 
 app.use(notFound);
 app.use(errorHandler);
