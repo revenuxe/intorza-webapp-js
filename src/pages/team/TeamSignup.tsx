@@ -15,6 +15,7 @@ interface Company {
   company_name: string;
   full_name: string | null;
   country_name: string | null;
+  address: string | null;
   org_code: string | null;
 }
 
