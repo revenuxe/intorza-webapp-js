@@ -1080,10 +1080,16 @@ const Team = () => {
                     {request.rejection_reason && <p className="text-[10px] text-destructive bg-destructive/5 rounded-lg px-2 py-1 mb-1.5">Reason: {request.rejection_reason}</p>}
                     {request.docs_request_note && <p className="text-[10px] text-blue-700 bg-blue-50 rounded-lg px-2 py-1 mb-1.5">Note: {request.docs_request_note}</p>}
                     {isPending && (
-                      <div className="flex gap-1.5">
-                        <Button size="sm" variant="outline" className="flex-1 rounded-xl text-[10px] text-destructive border-destructive/30 h-7" onClick={() => openActionDialog(request, 'reject')}>Reject</Button>
-                        <Button size="sm" variant="outline" className="flex-1 rounded-xl text-[10px] h-7" onClick={() => openActionDialog(request, 'docs_requested')}>Docs</Button>
-                        <Button size="sm" className="flex-1 rounded-xl text-[10px] h-7" onClick={() => handleApproveRequest(request)}>Approve</Button>
+                      <div className="flex items-center gap-1 justify-end">
+                        <button title="Reject" aria-label="Reject" onClick={() => openActionDialog(request, 'reject')} className="h-8 w-8 rounded-lg flex items-center justify-center text-destructive hover:bg-destructive/10 transition-colors">
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                        <button title="Request Documents" aria-label="Request documents" onClick={() => openActionDialog(request, 'docs_requested')} className="h-8 w-8 rounded-lg flex items-center justify-center text-blue-600 hover:bg-blue-50 transition-colors">
+                          <FileQuestion className="h-4 w-4" />
+                        </button>
+                        <button title="Approve" aria-label="Approve" onClick={() => handleApproveRequest(request)} className="h-8 w-8 rounded-lg flex items-center justify-center text-green-600 hover:bg-green-50 transition-colors">
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
                       </div>
                     )}
                   </div>
