@@ -300,7 +300,7 @@ const CreateQuotation = () => {
           .select('*')
           .eq('user_id', user.id)
           .eq('is_default', true)
-          .single();
+          .maybeSingle();
 
         setProfile({
           company_name: data.company_name || "",
@@ -806,7 +806,7 @@ const CreateQuotation = () => {
       .select('*')
       .eq('user_id', user.id)
       .eq('is_default', true)
-      .single();
+      .maybeSingle();
 
     return {
       company_name: profileData.company_name || "",
