@@ -1083,9 +1083,9 @@ const CreateQuotation = () => {
             <CardContent className="space-y-4">
               {/* Table Header - Hidden on mobile, shown on tablet+ */}
               <div className="hidden md:block overflow-x-auto">
-                <div className="min-w-[800px]">
+                <div className="min-w-[880px]">
                   <div className="grid gap-2 text-sm font-medium text-muted-foreground border-b pb-2" style={{
-                gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
+                gridTemplateColumns: `${customizeSettings.showSideColumn ? '56px ' : ''}minmax(200px,1.4fr) ${customizeSettings.showProductDetails ? 'minmax(220px,1.6fr) ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}110px 120px`
               }}>
                     {customizeSettings.showSideColumn && <div>Side</div>}
                     <div>Product Name</div>
