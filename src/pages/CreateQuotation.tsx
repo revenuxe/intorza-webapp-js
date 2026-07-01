@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon } from "lucide-react";
+import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon, Copy } from "lucide-react";
 import { getCountryByCode } from "@/lib/countryConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
