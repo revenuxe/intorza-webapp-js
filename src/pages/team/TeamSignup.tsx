@@ -236,6 +236,34 @@ const TeamSignup = () => {
                 </button>
               </div>
 
+              {/* Cascading location filters */}
+              {searchMode === 'name' && (
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Select value={filterCountry} onValueChange={(v) => { setFilterCountry(v); setFilterState('all'); setFilterCity('all'); }}>
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue placeholder="Country" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Countries</SelectItem>
+                      {uniqueCountries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterState} onValueChange={(v) => { setFilterState(v); setFilterCity('all'); }} disabled={uniqueStates.length === 0}>
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue placeholder="State" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All States</SelectItem>
+                      {uniqueStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterCity} onValueChange={setFilterCity} disabled={uniqueCities.length === 0}>
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue placeholder="City" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Cities</SelectItem>
+                      {uniqueCities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+
               <div className="relative">
                 {searchMode === 'code' ? (
                   <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
