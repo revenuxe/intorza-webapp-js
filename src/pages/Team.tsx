@@ -835,12 +835,20 @@ const Team = () => {
         {/* Members Tab - Compact */}
         <TabsContent value="members" className="space-y-2">
           {teamMembers.length === 0 ? (
-            <div className="text-center py-10">
+            <div className="text-center py-10 border rounded-2xl bg-muted/20">
               <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">No team members yet</p>
-              <Button size="sm" onClick={() => setMemberDialogOpen(true)} className="mt-3 rounded-xl text-xs">
-                <UserPlus className="h-3.5 w-3.5 mr-1.5" />Add First Member
-              </Button>
+              <p className="text-sm font-medium">No members yet</p>
+              <p className="text-xs text-muted-foreground mt-1 px-6">
+                Members join by requesting access from the Team Signup page. Share your Org Code above.
+              </p>
+              {pendingRequestsCount > 0 && (
+                <Button size="sm" variant="outline" className="mt-3 rounded-xl text-xs" onClick={() => {
+                  const trigger = document.querySelector('[data-state][value="approvals"]') as HTMLElement;
+                  trigger?.click();
+                }}>
+                  <AlertCircle className="h-3.5 w-3.5 mr-1.5" />Review {pendingRequestsCount} Request(s)
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-1.5">
