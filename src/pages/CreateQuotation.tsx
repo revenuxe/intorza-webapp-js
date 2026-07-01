@@ -1137,9 +1137,9 @@ const CreateQuotation = () => {
 
                   {/* Desktop Table Row */}
                   <div className="hidden md:block overflow-x-auto">
-                    <div className="min-w-[800px]">
-                      <div className="grid gap-2" style={{
-                  gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
+                    <div className="min-w-[880px]">
+                      <div className="grid gap-2 items-start" style={{
+                  gridTemplateColumns: `${customizeSettings.showSideColumn ? '56px ' : ''}minmax(200px,1.4fr) ${customizeSettings.showProductDetails ? 'minmax(220px,1.6fr) ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}110px 120px`
                 }}>
                         {customizeSettings.showSideColumn && <Input value={item.side} onChange={e => updateItem(section.id, item.id, "side", e.target.value)} placeholder="A" className="h-9" />}
                         <ProductNameInput
