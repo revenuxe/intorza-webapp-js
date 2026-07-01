@@ -457,6 +457,35 @@ const CreateQuotation = () => {
   const removeSection = (sectionId: string) => {
     setSections(sections.filter(section => section.id !== sectionId));
   };
+  const duplicateItem = (sectionId: string, itemId: string) => {
+    setSections(sections.map(section => {
+      if (section.id !== sectionId) return section;
+      const idx = section.items.findIndex(i => i.id === itemId);
+      if (idx === -1) return section;
+      const src = section.items[idx];
+      const copy = { ...src, id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}` };
+      const items = [...section.items];
+      items.splice(idx + 1, 0, copy);
+      return { ...section, items };
+    }));
+  };
+  const duplicateSection = (sectionId: string) => {
+    setSections(prev => {
+      const idx = prev.findIndex(s => s.id === sectionId);
+      if (idx === -1) return prev;
+      const src = prev[idx];
+      const stamp = Date.now();
+      const copy = {
+        ...src,
+        id: `${stamp}`,
+        title: src.title ? `${src.title} (Copy)` : "",
+        items: src.items.map((it, i) => ({ ...it, id: `${stamp}-${i}-${Math.random().toString(36).slice(2, 6)}` })),
+      };
+      const next = [...prev];
+      next.splice(idx + 1, 0, copy);
+      return next;
+    });
+  };
   const updateSectionTitle = (sectionId: string, title: string) => {
     setSections(sections.map(section => section.id === sectionId ? {
       ...section,
