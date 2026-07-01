@@ -717,10 +717,6 @@ const Team = () => {
             <FolderPlus className="h-3.5 w-3.5 mr-1" />
             <span className="hidden sm:inline">Team</span>
           </Button>
-          <Button size="sm" className="rounded-xl h-8 text-xs" onClick={() => { setEditingMember(null); setMemberDialogOpen(true); }}>
-            <UserPlus className="h-3.5 w-3.5 mr-1" />
-            <span className="hidden sm:inline">Member</span>
-          </Button>
         </div>
       </div>
 
