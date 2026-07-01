@@ -1105,16 +1105,19 @@ const CreateQuotation = () => {
               {section.items.map((item, itemIndex) => <div key={item.id} className="p-4 border border-border rounded-lg space-y-4 bg-muted/30">
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-medium text-muted-foreground">Item {itemIndex + 1}</span>
-                    <div className="flex gap-1">
+                    <div className="flex gap-0.5">
                       <Button variant="ghost" size="sm" onClick={() => {
                         setImagePickerItemId(item.id);
                         setImagePickerProductName(item.productName);
                         setImagePickerOpen(true);
-                      }} className="h-8 text-muted-foreground hover:text-primary">
+                      }} title="Attach image" className="h-8 text-muted-foreground hover:text-primary">
                         <ImageIcon className="h-4 w-4" />
                         {itemImages[item.id]?.length ? <span className="text-xs ml-1">{itemImages[item.id].length}</span> : null}
                       </Button>
-                      {section.items.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(section.id, item.id)} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
+                      <Button variant="ghost" size="sm" onClick={() => duplicateItem(section.id, item.id)} title="Duplicate item" className="h-8 w-8 p-0 text-muted-foreground hover:text-primary">
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      {section.items.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(section.id, item.id)} title="Delete item" className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10">
                           <Trash2 className="h-4 w-4" />
                         </Button>}
                     </div>
