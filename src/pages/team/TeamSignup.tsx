@@ -38,6 +38,9 @@ const TeamSignup = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState<'name' | 'code'>('name');
+  const [filterCountry, setFilterCountry] = useState<string>('all');
+  const [filterState, setFilterState] = useState<string>('all');
+  const [filterCity, setFilterCity] = useState<string>('all');
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -55,7 +58,7 @@ const TeamSignup = () => {
   const fetchCompanies = async () => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, company_name, full_name, country_name, org_code')
+      .select('id, company_name, full_name, country_name, address, org_code')
       .not('company_name', 'is', null)
       .neq('company_name', '');
     
@@ -65,12 +68,30 @@ const TeamSignup = () => {
         company_name: d.company_name || '',
         full_name: d.full_name || null,
         country_name: d.country_name || null,
+        address: d.address || null,
         org_code: d.org_code || null,
       })));
     }
   };
 
-  const filteredCompanies = companies.filter(c => {
+  // Parse address as "..., City, State" (best effort). Fallbacks handle any format.
+  const parseLocation = (addr: string | null) => {
+    if (!addr) return { city: '', state: '' };
+    const parts = addr.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      return { city: parts[parts.length - 2] || '', state: parts[parts.length - 1] || '' };
+    }
+    return { city: '', state: parts[0] || '' };
+  };
+
+  const uniqueCountries = Array.from(new Set(companies.map(c => c.country_name).filter(Boolean))) as string[];
+  const inCountry = filterCountry === 'all' ? companies : companies.filter(c => c.country_name === filterCountry);
+  const uniqueStates = Array.from(new Set(inCountry.map(c => parseLocation(c.address).state).filter(Boolean)));
+  const inState = filterState === 'all' ? inCountry : inCountry.filter(c => parseLocation(c.address).state === filterState);
+  const uniqueCities = Array.from(new Set(inState.map(c => parseLocation(c.address).city).filter(Boolean)));
+
+  const filteredCompanies = inState.filter(c => {
+    if (filterCity !== 'all' && parseLocation(c.address).city !== filterCity) return false;
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     if (searchMode === 'code') {
@@ -79,7 +100,8 @@ const TeamSignup = () => {
     return (
       c.company_name?.toLowerCase().includes(q) ||
       c.full_name?.toLowerCase().includes(q) ||
-      c.country_name?.toLowerCase().includes(q)
+      c.country_name?.toLowerCase().includes(q) ||
+      c.address?.toLowerCase().includes(q)
     );
   });
 
