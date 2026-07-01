@@ -1070,9 +1070,14 @@ const CreateQuotation = () => {
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
                 <Input value={section.title} onChange={e => updateSectionTitle(section.id, e.target.value)} className="text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0" placeholder="Section Title" />
-                {sections.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeSection(section.id)} className="text-destructive hover:text-destructive">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>}
+                <div className="flex gap-1 shrink-0">
+                  <Button variant="ghost" size="sm" onClick={() => duplicateSection(section.id)} title="Duplicate section" className="h-8 w-8 p-0 text-muted-foreground hover:text-primary">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  {sections.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeSection(section.id)} title="Delete section" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
