@@ -15,6 +15,7 @@ interface Company {
   company_name: string;
   full_name: string | null;
   country_name: string | null;
+  address: string | null;
   org_code: string | null;
 }
 
@@ -37,6 +38,9 @@ const TeamSignup = () => {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMode, setSearchMode] = useState<'name' | 'code'>('name');
+  const [filterCountry, setFilterCountry] = useState<string>('all');
+  const [filterState, setFilterState] = useState<string>('all');
+  const [filterCity, setFilterCity] = useState<string>('all');
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -54,7 +58,7 @@ const TeamSignup = () => {
   const fetchCompanies = async () => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, company_name, full_name, country_name, org_code')
+      .select('id, company_name, full_name, country_name, address, org_code')
       .not('company_name', 'is', null)
       .neq('company_name', '');
     
@@ -64,12 +68,30 @@ const TeamSignup = () => {
         company_name: d.company_name || '',
         full_name: d.full_name || null,
         country_name: d.country_name || null,
+        address: d.address || null,
         org_code: d.org_code || null,
       })));
     }
   };
 
-  const filteredCompanies = companies.filter(c => {
+  // Parse address as "..., City, State" (best effort). Fallbacks handle any format.
+  const parseLocation = (addr: string | null) => {
+    if (!addr) return { city: '', state: '' };
+    const parts = addr.split(',').map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      return { city: parts[parts.length - 2] || '', state: parts[parts.length - 1] || '' };
+    }
+    return { city: '', state: parts[0] || '' };
+  };
+
+  const uniqueCountries = Array.from(new Set(companies.map(c => c.country_name).filter(Boolean))) as string[];
+  const inCountry = filterCountry === 'all' ? companies : companies.filter(c => c.country_name === filterCountry);
+  const uniqueStates = Array.from(new Set(inCountry.map(c => parseLocation(c.address).state).filter(Boolean)));
+  const inState = filterState === 'all' ? inCountry : inCountry.filter(c => parseLocation(c.address).state === filterState);
+  const uniqueCities = Array.from(new Set(inState.map(c => parseLocation(c.address).city).filter(Boolean)));
+
+  const filteredCompanies = inState.filter(c => {
+    if (filterCity !== 'all' && parseLocation(c.address).city !== filterCity) return false;
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
     if (searchMode === 'code') {
@@ -78,7 +100,8 @@ const TeamSignup = () => {
     return (
       c.company_name?.toLowerCase().includes(q) ||
       c.full_name?.toLowerCase().includes(q) ||
-      c.country_name?.toLowerCase().includes(q)
+      c.country_name?.toLowerCase().includes(q) ||
+      c.address?.toLowerCase().includes(q)
     );
   });
 
@@ -212,6 +235,34 @@ const TeamSignup = () => {
                   Org Code
                 </button>
               </div>
+
+              {/* Cascading location filters */}
+              {searchMode === 'name' && (
+                <div className="grid grid-cols-3 gap-1.5">
+                  <Select value={filterCountry} onValueChange={(v) => { setFilterCountry(v); setFilterState('all'); setFilterCity('all'); }}>
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue placeholder="Country" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Countries</SelectItem>
+                      {uniqueCountries.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterState} onValueChange={(v) => { setFilterState(v); setFilterCity('all'); }} disabled={uniqueStates.length === 0}>
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue placeholder="State" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All States</SelectItem>
+                      {uniqueStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterCity} onValueChange={setFilterCity} disabled={uniqueCities.length === 0}>
+                    <SelectTrigger className="rounded-xl h-9 text-xs"><SelectValue placeholder="City" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Cities</SelectItem>
+                      {uniqueCities.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
 
               <div className="relative">
                 {searchMode === 'code' ? (
