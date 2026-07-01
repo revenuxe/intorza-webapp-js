@@ -841,12 +841,12 @@ const Team = () => {
               <p className="text-xs text-muted-foreground mt-1 px-6">
                 Members join by requesting access from the Team Signup page. Share your Org Code above.
               </p>
-              {pendingRequestsCount > 0 && (
+              {pendingCount > 0 && (
                 <Button size="sm" variant="outline" className="mt-3 rounded-xl text-xs" onClick={() => {
                   const trigger = document.querySelector('[data-state][value="approvals"]') as HTMLElement;
                   trigger?.click();
                 }}>
-                  <AlertCircle className="h-3.5 w-3.5 mr-1.5" />Review {pendingRequestsCount} Request(s)
+                  <AlertCircle className="h-3.5 w-3.5 mr-1.5" />Review {pendingCount} Request(s)
                 </Button>
               )}
             </div>
