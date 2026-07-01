@@ -35,10 +35,18 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `logo-${Date.now()}.${fileExt}`;
+      const fileName = `${userId}-${Date.now()}.${fileExt}`;
+      const filePath = `${userId}/${fileName}`;
 
-      const { uploadToS3 } = await import('@/lib/s3Upload');
-      const { url: publicUrl } = await uploadToS3(file, 'logo', fileName);
+      const { error: uploadError } = await supabase.storage
+        .from('company-logos')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('company-logos')
+        .getPublicUrl(filePath);
 
       setLogoUrl(publicUrl);
       toast.success("Logo uploaded successfully!");
