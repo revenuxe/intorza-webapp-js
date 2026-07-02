@@ -877,15 +877,28 @@ const Team = () => {
                       </div>
                     </div>
                     {/* Actions */}
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <button className="p-1.5 hover:bg-muted rounded-lg" onClick={() => handleEditMember(member)}>
-                        <Edit className="h-3.5 w-3.5 text-muted-foreground" />
-                      </button>
+                    <div className="flex items-center gap-1 shrink-0 border-l border-border pl-2 ml-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditMember(member)}
+                        className="h-8 px-2 gap-1 rounded-lg text-xs text-muted-foreground hover:text-foreground"
+                        title="Edit member"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                        <span className="hidden lg:inline">Edit</span>
+                      </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <button className="p-1.5 hover:bg-destructive/10 rounded-lg">
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 px-2 gap-1 rounded-lg text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                            title="Remove member"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span className="hidden lg:inline">Remove</span>
+                          </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent className="rounded-2xl">
                           <AlertDialogHeader>
@@ -899,6 +912,7 @@ const Team = () => {
                         </AlertDialogContent>
                       </AlertDialog>
                     </div>
+
                   </div>
                 );
               })}
