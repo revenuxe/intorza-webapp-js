@@ -66,17 +66,22 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
             onChange={handleInputChange}
             onFocus={() => clients.length > 0 && setOpen(true)}
             placeholder={placeholder}
-            className="pr-8"
+            className="pr-9 h-10"
           />
           {clients.length > 0 && (
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           )}
         </div>
       </PopoverTrigger>
       {filteredClients.length > 0 && (
-        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-popover" align="start">
+        <PopoverContent
+          className="w-[min(360px,calc(100vw-2rem))] p-0 rounded-xl border-border shadow-xl bg-popover"
+          align="start"
+          sideOffset={6}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <Command>
-            <CommandList>
+            <CommandList className="max-h-64">
               <CommandEmpty>No clients found.</CommandEmpty>
               <CommandGroup>
                 {filteredClients.map((client) => (
@@ -84,17 +89,17 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
                     key={client.id}
                     value={client.name}
                     onSelect={() => handleSelect(client)}
-                    className="cursor-pointer"
+                    className="cursor-pointer rounded-lg py-2.5 gap-2"
                   >
-                    <User className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <User className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{client.name}</p>
                       {client.address && (
-                        <p className="text-xs text-muted-foreground truncate">{client.address}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{client.address}</p>
                       )}
                     </div>
                     {value === client.name && (
-                      <Check className="ml-2 h-4 w-4 text-primary" />
+                      <Check className="ml-2 h-4 w-4 text-primary shrink-0" />
                     )}
                   </CommandItem>
                 ))}
@@ -106,3 +111,4 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
     </Popover>
   );
 };
+
