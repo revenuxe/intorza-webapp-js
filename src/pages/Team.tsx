@@ -877,12 +877,12 @@ const Team = () => {
                       </div>
                     </div>
                     {/* Actions */}
-                    <div className="flex items-center gap-1 shrink-0 border-l border-border pl-2 ml-1">
+                    <div className="flex items-center gap-1.5 shrink-0 border-l border-border pl-2.5 ml-1">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => handleEditMember(member)}
-                        className="h-8 px-2 gap-1 rounded-lg text-xs text-muted-foreground hover:text-foreground"
+                        className="h-8 w-9 lg:w-24 justify-center gap-1.5 rounded-lg text-xs whitespace-nowrap"
                         title="Edit member"
                       >
                         <Edit className="h-3.5 w-3.5" />
@@ -891,9 +891,9 @@ const Team = () => {
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            className="h-8 px-2 gap-1 rounded-lg text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                            className="h-8 w-9 lg:w-24 justify-center gap-1.5 rounded-lg text-xs whitespace-nowrap text-destructive border-destructive/30 hover:text-destructive hover:bg-destructive/10"
                             title="Remove member"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -912,6 +912,7 @@ const Team = () => {
                         </AlertDialogContent>
                       </AlertDialog>
                     </div>
+
 
                   </div>
                 );
