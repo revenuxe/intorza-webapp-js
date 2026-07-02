@@ -88,7 +88,7 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
   }, [value]);
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className={cn("relative", open && "z-50")}>
       <Input
         ref={inputRef}
         value={inputValue}
@@ -96,37 +96,39 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
         onFocus={() => patterns.length > 0 && setOpen(true)}
         onBlur={handleBlur}
         placeholder={placeholder}
-        className={className}
+        className={cn("h-10", className)}
       />
       {open && filteredProducts.length > 0 && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg">
+        <div
+          className="absolute top-full left-0 z-50 mt-1.5 w-max min-w-full max-w-[360px] bg-popover border border-border rounded-xl shadow-xl overflow-hidden"
+        >
           <Command>
-            <CommandList>
-              <CommandGroup heading="Recent & Popular Items">
+            <CommandList className="max-h-64">
+              <CommandGroup heading="Recent & Popular">
                 {filteredProducts.map((pattern, index) => (
                   <CommandItem
                     key={`${pattern.product_name}-${index}`}
                     value={pattern.product_name}
                     onSelect={() => handleSelect(pattern)}
-                    className="cursor-pointer"
+                    className="cursor-pointer rounded-lg py-2.5 px-2 gap-2 aria-selected:bg-accent/60"
                   >
-                    <Package className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{pattern.product_name}</p>
                       {pattern.preferred_rate && pattern.preferred_rate > 0 && (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[11px] text-muted-foreground">
                           {symbol}{pattern.preferred_rate.toLocaleString(settings.locale)}/{areaUnit}
                         </p>
                       )}
                     </div>
                     {pattern.usage_count > 1 && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                      <span className="text-[10px] text-muted-foreground flex items-center gap-0.5 shrink-0">
                         <TrendingUp className="h-3 w-3" />
                         {pattern.usage_count}
                       </span>
                     )}
                     {value === pattern.product_name && (
-                      <Check className="ml-1 h-4 w-4 text-primary" />
+                      <Check className="ml-1 h-4 w-4 text-primary shrink-0" />
                     )}
                   </CommandItem>
                 ))}
