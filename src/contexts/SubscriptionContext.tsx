@@ -28,20 +28,18 @@ const getInitialState = (): SubscriptionState => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      // Check if expiry is still valid
-      if (parsed.expiry) {
-        const expiry = new Date(parsed.expiry);
-        if (expiry > new Date()) {
-          return {
-            isPro: parsed.isPro || false,
-            plan: parsed.plan || null,
-            expiry: parsed.expiry || null,
-            proSince: parsed.proSince || null,
-            status: parsed.status || 'inactive',
-            loading: true,
-            initialLoadComplete: false,
-          };
-        }
+      // Trust the cache while we validate in the background — prevents Pro badge flicker.
+      const expiryValid = !parsed.expiry || new Date(parsed.expiry) > new Date();
+      if (expiryValid) {
+        return {
+          isPro: !!parsed.isPro,
+          plan: parsed.plan || null,
+          expiry: parsed.expiry || null,
+          proSince: parsed.proSince || null,
+          status: parsed.status || 'inactive',
+          loading: false,
+          initialLoadComplete: !!parsed.isPro, // treat cached-pro as complete for UI stability
+        };
       }
     }
   } catch (e) {
@@ -57,6 +55,7 @@ const getInitialState = (): SubscriptionState => {
     initialLoadComplete: false,
   };
 };
+
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
