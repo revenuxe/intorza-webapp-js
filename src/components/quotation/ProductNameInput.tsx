@@ -109,6 +109,17 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
     el?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex]);
 
+  // Flip dropdown above the input if there's not enough space below
+  const [dropUp, setDropUp] = useState(false);
+  React.useEffect(() => {
+    if (!open) return;
+    const rect = inputRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    setDropUp(spaceBelow < 280 && spaceAbove > spaceBelow);
+  }, [open, filteredProducts.length]);
+
   return (
     <div ref={containerRef} className={cn("relative", open && "z-50")}>
       <Input
@@ -116,10 +127,7 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
         value={inputValue}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        onFocus={(e) => {
-          if (patterns.length > 0) setOpen(true);
-          e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-        }}
+        onFocus={() => patterns.length > 0 && setOpen(true)}
         onBlur={handleBlur}
         placeholder={placeholder}
         role="combobox"
@@ -134,7 +142,10 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
           ref={listRef}
           id="product-name-listbox"
           role="listbox"
-          className="absolute top-full left-0 z-50 mt-1.5 w-[320px] max-w-[calc(100vw-2rem)] bg-popover border border-border rounded-xl shadow-xl overflow-hidden"
+          className={cn(
+            "absolute left-0 z-50 w-[320px] max-w-[calc(100vw-2rem)] bg-popover border border-border rounded-xl shadow-xl overflow-hidden",
+            dropUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          )}
         >
           <div className="max-h-64 overflow-y-auto p-1">
             <p className="px-2 pt-1.5 pb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
