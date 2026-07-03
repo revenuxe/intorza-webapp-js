@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize, ChevronLeft, ChevronRight, MoveHorizontal } from "lucide-react";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
@@ -104,10 +104,15 @@ export const PDFPreviewEditor = ({
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
+  const [fitWidth, setFitWidth] = useState(true);
+  const [totalPages, setTotalPages] = useState(0);
+  const [activePage, setActivePage] = useState(0);
+  const canvasRef = useRef<import('./PDFCanvasPreview').PDFCanvasPreviewHandle | null>(null);
   const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
   const [showItemImages, setShowItemImages] = useState(customizeSettings.showItemImages);
   const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   
   // Load font preferences from database
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences, loading: fontLoading } = useFontPreferences();
@@ -1033,78 +1038,118 @@ export const PDFPreviewEditor = ({
     </div>
   );
 
-  // Preview Panel Component - Now shows actual PDF with zoom controls
-  const PreviewPanel = () => (
-    <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
-      {/* Zoom Controls */}
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-background/80 backdrop-blur-sm gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 shrink-0"
-            onClick={() => setPreviewZoom(Math.max(25, previewZoom - 25))}
-            disabled={previewZoom <= 25}
-          >
-            <ZoomOut className="h-3.5 w-3.5" />
-          </Button>
-          <div className="flex items-center w-20 sm:w-28">
-            <Slider
-              value={[previewZoom]}
-              onValueChange={([v]) => setPreviewZoom(v)}
-              min={25}
-              max={200}
-              step={5}
-              className="w-full"
-            />
+  // Preview Panel Component - mobile-first with zoom, page nav, fit-width
+  const PreviewPanel = () => {
+    const goPrev = () => {
+      const next = Math.max(0, activePage - 1);
+      canvasRef.current?.scrollToPage(next);
+    };
+    const goNext = () => {
+      const next = Math.min(totalPages - 1, activePage + 1);
+      canvasRef.current?.scrollToPage(next);
+    };
+
+    return (
+      <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
+        {/* Toolbar */}
+        <div className="sticky top-0 z-20 flex items-center justify-between px-2 sm:px-3 py-2 border-b bg-background/95 backdrop-blur gap-2">
+          {/* Page navigation */}
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 sm:h-8 sm:w-8 rounded-full"
+              onClick={goPrev}
+              disabled={activePage <= 0}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-[11px] font-medium tabular-nums px-1.5 min-w-[52px] text-center">
+              {totalPages > 0 ? `${activePage + 1} / ${totalPages}` : '– / –'}
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 sm:h-8 sm:w-8 rounded-full"
+              onClick={goNext}
+              disabled={activePage >= totalPages - 1}
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 shrink-0"
-            onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))}
-            disabled={previewZoom >= 200}
-          >
-            <ZoomIn className="h-3.5 w-3.5" />
-          </Button>
-          <span className="text-[10px] text-muted-foreground w-9 text-center">{previewZoom}%</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2"
-            onClick={() => setPreviewZoom(100)}
-          >
-            <Maximize className="h-3 w-3 mr-1" />
-            <span className="text-[10px]">Fit</span>
-          </Button>
+
+          {/* Zoom + fit controls */}
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant={fitWidth ? 'default' : 'outline'}
+              size="sm"
+              className="h-9 sm:h-8 px-2.5 rounded-full"
+              onClick={() => setFitWidth(f => !f)}
+              aria-pressed={fitWidth}
+            >
+              <MoveHorizontal className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline text-[11px]">Fit</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 sm:h-8 sm:w-8 rounded-full"
+              onClick={() => { setFitWidth(false); setPreviewZoom(Math.max(25, previewZoom - 25)); }}
+              disabled={!fitWidth && previewZoom <= 25}
+              aria-label="Zoom out"
+            >
+              <ZoomOut className="h-3.5 w-3.5" />
+            </Button>
+            <span className="text-[10px] text-muted-foreground tabular-nums w-10 text-center hidden xs:inline sm:inline">
+              {fitWidth ? 'Fit' : `${previewZoom}%`}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 sm:h-8 sm:w-8 rounded-full"
+              onClick={() => { setFitWidth(false); setPreviewZoom(Math.min(200, previewZoom + 25)); }}
+              disabled={!fitWidth && previewZoom >= 200}
+              aria-label="Zoom in"
+            >
+              <ZoomIn className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
+
         {highlightedElement && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px]">
+          <div className="mx-auto mt-2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-[10px]">
             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
             {highlightedElement}
           </div>
         )}
-      </div>
 
-      {/* PDF Preview */}
-      <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
-        {isGeneratingPdf && !pdfBlobUrl ? (
-          <div className="h-full flex items-center justify-center min-h-[300px]">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Generating preview...</p>
+        {/* PDF Preview */}
+        <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
+          {isGeneratingPdf && !pdfBlobUrl ? (
+            <div className="h-full flex items-center justify-center min-h-[300px]">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Generating preview...</p>
+              </div>
             </div>
-          </div>
-        ) : (
-          <PDFCanvasPreview
-            pdfBlobUrl={pdfBlobUrl}
-            zoom={previewZoom}
-            isGenerating={isGeneratingPdf}
-          />
-        )}
+          ) : (
+            <PDFCanvasPreview
+              ref={canvasRef}
+              pdfBlobUrl={pdfBlobUrl}
+              zoom={previewZoom}
+              fitWidth={fitWidth}
+              isGenerating={isGeneratingPdf}
+              onPagesChange={setTotalPages}
+              onActivePageChange={setActivePage}
+            />
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
