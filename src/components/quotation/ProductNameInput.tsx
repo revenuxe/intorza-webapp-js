@@ -116,7 +116,10 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
         value={inputValue}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        onFocus={() => patterns.length > 0 && setOpen(true)}
+        onFocus={(e) => {
+          if (patterns.length > 0) setOpen(true);
+          e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+        }}
         onBlur={handleBlur}
         placeholder={placeholder}
         role="combobox"
