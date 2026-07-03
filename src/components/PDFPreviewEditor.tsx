@@ -104,10 +104,15 @@ export const PDFPreviewEditor = ({
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
+  const [fitWidth, setFitWidth] = useState(true);
+  const [totalPages, setTotalPages] = useState(0);
+  const [activePage, setActivePage] = useState(0);
+  const canvasRef = useRef<import('./PDFCanvasPreview').PDFCanvasPreviewHandle | null>(null);
   const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
   const [showItemImages, setShowItemImages] = useState(customizeSettings.showItemImages);
   const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   
   // Load font preferences from database
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences, loading: fontLoading } = useFontPreferences();
