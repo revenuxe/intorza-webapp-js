@@ -129,9 +129,11 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [session?.access_token, persistStatus]);
 
-  // Fetch subscription status on mount and when user changes
+  // Fetch subscription status after auth resolves — never react to transient session=null on boot.
   useEffect(() => {
-    if (user && session) {
+    if (authLoading) return; // wait for Supabase to hydrate the session
+
+    if (user && session?.access_token) {
       refreshSubscription();
     } else {
       setState({
@@ -145,7 +147,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
       localStorage.removeItem(STORAGE_KEY);
     }
-  }, [user, session, refreshSubscription]);
+    // Only re-run when auth truly changes identity, not on every token refresh.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?.id]);
+
 
   // Listen for payment success event
   useEffect(() => {
