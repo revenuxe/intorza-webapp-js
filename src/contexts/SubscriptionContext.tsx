@@ -60,7 +60,8 @@ const getInitialState = (): SubscriptionState => {
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, session } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
+
   const [state, setState] = useState<SubscriptionState>(getInitialState);
   const [paywallOpen, setPaywallOpenState] = useState(false);
   const [paywallAction, setPaywallAction] = useState('');
