@@ -97,6 +97,16 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
     el?.scrollIntoView({ block: 'nearest' });
   }, [activeIndex]);
 
+  const [dropUp, setDropUp] = useState(false);
+  React.useEffect(() => {
+    if (!open) return;
+    const rect = inputRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    setDropUp(spaceBelow < 280 && spaceAbove > spaceBelow);
+  }, [open, filteredClients.length]);
+
   return (
     <div ref={containerRef} className={cn("relative", open && "z-50")}>
       <div className="relative">
@@ -124,7 +134,10 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
           ref={listRef}
           id="client-selector-listbox"
           role="listbox"
-          className="absolute top-full left-0 z-50 mt-1.5 w-[320px] max-w-[calc(100vw-2rem)] bg-popover border border-border rounded-xl shadow-xl overflow-hidden"
+          className={cn(
+            "absolute left-0 z-50 w-[320px] max-w-[calc(100vw-2rem)] bg-popover border border-border rounded-xl shadow-xl overflow-hidden",
+            dropUp ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          )}
         >
           <div className="max-h-64 overflow-y-auto p-1">
             {filteredClients.map((client, index) => {
