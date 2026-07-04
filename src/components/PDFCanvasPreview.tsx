@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, memo, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useState, memo, forwardRef, useImperativeHandle, useLayoutEffect } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Loader2 } from 'lucide-react';
 
@@ -18,6 +18,20 @@ interface PDFCanvasPreviewProps {
   onActivePageChange?: (pageIndex: number) => void;
 }
 
+// Find the nearest scrollable ancestor of an element
+const getScrollParent = (el: HTMLElement | null): HTMLElement | Window => {
+  let node = el?.parentElement;
+  while (node) {
+    const style = getComputedStyle(node);
+    const overflowY = style.overflowY;
+    if ((overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return window;
+};
+
 export const PDFCanvasPreview = memo(
   forwardRef<PDFCanvasPreviewHandle, PDFCanvasPreviewProps>(
     ({ pdfBlobUrl, zoom, isGenerating, fitWidth, onPagesChange, onActivePageChange }, ref) => {
@@ -26,6 +40,8 @@ export const PDFCanvasPreview = memo(
       const [pageDataUrls, setPageDataUrls] = useState<string[]>([]);
       const [loading, setLoading] = useState(false);
       const renderTaskRef = useRef<number>(0);
+      // Preserve scroll position across regenerations
+      const preservedScrollRef = useRef<{ parent: HTMLElement | Window; top: number } | null>(null);
 
       useImperativeHandle(ref, () => ({
         scrollToPage: (i: number) => {
@@ -34,11 +50,19 @@ export const PDFCanvasPreview = memo(
         },
       }));
 
+      // Capture scroll position BEFORE swapping images
       useEffect(() => {
         if (!pdfBlobUrl) {
           setPageDataUrls([]);
           onPagesChange?.(0);
           return;
+        }
+
+        // Snapshot scroll of the ancestor scroll container so we can restore it
+        if (containerRef.current && pageDataUrls.length > 0) {
+          const parent = getScrollParent(containerRef.current);
+          const top = parent instanceof Window ? window.scrollY : parent.scrollTop;
+          preservedScrollRef.current = { parent, top };
         }
 
         const taskId = ++renderTaskRef.current;
@@ -53,7 +77,9 @@ export const PDFCanvasPreview = memo(
             if (taskId !== renderTaskRef.current) return;
 
             const dataUrls: string[] = [];
-            const scale = 1.5;
+            // Cap DPR to keep canvas cost reasonable on high-DPI screens
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const scale = 1.25 * dpr;
 
             for (let i = 1; i <= pdf.numPages; i++) {
               const page = await pdf.getPage(i);
@@ -62,9 +88,11 @@ export const PDFCanvasPreview = memo(
               const canvas = document.createElement('canvas');
               canvas.width = viewport.width;
               canvas.height = viewport.height;
-              const ctx = canvas.getContext('2d')!;
+              const ctx = canvas.getContext('2d', { alpha: false })!;
               await page.render({ canvasContext: ctx, viewport }).promise;
-              dataUrls.push(canvas.toDataURL('image/jpeg', 0.92));
+              dataUrls.push(canvas.toDataURL('image/jpeg', 0.88));
+              // Yield to the browser between pages to keep UI responsive
+              await new Promise<void>((r) => requestAnimationFrame(() => r()));
             }
 
             if (taskId === renderTaskRef.current) {
@@ -80,6 +108,23 @@ export const PDFCanvasPreview = memo(
 
         renderPdf();
       }, [pdfBlobUrl]);
+
+      // Restore scroll position AFTER new images have been committed to the DOM
+      useLayoutEffect(() => {
+        const snap = preservedScrollRef.current;
+        if (!snap) return;
+        preservedScrollRef.current = null;
+        // Two rAFs: wait for layout + paint of new images
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (snap.parent instanceof Window) {
+              window.scrollTo({ top: snap.top, behavior: 'auto' });
+            } else {
+              snap.parent.scrollTop = snap.top;
+            }
+          });
+        });
+      }, [pageDataUrls]);
 
       // Track which page is most visible
       useEffect(() => {
@@ -129,16 +174,20 @@ export const PDFCanvasPreview = memo(
           )}
           {pageDataUrls.map((src, i) => (
             <img
-              key={`page-${i}-${src.slice(-20)}`}
+              // Stable key: prevents remount on regeneration → preserves scroll & avoids flicker
+              key={i}
               ref={el => (pageRefs.current[i] = el)}
               data-page-idx={i}
               src={src}
               alt={`PDF page ${i + 1}`}
-              className="rounded-lg shadow-lg border bg-white scroll-mt-4"
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              className="rounded-lg shadow-lg border bg-white scroll-mt-4 select-none"
               style={
                 fitWidth
-                  ? { width: '100%', maxWidth: '900px' }
-                  : { width: `min(100%, ${595 * (zoom / 100)}px)` }
+                  ? { width: '100%', maxWidth: '900px', contain: 'content' }
+                  : { width: `min(100%, ${595 * (zoom / 100)}px)`, contain: 'content' }
               }
             />
           ))}
