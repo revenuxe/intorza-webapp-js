@@ -304,6 +304,9 @@ export const PDFCanvasPreview = memo(
             pendingAnchorRef.current = captureAnchor();
             setPages((prev) => metas.map((meta, index) => {
               const previous = prev[index];
+              if (index === metas.length - 1 && prev.length > metas.length) {
+                prev.slice(metas.length).forEach((oldPage) => revokeSoon(oldPage.src));
+              }
               return {
                 ...meta,
                 // Keep the old page image visible until the matching new page is
