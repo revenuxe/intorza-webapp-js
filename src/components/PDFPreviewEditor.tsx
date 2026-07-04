@@ -271,14 +271,13 @@ export const PDFPreviewEditor = ({
 
       const blob = doc.output('blob');
       
-      // Revoke previous blob URL
-      if (prevBlobUrlRef.current) {
-        URL.revokeObjectURL(prevBlobUrlRef.current);
-      }
-      
+      const oldBlobUrl = prevBlobUrlRef.current;
       const newBlobUrl = URL.createObjectURL(blob);
       prevBlobUrlRef.current = newBlobUrl;
       setPdfBlobUrl(newBlobUrl);
+      if (oldBlobUrl) {
+        window.setTimeout(() => URL.revokeObjectURL(oldBlobUrl), 3000);
+      }
     } catch (error) {
       console.error('Error generating live PDF preview:', error);
     } finally {
