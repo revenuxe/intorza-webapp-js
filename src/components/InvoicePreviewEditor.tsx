@@ -697,42 +697,66 @@ export const InvoicePreviewEditor = ({
     </div>
   );
 
-  // Preview Panel with PDF Canvas and Zoom
-  const PreviewPanel = () => (
-    <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-background/80 backdrop-blur-sm gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <Button variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={() => setPreviewZoom(Math.max(25, previewZoom - 25))} disabled={previewZoom <= 25}>
-            <ZoomOut className="h-3.5 w-3.5" />
-          </Button>
-          <div className="flex items-center w-20 sm:w-28">
-            <Slider value={[previewZoom]} onValueChange={([v]) => setPreviewZoom(v)} min={25} max={200} step={5} className="w-full" />
+  // Preview Panel with virtualized PDF pages, page navigation and fit/zoom controls
+  const PreviewPanel = () => {
+    const goPrev = () => canvasRef.current?.scrollToPage(Math.max(0, activePage - 1));
+    const goNext = () => canvasRef.current?.scrollToPage(Math.min(totalPages - 1, activePage + 1));
+
+    return (
+      <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
+        <div className="sticky top-0 z-20 flex items-center justify-between px-2 sm:px-3 py-2 border-b bg-background/95 backdrop-blur gap-2">
+          <div className="flex items-center gap-1 shrink-0">
+            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full" onClick={goPrev} disabled={activePage <= 0} aria-label="Previous page">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-[11px] font-medium tabular-nums px-1.5 min-w-[52px] text-center">
+              {totalPages > 0 ? `${activePage + 1} / ${totalPages}` : '– / –'}
+            </div>
+            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full" onClick={goNext} disabled={activePage >= totalPages - 1} aria-label="Next page">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-          <Button variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))} disabled={previewZoom >= 200}>
-            <ZoomIn className="h-3.5 w-3.5" />
-          </Button>
-          <span className="text-[10px] text-muted-foreground w-9 text-center">{previewZoom}%</span>
-          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setPreviewZoom(100)}>
-            <Maximize className="h-3 w-3 mr-1" />
-            <span className="text-[10px]">Fit</span>
-          </Button>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <Button variant={fitWidth ? 'default' : 'outline'} size="sm" className="h-9 sm:h-8 px-2.5 rounded-full" onClick={() => setFitWidth((v) => !v)} aria-pressed={fitWidth}>
+              <MoveHorizontal className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline text-[11px]">Fit</span>
+            </Button>
+            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full" onClick={() => { setFitWidth(false); setPreviewZoom(Math.max(25, previewZoom - 25)); }} disabled={!fitWidth && previewZoom <= 25} aria-label="Zoom out">
+              <ZoomOut className="h-3.5 w-3.5" />
+            </Button>
+            <span className="text-[10px] text-muted-foreground tabular-nums w-10 text-center hidden sm:inline">
+              {fitWidth ? 'Fit' : `${previewZoom}%`}
+            </span>
+            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full" onClick={() => { setFitWidth(false); setPreviewZoom(Math.min(200, previewZoom + 25)); }} disabled={!fitWidth && previewZoom >= 200} aria-label="Zoom in">
+              <ZoomIn className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
+          {isGeneratingPdf && !pdfBlobUrl ? (
+            <div className="h-full flex items-center justify-center min-h-[300px]">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Generating preview...</p>
+              </div>
+            </div>
+          ) : (
+            <PDFCanvasPreview
+              ref={canvasRef}
+              pdfBlobUrl={pdfBlobUrl}
+              zoom={previewZoom}
+              fitWidth={fitWidth}
+              isGenerating={isGeneratingPdf}
+              onPagesChange={setTotalPages}
+              onActivePageChange={setActivePage}
+            />
+          )}
         </div>
       </div>
-
-      <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
-        {isGeneratingPdf && !pdfBlobUrl ? (
-          <div className="h-full flex items-center justify-center min-h-[300px]">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Generating preview...</p>
-            </div>
-          </div>
-        ) : (
-          <PDFCanvasPreview pdfBlobUrl={pdfBlobUrl} zoom={previewZoom} isGenerating={isGeneratingPdf} />
-        )}
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
