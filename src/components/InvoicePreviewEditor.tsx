@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize, Copy } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Copy, ChevronLeft, ChevronRight, MoveHorizontal } from "lucide-react";
 import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
-import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -105,12 +104,17 @@ export const InvoicePreviewEditor = ({
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
+  const [fitWidth, setFitWidth] = useState(true);
+  const [totalPages, setTotalPages] = useState(0);
+  const [activePage, setActivePage] = useState(0);
   const [useQuotationDesign, setUseQuotationDesign] = useState(() => {
     try { return localStorage.getItem(USE_QUOTATION_DESIGN_KEY) === 'true'; } catch { return false; }
   });
   const [profile, setProfile] = useState<any>(null);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<import('./PDFCanvasPreview').PDFCanvasPreviewHandle | null>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pdfGenerationIdRef = useRef(0);
+  const latestPreviewPayloadRef = useRef("");
   const prevBlobUrlRef = useRef<string | null>(null);
   
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences } = useFontPreferences();
@@ -222,13 +226,17 @@ export const InvoicePreviewEditor = ({
     return getThemesByCategory(selectedCategory);
   };
 
-  // Generate live PDF preview
-  const generateLivePdf = useCallback(async () => {
+  // Generate live PDF preview from a debounced snapshot, keeping the UI inputs instant.
+  const generateLivePdf = useCallback(async (
+    editorSnapshot: PDFEditorSettings,
+    invoiceSnapshot: InvoiceSettings,
+    jobId: number
+  ) => {
     setIsGeneratingPdf(true);
     try {
       const currentEditorSettings: PDFEditorSettings = {
-        ...editorSettings,
-        brandColors: editorSettings.useBrandColors && brandColors ? brandColors : editorSettings.brandColors,
+        ...editorSnapshot,
+        brandColors: editorSnapshot.useBrandColors && brandColors ? brandColors : editorSnapshot.brandColors,
       };
 
       const pdfDoc = await generateInvoicePDF({
@@ -257,11 +265,12 @@ export const InvoicePreviewEditor = ({
           taxRegistrationLabel: profile.tax_label === 'GST' ? 'GSTIN' : `${profile.tax_label || 'Tax'} No`,
         } : undefined,
         editorSettings: currentEditorSettings,
-        invoiceSettings: invoiceSettings,
+        invoiceSettings: invoiceSnapshot,
         previewOnly: true,
       });
 
       if (!pdfDoc) throw new Error('Failed to generate PDF');
+      if (jobId !== pdfGenerationIdRef.current) return;
       const blob = pdfDoc.output('blob');
       if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current);
       const newBlobUrl = URL.createObjectURL(blob);
@@ -270,17 +279,30 @@ export const InvoicePreviewEditor = ({
     } catch (error) {
       console.error('Error generating live invoice PDF preview:', error);
     } finally {
-      setIsGeneratingPdf(false);
+      if (jobId === pdfGenerationIdRef.current) setIsGeneratingPdf(false);
     }
-  }, [editorSettings, invoiceSettings, invoiceData, brandColors, profile]);
+  }, [invoiceData, brandColors, profile]);
 
-  // Debounced PDF generation
+  // Debounced incremental preview pipeline. Changes persist immediately while
+  // only the latest snapshot regenerates the heavy PDF preview.
   useEffect(() => {
     if (!open) return;
+
+    const payload = JSON.stringify({ editorSettings, invoiceSettings, invoiceData, brandColors, profile });
+    if (payload === latestPreviewPayloadRef.current && pdfBlobUrl) return;
+    latestPreviewPayloadRef.current = payload;
+
     if (pdfGenerationTimer.current) clearTimeout(pdfGenerationTimer.current);
-    pdfGenerationTimer.current = setTimeout(() => { generateLivePdf(); }, 800);
+    const jobId = ++pdfGenerationIdRef.current;
+    const editorSnapshot = editorSettings;
+    const invoiceSnapshot = invoiceSettings;
+    const debounceMs = pdfBlobUrl ? 500 : 80;
+    setIsGeneratingPdf(true);
+    pdfGenerationTimer.current = setTimeout(() => {
+      void generateLivePdf(editorSnapshot, invoiceSnapshot, jobId);
+    }, debounceMs);
     return () => { if (pdfGenerationTimer.current) clearTimeout(pdfGenerationTimer.current); };
-  }, [open, generateLivePdf]);
+  }, [open, editorSettings, invoiceSettings, invoiceData, brandColors, profile, pdfBlobUrl, generateLivePdf]);
 
   // Editor Panel
   const EditorPanel = () => (
