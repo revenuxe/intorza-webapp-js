@@ -1213,15 +1213,15 @@ export const PDFPreviewEditor = ({
 
         {/* Mobile View */}
         <div className="flex-1 min-h-0 overflow-hidden md:hidden flex flex-col">
-          {showEditor ? <EditorPanel /> : <PreviewPanel />}
+          {showEditor ? EditorPanel() : PreviewPanel()}
         </div>
 
         {/* Desktop View */}
         <div className="hidden md:flex flex-1 overflow-hidden">
           <div className="w-80 border-r flex flex-col">
-            <EditorPanel />
+            {EditorPanel()}
           </div>
-          <PreviewPanel />
+          {PreviewPanel()}
         </div>
       </SheetContent>
 
