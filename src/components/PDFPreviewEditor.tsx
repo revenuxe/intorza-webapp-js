@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize, ChevronLeft, ChevronRight, MoveHorizontal } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal } from "lucide-react";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
-import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -110,7 +109,6 @@ export const PDFPreviewEditor = ({
   const canvasRef = useRef<import('./PDFCanvasPreview').PDFCanvasPreviewHandle | null>(null);
   const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
   const [showItemImages, setShowItemImages] = useState(customizeSettings.showItemImages);
-  const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pdfGenerationIdRef = useRef(0);
   const latestPreviewPayloadRef = useRef<string>("");
