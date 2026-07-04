@@ -112,6 +112,8 @@ export const PDFPreviewEditor = ({
   const [showItemImages, setShowItemImages] = useState(customizeSettings.showItemImages);
   const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pdfGenerationIdRef = useRef(0);
+  const latestPreviewPayloadRef = useRef<string>("");
 
   
   // Load font preferences from database
@@ -167,14 +169,19 @@ export const PDFPreviewEditor = ({
   // Track previous blob URL for cleanup without causing re-renders
   const prevBlobUrlRef = useRef<string | null>(null);
 
-  // Generate live PDF preview with debouncing
-  const generateLivePdf = useCallback(async () => {
+  // Generate live PDF preview from an explicit snapshot so typing/sliders can
+  // update editor state instantly while the expensive PDF work stays debounced.
+  const generateLivePdf = useCallback(async (
+    settingsSnapshot: PDFEditorSettings,
+    itemImagesSnapshot: boolean,
+    jobId: number
+  ) => {
     setIsGeneratingPdf(true);
     try {
       // Ensure brand colors are included if enabled
       const currentEditorSettings: PDFEditorSettings = {
-        ...editorSettings,
-        brandColors: editorSettings.useBrandColors && brandColors ? brandColors : editorSettings.brandColors,
+        ...settingsSnapshot,
+        brandColors: settingsSnapshot.useBrandColors && brandColors ? brandColors : settingsSnapshot.brandColors,
       };
 
       // Settings from customizeSettings
@@ -206,7 +213,7 @@ export const PDFPreviewEditor = ({
         showQRCode: customizeSettings.showQRCode,
         showProfessionalAdvantages: customizeSettings.showProfessionalAdvantages,
         showQuotationNumber: customizeSettings.showQuotationNumber,
-        showItemImages: showItemImages,
+        showItemImages: itemImagesSnapshot,
       };
 
       // Transform quotationData to match the generator's expected format with settings embedded
@@ -262,6 +269,8 @@ export const PDFPreviewEditor = ({
       if (!doc) {
         throw new Error('Failed to generate PDF document');
       }
+      if (jobId !== pdfGenerationIdRef.current) return;
+
       const blob = doc.output('blob');
       
       // Revoke previous blob URL
@@ -275,29 +284,41 @@ export const PDFPreviewEditor = ({
     } catch (error) {
       console.error('Error generating live PDF preview:', error);
     } finally {
-      setIsGeneratingPdf(false);
+      if (jobId === pdfGenerationIdRef.current) {
+        setIsGeneratingPdf(false);
+      }
     }
-  }, [editorSettings, customizeSettings, quotationData, brandColors, showItemImages]);
+  }, [customizeSettings, quotationData, brandColors]);
 
-  // Debounced PDF generation effect - longer debounce for smooth slider interaction
+  // Debounced incremental preview pipeline. Editor changes are saved immediately,
+  // but PDF regeneration only receives the latest stable snapshot.
   useEffect(() => {
     if (!open) return;
-    
+
+    const payload = JSON.stringify({ editorSettings, customizeSettings, showItemImages, quotationData, brandColors });
+    if (payload === latestPreviewPayloadRef.current && pdfBlobUrl) return;
+    latestPreviewPayloadRef.current = payload;
+
     if (pdfGenerationTimer.current) {
       clearTimeout(pdfGenerationTimer.current);
     }
-    
-    // Use longer debounce (800ms) to avoid regenerating while user is actively dragging sliders
+
+    const jobId = ++pdfGenerationIdRef.current;
+    const settingsSnapshot = editorSettings;
+    const itemImagesSnapshot = showItemImages;
+    const debounceMs = pdfBlobUrl ? 500 : 80;
+    setIsGeneratingPdf(true);
+
     pdfGenerationTimer.current = setTimeout(() => {
-      generateLivePdf();
-    }, 800);
+      void generateLivePdf(settingsSnapshot, itemImagesSnapshot, jobId);
+    }, debounceMs);
 
     return () => {
       if (pdfGenerationTimer.current) {
         clearTimeout(pdfGenerationTimer.current);
       }
     };
-  }, [open, generateLivePdf]);
+  }, [open, editorSettings, customizeSettings, quotationData, brandColors, showItemImages, pdfBlobUrl, generateLivePdf]);
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
     const newSettings = { ...editorSettings, ...updates };
