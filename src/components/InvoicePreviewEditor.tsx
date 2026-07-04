@@ -272,10 +272,13 @@ export const InvoicePreviewEditor = ({
       if (!pdfDoc) throw new Error('Failed to generate PDF');
       if (jobId !== pdfGenerationIdRef.current) return;
       const blob = pdfDoc.output('blob');
-      if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current);
+      const oldBlobUrl = prevBlobUrlRef.current;
       const newBlobUrl = URL.createObjectURL(blob);
       prevBlobUrlRef.current = newBlobUrl;
       setPdfBlobUrl(newBlobUrl);
+      if (oldBlobUrl) {
+        window.setTimeout(() => URL.revokeObjectURL(oldBlobUrl), 3000);
+      }
     } catch (error) {
       console.error('Error generating live invoice PDF preview:', error);
     } finally {
