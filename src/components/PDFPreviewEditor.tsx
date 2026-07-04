@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize, ChevronLeft, ChevronRight, MoveHorizontal } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal } from "lucide-react";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
-import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -110,8 +109,9 @@ export const PDFPreviewEditor = ({
   const canvasRef = useRef<import('./PDFCanvasPreview').PDFCanvasPreviewHandle | null>(null);
   const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
   const [showItemImages, setShowItemImages] = useState(customizeSettings.showItemImages);
-  const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pdfGenerationIdRef = useRef(0);
+  const latestPreviewPayloadRef = useRef<string>("");
 
   
   // Load font preferences from database
@@ -167,14 +167,19 @@ export const PDFPreviewEditor = ({
   // Track previous blob URL for cleanup without causing re-renders
   const prevBlobUrlRef = useRef<string | null>(null);
 
-  // Generate live PDF preview with debouncing
-  const generateLivePdf = useCallback(async () => {
+  // Generate live PDF preview from an explicit snapshot so typing/sliders can
+  // update editor state instantly while the expensive PDF work stays debounced.
+  const generateLivePdf = useCallback(async (
+    settingsSnapshot: PDFEditorSettings,
+    itemImagesSnapshot: boolean,
+    jobId: number
+  ) => {
     setIsGeneratingPdf(true);
     try {
       // Ensure brand colors are included if enabled
       const currentEditorSettings: PDFEditorSettings = {
-        ...editorSettings,
-        brandColors: editorSettings.useBrandColors && brandColors ? brandColors : editorSettings.brandColors,
+        ...settingsSnapshot,
+        brandColors: settingsSnapshot.useBrandColors && brandColors ? brandColors : settingsSnapshot.brandColors,
       };
 
       // Settings from customizeSettings
@@ -206,7 +211,7 @@ export const PDFPreviewEditor = ({
         showQRCode: customizeSettings.showQRCode,
         showProfessionalAdvantages: customizeSettings.showProfessionalAdvantages,
         showQuotationNumber: customizeSettings.showQuotationNumber,
-        showItemImages: showItemImages,
+        showItemImages: itemImagesSnapshot,
       };
 
       // Transform quotationData to match the generator's expected format with settings embedded
@@ -262,42 +267,55 @@ export const PDFPreviewEditor = ({
       if (!doc) {
         throw new Error('Failed to generate PDF document');
       }
+      if (jobId !== pdfGenerationIdRef.current) return;
+
       const blob = doc.output('blob');
       
-      // Revoke previous blob URL
-      if (prevBlobUrlRef.current) {
-        URL.revokeObjectURL(prevBlobUrlRef.current);
-      }
-      
+      const oldBlobUrl = prevBlobUrlRef.current;
       const newBlobUrl = URL.createObjectURL(blob);
       prevBlobUrlRef.current = newBlobUrl;
       setPdfBlobUrl(newBlobUrl);
+      if (oldBlobUrl) {
+        window.setTimeout(() => URL.revokeObjectURL(oldBlobUrl), 3000);
+      }
     } catch (error) {
       console.error('Error generating live PDF preview:', error);
     } finally {
-      setIsGeneratingPdf(false);
+      if (jobId === pdfGenerationIdRef.current) {
+        setIsGeneratingPdf(false);
+      }
     }
-  }, [editorSettings, customizeSettings, quotationData, brandColors, showItemImages]);
+  }, [customizeSettings, quotationData, brandColors]);
 
-  // Debounced PDF generation effect - longer debounce for smooth slider interaction
+  // Debounced incremental preview pipeline. Editor changes are saved immediately,
+  // but PDF regeneration only receives the latest stable snapshot.
   useEffect(() => {
     if (!open) return;
-    
+
+    const payload = JSON.stringify({ editorSettings, customizeSettings, showItemImages, quotationData, brandColors });
+    if (payload === latestPreviewPayloadRef.current && pdfBlobUrl) return;
+    latestPreviewPayloadRef.current = payload;
+
     if (pdfGenerationTimer.current) {
       clearTimeout(pdfGenerationTimer.current);
     }
-    
-    // Use longer debounce (800ms) to avoid regenerating while user is actively dragging sliders
+
+    const jobId = ++pdfGenerationIdRef.current;
+    const settingsSnapshot = editorSettings;
+    const itemImagesSnapshot = showItemImages;
+    const debounceMs = pdfBlobUrl ? 500 : 80;
+    setIsGeneratingPdf(true);
+
     pdfGenerationTimer.current = setTimeout(() => {
-      generateLivePdf();
-    }, 800);
+      void generateLivePdf(settingsSnapshot, itemImagesSnapshot, jobId);
+    }, debounceMs);
 
     return () => {
       if (pdfGenerationTimer.current) {
         clearTimeout(pdfGenerationTimer.current);
       }
     };
-  }, [open, generateLivePdf]);
+  }, [open, editorSettings, customizeSettings, quotationData, brandColors, showItemImages, pdfBlobUrl, generateLivePdf]);
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
     const newSettings = { ...editorSettings, ...updates };
@@ -1195,15 +1213,15 @@ export const PDFPreviewEditor = ({
 
         {/* Mobile View */}
         <div className="flex-1 min-h-0 overflow-hidden md:hidden flex flex-col">
-          {showEditor ? <EditorPanel /> : <PreviewPanel />}
+          {showEditor ? EditorPanel() : PreviewPanel()}
         </div>
 
         {/* Desktop View */}
         <div className="hidden md:flex flex-1 overflow-hidden">
           <div className="w-80 border-r flex flex-col">
-            <EditorPanel />
+            {EditorPanel()}
           </div>
-          <PreviewPanel />
+          {PreviewPanel()}
         </div>
       </SheetContent>
 
