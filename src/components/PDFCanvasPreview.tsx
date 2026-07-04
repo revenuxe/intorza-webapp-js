@@ -338,7 +338,7 @@ export const PDFCanvasPreview = memo(
         pendingAnchorRef.current = null;
         restoreAnchor(anchor);
         requestAnimationFrame(updateViewportState);
-      }, [pages.length, restoreAnchor, updateViewportState]);
+      }, [pages, restoreAnchor, updateViewportState]);
 
       useEffect(() => {
         const root = getRoot();
