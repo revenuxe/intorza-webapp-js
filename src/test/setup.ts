@@ -14,10 +14,8 @@ Object.defineProperty(window, "matchMedia", {
   }),
 });
 
-// Stable rAF for tests
-if (!('requestAnimationFrame' in globalThis)) {
-  // @ts-expect-error jsdom shim
-  globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => setTimeout(() => cb(performance.now()), 0) as unknown as number;
-  // @ts-expect-error jsdom shim
-  globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);
+if (typeof (globalThis as any).requestAnimationFrame !== "function") {
+  (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) =>
+    setTimeout(() => cb(performance.now()), 0) as unknown as number;
+  (globalThis as any).cancelAnimationFrame = (id: number) => clearTimeout(id);
 }
