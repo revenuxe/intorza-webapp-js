@@ -27,11 +27,9 @@ if (!("createObjectURL" in URL)) {
   (URL as any).revokeObjectURL = () => {};
 }
 
-// fetch shim
-if (typeof globalThis.fetch !== "function") {
-  (globalThis as any).fetch = () =>
-    Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) });
-}
+// fetch shim (always override — jsdom's fetch tries real network)
+(globalThis as any).fetch = () =>
+  Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) });
 
 // canvas.toBlob shim
 HTMLCanvasElement.prototype.getContext = vi.fn(() => ({})) as any;
