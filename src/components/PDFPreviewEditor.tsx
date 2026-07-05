@@ -1070,7 +1070,7 @@ export const PDFPreviewEditor = ({
     };
 
     return (
-      <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
+      <div className="relative flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
         {/* Toolbar */}
         <div className="sticky top-0 z-20 flex items-center justify-between px-2 sm:px-3 py-2 border-b bg-background/95 backdrop-blur gap-2">
           {/* Page navigation */}
@@ -1134,6 +1134,17 @@ export const PDFPreviewEditor = ({
               aria-label="Zoom in"
             >
               <ZoomIn className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant={showPerfHud ? 'default' : 'outline'}
+              size="icon"
+              className="h-9 w-9 sm:h-8 sm:w-8 rounded-full"
+              onClick={() => setShowPerfHud(v => !v)}
+              aria-pressed={showPerfHud}
+              aria-label="Toggle performance metrics"
+              title="Performance metrics"
+            >
+              <Sliders className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
