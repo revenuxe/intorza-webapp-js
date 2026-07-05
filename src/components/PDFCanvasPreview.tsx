@@ -398,6 +398,40 @@ export const PDFCanvasPreview = memo(
         enqueuePages(visible);
       }, [enqueuePages, pages.length, virtualRange]);
 
+      // FPS + dropped-frame monitor. Uses rAF timing; anything >24ms between
+      // frames counts as a drop, which is a decent smoothness proxy in the
+      // browser main thread.
+      useEffect(() => {
+        if (!onMetricsRef.current) return;
+        let lastTs = performance.now();
+        let emitAcc = 0;
+        const tick = (now: number) => {
+          const delta = now - lastTs;
+          lastTs = now;
+          if (delta > 24) frameDropsRef.current += 1;
+          fpsRef.current = delta > 0 ? Math.min(120, Math.round(1000 / delta)) : fpsRef.current;
+          emitAcc += delta;
+          if (emitAcc >= 500) {
+            emitAcc = 0;
+            const samples = renderTimesRef.current;
+            const last = samples[samples.length - 1] ?? 0;
+            const avg = samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
+            const mounted = Math.max(0, virtualRange.end - virtualRange.start + 1);
+            onMetricsRef.current?.({
+              lastRenderMs: Math.round(last),
+              avgRenderMs: Math.round(avg),
+              mountedPages: mounted,
+              totalPages: pagesRef.current.length,
+              frameDrops: frameDropsRef.current,
+              fps: fpsRef.current,
+            });
+          }
+          metricsRafRef.current = requestAnimationFrame(tick);
+        };
+        metricsRafRef.current = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(metricsRafRef.current);
+      }, [virtualRange.end, virtualRange.start]);
+
       useEffect(() => {
         return () => {
           renderTaskRef.current += 1;
@@ -442,6 +476,7 @@ export const PDFCanvasPreview = memo(
               key={i}
               ref={el => (pageRefs.current[i] = el)}
               data-page-idx={i}
+              data-testid={`pdf-page-${i}`}
               className="relative rounded-lg shadow-lg border bg-white scroll-mt-4 overflow-hidden select-none"
               style={{ ...pageWidthStyle, aspectRatio, contain: 'layout paint size' }}
             >
@@ -455,8 +490,18 @@ export const PDFCanvasPreview = memo(
                   className="absolute inset-0 h-full w-full object-fill"
                 />
               ) : isMounted ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/40">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                // Mobile-friendly skeleton shown while a nearby page renders.
+                // Shimmer conveys progress; page-header/footer bars keep the
+                // silhouette recognisable so scrolling feels stable.
+                <div
+                  role="status"
+                  aria-label={`Loading page ${i + 1}`}
+                  className="absolute inset-0 overflow-hidden bg-muted/40"
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_25%,hsl(var(--muted-foreground)/0.12)_50%,transparent_75%)] bg-[length:200%_100%] animate-[shimmer_1.4s_infinite]" />
+                  <div className="absolute top-6 left-6 right-6 h-3 rounded bg-muted-foreground/15" />
+                  <div className="absolute top-12 left-6 w-2/3 h-3 rounded bg-muted-foreground/10" />
+                  <div className="absolute bottom-6 left-6 right-6 h-3 rounded bg-muted-foreground/10" />
                 </div>
               ) : null}
             </div>
