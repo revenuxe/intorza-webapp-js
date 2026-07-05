@@ -1157,21 +1157,18 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     yPosition = (doc as any).lastAutoTable.finalY + 15;
   }
 
-  // --- 6. Terms & Conditions --- (always begins on a dedicated new page)
+  // --- 6. Terms & Conditions ---
   if (settings.showTermsConditions) {
-    doc.addPage();
-    yPosition = pageTopY;
+    if (yPosition > pageBottomY - 45) {
+      doc.addPage();
+      yPosition = pageTopY;
+    }
 
-    setHeadingFont('bold');
-    doc.setFontSize(14);
-    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-    doc.text("TERMS & CONDITIONS", margin, yPosition);
-    // Underline accent
-    doc.setDrawColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-    doc.setLineWidth(0.4);
-    doc.line(margin, yPosition + 2, margin + 40, yPosition + 2);
-    yPosition += 10;
-
+  setHeadingFont('bold');
+  doc.setFontSize(10);
+  doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+  doc.text("TERMS & CONDITIONS", margin, yPosition);
+  yPosition += 8;
 
   setBodyFont('normal');
   doc.setFontSize(7);

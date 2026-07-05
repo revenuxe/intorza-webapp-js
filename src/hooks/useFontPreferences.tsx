@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { profileApi } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface FontPreferences {
@@ -20,23 +20,7 @@ export const useFontPreferences = () => {
   // Load preferences from database
   const loadPreferences = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('pdf_heading_font, pdf_body_font')
-        .eq('id', user.id)
-        .single();
-
-      if (error) {
-        console.error('Error loading font preferences:', error);
-        setLoading(false);
-        return;
-      }
+      const { data } = await profileApi.get();
 
       if (data) {
         setPreferences({
@@ -55,25 +39,10 @@ export const useFontPreferences = () => {
   const savePreferences = useCallback(async (newPreferences: FontPreferences) => {
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error('Please sign in to save preferences');
-        return false;
-      }
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          pdf_heading_font: newPreferences.headingFont,
-          pdf_body_font: newPreferences.bodyFont,
-        })
-        .eq('id', user.id);
-
-      if (error) {
-        console.error('Error saving font preferences:', error);
-        toast.error('Failed to save font preferences');
-        return false;
-      }
+      await profileApi.update({
+        pdf_heading_font: newPreferences.headingFont,
+        pdf_body_font: newPreferences.bodyFont,
+      });
 
       setPreferences(newPreferences);
       return true;

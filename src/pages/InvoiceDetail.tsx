@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Plus, CheckCircle, Eye, Calendar, CreditCard, Trash2, Share2 } from "lucide-react";
+import { ArrowLeft, Download, Plus, CheckCircle, Eye, Calendar, CreditCard, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
+import { invoicesApi, profileApi } from "@/lib/api";
+import { getDisplayStatus } from "@/lib/invoiceStatus";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -94,7 +96,6 @@ const InvoiceDetail = () => {
   useEffect(() => {
     if (id) {
       loadInvoice();
-      loadPayments();
       loadProfile();
     }
   }, [id]);
@@ -106,28 +107,20 @@ const InvoiceDetail = () => {
   }, [invoice?.quotation_id]);
 
   const loadProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      if (data) setProfile(data);
-    }
+    const { data } = await profileApi.get();
+    if (data) setProfile(data);
   };
 
   const loadInvoice = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      setInvoice(data);
+      // GET /:id returns the invoice with its payments nested (backend/src/routes/invoices.js).
+      const { data } = await invoicesApi.get(id!);
+      const { payments: pays, ...inv } = data as Invoice & { payments: Payment[] };
+      setInvoice(inv);
+      setPayments((pays || []).slice().sort((a: Payment, b: Payment) =>
+        new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
+      ));
     } catch (error) {
       console.error('Error loading invoice:', error);
       toast({
@@ -137,21 +130,6 @@ const InvoiceDetail = () => {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadPayments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('invoice_id', id)
-        .order('payment_date', { ascending: false });
-
-      if (error) throw error;
-      setPayments(data || []);
-    } catch (error) {
-      console.error('Error loading payments:', error);
     }
   };
 
@@ -186,23 +164,10 @@ const InvoiceDetail = () => {
   const handleDeleteInvoice = async () => {
     try {
       setDeleting(true);
-      
-      // First delete all payments associated with this invoice
-      const { error: paymentsError } = await supabase
-        .from('payments')
-        .delete()
-        .eq('invoice_id', id);
-      
-      if (paymentsError) throw paymentsError;
-      
-      // Then delete the invoice
-      const { error: invoiceError } = await supabase
-        .from('invoices')
-        .delete()
-        .eq('id', id);
-      
-      if (invoiceError) throw invoiceError;
-      
+
+      // Backend cascade-deletes payments with the invoice.
+      await invoicesApi.remove(id!);
+
       toast({
         title: "Invoice Deleted",
         description: "The invoice has been permanently deleted",
@@ -249,45 +214,18 @@ const InvoiceDetail = () => {
         finalNotes = finalNotes ? `${finalNotes} | Next due: ${nextPaymentDue} - ${currCode} ${nextPaymentAmount.toLocaleString()}` : `Next due: ${nextPaymentDue} - ${currCode} ${nextPaymentAmount.toLocaleString()}`;
       }
 
-      const { error: paymentError } = await supabase
-        .from('payments')
-        .insert({
-          invoice_id: id,
-          amount: paymentAmount,
-          payment_method: paymentMethod,
-          payment_date: paymentDate,
-          notes: finalNotes || null
-        });
+      // paid_amount / remaining_amount / status are recomputed server-side
+      // (recalc() in backend/src/routes/invoices.js) — single source of truth
+      // instead of duplicating that logic here.
+      await invoicesApi.addPayment(id!, {
+        amount: paymentAmount,
+        payment_method: paymentMethod,
+        payment_date: paymentDate,
+        notes: finalNotes || null,
+      });
 
-      if (paymentError) {
-        console.error('Payment insert error:', paymentError);
-        throw paymentError;
-      }
-
-      const newPaidAmount = (invoice?.paid_amount || 0) + paymentAmount;
-      const newRemainingAmount = (invoice?.total_amount || 0) - newPaidAmount;
-      // Use underscore format to match database constraint
-      const newStatus = newRemainingAmount <= 0 ? 'paid' : (newPaidAmount > 0 ? 'partially_paid' : 'unpaid');
-
-      // Update invoice with new due date if provided
-      const updateData: any = {
-        paid_amount: newPaidAmount,
-        remaining_amount: Math.max(0, newRemainingAmount),
-        status: newStatus
-      };
-      
       if (nextPaymentDue) {
-        updateData.due_date = nextPaymentDue;
-      }
-
-      const { error: invoiceError } = await supabase
-        .from('invoices')
-        .update(updateData)
-        .eq('id', id);
-
-      if (invoiceError) {
-        console.error('Invoice update error:', invoiceError);
-        throw invoiceError;
+        await invoicesApi.update(id!, { due_date: nextPaymentDue });
       }
 
       toast({
@@ -301,7 +239,6 @@ const InvoiceDetail = () => {
       setNextPaymentDue("");
       setNextPaymentAmount(0);
       loadInvoice();
-      loadPayments();
     } catch (error) {
       console.error('Error adding payment:', error);
       toast({
@@ -409,14 +346,6 @@ const InvoiceDetail = () => {
     }
   };
 
-  const handleSharePaymentReceipt = async (payment: Payment) => {
-    await handleDownloadPaymentReceipt(payment);
-  };
-
-  const handleShareInvoice = async () => {
-    await handleDownloadPDF();
-  };
-
   const isFullyPaid = invoice && (invoice.remaining_amount || 0) <= 0;
 
   if (loading) {
@@ -471,10 +400,6 @@ const InvoiceDetail = () => {
             <Eye className="h-4 w-4 mr-2" />
             Preview
           </Button>
-          <Button variant="outline" onClick={handleShareInvoice} className="flex-1 sm:flex-none">
-            <Share2 className="h-4 w-4 mr-2" />
-            Share
-          </Button>
           <Button variant="outline" onClick={() => handleDownloadPDF()} disabled={pdfLoading} className="flex-1 sm:flex-none">
             <Download className="h-4 w-4 mr-2" />
             {pdfLoading ? '...' : 'PDF'}
@@ -512,8 +437,8 @@ const InvoiceDetail = () => {
               <CardTitle className="text-xl sm:text-2xl">{invoice.project_name}</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">{invoice.invoice_number}</p>
             </div>
-            <Badge className={`w-fit ${getStatusColor(invoice.status)}`}>
-              {formatStatusDisplay(invoice.status)}
+            <Badge className={`w-fit ${getStatusColor(getDisplayStatus(invoice.status, invoice.due_date))}`}>
+              {formatStatusDisplay(getDisplayStatus(invoice.status, invoice.due_date))}
             </Badge>
           </div>
         </CardHeader>
@@ -601,16 +526,8 @@ const InvoiceDetail = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleSharePaymentReceipt(payment)}
-                        className="h-8 px-2"
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="sm"
                         onClick={() => handleDownloadPaymentReceipt(payment)}
                         className="h-8 px-2"
@@ -641,8 +558,8 @@ const InvoiceDetail = () => {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold tabular-nums">₹{relInvoice.total_amount?.toLocaleString('en-IN')}</p>
-                      <Badge className={`text-xs ${getStatusColor(relInvoice.status)}`}>
-                        {formatStatusDisplay(relInvoice.status)}
+                      <Badge className={`text-xs ${getStatusColor(getDisplayStatus(relInvoice.status, relInvoice.due_date))}`}>
+                        {formatStatusDisplay(getDisplayStatus(relInvoice.status, relInvoice.due_date))}
                       </Badge>
                     </div>
                   </div>

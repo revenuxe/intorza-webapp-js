@@ -28,18 +28,20 @@ const getInitialState = (): SubscriptionState => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      // Trust the cache while we validate in the background — prevents Pro badge flicker.
-      const expiryValid = !parsed.expiry || new Date(parsed.expiry) > new Date();
-      if (expiryValid) {
-        return {
-          isPro: !!parsed.isPro,
-          plan: parsed.plan || null,
-          expiry: parsed.expiry || null,
-          proSince: parsed.proSince || null,
-          status: parsed.status || 'inactive',
-          loading: false,
-          initialLoadComplete: !!parsed.isPro, // treat cached-pro as complete for UI stability
-        };
+      // Check if expiry is still valid
+      if (parsed.expiry) {
+        const expiry = new Date(parsed.expiry);
+        if (expiry > new Date()) {
+          return {
+            isPro: parsed.isPro || false,
+            plan: parsed.plan || null,
+            expiry: parsed.expiry || null,
+            proSince: parsed.proSince || null,
+            status: parsed.status || 'inactive',
+            loading: true,
+            initialLoadComplete: false,
+          };
+        }
       }
     }
   } catch (e) {
@@ -56,12 +58,10 @@ const getInitialState = (): SubscriptionState => {
   };
 };
 
-
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, session, loading: authLoading } = useAuth();
-
+  const { user, session } = useAuth();
   const [state, setState] = useState<SubscriptionState>(getInitialState);
   const [paywallOpen, setPaywallOpenState] = useState(false);
   const [paywallAction, setPaywallAction] = useState('');
@@ -129,11 +129,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [session?.access_token, persistStatus]);
 
-  // Fetch subscription status after auth resolves — never react to transient session=null on boot.
+  // Fetch subscription status on mount and when user changes
   useEffect(() => {
-    if (authLoading) return; // wait for Supabase to hydrate the session
-
-    if (user && session?.access_token) {
+    if (user && session) {
       refreshSubscription();
     } else {
       setState({
@@ -147,10 +145,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       });
       localStorage.removeItem(STORAGE_KEY);
     }
-    // Only re-run when auth truly changes identity, not on every token refresh.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user?.id]);
-
+  }, [user, session, refreshSubscription]);
 
   // Listen for payment success event
   useEffect(() => {

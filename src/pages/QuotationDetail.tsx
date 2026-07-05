@@ -160,7 +160,7 @@ const QuotationDetail = () => {
           .select('*')
           .eq('user_id', user.id)
           .eq('is_default', true)
-          .maybeSingle();
+          .single();
         
         if (bankTemplate) {
           bankDetails = {

@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { libraryApi } from "@/lib/api";
 
 interface WarrantyTemplate {
   id: string;
@@ -37,18 +37,8 @@ export const WarrantyNotesTab = () => {
 
   const loadTemplates = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('warranty_templates')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTemplates(data || []);
+      const { data } = await libraryApi.warranty.list();
+      setTemplates((data as WarrantyTemplate[]) || []);
     } catch (error) {
       console.error('Error loading templates:', error);
     } finally {
@@ -64,31 +54,19 @@ export const WarrantyNotesTab = () => {
 
     try {
       setSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
 
       if (editingTemplate) {
-        const { error } = await supabase
-          .from('warranty_templates')
-          .update({
-            template_name: formData.template_name,
-            content: formData.content,
-          })
-          .eq('id', editingTemplate.id);
-
-        if (error) throw error;
+        await libraryApi.warranty.update(editingTemplate.id, {
+          template_name: formData.template_name,
+          content: formData.content,
+        });
         toast({ title: "Template updated" });
       } else {
-        const { error } = await supabase
-          .from('warranty_templates')
-          .insert({
-            user_id: user.id,
-            template_name: formData.template_name,
-            content: formData.content,
-            is_default: templates.length === 0,
-          });
-
-        if (error) throw error;
+        await libraryApi.warranty.create({
+          template_name: formData.template_name,
+          content: formData.content,
+          is_default: templates.length === 0,
+        });
         toast({ title: "Template created" });
       }
 
@@ -106,12 +84,7 @@ export const WarrantyNotesTab = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('warranty_templates')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await libraryApi.warranty.remove(id);
       toast({ title: "Template deleted" });
       loadTemplates();
     } catch (error) {
@@ -122,20 +95,13 @@ export const WarrantyNotesTab = () => {
 
   const handleSetDefault = async (id: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      await supabase
-        .from('warranty_templates')
-        .update({ is_default: false })
-        .eq('user_id', user.id);
-
-      const { error } = await supabase
-        .from('warranty_templates')
-        .update({ is_default: true })
-        .eq('id', id);
-
-      if (error) throw error;
+      // Clear existing default(s), then set this one (no bulk endpoint).
+      await Promise.all(
+        templates
+          .filter(t => t.is_default && t.id !== id)
+          .map(t => libraryApi.warranty.update(t.id, { is_default: false })),
+      );
+      await libraryApi.warranty.update(id, { is_default: true });
       toast({ title: "Default updated" });
       loadTemplates();
     } catch (error) {

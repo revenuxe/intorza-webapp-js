@@ -3,7 +3,7 @@ import { Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalization } from "@/hooks/useLocalization";
-import { supabase } from "@/integrations/supabase/client";
+import { quotationsApi, invoicesApi } from "@/lib/api";
 
 interface Client {
   name: string;
@@ -26,24 +26,12 @@ const Clients = () => {
   const loadClients = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
-      // Fetch quotations
-      const { data: quotations, error: quotationsError } = await supabase
-        .from('quotations')
-        .select('client_name, grand_total')
-        .eq('user_id', user.id);
-
-      if (quotationsError) throw quotationsError;
-
-      // Fetch invoices with payment info
-      const { data: invoices, error: invoicesError } = await supabase
-        .from('invoices')
-        .select('client_name, total_amount, paid_amount, remaining_amount')
-        .eq('user_id', user.id);
-
-      if (invoicesError) throw invoicesError;
+      // The backend scopes both lists to the authenticated user via the JWT.
+      const [{ data: quotations }, { data: invoices }] = await Promise.all([
+        quotationsApi.list(),
+        invoicesApi.list(),
+      ]);
 
       // Combine and group by client
       const clientMap = new Map<string, Client>();

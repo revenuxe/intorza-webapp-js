@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { profileApi } from "@/lib/api";
 import { BillingSection } from "@/components/BillingSection";
 import { BrandColorExtractor } from "@/components/BrandColorExtractor";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -50,16 +50,8 @@ const Settings = () => {
 
   const loadProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data } = await profileApi.get();
 
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
       if (data) {
         setProfile({
           company_name: data.company_name || "",
@@ -93,26 +85,17 @@ const Settings = () => {
     setCountrySearch("");
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          country_code: country.code,
-          country_name: country.name,
-          currency_code: country.currency.code,
-          currency_symbol: country.currency.symbol,
-          tax_label: country.tax.shortLabel,
-          measurement_system: country.measurement.system,
-          locale: country.currency.locale,
-          date_format: country.dateFormat,
-          number_format: JSON.stringify(country.numberFormat),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
+      await profileApi.update({
+        country_code: country.code,
+        country_name: country.name,
+        currency_code: country.currency.code,
+        currency_symbol: country.currency.symbol,
+        tax_label: country.tax.shortLabel,
+        measurement_system: country.measurement.system,
+        locale: country.currency.locale,
+        date_format: country.dateFormat,
+        number_format: JSON.stringify(country.numberFormat),
+      });
 
       setProfile({ ...profile, country_code: country.code });
       toast({
@@ -144,33 +127,13 @@ const Settings = () => {
         return;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
-
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/logo.${fileExt}`;
+      const fileName = `logo-${Date.now()}.${fileExt}`;
 
-      if (profile.logo_url) {
-        const oldPath = profile.logo_url.split('/').slice(-2).join('/');
-        await supabase.storage.from('company-logos').remove([oldPath]);
-      }
+      const { uploadToS3 } = await import('@/lib/s3Upload');
+      const { url: publicUrl } = await uploadToS3(file, 'logo', fileName);
 
-      const { error: uploadError } = await supabase.storage
-        .from('company-logos')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('company-logos')
-        .getPublicUrl(fileName);
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ logo_url: publicUrl })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
+      await profileApi.update({ logo_url: publicUrl });
 
       setProfile({ ...profile, logo_url: publicUrl });
       toast({
@@ -204,33 +167,13 @@ const Settings = () => {
         return;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
-
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/signature.${fileExt}`;
+      const fileName = `signature-${Date.now()}.${fileExt}`;
 
-      if (profile.signature_url) {
-        const oldPath = profile.signature_url.split('/').slice(-2).join('/');
-        await supabase.storage.from('company-logos').remove([oldPath]);
-      }
+      const { uploadToS3 } = await import('@/lib/s3Upload');
+      const { url: publicUrl } = await uploadToS3(file, 'signature', fileName);
 
-      const { error: uploadError } = await supabase.storage
-        .from('company-logos')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('company-logos')
-        .getPublicUrl(fileName);
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ signature_url: publicUrl })
-        .eq('id', user.id);
-
-      if (updateError) throw updateError;
+      await profileApi.update({ signature_url: publicUrl });
 
       setProfile({ ...profile, signature_url: publicUrl });
       toast({
@@ -252,24 +195,15 @@ const Settings = () => {
   const handleSave = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user found');
-
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          company_name: profile.company_name,
-          full_name: profile.full_name,
-          email: profile.email,
-          phone: profile.phone,
-          address: profile.address,
-          gstin: profile.gstin,
-          professional_advantages: profile.professional_advantages,
-          updated_at: new Date().toISOString(),
-        });
-
-      if (error) throw error;
+      await profileApi.update({
+        company_name: profile.company_name,
+        full_name: profile.full_name,
+        email: profile.email,
+        phone: profile.phone,
+        address: profile.address,
+        gstin: profile.gstin,
+        professional_advantages: profile.professional_advantages,
+      });
 
       toast({
         title: "Settings saved",

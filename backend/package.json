@@ -1,0 +1,27 @@
+{
+  "name": "intorza-backend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --watch src/dev.js",
+    "start": "node src/dev.js",
+    "migrate:schema": "bash scripts/migrate-schema.sh",
+    "migrate:apply": "bash scripts/apply-schema.sh",
+    "migrate:data": "node scripts/migrate-data.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.658.0",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "jose": "^5.9.6",
+    "morgan": "^1.10.0",
+    "pg": "^8.13.1",
+    "serverless-http": "^3.2.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.86.0",
+    "dotenv": "^16.4.5"
+  }
+}

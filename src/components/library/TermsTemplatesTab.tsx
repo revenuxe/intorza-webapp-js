@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { libraryApi } from "@/lib/api";
 
 interface TermsSection {
   id: string;
@@ -48,18 +48,8 @@ export const TermsTemplatesTab = () => {
 
   const loadTemplates = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('terms_templates')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTemplates((data || []).map(t => ({
+      const { data } = await libraryApi.terms.list();
+      setTemplates(((data as any[]) || []).map(t => ({
         ...t,
         template_type: t.template_type as 'quotation' | 'invoice',
         content: Array.isArray(t.content) ? t.content as unknown as TermsSection[] : []
@@ -79,34 +69,22 @@ export const TermsTemplatesTab = () => {
 
     try {
       setSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
 
       if (editingTemplate) {
-        const { error } = await supabase
-          .from('terms_templates')
-          .update({
-            template_name: formData.template_name,
-            template_type: formData.template_type,
-            content: formData.content as unknown as any,
-          })
-          .eq('id', editingTemplate.id);
-
-        if (error) throw error;
+        await libraryApi.terms.update(editingTemplate.id, {
+          template_name: formData.template_name,
+          template_type: formData.template_type,
+          content: formData.content as unknown as any,
+        });
         toast({ title: "Template updated" });
       } else {
         const sameTypeTemplates = templates.filter(t => t.template_type === formData.template_type);
-        const { error } = await supabase
-          .from('terms_templates')
-          .insert([{
-            user_id: user.id,
-            template_name: formData.template_name,
-            template_type: formData.template_type,
-            content: formData.content as unknown as any,
-            is_default: sameTypeTemplates.length === 0,
-          }]);
-
-        if (error) throw error;
+        await libraryApi.terms.create({
+          template_name: formData.template_name,
+          template_type: formData.template_type,
+          content: formData.content as unknown as any,
+          is_default: sameTypeTemplates.length === 0,
+        });
         toast({ title: "Template created" });
       }
 
@@ -124,12 +102,7 @@ export const TermsTemplatesTab = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('terms_templates')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await libraryApi.terms.remove(id);
       toast({ title: "Template deleted" });
       loadTemplates();
     } catch (error) {
@@ -140,23 +113,14 @@ export const TermsTemplatesTab = () => {
 
   const handleSetDefault = async (template: TermsTemplate) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Remove default from same type templates
-      await supabase
-        .from('terms_templates')
-        .update({ is_default: false })
-        .eq('user_id', user.id)
-        .eq('template_type', template.template_type);
-
-      // Set new default
-      const { error } = await supabase
-        .from('terms_templates')
-        .update({ is_default: true })
-        .eq('id', template.id);
-
-      if (error) throw error;
+      // Clear default on same-type templates, then set this one (no bulk
+      // endpoint, so do it client-side).
+      await Promise.all(
+        templates
+          .filter(t => t.template_type === template.template_type && t.is_default && t.id !== template.id)
+          .map(t => libraryApi.terms.update(t.id, { is_default: false })),
+      );
+      await libraryApi.terms.update(template.id, { is_default: true });
       toast({ title: "Default template updated" });
       loadTemplates();
     } catch (error) {

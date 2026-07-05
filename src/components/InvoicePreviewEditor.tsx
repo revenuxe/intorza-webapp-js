@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Copy, ChevronLeft, ChevronRight, MoveHorizontal } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize, Copy } from "lucide-react";
 import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
+import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -35,7 +36,7 @@ import { CustomThemeBuilder } from "./CustomThemeBuilder";
 import { FontPreviewPanel } from "./FontPreviewPanel";
 import { PDFCanvasPreview } from "./PDFCanvasPreview";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
-import { supabase } from "@/integrations/supabase/client";
+import { profileApi } from "@/lib/api";
 
 interface BrandColors {
   primary?: string;
@@ -104,17 +105,12 @@ export const InvoicePreviewEditor = ({
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(100);
-  const [fitWidth, setFitWidth] = useState(true);
-  const [totalPages, setTotalPages] = useState(0);
-  const [activePage, setActivePage] = useState(0);
   const [useQuotationDesign, setUseQuotationDesign] = useState(() => {
     try { return localStorage.getItem(USE_QUOTATION_DESIGN_KEY) === 'true'; } catch { return false; }
   });
   const [profile, setProfile] = useState<any>(null);
-  const canvasRef = useRef<import('./PDFCanvasPreview').PDFCanvasPreviewHandle | null>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pdfGenerationIdRef = useRef(0);
-  const latestPreviewPayloadRef = useRef("");
   const prevBlobUrlRef = useRef<string | null>(null);
   
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences } = useFontPreferences();
@@ -123,14 +119,7 @@ export const InvoicePreviewEditor = ({
   useEffect(() => {
     const loadData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle();
+        const { data } = await profileApi.get();
 
         if (data) {
           setProfile(data);
@@ -226,17 +215,13 @@ export const InvoicePreviewEditor = ({
     return getThemesByCategory(selectedCategory);
   };
 
-  // Generate live PDF preview from a debounced snapshot, keeping the UI inputs instant.
-  const generateLivePdf = useCallback(async (
-    editorSnapshot: PDFEditorSettings,
-    invoiceSnapshot: InvoiceSettings,
-    jobId: number
-  ) => {
+  // Generate live PDF preview
+  const generateLivePdf = useCallback(async () => {
     setIsGeneratingPdf(true);
     try {
       const currentEditorSettings: PDFEditorSettings = {
-        ...editorSnapshot,
-        brandColors: editorSnapshot.useBrandColors && brandColors ? brandColors : editorSnapshot.brandColors,
+        ...editorSettings,
+        brandColors: editorSettings.useBrandColors && brandColors ? brandColors : editorSettings.brandColors,
       };
 
       const pdfDoc = await generateInvoicePDF({
@@ -265,50 +250,35 @@ export const InvoicePreviewEditor = ({
           taxRegistrationLabel: profile.tax_label === 'GST' ? 'GSTIN' : `${profile.tax_label || 'Tax'} No`,
         } : undefined,
         editorSettings: currentEditorSettings,
-        invoiceSettings: invoiceSnapshot,
+        invoiceSettings: invoiceSettings,
         previewOnly: true,
       });
 
       if (!pdfDoc) throw new Error('Failed to generate PDF');
-      if (jobId !== pdfGenerationIdRef.current) return;
       const blob = pdfDoc.output('blob');
-      const oldBlobUrl = prevBlobUrlRef.current;
+      if (prevBlobUrlRef.current) URL.revokeObjectURL(prevBlobUrlRef.current);
       const newBlobUrl = URL.createObjectURL(blob);
       prevBlobUrlRef.current = newBlobUrl;
       setPdfBlobUrl(newBlobUrl);
-      if (oldBlobUrl) {
-        window.setTimeout(() => URL.revokeObjectURL(oldBlobUrl), 3000);
-      }
     } catch (error) {
       console.error('Error generating live invoice PDF preview:', error);
     } finally {
-      if (jobId === pdfGenerationIdRef.current) setIsGeneratingPdf(false);
+      setIsGeneratingPdf(false);
     }
-  }, [invoiceData, brandColors, profile]);
+  }, [editorSettings, invoiceSettings, invoiceData, brandColors, profile]);
 
-  // Debounced incremental preview pipeline. Changes persist immediately while
-  // only the latest snapshot regenerates the heavy PDF preview.
+  // Debounced PDF generation
   useEffect(() => {
     if (!open) return;
-
-    const payload = JSON.stringify({ editorSettings, invoiceSettings, invoiceData, brandColors, profile });
-    if (payload === latestPreviewPayloadRef.current && pdfBlobUrl) return;
-    latestPreviewPayloadRef.current = payload;
-
     if (pdfGenerationTimer.current) clearTimeout(pdfGenerationTimer.current);
-    const jobId = ++pdfGenerationIdRef.current;
-    const editorSnapshot = editorSettings;
-    const invoiceSnapshot = invoiceSettings;
-    const debounceMs = pdfBlobUrl ? 500 : 80;
-    setIsGeneratingPdf(true);
-    pdfGenerationTimer.current = setTimeout(() => {
-      void generateLivePdf(editorSnapshot, invoiceSnapshot, jobId);
-    }, debounceMs);
+    pdfGenerationTimer.current = setTimeout(() => { generateLivePdf(); }, 800);
     return () => { if (pdfGenerationTimer.current) clearTimeout(pdfGenerationTimer.current); };
-  }, [open, editorSettings, invoiceSettings, invoiceData, brandColors, profile, pdfBlobUrl, generateLivePdf]);
+  }, [open, generateLivePdf]);
 
-  // Editor Panel
-  const EditorPanel = () => (
+  // Editor Panel — rendered as a JSX element (not a nested component) so React
+  // reconciles it in place instead of remounting on every render. Remounting
+  // would reset scroll position and steal focus from inputs.
+  const editorPanel = (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Use Quotation Design Checkbox */}
       <div className="px-4 py-3 border-b bg-muted/30">
@@ -700,66 +670,44 @@ export const InvoicePreviewEditor = ({
     </div>
   );
 
-  // Preview Panel with virtualized PDF pages, page navigation and fit/zoom controls
-  const PreviewPanel = () => {
-    const goPrev = () => canvasRef.current?.scrollToPage(Math.max(0, activePage - 1));
-    const goNext = () => canvasRef.current?.scrollToPage(Math.min(totalPages - 1, activePage + 1));
-
-    return (
-      <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
-        <div className="sticky top-0 z-20 flex items-center justify-between px-2 sm:px-3 py-2 border-b bg-background/95 backdrop-blur gap-2">
-          <div className="flex items-center gap-1 shrink-0">
-            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full" onClick={goPrev} disabled={activePage <= 0} aria-label="Previous page">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="text-[11px] font-medium tabular-nums px-1.5 min-w-[52px] text-center">
-              {totalPages > 0 ? `${activePage + 1} / ${totalPages}` : '– / –'}
-            </div>
-            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full" onClick={goNext} disabled={activePage >= totalPages - 1} aria-label="Next page">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+  // Preview Panel — also a JSX element variable (see editorPanel note above) so
+  // the scrollable preview area and the memoized PDF canvas stay mounted across
+  // regenerations, preserving scroll position and avoiding flicker.
+  const previewPanel = (
+    <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-background/80 backdrop-blur-sm gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <Button variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={() => setPreviewZoom(Math.max(25, previewZoom - 25))} disabled={previewZoom <= 25}>
+            <ZoomOut className="h-3.5 w-3.5" />
+          </Button>
+          <div className="flex items-center w-20 sm:w-28">
+            <Slider value={[previewZoom]} onValueChange={([v]) => setPreviewZoom(v)} min={25} max={200} step={5} className="w-full" />
           </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <Button variant={fitWidth ? 'default' : 'outline'} size="sm" className="h-9 sm:h-8 px-2.5 rounded-full" onClick={() => setFitWidth((v) => !v)} aria-pressed={fitWidth}>
-              <MoveHorizontal className="h-3.5 w-3.5 sm:mr-1" />
-              <span className="hidden sm:inline text-[11px]">Fit</span>
-            </Button>
-            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full" onClick={() => { setFitWidth(false); setPreviewZoom(Math.max(25, previewZoom - 25)); }} disabled={!fitWidth && previewZoom <= 25} aria-label="Zoom out">
-              <ZoomOut className="h-3.5 w-3.5" />
-            </Button>
-            <span className="text-[10px] text-muted-foreground tabular-nums w-10 text-center hidden sm:inline">
-              {fitWidth ? 'Fit' : `${previewZoom}%`}
-            </span>
-            <Button variant="outline" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 rounded-full" onClick={() => { setFitWidth(false); setPreviewZoom(Math.min(200, previewZoom + 25)); }} disabled={!fitWidth && previewZoom >= 200} aria-label="Zoom in">
-              <ZoomIn className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
-          {isGeneratingPdf && !pdfBlobUrl ? (
-            <div className="h-full flex items-center justify-center min-h-[300px]">
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Generating preview...</p>
-              </div>
-            </div>
-          ) : (
-            <PDFCanvasPreview
-              ref={canvasRef}
-              pdfBlobUrl={pdfBlobUrl}
-              zoom={previewZoom}
-              fitWidth={fitWidth}
-              isGenerating={isGeneratingPdf}
-              onPagesChange={setTotalPages}
-              onActivePageChange={setActivePage}
-            />
-          )}
+          <Button variant="outline" size="icon" className="h-7 w-7 shrink-0" onClick={() => setPreviewZoom(Math.min(200, previewZoom + 25))} disabled={previewZoom >= 200}>
+            <ZoomIn className="h-3.5 w-3.5" />
+          </Button>
+          <span className="text-[10px] text-muted-foreground w-9 text-center">{previewZoom}%</span>
+          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setPreviewZoom(100)}>
+            <Maximize className="h-3 w-3 mr-1" />
+            <span className="text-[10px]">Fit</span>
+          </Button>
         </div>
       </div>
-    );
-  };
+
+      <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
+        {isGeneratingPdf && !pdfBlobUrl ? (
+          <div className="h-full flex items-center justify-center min-h-[300px]">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Generating preview...</p>
+            </div>
+          </div>
+        ) : (
+          <PDFCanvasPreview pdfBlobUrl={pdfBlobUrl} zoom={previewZoom} isGenerating={isGeneratingPdf} />
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -805,15 +753,15 @@ export const InvoicePreviewEditor = ({
 
         {/* Mobile View */}
         <div className="flex-1 min-h-0 overflow-hidden md:hidden flex flex-col">
-          {showEditor ? EditorPanel() : PreviewPanel()}
+          {showEditor ? editorPanel : previewPanel}
         </div>
 
         {/* Desktop View */}
         <div className="hidden md:flex flex-1 overflow-hidden">
           <div className="w-80 border-r flex flex-col">
-            {EditorPanel()}
+            {editorPanel}
           </div>
-          {PreviewPanel()}
+          {previewPanel}
         </div>
       </SheetContent>
 

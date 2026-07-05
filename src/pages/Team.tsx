@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { teamApi, tasksApi, quotationsApi, profileApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -192,25 +193,13 @@ const Team = () => {
 
   const fetchMemberRequests = async () => {
     if (!user) return;
-    const { data, error } = await supabase
-      .from('team_member_requests')
-      .select('*')
-      .eq('company_id', user.id)
-      .order('created_at', { ascending: false });
-    
-    if (!error && data) {
-      setMemberRequests(data as TeamMemberRequest[]);
-    }
+    const { data } = await teamApi.requests.list();
+    setMemberRequests((data || []) as TeamMemberRequest[]);
   };
 
   const fetchTasks = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('company_id', user.id)
-      .order('created_at', { ascending: false });
-    
+    const { data } = await tasksApi.list();
     setTasks((data || []) as Task[]);
   };
 
@@ -218,20 +207,23 @@ const Team = () => {
     if (!user) return;
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    
+
     const { data } = await supabase
       .from('attendance')
       .select('*')
       .gte('clock_in', sevenDaysAgo.toISOString())
       .order('clock_in', { ascending: false });
-    
+
     setWeeklyAttendance((data || []) as MemberAttendance[]);
   };
 
   const handleApproveRequest = async (request: TeamMemberRequest) => {
     if (!user) return;
     try {
-      const { data: newMember, error: memberError } = await supabase
+      // team_members stays on Supabase for now — create-team-member-auth
+      // (the Edge Function used elsewhere in this file) still writes new
+      // members only there, so RDS's team_members table is incomplete.
+      const { error: memberError } = await supabase
         .from('team_members')
         .insert({
           company_id: user.id,
@@ -240,18 +232,11 @@ const Team = () => {
           phone: request.phone,
           work_type: request.work_type as any,
           user_id: request.user_id,
-        })
-        .select()
-        .single();
+        });
 
       if (memberError) throw memberError;
 
-      const { error: updateError } = await supabase
-        .from('team_member_requests')
-        .update({ status: 'approved' })
-        .eq('id', request.id);
-
-      if (updateError) throw updateError;
+      await teamApi.requests.update(request.id, { status: 'approved' });
 
       toast.success(`${request.name} approved and added to team!`);
       fetchMemberRequests();
@@ -271,12 +256,7 @@ const Team = () => {
         updateData.docs_request_note = actionNote;
       }
 
-      const { error } = await supabase
-        .from('team_member_requests')
-        .update(updateData)
-        .eq('id', selectedRequest.id);
-
-      if (error) throw error;
+      await teamApi.requests.update(selectedRequest.id, updateData);
 
       toast.success(actionType === 'reject' ? 'Request rejected' : 'Documentation requested');
       setActionDialogOpen(false);
@@ -297,11 +277,7 @@ const Team = () => {
 
   const fetchCompanyName = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('profiles')
-      .select('company_name, org_code')
-      .eq('id', user.id)
-      .single();
+    const { data } = await profileApi.get();
     if (data?.company_name) {
       setCompanyName(data.company_name);
     }
@@ -310,18 +286,15 @@ const Team = () => {
 
   const fetchQuotations = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('quotations')
-      .select('id, project_name, client_name, client_address, place_of_project, status, project_deadline, grand_total')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    
-    setQuotations(data || []);
+    const { data } = await quotationsApi.list();
+    setQuotations((data || []) as Quotation[]);
   };
 
+  // team_members and team_project_assignments stay on Supabase for now — see
+  // note on handleApproveRequest about create-team-member-auth.
   const fetchTeamMembers = async () => {
     if (!user) return;
-    
+
     const { data, error } = await supabase
       .from('team_members')
       .select('*')
@@ -335,7 +308,7 @@ const Team = () => {
 
   const fetchProjectTeams = async () => {
     if (!user) return;
-    
+
     const { data: assignments } = await supabase
       .from('team_project_assignments')
       .select(`
@@ -347,24 +320,24 @@ const Team = () => {
 
     if (assignments) {
       const teamsMap = new Map<string, ProjectTeam>();
-      
+
       for (const assignment of assignments) {
         const quotation = assignment.quotations as unknown as Quotation;
         if (!quotation) continue;
-        
+
         const member = teamMembers.find(m => m.id === assignment.team_member_id);
         if (!member) continue;
-        
+
         if (!teamsMap.has(quotation.id)) {
           teamsMap.set(quotation.id, { quotation, members: [] });
         }
-        
+
         teamsMap.get(quotation.id)!.members.push({
           ...member,
           assignmentId: assignment.id,
         });
       }
-      
+
       setProjectTeams(Array.from(teamsMap.values()));
     }
   };
@@ -427,25 +400,17 @@ const Team = () => {
     }
     
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ org_code: orgCodeInput.trim().toUpperCase() })
-        .eq('id', user.id);
-
-      if (error) {
-        if (error.message.includes('unique') || error.message.includes('duplicate')) {
-          toast.error("This code is already taken. Try a different one.");
-        } else {
-          throw error;
-        }
-        return;
-      }
+      await profileApi.update({ org_code: orgCodeInput.trim().toUpperCase() });
 
       setOrgCode(orgCodeInput.trim().toUpperCase());
       setOrgCodeDialogOpen(false);
       toast.success("Organization code saved!");
     } catch (error: any) {
-      toast.error(error.message || "Failed to save code");
+      if (error.message?.includes('unique') || error.message?.includes('duplicate')) {
+        toast.error("This code is already taken. Try a different one.");
+      } else {
+        toast.error(error.message || "Failed to save code");
+      }
     }
   };
 
@@ -568,34 +533,24 @@ const Team = () => {
 
     try {
       if (editingTask) {
-        const { error } = await supabase
-          .from('tasks')
-          .update({
-            title: taskForm.title,
-            description: taskForm.description || null,
-            priority: taskForm.priority,
-            due_date: taskForm.due_date || null,
-            assigned_to: taskForm.assigned_to || null,
-            quotation_id: taskForm.quotation_id || null,
-          })
-          .eq('id', editingTask.id);
-
-        if (error) throw error;
+        await tasksApi.update(editingTask.id, {
+          title: taskForm.title,
+          description: taskForm.description || null,
+          priority: taskForm.priority,
+          due_date: taskForm.due_date || null,
+          assigned_to: taskForm.assigned_to || null,
+          quotation_id: taskForm.quotation_id || null,
+        });
         toast.success("Task updated");
       } else {
-        const { error } = await supabase
-          .from('tasks')
-          .insert({
-            company_id: user.id,
-            title: taskForm.title,
-            description: taskForm.description || null,
-            priority: taskForm.priority,
-            due_date: taskForm.due_date || null,
-            assigned_to: taskForm.assigned_to || null,
-            quotation_id: taskForm.quotation_id || null,
-          });
-
-        if (error) throw error;
+        await tasksApi.create({
+          title: taskForm.title,
+          description: taskForm.description || null,
+          priority: taskForm.priority,
+          due_date: taskForm.due_date || null,
+          assigned_to: taskForm.assigned_to || null,
+          quotation_id: taskForm.quotation_id || null,
+        });
         toast.success("Task created");
       }
 
@@ -614,17 +569,21 @@ const Team = () => {
       if (newStatus === 'completed') {
         updateData.completed_at = new Date().toISOString();
       }
-      const { error } = await supabase.from('tasks').update(updateData).eq('id', taskId);
-      if (error) throw error;
+      await tasksApi.update(taskId, updateData);
       fetchTasks();
-    } catch (error: any) {
+    } catch {
       toast.error("Failed to update task");
     }
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-    if (!error) { toast.success("Task deleted"); fetchTasks(); }
+    try {
+      await tasksApi.remove(taskId);
+      toast.success("Task deleted");
+      fetchTasks();
+    } catch {
+      toast.error("Failed to delete task");
+    }
   };
 
   const handleRemoveMemberFromProject = async (assignmentId: string) => {
@@ -716,6 +675,10 @@ const Team = () => {
           <Button variant="outline" size="sm" className="rounded-xl h-8 text-xs" onClick={() => setTeamDialogOpen(true)}>
             <FolderPlus className="h-3.5 w-3.5 mr-1" />
             <span className="hidden sm:inline">Team</span>
+          </Button>
+          <Button size="sm" className="rounded-xl h-8 text-xs" onClick={() => { setEditingMember(null); setMemberDialogOpen(true); }}>
+            <UserPlus className="h-3.5 w-3.5 mr-1" />
+            <span className="hidden sm:inline">Member</span>
           </Button>
         </div>
       </div>
@@ -835,20 +798,12 @@ const Team = () => {
         {/* Members Tab - Compact */}
         <TabsContent value="members" className="space-y-2">
           {teamMembers.length === 0 ? (
-            <div className="text-center py-10 border rounded-2xl bg-muted/20">
+            <div className="text-center py-10">
               <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm font-medium">No members yet</p>
-              <p className="text-xs text-muted-foreground mt-1 px-6">
-                Members join by requesting access from the Team Signup page. Share your Org Code above.
-              </p>
-              {pendingCount > 0 && (
-                <Button size="sm" variant="outline" className="mt-3 rounded-xl text-xs" onClick={() => {
-                  const trigger = document.querySelector('[data-state][value="approvals"]') as HTMLElement;
-                  trigger?.click();
-                }}>
-                  <AlertCircle className="h-3.5 w-3.5 mr-1.5" />Review {pendingCount} Request(s)
-                </Button>
-              )}
+              <p className="text-sm text-muted-foreground">No team members yet</p>
+              <Button size="sm" onClick={() => setMemberDialogOpen(true)} className="mt-3 rounded-xl text-xs">
+                <UserPlus className="h-3.5 w-3.5 mr-1.5" />Add First Member
+              </Button>
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -877,28 +832,15 @@ const Team = () => {
                       </div>
                     </div>
                     {/* Actions */}
-                    <div className="flex items-center gap-1.5 shrink-0 border-l border-border pl-2.5 ml-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditMember(member)}
-                        className="h-8 w-9 lg:w-24 justify-center gap-1.5 rounded-lg text-xs whitespace-nowrap"
-                        title="Edit member"
-                      >
-                        <Edit className="h-3.5 w-3.5" />
-                        <span className="hidden lg:inline">Edit</span>
-                      </Button>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button className="p-1.5 hover:bg-muted rounded-lg" onClick={() => handleEditMember(member)}>
+                        <Edit className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 w-9 lg:w-24 justify-center gap-1.5 rounded-lg text-xs whitespace-nowrap text-destructive border-destructive/30 hover:text-destructive hover:bg-destructive/10"
-                            title="Remove member"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span className="hidden lg:inline">Remove</span>
-                          </Button>
+                          <button className="p-1.5 hover:bg-destructive/10 rounded-lg">
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </button>
                         </AlertDialogTrigger>
                         <AlertDialogContent className="rounded-2xl">
                           <AlertDialogHeader>
@@ -912,8 +854,6 @@ const Team = () => {
                         </AlertDialogContent>
                       </AlertDialog>
                     </div>
-
-
                   </div>
                 );
               })}
@@ -1095,34 +1035,12 @@ const Team = () => {
                     {request.rejection_reason && <p className="text-[10px] text-destructive bg-destructive/5 rounded-lg px-2 py-1 mb-1.5">Reason: {request.rejection_reason}</p>}
                     {request.docs_request_note && <p className="text-[10px] text-blue-700 bg-blue-50 rounded-lg px-2 py-1 mb-1.5">Note: {request.docs_request_note}</p>}
                     {isPending && (
-                      <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-border mt-1.5">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openActionDialog(request, 'reject')}
-                          className="h-8 w-full justify-center gap-1.5 rounded-lg text-xs whitespace-nowrap text-destructive border-destructive/30 hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <XCircle className="h-3.5 w-3.5" /> Reject
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openActionDialog(request, 'docs_requested')}
-                          className="h-8 w-full justify-center gap-1.5 rounded-lg text-xs whitespace-nowrap text-blue-600 border-blue-200 hover:text-blue-700 hover:bg-blue-50"
-                        >
-                          <FileQuestion className="h-3.5 w-3.5" /> Docs
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleApproveRequest(request)}
-                          className="h-8 w-full justify-center gap-1.5 rounded-lg text-xs whitespace-nowrap bg-emerald-600 hover:bg-emerald-700 text-white"
-                        >
-                          <CheckCircle className="h-3.5 w-3.5" /> Approve
-                        </Button>
+                      <div className="flex gap-1.5">
+                        <Button size="sm" variant="outline" className="flex-1 rounded-xl text-[10px] text-destructive border-destructive/30 h-7" onClick={() => openActionDialog(request, 'reject')}>Reject</Button>
+                        <Button size="sm" variant="outline" className="flex-1 rounded-xl text-[10px] h-7" onClick={() => openActionDialog(request, 'docs_requested')}>Docs</Button>
+                        <Button size="sm" className="flex-1 rounded-xl text-[10px] h-7" onClick={() => handleApproveRequest(request)}>Approve</Button>
                       </div>
                     )}
-
-
                   </div>
                 );
               })}

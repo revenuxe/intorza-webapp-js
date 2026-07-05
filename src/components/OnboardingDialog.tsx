@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload, Building2, Phone, ArrowRight, Check, Globe } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { profileApi } from "@/lib/api";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { COUNTRY_CONFIGS, getCountryGroups, type CountryConfig } from "@/lib/countryConfig";
@@ -35,18 +36,10 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}-${Date.now()}.${fileExt}`;
-      const filePath = `${userId}/${fileName}`;
+      const fileName = `logo-${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('company-logos')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('company-logos')
-        .getPublicUrl(filePath);
+      const { uploadToS3 } = await import('@/lib/s3Upload');
+      const { url: publicUrl } = await uploadToS3(file, 'logo', fileName);
 
       setLogoUrl(publicUrl);
       toast.success("Logo uploaded successfully!");
@@ -79,12 +72,7 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
         updateData.number_format = JSON.stringify(selectedCountry.numberFormat);
       }
 
-      const { error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', userId);
-
-      if (error) throw error;
+      await profileApi.update(updateData);
 
       // Create default templates and items for the selected country
       if (selectedCountry) {

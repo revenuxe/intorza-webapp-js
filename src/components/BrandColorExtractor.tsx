@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { profileApi } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface BrandColor {
@@ -53,14 +53,7 @@ export const BrandColorExtractor = ({
 
   const loadSavedColors = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase
-        .from('profiles')
-        .select('brand_colors, logo_url')
-        .eq('id', user.id)
-        .single();
+      const { data } = await profileApi.get();
 
       if (data?.brand_colors && typeof data.brand_colors === 'object') {
         const colors = data.brand_colors as unknown as BrandColors;
@@ -247,18 +240,9 @@ export const BrandColorExtractor = ({
   const handleSaveColors = async () => {
     setSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          brand_colors: JSON.parse(JSON.stringify(brandColors)),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
-
-      if (error) throw error;
+      await profileApi.update({
+        brand_colors: JSON.parse(JSON.stringify(brandColors)),
+      });
 
       toast({
         title: "Brand colors saved",

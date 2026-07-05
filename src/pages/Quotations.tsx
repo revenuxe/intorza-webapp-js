@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalization } from "@/hooks/useLocalization";
-import { supabase } from "@/integrations/supabase/client";
+import { quotationsApi } from "@/lib/api";
 import { ListSkeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -54,17 +54,9 @@ const Quotations = () => {
   const loadQuotations = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('quotations')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setQuotations(data || []);
+      // Backend scopes to the authenticated user and orders by created_at desc.
+      const { data } = await quotationsApi.list();
+      setQuotations((data as Quotation[]) || []);
     } catch (error) {
       console.error('Error loading quotations:', error);
       toast({
@@ -80,36 +72,10 @@ const Quotations = () => {
   const handleDeleteQuotation = async (quotationId: string) => {
     try {
       setDeletingId(quotationId);
-      
-      // First get all sections for this quotation
-      const { data: sections } = await supabase
-        .from('quotation_sections')
-        .select('id')
-        .eq('quotation_id', quotationId);
-      
-      if (sections && sections.length > 0) {
-        // Delete all items from all sections
-        const sectionIds = sections.map(s => s.id);
-        await supabase
-          .from('quotation_items')
-          .delete()
-          .in('section_id', sectionIds);
-        
-        // Delete all sections
-        await supabase
-          .from('quotation_sections')
-          .delete()
-          .eq('quotation_id', quotationId);
-      }
-      
-      // Finally delete the quotation
-      const { error } = await supabase
-        .from('quotations')
-        .delete()
-        .eq('id', quotationId);
-      
-      if (error) throw error;
-      
+
+      // Backend cascade-deletes sections + items with the quotation.
+      await quotationsApi.remove(quotationId);
+
       toast({
         title: "Quotation Deleted",
         description: "The quotation has been permanently deleted",
@@ -130,84 +96,49 @@ const Quotations = () => {
 
   const handleDuplicateQuotation = async (quotationId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Fetch the full original (quotation + nested sections + items).
+      const { data: original } = await quotationsApi.get(quotationId);
+      if (!original) throw new Error('Original quotation not found');
 
-      // Get original quotation
-      const { data: original, error: fetchError } = await supabase
-        .from('quotations')
-        .select('*')
-        .eq('id', quotationId)
-        .single();
-
-      if (fetchError || !original) throw fetchError;
-
-      // Create new quotation with copied data
       const newQuotationNumber = `QT-${Date.now()}`;
-      const { data: newQuotation, error: insertError } = await supabase
-        .from('quotations')
-        .insert({
-          user_id: user.id,
-          quotation_number: newQuotationNumber,
-          quotation_title: original.quotation_title ? `${original.quotation_title} (Copy)` : 'Copy',
-          client_name: original.client_name,
-          client_address: original.client_address,
-          project_name: original.project_name ? `${original.project_name} (Copy)` : 'Copy',
-          date_of_proposal: new Date().toISOString().split('T')[0],
-          valid_till: original.valid_till,
-          project_deadline: original.project_deadline,
-          place_of_project: original.place_of_project,
-          warranty: original.warranty,
-          project_type: original.project_type,
-          status: 'draft',
-          gst_enabled: original.gst_enabled,
-          gst_percentage: original.gst_percentage,
-          gst_amount: original.gst_amount,
-          discount_amount: original.discount_amount,
-          subtotal: original.subtotal,
-          grand_total: original.grand_total
-        })
-        .select()
-        .single();
-
-      if (insertError || !newQuotation) throw insertError;
-
-      // Copy sections and items
-      const { data: sections } = await supabase
-        .from('quotation_sections')
-        .select('*, quotation_items(*)')
-        .eq('quotation_id', quotationId)
-        .order('sort_order');
-
-      if (sections) {
-        for (const section of sections) {
-          const { data: newSection } = await supabase
-            .from('quotation_sections')
-            .insert({
-              quotation_id: newQuotation.id,
-              section_name: section.section_name,
-              sort_order: section.sort_order
-            })
-            .select()
-            .single();
-
-          if (newSection && section.quotation_items?.length > 0) {
-            const itemsToInsert = section.quotation_items.map((item: any) => ({
-              section_id: newSection.id,
-              product_name: item.product_name,
-              product_details: item.product_details,
-              side: item.side,
-              width_ft: item.width_ft,
-              height_ft: item.height_ft,
-              sft_area: item.sft_area,
-              rate_per_sft: item.rate_per_sft,
-              amount: item.amount,
-              sort_order: item.sort_order
-            }));
-            await supabase.from('quotation_items').insert(itemsToInsert);
-          }
-        }
-      }
+      // Build a create payload with the nested sections/items the backend expects.
+      await quotationsApi.create({
+        quotation_number: newQuotationNumber,
+        quotation_title: original.quotation_title ? `${original.quotation_title} (Copy)` : 'Copy',
+        client_name: original.client_name,
+        client_address: original.client_address,
+        project_name: original.project_name ? `${original.project_name} (Copy)` : 'Copy',
+        date_of_proposal: new Date().toISOString().split('T')[0],
+        valid_till: original.valid_till,
+        project_deadline: original.project_deadline,
+        place_of_project: original.place_of_project,
+        warranty: original.warranty,
+        project_type: original.project_type,
+        status: 'draft',
+        gst_enabled: original.gst_enabled,
+        gst_percentage: original.gst_percentage,
+        gst_amount: original.gst_amount,
+        discount_amount: original.discount_amount,
+        subtotal: original.subtotal,
+        grand_total: original.grand_total,
+        sections: (original.sections || []).map((section: any) => ({
+          section_name: section.section_name,
+          sort_order: section.sort_order,
+          items: (section.items || []).map((item: any) => ({
+            product_name: item.product_name,
+            product_details: item.product_details,
+            side: item.side,
+            depth: item.depth,
+            width_ft: item.width_ft,
+            height_ft: item.height_ft,
+            sft_area: item.sft_area,
+            rate_per_sft: item.rate_per_sft,
+            amount: item.amount,
+            notes: item.notes,
+            sort_order: item.sort_order,
+          })),
+        })),
+      });
 
       toast({
         title: "Quotation Duplicated",

@@ -6,7 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useLocalization } from "@/hooks/useLocalization";
-import { supabase } from "@/integrations/supabase/client";
+import { invoicesApi } from "@/lib/api";
+import { getDisplayStatus } from "@/lib/invoiceStatus";
 import { ListSkeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -20,6 +21,7 @@ interface Invoice {
   remaining_amount: number;
   status: string;
   invoice_date: string;
+  due_date: string | null;
   created_at: string;
 }
 
@@ -59,17 +61,8 @@ const Invoices = () => {
   const loadInvoices = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('invoices')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setInvoices(data || []);
+      const { data } = await invoicesApi.list();
+      setInvoices((data as Invoice[]) || []);
     } catch (error) {
       console.error('Error loading invoices:', error);
       toast({
@@ -85,21 +78,10 @@ const Invoices = () => {
   const handleDeleteInvoice = async (invoiceId: string) => {
     try {
       setDeletingId(invoiceId);
-      
-      // First delete all payments
-      await supabase
-        .from('payments')
-        .delete()
-        .eq('invoice_id', invoiceId);
-      
-      // Then delete the invoice
-      const { error } = await supabase
-        .from('invoices')
-        .delete()
-        .eq('id', invoiceId);
-      
-      if (error) throw error;
-      
+
+      // Backend cascade-deletes payments with the invoice.
+      await invoicesApi.remove(invoiceId);
+
       toast({
         title: "Invoice Deleted",
         description: "The invoice has been permanently deleted",
@@ -152,8 +134,8 @@ const Invoices = () => {
                         <h3 className="font-semibold text-foreground mt-1">{invoice.project_name}</h3>
                         <p className="text-sm text-muted-foreground">{invoice.client_name}</p>
                       </div>
-                      <Badge className={getStatusColor(invoice.status)}>
-                        {formatStatusDisplay(invoice.status)}
+                      <Badge className={getStatusColor(getDisplayStatus(invoice.status, invoice.due_date))}>
+                        {formatStatusDisplay(getDisplayStatus(invoice.status, invoice.due_date))}
                       </Badge>
                     </div>
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t border-border">

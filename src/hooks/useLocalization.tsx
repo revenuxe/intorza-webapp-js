@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { profileApi } from '@/lib/api';
 import { useAuth } from './useAuth';
 import { getCountryByCode, getDefaultCountry, CountryConfig } from '@/lib/countryConfig';
 
@@ -61,11 +61,7 @@ export const useLocalization = () => {
       }
 
       try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('country_code, currency_symbol, locale, measurement_system, tax_label')
-          .eq('id', user.id)
-          .single();
+        const { data: profile } = await profileApi.get();
 
         if (profile?.country_code) {
           const country = getCountryByCode(profile.country_code) || getDefaultCountry();

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon, Copy } from "lucide-react";
+import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon } from "lucide-react";
 import { getCountryByCode } from "@/lib/countryConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -300,7 +300,7 @@ const CreateQuotation = () => {
           .select('*')
           .eq('user_id', user.id)
           .eq('is_default', true)
-          .maybeSingle();
+          .single();
 
         setProfile({
           company_name: data.company_name || "",
@@ -456,35 +456,6 @@ const CreateQuotation = () => {
   };
   const removeSection = (sectionId: string) => {
     setSections(sections.filter(section => section.id !== sectionId));
-  };
-  const duplicateItem = (sectionId: string, itemId: string) => {
-    setSections(sections.map(section => {
-      if (section.id !== sectionId) return section;
-      const idx = section.items.findIndex(i => i.id === itemId);
-      if (idx === -1) return section;
-      const src = section.items[idx];
-      const copy = { ...src, id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}` };
-      const items = [...section.items];
-      items.splice(idx + 1, 0, copy);
-      return { ...section, items };
-    }));
-  };
-  const duplicateSection = (sectionId: string) => {
-    setSections(prev => {
-      const idx = prev.findIndex(s => s.id === sectionId);
-      if (idx === -1) return prev;
-      const src = prev[idx];
-      const stamp = Date.now();
-      const copy = {
-        ...src,
-        id: `${stamp}`,
-        title: src.title ? `${src.title} (Copy)` : "",
-        items: src.items.map((it, i) => ({ ...it, id: `${stamp}-${i}-${Math.random().toString(36).slice(2, 6)}` })),
-      };
-      const next = [...prev];
-      next.splice(idx + 1, 0, copy);
-      return next;
-    });
   };
   const updateSectionTitle = (sectionId: string, title: string) => {
     setSections(sections.map(section => section.id === sectionId ? {
@@ -835,7 +806,7 @@ const CreateQuotation = () => {
       .select('*')
       .eq('user_id', user.id)
       .eq('is_default', true)
-      .maybeSingle();
+      .single();
 
     return {
       company_name: profileData.company_name || "",
@@ -962,7 +933,10 @@ const CreateQuotation = () => {
       setIsDownloading(false);
     }
   };
-  const getQuotationPreviewData = () => ({
+  // Memoized so the object reference is stable across unrelated re-renders —
+  // it's passed straight into PDFPreviewEditor's live-preview effect, which
+  // treats a new reference as "data changed" and restarts PDF regeneration.
+  const quotationPreviewData = useMemo(() => ({
     quotationTitle: projectTitle,
     clientName,
     clientAddress,
@@ -978,7 +952,7 @@ const CreateQuotation = () => {
     grandTotal,
     companyName: profile.company_name,
     companyLogo: profile.logo_url
-  });
+  }), [projectTitle, clientName, clientAddress, dateOfProposal, sections, itemImages, subtotal, grandTotal, profile.company_name, profile.logo_url]);
   return <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8 relative">
       {/* Download Loader Overlay */}
       {isDownloading && (
@@ -1070,22 +1044,17 @@ const CreateQuotation = () => {
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
                 <Input value={section.title} onChange={e => updateSectionTitle(section.id, e.target.value)} className="text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0" placeholder="Section Title" />
-                <div className="flex gap-1 shrink-0">
-                  <Button variant="ghost" size="sm" onClick={() => duplicateSection(section.id)} title="Duplicate section" className="h-8 w-8 p-0 text-muted-foreground hover:text-primary">
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  {sections.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeSection(section.id)} title="Delete section" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>}
-                </div>
+                {sections.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeSection(section.id)} className="text-destructive hover:text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Table Header - Hidden on mobile, shown on tablet+ */}
               <div className="hidden md:block overflow-x-auto">
-                <div className="min-w-[880px]">
+                <div className="min-w-[800px]">
                   <div className="grid gap-2 text-sm font-medium text-muted-foreground border-b pb-2" style={{
-                gridTemplateColumns: `${customizeSettings.showSideColumn ? '56px ' : ''}minmax(200px,1.4fr) ${customizeSettings.showProductDetails ? 'minmax(220px,1.6fr) ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}110px 120px`
+                gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
               }}>
                     {customizeSettings.showSideColumn && <div>Side</div>}
                     <div>Product Name</div>
@@ -1105,19 +1074,16 @@ const CreateQuotation = () => {
               {section.items.map((item, itemIndex) => <div key={item.id} className="p-4 border border-border rounded-lg space-y-4 bg-muted/30">
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-medium text-muted-foreground">Item {itemIndex + 1}</span>
-                    <div className="flex gap-0.5">
+                    <div className="flex gap-1">
                       <Button variant="ghost" size="sm" onClick={() => {
                         setImagePickerItemId(item.id);
                         setImagePickerProductName(item.productName);
                         setImagePickerOpen(true);
-                      }} title="Attach image" className="h-8 text-muted-foreground hover:text-primary">
+                      }} className="h-8 text-muted-foreground hover:text-primary">
                         <ImageIcon className="h-4 w-4" />
                         {itemImages[item.id]?.length ? <span className="text-xs ml-1">{itemImages[item.id].length}</span> : null}
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => duplicateItem(section.id, item.id)} title="Duplicate item" className="h-8 w-8 p-0 text-muted-foreground hover:text-primary">
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      {section.items.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(section.id, item.id)} title="Delete item" className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10">
+                      {section.items.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(section.id, item.id)} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
                           <Trash2 className="h-4 w-4" />
                         </Button>}
                     </div>
@@ -1137,9 +1103,9 @@ const CreateQuotation = () => {
 
                   {/* Desktop Table Row */}
                   <div className="hidden md:block overflow-x-auto">
-                    <div className="min-w-[880px]">
-                      <div className="grid gap-2 items-start" style={{
-                  gridTemplateColumns: `${customizeSettings.showSideColumn ? '56px ' : ''}minmax(200px,1.4fr) ${customizeSettings.showProductDetails ? 'minmax(220px,1.6fr) ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}110px 120px`
+                    <div className="min-w-[800px]">
+                      <div className="grid gap-2" style={{
+                  gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
                 }}>
                         {customizeSettings.showSideColumn && <Input value={item.side} onChange={e => updateItem(section.id, item.id, "side", e.target.value)} placeholder="A" className="h-9" />}
                         <ProductNameInput
@@ -1383,7 +1349,7 @@ const CreateQuotation = () => {
         </Card>
 
         {/* PDF Preview Editor */}
-        <PDFPreviewEditor open={showPreview} onClose={() => setShowPreview(false)} onDownload={settings => handleDownloadPDF(settings)} quotationData={getQuotationPreviewData()} customizeSettings={customizeSettings} />
+        <PDFPreviewEditor open={showPreview} onClose={() => setShowPreview(false)} onDownload={settings => handleDownloadPDF(settings)} quotationData={quotationPreviewData} customizeSettings={customizeSettings} />
         
         {/* Gallery Image Picker */}
         <GalleryImagePicker

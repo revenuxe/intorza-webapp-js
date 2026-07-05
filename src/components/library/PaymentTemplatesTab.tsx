@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { libraryApi } from "@/lib/api";
 
 interface PaymentStage {
   id: string;
@@ -49,18 +49,8 @@ export const PaymentTemplatesTab = () => {
 
   const loadTemplates = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('payment_templates')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTemplates((data || []).map(t => ({
+      const { data } = await libraryApi.paymentTemplates.list();
+      setTemplates(((data as any[]) || []).map(t => ({
         ...t,
         stages: Array.isArray(t.stages) ? t.stages as unknown as PaymentStage[] : []
       })));
@@ -79,31 +69,19 @@ export const PaymentTemplatesTab = () => {
 
     try {
       setSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
 
       if (editingTemplate) {
-        const { error } = await supabase
-          .from('payment_templates')
-          .update({
-            template_name: formData.template_name,
-            stages: formData.stages as unknown as any,
-          })
-          .eq('id', editingTemplate.id);
-
-        if (error) throw error;
+        await libraryApi.paymentTemplates.update(editingTemplate.id, {
+          template_name: formData.template_name,
+          stages: formData.stages as unknown as any,
+        });
         toast({ title: "Template updated" });
       } else {
-        const { error } = await supabase
-          .from('payment_templates')
-          .insert([{
-            user_id: user.id,
-            template_name: formData.template_name,
-            stages: formData.stages as unknown as any,
-            is_default: templates.length === 0,
-          }]);
-
-        if (error) throw error;
+        await libraryApi.paymentTemplates.create({
+          template_name: formData.template_name,
+          stages: formData.stages as unknown as any,
+          is_default: templates.length === 0,
+        });
         toast({ title: "Template created" });
       }
 
@@ -121,12 +99,7 @@ export const PaymentTemplatesTab = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('payment_templates')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await libraryApi.paymentTemplates.remove(id);
       toast({ title: "Template deleted" });
       loadTemplates();
     } catch (error) {
@@ -137,22 +110,13 @@ export const PaymentTemplatesTab = () => {
 
   const handleSetDefault = async (id: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // First, remove default from all templates
-      await supabase
-        .from('payment_templates')
-        .update({ is_default: false })
-        .eq('user_id', user.id);
-
-      // Set new default
-      const { error } = await supabase
-        .from('payment_templates')
-        .update({ is_default: true })
-        .eq('id', id);
-
-      if (error) throw error;
+      // Clear existing default(s), then set this one (no bulk endpoint).
+      await Promise.all(
+        templates
+          .filter(t => t.is_default && t.id !== id)
+          .map(t => libraryApi.paymentTemplates.update(t.id, { is_default: false })),
+      );
+      await libraryApi.paymentTemplates.update(id, { is_default: true });
       toast({ title: "Default template updated" });
       loadTemplates();
     } catch (error) {

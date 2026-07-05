@@ -36,7 +36,7 @@ import { FontPreviewPanel } from "./FontPreviewPanel";
 import { PDFAdvancedEditor } from "./PDFAdvancedEditor";
 import { PDFCanvasPreview, type PDFPreviewMetrics } from "./PDFCanvasPreview";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
-import { supabase } from "@/integrations/supabase/client";
+import { profileApi } from "@/lib/api";
 
 interface BrandColors {
   primary?: string;
@@ -123,14 +123,7 @@ export const PDFPreviewEditor = ({
   useEffect(() => {
     const loadBrandColors = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data } = await supabase
-          .from('profiles')
-          .select('brand_colors')
-          .eq('id', user.id)
-          .maybeSingle();
+        const { data } = await profileApi.get();
 
         if (data?.brand_colors && typeof data.brand_colors === 'object') {
           const colors = data.brand_colors as unknown as BrandColors;

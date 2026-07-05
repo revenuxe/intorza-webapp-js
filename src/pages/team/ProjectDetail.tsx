@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { tasksApi, quotationsApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -93,22 +94,15 @@ const ProjectDetail = () => {
 
   useEffect(() => {
     checkAuthAndFetch();
-    
-    // Set up real-time subscription for tasks
-    const tasksChannel = supabase
-      .channel('project-tasks')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'tasks',
-      }, () => {
-        if (projectId) fetchTasks();
-      })
-      .subscribe();
 
-    return () => {
-      supabase.removeChannel(tasksChannel);
-    };
+    // Tasks now live in RDS (via tasksApi), not Supabase, so a
+    // supabase.channel() postgres_changes subscription on 'tasks' would never
+    // fire again — poll instead until a real AWS realtime layer exists.
+    const interval = setInterval(() => {
+      if (projectId) fetchTasks();
+    }, 20000);
+
+    return () => clearInterval(interval);
   }, [projectId]);
 
   const checkAuthAndFetch = async () => {
@@ -126,17 +120,16 @@ const ProjectDetail = () => {
     if (!projectId) return;
 
     // Fetch quotation
-    const { data: quotationData } = await supabase
-      .from('quotations')
-      .select('*')
-      .eq('id', projectId)
-      .single();
-
+    const { data: quotationData } = await quotationsApi.get(projectId);
     if (quotationData) {
       setQuotation(quotationData);
     }
 
-    // Fetch assigned members
+    // team_members/assignments/attendance stay on Supabase for now: the
+    // create-team-member-auth Edge Function still writes new members only
+    // into Supabase's team_members table, so RDS's copy is missing every
+    // member added since the last data migration. Porting these reads would
+    // silently show incomplete teams until that Edge Function is migrated too.
     const { data: assignments } = await supabase
       .from('team_project_assignments')
       .select(`
@@ -163,26 +156,24 @@ const ProjectDetail = () => {
   const fetchTasks = async () => {
     if (!projectId) return;
 
-    const { data } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('quotation_id', projectId)
-      .order('created_at', { ascending: false });
-
-    setTasks(data || []);
+    const { data } = await tasksApi.list();
+    const projectTasks = ((data || []) as (Task & { quotation_id: string | null })[])
+      .filter((t) => t.quotation_id === projectId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setTasks(projectTasks);
   };
 
   const fetchAttendance = async () => {
     if (!projectId || members.length === 0) return;
 
-    const memberIds = members.map(m => m.id);
+    const memberIds = new Set(members.map(m => m.id));
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const { data } = await supabase
       .from('attendance')
       .select('*')
-      .in('team_member_id', memberIds)
+      .in('team_member_id', Array.from(memberIds))
       .gte('clock_in', sevenDaysAgo.toISOString())
       .order('clock_in', { ascending: false });
 
@@ -203,33 +194,23 @@ const ProjectDetail = () => {
 
     try {
       if (editingTask) {
-        const { error } = await supabase
-          .from('tasks')
-          .update({
-            title: taskForm.title,
-            description: taskForm.description || null,
-            priority: taskForm.priority,
-            due_date: taskForm.due_date || null,
-            assigned_to: taskForm.assigned_to || null,
-          })
-          .eq('id', editingTask.id);
-
-        if (error) throw error;
+        await tasksApi.update(editingTask.id, {
+          title: taskForm.title,
+          description: taskForm.description || null,
+          priority: taskForm.priority,
+          due_date: taskForm.due_date || null,
+          assigned_to: taskForm.assigned_to || null,
+        });
         toast.success("Task updated");
       } else {
-        const { error } = await supabase
-          .from('tasks')
-          .insert({
-            title: taskForm.title,
-            description: taskForm.description || null,
-            priority: taskForm.priority,
-            due_date: taskForm.due_date || null,
-            assigned_to: taskForm.assigned_to || null,
-            company_id: user.id,
-            quotation_id: projectId,
-          });
-
-        if (error) throw error;
+        await tasksApi.create({
+          title: taskForm.title,
+          description: taskForm.description || null,
+          priority: taskForm.priority,
+          due_date: taskForm.due_date || null,
+          assigned_to: taskForm.assigned_to || null,
+          quotation_id: projectId,
+        });
         toast.success("Task created");
       }
 
@@ -243,32 +224,24 @@ const ProjectDetail = () => {
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-    if (error) {
-      toast.error("Error deleting task");
-    } else {
+    try {
+      await tasksApi.remove(taskId);
       toast.success("Task deleted");
       fetchTasks();
+    } catch {
+      toast.error("Error deleting task");
     }
   };
 
   const handleUpdateTaskStatus = async (taskId: string, status: string) => {
     const updates: any = { status };
-    if (status === 'completed') {
-      updates.completed_at = new Date().toISOString();
-    } else {
-      updates.completed_at = null;
-    }
+    updates.completed_at = status === 'completed' ? new Date().toISOString() : null;
 
-    const { error } = await supabase
-      .from('tasks')
-      .update(updates)
-      .eq('id', taskId);
-
-    if (error) {
-      toast.error("Error updating task");
-    } else {
+    try {
+      await tasksApi.update(taskId, updates);
       fetchTasks();
+    } catch {
+      toast.error("Error updating task");
     }
   };
 
