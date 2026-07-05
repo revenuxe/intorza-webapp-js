@@ -34,7 +34,7 @@ import { QuotationSettings } from "./CustomizeFieldsDrawer";
 import { CustomThemeBuilder } from "./CustomThemeBuilder";
 import { FontPreviewPanel } from "./FontPreviewPanel";
 import { PDFAdvancedEditor } from "./PDFAdvancedEditor";
-import { PDFCanvasPreview } from "./PDFCanvasPreview";
+import { PDFCanvasPreview, type PDFPreviewMetrics } from "./PDFCanvasPreview";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -106,6 +106,8 @@ export const PDFPreviewEditor = ({
   const [fitWidth, setFitWidth] = useState(true);
   const [totalPages, setTotalPages] = useState(0);
   const [activePage, setActivePage] = useState(0);
+  const [showPerfHud, setShowPerfHud] = useState(false);
+  const [perfMetrics, setPerfMetrics] = useState<PDFPreviewMetrics | null>(null);
   const canvasRef = useRef<import('./PDFCanvasPreview').PDFCanvasPreviewHandle | null>(null);
   const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
   const [showItemImages, setShowItemImages] = useState(customizeSettings.showItemImages);
@@ -1068,7 +1070,7 @@ export const PDFPreviewEditor = ({
     };
 
     return (
-      <div className="flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
+      <div className="relative flex-1 min-h-0 bg-muted/30 overflow-hidden flex flex-col">
         {/* Toolbar */}
         <div className="sticky top-0 z-20 flex items-center justify-between px-2 sm:px-3 py-2 border-b bg-background/95 backdrop-blur gap-2">
           {/* Page navigation */}
@@ -1133,6 +1135,17 @@ export const PDFPreviewEditor = ({
             >
               <ZoomIn className="h-3.5 w-3.5" />
             </Button>
+            <Button
+              variant={showPerfHud ? 'default' : 'outline'}
+              size="icon"
+              className="h-9 w-9 sm:h-8 sm:w-8 rounded-full"
+              onClick={() => setShowPerfHud(v => !v)}
+              aria-pressed={showPerfHud}
+              aria-label="Toggle performance metrics"
+              title="Performance metrics"
+            >
+              <Sliders className="h-3.5 w-3.5" />
+            </Button>
           </div>
         </div>
 
@@ -1161,9 +1174,21 @@ export const PDFPreviewEditor = ({
               isGenerating={isGeneratingPdf}
               onPagesChange={setTotalPages}
               onActivePageChange={setActivePage}
+              onMetrics={showPerfHud ? setPerfMetrics : undefined}
             />
           )}
         </div>
+
+        {showPerfHud && perfMetrics && (
+          <div className="pointer-events-none absolute bottom-3 right-3 z-30 rounded-lg bg-background/95 backdrop-blur border shadow-lg px-2.5 py-1.5 text-[10px] font-mono leading-tight tabular-nums text-muted-foreground">
+            <div className="flex items-center gap-1 text-foreground font-semibold">
+              <CircleDot className={`h-2.5 w-2.5 ${perfMetrics.fps >= 50 ? 'text-green-500' : perfMetrics.fps >= 30 ? 'text-amber-500' : 'text-red-500'}`} />
+              {perfMetrics.fps} fps · {perfMetrics.frameDrops} drops
+            </div>
+            <div>render: {perfMetrics.lastRenderMs}ms (avg {perfMetrics.avgRenderMs}ms)</div>
+            <div>pages mounted: {perfMetrics.mountedPages}/{perfMetrics.totalPages}</div>
+          </div>
+        )}
       </div>
     );
   };

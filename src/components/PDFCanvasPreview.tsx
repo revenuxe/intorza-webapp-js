@@ -9,6 +9,15 @@ export interface PDFCanvasPreviewHandle {
   scrollToPage: (pageIndex: number) => void;
 }
 
+export interface PDFPreviewMetrics {
+  lastRenderMs: number;
+  avgRenderMs: number;
+  mountedPages: number;
+  totalPages: number;
+  frameDrops: number;
+  fps: number;
+}
+
 interface PDFCanvasPreviewProps {
   pdfBlobUrl: string | null;
   zoom: number;
@@ -16,6 +25,7 @@ interface PDFCanvasPreviewProps {
   fitWidth?: boolean;
   onPagesChange?: (count: number) => void;
   onActivePageChange?: (pageIndex: number) => void;
+  onMetrics?: (metrics: PDFPreviewMetrics) => void;
 }
 
 interface RenderedPage {
@@ -31,7 +41,9 @@ interface ScrollAnchor {
 }
 
 const PAGE_WIDTH_PT = 595;
-const PAGE_OVERSCAN = 1;
+// Overscan of 2 = pre-render next & previous 2 pages, so scrolling on
+// slower mobile devices feels instant with no blank flashes.
+const PAGE_OVERSCAN = 2;
 
 // Find the nearest scrollable ancestor of an element. The editor uses an element
 // scroll container, but this fallback keeps the preview safe in standalone use.
@@ -57,7 +69,7 @@ const revokeSoon = (url?: string) => {
 
 export const PDFCanvasPreview = memo(
   forwardRef<PDFCanvasPreviewHandle, PDFCanvasPreviewProps>(
-    ({ pdfBlobUrl, zoom, isGenerating, fitWidth, onPagesChange, onActivePageChange }, ref) => {
+    ({ pdfBlobUrl, zoom, isGenerating, fitWidth, onPagesChange, onActivePageChange, onMetrics }, ref) => {
       const containerRef = useRef<HTMLDivElement>(null);
       const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
       const scrollRootRef = useRef<HTMLElement | null>(null);
@@ -72,6 +84,13 @@ export const PDFCanvasPreview = memo(
       const [virtualRange, setVirtualRange] = useState({ start: 0, end: 1 });
       const [loading, setLoading] = useState(false);
       const renderTaskRef = useRef<number>(0);
+      // Perf metrics
+      const renderTimesRef = useRef<number[]>([]);
+      const frameDropsRef = useRef(0);
+      const fpsRef = useRef(60);
+      const metricsRafRef = useRef<number>(0);
+      const onMetricsRef = useRef(onMetrics);
+      useEffect(() => { onMetricsRef.current = onMetrics; }, [onMetrics]);
 
       useEffect(() => {
         pagesRef.current = pages;
@@ -186,6 +205,7 @@ export const PDFCanvasPreview = memo(
         if (renderingPagesRef.current.has(index)) return;
 
         renderingPagesRef.current.add(index);
+        const startedAt = performance.now();
         try {
           const page = await pdf.getPage(index + 1);
           if (version !== renderTaskRef.current || pdfDocRef.current !== pdf) return;
@@ -217,6 +237,12 @@ export const PDFCanvasPreview = memo(
             next[index] = { ...previous, src: url, version };
             return next;
           });
+
+          // Record render time for the metrics HUD (keep last 20 samples).
+          const elapsed = performance.now() - startedAt;
+          const samples = renderTimesRef.current;
+          samples.push(elapsed);
+          if (samples.length > 20) samples.shift();
         } catch (error) {
           console.error(`PDF page ${index + 1} render error:`, error);
         } finally {
@@ -372,6 +398,40 @@ export const PDFCanvasPreview = memo(
         enqueuePages(visible);
       }, [enqueuePages, pages.length, virtualRange]);
 
+      // FPS + dropped-frame monitor. Uses rAF timing; anything >24ms between
+      // frames counts as a drop, which is a decent smoothness proxy in the
+      // browser main thread.
+      useEffect(() => {
+        if (!onMetricsRef.current) return;
+        let lastTs = performance.now();
+        let emitAcc = 0;
+        const tick = (now: number) => {
+          const delta = now - lastTs;
+          lastTs = now;
+          if (delta > 24) frameDropsRef.current += 1;
+          fpsRef.current = delta > 0 ? Math.min(120, Math.round(1000 / delta)) : fpsRef.current;
+          emitAcc += delta;
+          if (emitAcc >= 500) {
+            emitAcc = 0;
+            const samples = renderTimesRef.current;
+            const last = samples[samples.length - 1] ?? 0;
+            const avg = samples.length ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
+            const mounted = Math.max(0, virtualRange.end - virtualRange.start + 1);
+            onMetricsRef.current?.({
+              lastRenderMs: Math.round(last),
+              avgRenderMs: Math.round(avg),
+              mountedPages: mounted,
+              totalPages: pagesRef.current.length,
+              frameDrops: frameDropsRef.current,
+              fps: fpsRef.current,
+            });
+          }
+          metricsRafRef.current = requestAnimationFrame(tick);
+        };
+        metricsRafRef.current = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(metricsRafRef.current);
+      }, [virtualRange.end, virtualRange.start]);
+
       useEffect(() => {
         return () => {
           renderTaskRef.current += 1;
@@ -416,6 +476,7 @@ export const PDFCanvasPreview = memo(
               key={i}
               ref={el => (pageRefs.current[i] = el)}
               data-page-idx={i}
+              data-testid={`pdf-page-${i}`}
               className="relative rounded-lg shadow-lg border bg-white scroll-mt-4 overflow-hidden select-none"
               style={{ ...pageWidthStyle, aspectRatio, contain: 'layout paint size' }}
             >
@@ -429,8 +490,18 @@ export const PDFCanvasPreview = memo(
                   className="absolute inset-0 h-full w-full object-fill"
                 />
               ) : isMounted ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-background/40">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                // Mobile-friendly skeleton shown while a nearby page renders.
+                // Shimmer conveys progress; page-header/footer bars keep the
+                // silhouette recognisable so scrolling feels stable.
+                <div
+                  role="status"
+                  aria-label={`Loading page ${i + 1}`}
+                  className="absolute inset-0 overflow-hidden bg-muted/40"
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(110deg,transparent_25%,hsl(var(--muted-foreground)/0.12)_50%,transparent_75%)] bg-[length:200%_100%] animate-[shimmer_1.4s_infinite]" />
+                  <div className="absolute top-6 left-6 right-6 h-3 rounded bg-muted-foreground/15" />
+                  <div className="absolute top-12 left-6 w-2/3 h-3 rounded bg-muted-foreground/10" />
+                  <div className="absolute bottom-6 left-6 right-6 h-3 rounded bg-muted-foreground/10" />
                 </div>
               ) : null}
             </div>
