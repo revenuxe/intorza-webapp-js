@@ -23,16 +23,13 @@ vi.mock("pdfjs-dist", () => ({
 
 // URL.createObjectURL isn't in jsdom.
 if (!("createObjectURL" in URL)) {
-  // @ts-expect-error jsdom shim
-  URL.createObjectURL = () => "blob:mock";
-  // @ts-expect-error jsdom shim
-  URL.revokeObjectURL = () => {};
+  (URL as any).createObjectURL = () => "blob:mock";
+  (URL as any).revokeObjectURL = () => {};
 }
 
 // fetch shim
 if (typeof globalThis.fetch !== "function") {
-  // @ts-expect-error jsdom shim
-  globalThis.fetch = () =>
+  (globalThis as any).fetch = () =>
     Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) });
 }
 
