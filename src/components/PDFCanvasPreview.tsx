@@ -9,6 +9,15 @@ export interface PDFCanvasPreviewHandle {
   scrollToPage: (pageIndex: number) => void;
 }
 
+export interface PDFPreviewMetrics {
+  lastRenderMs: number;
+  avgRenderMs: number;
+  mountedPages: number;
+  totalPages: number;
+  frameDrops: number;
+  fps: number;
+}
+
 interface PDFCanvasPreviewProps {
   pdfBlobUrl: string | null;
   zoom: number;
@@ -16,6 +25,7 @@ interface PDFCanvasPreviewProps {
   fitWidth?: boolean;
   onPagesChange?: (count: number) => void;
   onActivePageChange?: (pageIndex: number) => void;
+  onMetrics?: (metrics: PDFPreviewMetrics) => void;
 }
 
 interface RenderedPage {
@@ -31,7 +41,9 @@ interface ScrollAnchor {
 }
 
 const PAGE_WIDTH_PT = 595;
-const PAGE_OVERSCAN = 1;
+// Overscan of 2 = pre-render next & previous 2 pages, so scrolling on
+// slower mobile devices feels instant with no blank flashes.
+const PAGE_OVERSCAN = 2;
 
 // Find the nearest scrollable ancestor of an element. The editor uses an element
 // scroll container, but this fallback keeps the preview safe in standalone use.
@@ -57,7 +69,7 @@ const revokeSoon = (url?: string) => {
 
 export const PDFCanvasPreview = memo(
   forwardRef<PDFCanvasPreviewHandle, PDFCanvasPreviewProps>(
-    ({ pdfBlobUrl, zoom, isGenerating, fitWidth, onPagesChange, onActivePageChange }, ref) => {
+    ({ pdfBlobUrl, zoom, isGenerating, fitWidth, onPagesChange, onActivePageChange, onMetrics }, ref) => {
       const containerRef = useRef<HTMLDivElement>(null);
       const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
       const scrollRootRef = useRef<HTMLElement | null>(null);
@@ -72,6 +84,13 @@ export const PDFCanvasPreview = memo(
       const [virtualRange, setVirtualRange] = useState({ start: 0, end: 1 });
       const [loading, setLoading] = useState(false);
       const renderTaskRef = useRef<number>(0);
+      // Perf metrics
+      const renderTimesRef = useRef<number[]>([]);
+      const frameDropsRef = useRef(0);
+      const fpsRef = useRef(60);
+      const metricsRafRef = useRef<number>(0);
+      const onMetricsRef = useRef(onMetrics);
+      useEffect(() => { onMetricsRef.current = onMetrics; }, [onMetrics]);
 
       useEffect(() => {
         pagesRef.current = pages;
