@@ -205,6 +205,7 @@ export const PDFCanvasPreview = memo(
         if (renderingPagesRef.current.has(index)) return;
 
         renderingPagesRef.current.add(index);
+        const startedAt = performance.now();
         try {
           const page = await pdf.getPage(index + 1);
           if (version !== renderTaskRef.current || pdfDocRef.current !== pdf) return;
@@ -236,6 +237,12 @@ export const PDFCanvasPreview = memo(
             next[index] = { ...previous, src: url, version };
             return next;
           });
+
+          // Record render time for the metrics HUD (keep last 20 samples).
+          const elapsed = performance.now() - startedAt;
+          const samples = renderTimesRef.current;
+          samples.push(elapsed);
+          if (samples.length > 20) samples.shift();
         } catch (error) {
           console.error(`PDF page ${index + 1} render error:`, error);
         } finally {
