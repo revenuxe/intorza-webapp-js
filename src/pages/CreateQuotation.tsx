@@ -530,137 +530,65 @@ const CreateQuotation = () => {
       if (!user) throw new Error('No user found');
       
       let savedQuotationId: string | null = null;
-      
+
+      // Build a payload that matches the AWS backend QuotationSchema.
+      const payloadSections = sections.map((section, sIdx) => ({
+        section_name: section.title || `Section ${sIdx + 1}`,
+        sort_order: sIdx,
+        items: section.items.map((item, iIdx) => ({
+          product_name: item.productName || "",
+          product_details: item.productDetails ?? null,
+          side: item.side ?? null,
+          width_ft: Number(item.widthFt) || 0,
+          height_ft: Number(item.heightFt) || 0,
+          sft_area: Number(item.sftArea) || 0,
+          rate_per_sft: Number(item.ratePerSft) || 0,
+          amount: Number(item.amount) || 0,
+          sort_order: iIdx,
+        })),
+      }));
+
+      const basePayload = {
+        quotation_title: projectTitle,
+        client_name: clientName,
+        client_address: clientAddress,
+        project_name: projectTitle,
+        date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
+        valid_till: quotationValidTill || null,
+        project_deadline: projectDeadline || null,
+        place_of_project: placeOfProject,
+        warranty: warranty,
+        project_type: projectType,
+        status,
+        gst_enabled: gstEnabled,
+        gst_percentage: parseFloat(gstRate) || 0,
+        gst_amount: Number(gstAmount) || 0,
+        discount_amount: Number(discountAmount) || 0,
+        subtotal: Number(subtotal) || 0,
+        grand_total: Number(grandTotal) || 0,
+        sections: payloadSections,
+      };
+
       if (quotationId) {
-        // Update existing quotation
-        const {
-          error: quotationError
-        } = await supabase.from('quotations').update({
-          quotation_title: projectTitle,
-          client_name: clientName,
-          client_address: clientAddress,
-          project_name: projectTitle,
-          date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
-          valid_till: quotationValidTill,
-          project_deadline: projectDeadline || null,
-          place_of_project: placeOfProject,
-          warranty: warranty,
-          project_type: projectType,
-          status: status,
-          gst_enabled: gstEnabled,
-          gst_percentage: parseFloat(gstRate),
-          gst_amount: gstAmount,
-          discount_amount: discountAmount,
-          subtotal: subtotal,
-          grand_total: grandTotal
-        }).eq('id', quotationId);
-        if (quotationError) throw quotationError;
-
-        // Delete existing sections and items
-        const {
-          error: deleteSectionsError
-        } = await supabase.from('quotation_sections').delete().eq('quotation_id', quotationId);
-        if (deleteSectionsError) throw deleteSectionsError;
-
-        // Insert updated sections and items
-        for (const section of sections) {
-          const {
-            data: sectionData,
-            error: sectionError
-          } = await supabase.from('quotation_sections').insert({
-            quotation_id: quotationId,
-            section_name: section.title,
-            sort_order: sections.indexOf(section)
-          }).select().single();
-          if (sectionError) throw sectionError;
-          const itemsToInsert = section.items.map((item, index) => ({
-            section_id: sectionData.id,
-            side: item.side,
-            product_name: item.productName,
-            product_details: item.productDetails,
-            width_ft: item.widthFt,
-            height_ft: item.heightFt,
-            sft_area: item.sftArea,
-            rate_per_sft: item.ratePerSft,
-            amount: item.amount,
-            sort_order: index
-          }));
-          const {
-            error: itemsError
-          } = await supabase.from('quotation_items').insert(itemsToInsert);
-          if (itemsError) throw itemsError;
-        }
+        const { data: updated } = await quotationsApi.update(quotationId, basePayload);
+        savedQuotationId = updated?.id || quotationId;
         toast({
           title: "Quotation updated",
-          description: "Quotation has been updated successfully"
+          description: "Quotation has been updated successfully",
         });
-        
-        // Return existing quotation ID for PDF generation
-        savedQuotationId = quotationId;
       } else {
-        // Create new quotation
         const quotationNumber = `QT-${Date.now()}`;
-        const {
-          data: quotationData,
-          error: quotationError
-        } = await supabase.from('quotations').insert({
-          user_id: user.id,
+        const { data: created } = await quotationsApi.create({
+          ...basePayload,
           quotation_number: quotationNumber,
-          quotation_title: projectTitle,
-          client_name: clientName,
-          client_address: clientAddress,
-          project_name: projectTitle,
-          date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
-          valid_till: quotationValidTill,
-          project_deadline: projectDeadline || null,
-          place_of_project: placeOfProject,
-          warranty: warranty,
-          project_type: projectType,
-          status: status,
-          gst_enabled: gstEnabled,
-          gst_percentage: parseFloat(gstRate),
-          gst_amount: gstAmount,
-          discount_amount: discountAmount,
-          subtotal: subtotal,
-          grand_total: grandTotal
-        }).select().single();
-        if (quotationError) throw quotationError;
-        
-        // Store the new quotation ID
-        savedQuotationId = quotationData.id;
-        
-        for (const section of sections) {
-          const {
-            data: sectionData,
-            error: sectionError
-          } = await supabase.from('quotation_sections').insert({
-            quotation_id: quotationData.id,
-            section_name: section.title,
-            sort_order: sections.indexOf(section)
-          }).select().single();
-          if (sectionError) throw sectionError;
-          const itemsToInsert = section.items.map((item, index) => ({
-            section_id: sectionData.id,
-            side: item.side,
-            product_name: item.productName,
-            product_details: item.productDetails,
-            width_ft: item.widthFt,
-            height_ft: item.heightFt,
-            sft_area: item.sftArea,
-            rate_per_sft: item.ratePerSft,
-            amount: item.amount,
-            sort_order: index
-          }));
-          const {
-            error: itemsError
-          } = await supabase.from('quotation_items').insert(itemsToInsert);
-          if (itemsError) throw itemsError;
-        }
+        });
+        savedQuotationId = created?.id ?? null;
         toast({
           title: "Quotation saved",
-          description: `Quotation ${quotationNumber} has been saved successfully`
+          description: `Quotation ${quotationNumber} has been saved successfully`,
         });
       }
+
 
       // Silently save last used preferences and track item usage
       saveLastUsedPreferences({
