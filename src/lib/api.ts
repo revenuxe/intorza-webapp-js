@@ -6,7 +6,9 @@
  * directly to Supabase, using the same `{ data }` envelope surface that the
  * rest of the app already imports, so no call-site changes are required.
  */
-import { supabase } from '@/integrations/supabase/client';
+import { supabase as supabaseTyped } from '@/integrations/supabase/client';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const supabase: any = supabaseTyped;
 
 export class ApiError extends Error {
   status: number;
