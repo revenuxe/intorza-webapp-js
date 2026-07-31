@@ -36,6 +36,7 @@ const PREFIXES: Record<string, string> = {
   gallery: "gallery",
   room: "room-photos",
   qr: "payment-qr",
+  hero: "hero-banners",
   generic: "uploads",
 };
 

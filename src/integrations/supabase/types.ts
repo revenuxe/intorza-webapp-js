@@ -536,6 +536,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           gstin: string | null
+          hero_image_url: string | null
           id: string
           invoice_terms_conditions: Json | null
           is_pro: boolean | null
@@ -584,6 +585,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           gstin?: string | null
+          hero_image_url?: string | null
           id: string
           invoice_terms_conditions?: Json | null
           is_pro?: boolean | null
@@ -632,6 +634,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           gstin?: string | null
+          hero_image_url?: string | null
           id?: string
           invoice_terms_conditions?: Json | null
           is_pro?: boolean | null

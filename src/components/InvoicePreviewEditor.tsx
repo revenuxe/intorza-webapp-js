@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize, Copy } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize, Copy, Image as ImageIcon, X, Upload } from "lucide-react";
 import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
+import { uploadToS3 } from "@/lib/s3Upload";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -31,6 +32,7 @@ import {
   saveInvoiceSettings,
   defaultInvoiceSettings,
   applyBrandColorsToTheme,
+  InvoiceLayoutStyle,
 } from "@/lib/pdfThemes";
 import { CustomThemeBuilder } from "./CustomThemeBuilder";
 import { FontPreviewPanel } from "./FontPreviewPanel";
@@ -87,6 +89,12 @@ const FONT_CATEGORY_CONFIG: { value: FontCategory; label: string }[] = [
 // Key for storing "use quotation design" preference
 const USE_QUOTATION_DESIGN_KEY = 'invoice-use-quotation-design';
 
+const INVOICE_LAYOUT_STYLES: { id: InvoiceLayoutStyle; name: string; description: string }[] = [
+  { id: 'classic', name: 'Classic', description: 'Logo + two info cards' },
+  { id: 'minimal-modern', name: 'Minimal Modern', description: 'Centered title, plain text' },
+  { id: 'hero-banner', name: 'Hero Banner', description: 'Dark banner + photo' },
+];
+
 export const InvoicePreviewEditor = ({
   open,
   onClose,
@@ -109,6 +117,7 @@ export const InvoicePreviewEditor = ({
     try { return localStorage.getItem(USE_QUOTATION_DESIGN_KEY) === 'true'; } catch { return false; }
   });
   const [profile, setProfile] = useState<any>(null);
+  const [uploadingHero, setUploadingHero] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevBlobUrlRef = useRef<string | null>(null);
@@ -175,6 +184,28 @@ export const InvoicePreviewEditor = ({
         headingFont: updates.headingFont || editorSettings.headingFont || 'times',
         bodyFont: updates.bodyFont || editorSettings.bodyFont || 'helvetica',
       });
+    }
+  };
+
+  const handleHeroImageUpload = async (file: File) => {
+    setUploadingHero(true);
+    try {
+      const { url } = await uploadToS3(file, 'hero', file.name);
+      await profileApi.update({ hero_image_url: url });
+      setProfile((prev: any) => ({ ...(prev || {}), hero_image_url: url }));
+    } catch (error) {
+      console.error('Hero image upload failed:', error);
+    } finally {
+      setUploadingHero(false);
+    }
+  };
+
+  const handleHeroImageRemove = async () => {
+    try {
+      await profileApi.update({ hero_image_url: null });
+      setProfile((prev: any) => ({ ...(prev || {}), hero_image_url: null }));
+    } catch (error) {
+      console.error('Hero image remove failed:', error);
     }
   };
 
@@ -500,6 +531,98 @@ export const InvoicePreviewEditor = ({
           {/* LAYOUT TAB */}
           <TabsContent value="layout" className="mt-0 space-y-4">
             <div className="space-y-3">
+              <Label className="text-sm font-semibold">Template</Label>
+              <p className="text-xs text-muted-foreground">Structural layout — separate from color theme.</p>
+              <div className="grid grid-cols-3 gap-2">
+                {INVOICE_LAYOUT_STYLES.map((style) => {
+                  const selected = (editorSettings.invoiceLayoutStyle || 'classic') === style.id;
+                  return (
+                    <button
+                      key={style.id}
+                      onClick={() => updateSettings({ invoiceLayoutStyle: style.id })}
+                      className={`relative p-2 rounded-lg border-2 transition-all text-left ${
+                        selected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      {selected && (
+                        <div className="absolute top-1 right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        </div>
+                      )}
+                      <div className="relative w-full h-10 rounded mb-1.5 overflow-hidden border bg-white">
+                        {style.id === 'classic' && (
+                          <div className="flex h-full w-full items-end gap-0.5 p-1">
+                            <div className="h-2.5 w-2.5 rounded-sm bg-muted-foreground/40" />
+                            <div className="flex-1 h-5 rounded-sm bg-muted" />
+                            <div className="flex-1 h-5 rounded-sm bg-muted" />
+                          </div>
+                        )}
+                        {style.id === 'minimal-modern' && (
+                          <div className="flex h-full w-full flex-col items-center justify-center gap-1">
+                            <div className="h-1.5 w-6 rounded-sm bg-muted-foreground/50" />
+                            <div className="h-px w-8 bg-border" />
+                          </div>
+                        )}
+                        {style.id === 'hero-banner' && (
+                          <div className="flex h-full w-full flex-col">
+                            <div className="h-2.5 w-full bg-slate-800" />
+                            <div className="flex-1 w-full bg-muted" />
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] font-medium truncate">{style.name}</p>
+                      <p className="text-[8px] text-muted-foreground truncate">{style.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {(editorSettings.invoiceLayoutStyle === 'hero-banner') && (
+              <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                <Label className="text-sm font-semibold flex items-center gap-1.5">
+                  <ImageIcon className="h-3.5 w-3.5" /> Hero Image
+                </Label>
+                <p className="text-xs text-muted-foreground">Shown across every invoice using this template. Falls back to your logo if not set.</p>
+                {profile?.hero_image_url ? (
+                  <div className="relative">
+                    <img src={profile.hero_image_url} alt="Hero" className="w-full h-20 object-cover rounded-md border" />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-1 right-1 h-6 w-6"
+                      onClick={handleHeroImageRemove}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-1 h-20 rounded-md border-2 border-dashed cursor-pointer hover:border-primary/50 transition-colors">
+                    {uploadingHero ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-[10px] text-muted-foreground">Upload photo</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingHero}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleHeroImageUpload(file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-3 pt-4 border-t">
               <Label className="text-sm font-semibold">Logo Placement</Label>
               <RadioGroup value={editorSettings.logoPlacement} onValueChange={(v) => updateSettings({ logoPlacement: v as any })} className="grid grid-cols-3 gap-2">
                 {['left', 'center', 'right'].map((pos) => (

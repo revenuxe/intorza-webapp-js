@@ -252,6 +252,7 @@ export default function PDFPreviewQA() {
         headerInfoColumns: 2 as const,
         showAcceptRejectButtons: true,
         useBrandColors: false,
+        invoiceLayoutStyle: 'classic' as const,
       };
 
       if (type === 'quotation') {
@@ -314,6 +315,7 @@ export default function PDFPreviewQA() {
               headerInfoColumns: 2 as const,
               showAcceptRejectButtons: true,
               useBrandColors: false,
+              invoiceLayoutStyle: 'classic' as const,
             };
 
             let pdfDoc: any;

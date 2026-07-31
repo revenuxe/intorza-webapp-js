@@ -50,6 +50,10 @@ export interface PDFTheme {
     body: string;
   };
   decorations: ThemeDecorations;
+  // UI hint only (not a hard restriction) — which invoice layout styles this theme's
+  // colors were designed to pair with. Used to auto-suggest a theme when the user
+  // switches layout and to show a "Recommended" badge in the theme gallery.
+  recommendedLayouts?: InvoiceLayoutStyle[];
 }
 
 // Default decorations by category
@@ -70,28 +74,28 @@ const professionalDecorations: ThemeDecorations = {
 const luxuryDecorations: ThemeDecorations = {
   borderStyle: 'double', borderWidth: 1.2, showCornerOrnaments: true, cornerStyle: 'flourish',
   dividerStyle: 'diamonds', showSectionDividers: true, headerDecoration: 'ornamental', showHeaderAccent: true,
-  showPageBorder: true, pageBorderInset: 12, showWatermark: false, watermarkStyle: 'none', watermarkOpacity: 0,
+  showPageBorder: true, pageBorderInset: 8, showWatermark: false, watermarkStyle: 'none', watermarkOpacity: 0,
   tableHeaderDecoration: 'gradient', showTableRowDividers: true, showFooterDecoration: true, footerStyle: 'ornamental',
 };
 
 const floralDecorations: ThemeDecorations = {
   borderStyle: 'ornate', borderWidth: 1.5, showCornerOrnaments: true, cornerStyle: 'floral',
   dividerStyle: 'leaves', showSectionDividers: true, headerDecoration: 'ornamental', showHeaderAccent: true,
-  showPageBorder: true, pageBorderInset: 10, showWatermark: true, watermarkStyle: 'pattern', watermarkOpacity: 0.03,
+  showPageBorder: true, pageBorderInset: 7, showWatermark: true, watermarkStyle: 'pattern', watermarkOpacity: 0.03,
   tableHeaderDecoration: 'gradient', showTableRowDividers: true, showFooterDecoration: true, footerStyle: 'ornamental',
 };
 
 const abstractDecorations: ThemeDecorations = {
   borderStyle: 'solid', borderWidth: 2, showCornerOrnaments: true, cornerStyle: 'decorative',
   dividerStyle: 'diamonds', showSectionDividers: true, headerDecoration: 'banner', showHeaderAccent: true,
-  showPageBorder: true, pageBorderInset: 8, showWatermark: true, watermarkStyle: 'pattern', watermarkOpacity: 0.02,
+  showPageBorder: true, pageBorderInset: 6, showWatermark: true, watermarkStyle: 'pattern', watermarkOpacity: 0.02,
   tableHeaderDecoration: 'striped', showTableRowDividers: true, showFooterDecoration: true, footerStyle: 'centered',
 };
 
 const decorationDecorations: ThemeDecorations = {
   borderStyle: 'double', borderWidth: 1.5, showCornerOrnaments: true, cornerStyle: 'flourish',
   dividerStyle: 'wave', showSectionDividers: true, headerDecoration: 'ribbon', showHeaderAccent: true,
-  showPageBorder: true, pageBorderInset: 10, showWatermark: true, watermarkStyle: 'subtle', watermarkOpacity: 0.04,
+  showPageBorder: true, pageBorderInset: 7, showWatermark: true, watermarkStyle: 'subtle', watermarkOpacity: 0.04,
   tableHeaderDecoration: 'gradient', showTableRowDividers: true, showFooterDecoration: true, footerStyle: 'ornamental',
 };
 
@@ -110,6 +114,7 @@ export const PDF_THEMES: PDFTheme[] = [
     },
     fonts: { heading: 'helvetica', body: 'helvetica' },
     decorations: minimalDecorations,
+    recommendedLayouts: ['minimal-modern'],
   },
   {
     id: 'minimalist-black',
@@ -124,6 +129,7 @@ export const PDF_THEMES: PDFTheme[] = [
     },
     fonts: { heading: 'helvetica', body: 'helvetica' },
     decorations: minimalDecorations,
+    recommendedLayouts: ['minimal-modern', 'hero-banner'],
   },
   
   // ===== PROFESSIONAL THEMES =====
@@ -140,6 +146,7 @@ export const PDF_THEMES: PDFTheme[] = [
     },
     fonts: { heading: 'helvetica', body: 'helvetica' },
     decorations: professionalDecorations,
+    recommendedLayouts: ['hero-banner'],
   },
   {
     id: 'soft-beige',
@@ -168,6 +175,7 @@ export const PDF_THEMES: PDFTheme[] = [
     },
     fonts: { heading: 'helvetica', body: 'helvetica' },
     decorations: professionalDecorations,
+    recommendedLayouts: ['hero-banner'],
   },
   {
     id: 'forest-green',
@@ -947,8 +955,15 @@ export const getBodyFonts = (): PDFFont[] => {
 };
 
 // ===== EDITOR SETTINGS =====
+// Structural page templates for invoices — distinct from `theme` (color/decoration).
+// Prefixed `invoice` (not a bare `layoutStyle`) since PDFEditorSettings is persisted
+// in one localStorage blob shared with the quotation editor, to leave room for a
+// `quotationLayoutStyle` sibling later without collision.
+export type InvoiceLayoutStyle = 'classic' | 'minimal-modern' | 'hero-banner';
+
 export interface PDFEditorSettings {
   theme: string;
+  invoiceLayoutStyle: InvoiceLayoutStyle;
   fontFamily: string; // Deprecated - use headingFont and bodyFont
   headingFont: string; // Font ID for titles/headings
   bodyFont: string; // Font ID for body text
@@ -1051,6 +1066,7 @@ export const defaultAdvancedSettings: PDFEditorSettings['advancedSettings'] = {
 
 export const defaultEditorSettings: PDFEditorSettings = {
   theme: 'minimal-white',
+  invoiceLayoutStyle: 'classic',
   fontFamily: 'helvetica',
   headingFont: 'times',
   bodyFont: 'helvetica',

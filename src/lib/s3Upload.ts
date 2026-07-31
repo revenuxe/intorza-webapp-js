@@ -6,6 +6,7 @@ export type S3UploadKind =
   | "gallery"
   | "room"
   | "qr"
+  | "hero"
   | "generic";
 
 export interface S3UploadResult {
