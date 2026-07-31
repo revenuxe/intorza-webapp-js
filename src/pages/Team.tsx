@@ -220,9 +220,6 @@ const Team = () => {
   const handleApproveRequest = async (request: TeamMemberRequest) => {
     if (!user) return;
     try {
-      // team_members stays on Supabase for now — create-team-member-auth
-      // (the Edge Function used elsewhere in this file) still writes new
-      // members only there, so RDS's team_members table is incomplete.
       const { error: memberError } = await supabase
         .from('team_members')
         .insert({

@@ -95,9 +95,8 @@ const ProjectDetail = () => {
   useEffect(() => {
     checkAuthAndFetch();
 
-    // Tasks now live in RDS (via tasksApi), not Supabase, so a
-    // supabase.channel() postgres_changes subscription on 'tasks' would never
-    // fire again — poll instead until a real AWS realtime layer exists.
+    // Polls rather than using a supabase.channel() postgres_changes subscription
+    // so other team members' task edits show up without a realtime wiring pass.
     const interval = setInterval(() => {
       if (projectId) fetchTasks();
     }, 20000);
@@ -125,11 +124,6 @@ const ProjectDetail = () => {
       setQuotation(quotationData);
     }
 
-    // team_members/assignments/attendance stay on Supabase for now: the
-    // create-team-member-auth Edge Function still writes new members only
-    // into Supabase's team_members table, so RDS's copy is missing every
-    // member added since the last data migration. Porting these reads would
-    // silently show incomplete teams until that Edge Function is migrated too.
     const { data: assignments } = await supabase
       .from('team_project_assignments')
       .select(`
