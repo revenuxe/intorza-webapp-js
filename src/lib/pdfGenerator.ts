@@ -1454,27 +1454,29 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- Apply decorations & footer to ALL pages ---
   const totalPagesCount = doc.getNumberOfPages();
-  // Reuse pageBottomY (already clear of the border lines and corner ornaments) instead
-  // of a separate, tighter offset — the old "borderInset - 3" landed exactly on the
-  // inner line of the double/triple border style, and the right-aligned page number
-  // sat right where the corner ornaments reach in from the edge.
-  const footerY = hasBorderDecoration ? pageBottomY : pageHeight - 10;
-  
+  // A couple mm further in than pageBottomY (the boundary body content itself respects)
+  // as extra cushion, since the footer is the very last thing drawn on the page.
+  const footerY = hasBorderDecoration ? pageBottomY - 3 : pageHeight - 10;
+
   for (let p = 1; p <= totalPagesCount; p++) {
     doc.setPage(p);
-    
+
     // Draw decorations
     if (editorSettings) {
       drawAllDecorations(doc, theme, editorSettings, p, totalPagesCount);
     }
-    
-    // Footer
-    doc.setFontSize(7);
+
+    // Footer — single centered line, well clear of both corners, rather than a
+    // separate right-aligned page number that used to sit right where the corner
+    // ornaments reach in from the edge.
+    doc.setFontSize(6.5);
     doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-    doc.text("This quotation is computer-generated.", pageWidth / 2, footerY, { align: 'center' });
-    
-    // Page number
-    doc.text(`Page ${p} of ${totalPagesCount}`, pageWidth - margin, footerY, { align: 'right' });
+    doc.text(
+      `This quotation is computer-generated.   Page ${p} of ${totalPagesCount}`,
+      pageWidth / 2,
+      footerY,
+      { align: 'center' },
+    );
   }
 
   // If previewOnly is set, just return the doc without saving
