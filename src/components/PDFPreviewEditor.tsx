@@ -1189,8 +1189,11 @@ export const PDFPreviewEditor = ({
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="bottom" className="h-[95vh] p-0 flex flex-col md:max-w-none md:h-[90vh]">
-        <SheetHeader className="px-4 py-3 border-b shrink-0">
+      <SheetContent side="bottom" className="h-[90dvh] p-0 flex flex-col md:max-w-none md:h-[90vh]">
+        <SheetHeader
+          className="px-4 pb-3 border-b shrink-0"
+          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {showEditor && (
