@@ -258,14 +258,22 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // Calculate margin & insets based on decoration settings
   const hasBorderDecoration = editorSettings?.showDecorations && editorSettings?.showPageBorder && theme.decorations.pageBorderInset > 0;
   const borderInset = hasBorderDecoration ? theme.decorations.pageBorderInset : 0;
-  const margin = Math.max(15, borderInset + 5);
+  // Filled elements (info cards, table headers) sitting right at the same offset as the
+  // border line read as "touching" it even a few mm out, so bordered themes get a
+  // noticeably wider clearance than the flat 15mm used everywhere else.
+  const margin = hasBorderDecoration ? Math.max(20, borderInset + 12) : 15;
   const contentWidth = pageWidth - (margin * 2);
-  const pageTopY = hasBorderDecoration ? borderInset + 8 : 15;
-  // Corner ornaments (drawCornerOrnaments in pdfDecorations.ts) draw inward from
-  // borderInset + 2 by up to ~12-18mm depending on corner style/intensity, well past
-  // the old 8mm buffer — content and the fixed-position footer were landing right on
-  // top of them. 24mm covers all corner styles at normal-to-bold intensity.
-  const pageBottomY = hasBorderDecoration ? pageHeight - borderInset - 24 : pageHeight - 15;
+  const pageTopY = hasBorderDecoration ? borderInset + 12 : 15;
+  // Two separate boundaries, not one shared value: FOOTER_CLEARANCE is how far the
+  // footer sits from the page edge/border — for bordered themes, 24mm clears the
+  // corner ornaments (they draw inward from borderInset + 2 by up to ~12-18mm
+  // depending on style/intensity); for plain themes there's no border to clear, so a
+  // flat 10mm from the edge is enough. Either way, content gets a further 10mm on top
+  // of that, so a genuinely full page stops clearly above the footer line instead of
+  // ending right where the footer text sits — that's what was letting the last table
+  // row overlap "Page X of Y".
+  const FOOTER_CLEARANCE = hasBorderDecoration ? borderInset + 24 : 10;
+  const pageBottomY = pageHeight - FOOTER_CLEARANCE - 10;
   let yPosition = pageTopY;
 
   // --- Design System Colors (from theme) ---
@@ -1454,9 +1462,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- Apply decorations & footer to ALL pages ---
   const totalPagesCount = doc.getNumberOfPages();
-  // A couple mm further in than pageBottomY (the boundary body content itself respects)
-  // as extra cushion, since the footer is the very last thing drawn on the page.
-  const footerY = hasBorderDecoration ? pageBottomY - 3 : pageHeight - 10;
+  // FOOTER_CLEARANCE, not pageBottomY — the footer needs its own boundary, sitting
+  // below (closer to the edge than) where content is allowed to stop, otherwise a
+  // full page's last row and the footer end up fighting for the same few millimeters.
+  const footerY = pageHeight - FOOTER_CLEARANCE;
 
   for (let p = 1; p <= totalPagesCount; p++) {
     doc.setPage(p);

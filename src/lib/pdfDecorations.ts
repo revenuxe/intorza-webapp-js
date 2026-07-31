@@ -44,18 +44,19 @@ export const drawPageBorder = (
     case 'double':
       // Outer border
       doc.rect(inset, inset, pageWidth - (inset * 2), pageHeight - (inset * 2));
-      // Inner border
+      // Inner border — tight 1mm gap so the two lines read as one attached frame
+      // instead of two separate lines with visible space between them.
       doc.setLineWidth(borderWidth * 0.5);
-      doc.rect(inset + 3, inset + 3, pageWidth - (inset * 2) - 6, pageHeight - (inset * 2) - 6);
+      doc.rect(inset + 1, inset + 1, pageWidth - (inset * 2) - 2, pageHeight - (inset * 2) - 2);
       break;
-      
+
     case 'triple':
-      // Three concentric borders
+      // Three concentric borders, tightly stacked
       doc.rect(inset, inset, pageWidth - (inset * 2), pageHeight - (inset * 2));
       doc.setLineWidth(borderWidth * 0.6);
-      doc.rect(inset + 2, inset + 2, pageWidth - (inset * 2) - 4, pageHeight - (inset * 2) - 4);
+      doc.rect(inset + 1, inset + 1, pageWidth - (inset * 2) - 2, pageHeight - (inset * 2) - 2);
       doc.setLineWidth(borderWidth * 0.3);
-      doc.rect(inset + 5, inset + 5, pageWidth - (inset * 2) - 10, pageHeight - (inset * 2) - 10);
+      doc.rect(inset + 2, inset + 2, pageWidth - (inset * 2) - 4, pageHeight - (inset * 2) - 4);
       break;
       
     case 'elegant':
@@ -127,10 +128,10 @@ export const drawPageBorder = (
     case 'ornate':
       // Main border
       doc.rect(inset, inset, pageWidth - (inset * 2), pageHeight - (inset * 2));
-      // Decorative inner line
+      // Decorative inner line — tight 1mm gap, attached to the main border
       doc.setLineWidth(borderWidth * 0.3);
       doc.setDrawColor(colors.secondary[0], colors.secondary[1], colors.secondary[2]);
-      doc.rect(inset + 2, inset + 2, pageWidth - (inset * 2) - 4, pageHeight - (inset * 2) - 4);
+      doc.rect(inset + 1, inset + 1, pageWidth - (inset * 2) - 2, pageHeight - (inset * 2) - 2);
       break;
       
     default: // solid
