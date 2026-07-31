@@ -461,7 +461,7 @@ export const PDFCanvasPreview = memo(
       }
 
       return (
-        <div ref={containerRef} className="relative flex flex-col items-center gap-4">
+        <div ref={containerRef} className="relative flex flex-col items-center gap-8">
           {isGenerating && (
             <div className="pointer-events-none absolute top-2 left-1/2 z-10 -translate-x-1/2 bg-background/90 backdrop-blur-sm rounded-full px-2.5 py-1 flex items-center gap-1.5 shadow-md border">
               <Loader2 className="h-3 w-3 animate-spin text-primary" />

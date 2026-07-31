@@ -1150,7 +1150,7 @@ export const PDFPreviewEditor = ({
         )}
 
         {/* PDF Preview */}
-        <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
+        <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
           {isGeneratingPdf && !pdfBlobUrl ? (
             <div className="h-full flex items-center justify-center min-h-[300px]">
               <div className="flex flex-col items-center gap-3">

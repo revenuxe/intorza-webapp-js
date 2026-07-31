@@ -1159,7 +1159,11 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- 6. Terms & Conditions ---
   if (settings.showTermsConditions) {
-    if (yPosition > pageBottomY - 45) {
+    // Always start Terms & Conditions on its own fresh page rather than
+    // wherever the previous section (e.g. payment summary) happened to end —
+    // otherwise it visually reads as part of the quotation instead of its
+    // own section. Skip only if the current page is already blank.
+    if (yPosition > pageTopY) {
       doc.addPage();
       yPosition = pageTopY;
     }
