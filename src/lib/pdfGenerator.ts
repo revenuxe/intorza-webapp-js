@@ -1454,7 +1454,11 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
   // --- Apply decorations & footer to ALL pages ---
   const totalPagesCount = doc.getNumberOfPages();
-  const footerY = hasBorderDecoration ? pageHeight - borderInset - 3 : pageHeight - 10;
+  // Reuse pageBottomY (already clear of the border lines and corner ornaments) instead
+  // of a separate, tighter offset — the old "borderInset - 3" landed exactly on the
+  // inner line of the double/triple border style, and the right-aligned page number
+  // sat right where the corner ornaments reach in from the edge.
+  const footerY = hasBorderDecoration ? pageBottomY : pageHeight - 10;
   
   for (let p = 1; p <= totalPagesCount; p++) {
     doc.setPage(p);
