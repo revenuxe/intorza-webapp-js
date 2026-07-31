@@ -261,7 +261,11 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   const margin = Math.max(15, borderInset + 5);
   const contentWidth = pageWidth - (margin * 2);
   const pageTopY = hasBorderDecoration ? borderInset + 8 : 15;
-  const pageBottomY = hasBorderDecoration ? pageHeight - borderInset - 8 : pageHeight - 15;
+  // Corner ornaments (drawCornerOrnaments in pdfDecorations.ts) draw inward from
+  // borderInset + 2 by up to ~12-18mm depending on corner style/intensity, well past
+  // the old 8mm buffer — content and the fixed-position footer were landing right on
+  // top of them. 24mm covers all corner styles at normal-to-bold intensity.
+  const pageBottomY = hasBorderDecoration ? pageHeight - borderInset - 24 : pageHeight - 15;
   let yPosition = pageTopY;
 
   // --- Design System Colors (from theme) ---
@@ -701,7 +705,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           // Amount column - reduced width
           4: { cellWidth: 32, halign: 'right', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 32, valign: 'middle' }
         },
-        margin: { left: margin, right: margin, top: pageTopY },
+        margin: { left: margin, right: margin, top: pageTopY, bottom: pageHeight - pageBottomY },
         didDrawPage: (d) => {
           if (d.cursor) yPosition = d.cursor.y;
         }
@@ -874,7 +878,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           valign: 'middle',
         },
         columnStyles: columnStyles as any,
-        margin: { left: margin, right: margin, top: pageTopY },
+        margin: { left: margin, right: margin, top: pageTopY, bottom: pageHeight - pageBottomY },
         didDrawCell: (hookData) => {
           // Draw image in the image column
           if (hasAnyImages && hookData.section === 'body' && hookData.column.index === imageColIndex) {
@@ -919,6 +923,14 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     const labelFontSize = advSettingsHighlight!.fontSizes.sectionTitle;
     const amountFontSize = advSettingsHighlight!.fontSizes.sectionTitle;
     const TOTAL_AMOUNT_FONT = 'helvetica';
+
+    // The table's own bottom margin keeps its rows out of the footer/corner-ornament
+    // zone, but the total bar is drawn manually right after — without this check it
+    // could still land in that zone if the table finished right at the boundary.
+    if (yPosition + highlightHeight > pageBottomY) {
+      doc.addPage();
+      yPosition = pageTopY;
+    }
 
     // Measure widths using their respective fonts
     setBodyFont('bold');
@@ -1094,7 +1106,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
       }
     },
-    margin: { left: margin, right: margin }
+    margin: { left: margin, right: margin, bottom: pageHeight - pageBottomY }
   });
 
   yPosition = (doc as any).lastAutoTable.finalY + 15;
@@ -1151,7 +1163,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
          // Amount column - fixed width, right-aligned, numeric-safe, BOLD
          3: { cellWidth: 42, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 42, valign: 'middle' }
        },
-      margin: { left: margin, right: margin }
+      margin: { left: margin, right: margin, bottom: pageHeight - pageBottomY }
     });
 
     yPosition = (doc as any).lastAutoTable.finalY + 15;
