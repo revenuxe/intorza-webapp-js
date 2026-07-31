@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "13.0.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       attendance: {
@@ -1618,6 +1643,10 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_pro_user: { Args: { _user_id: string }; Returns: boolean }
+      respond_to_quotation: {
+        Args: { p_action: string; p_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "user"
@@ -1757,6 +1786,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "user"],

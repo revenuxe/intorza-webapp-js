@@ -222,6 +222,22 @@ export const quotationsApi = {
 const invoicesBase = tableCrud('invoices');
 export const invoicesApi = {
   ...invoicesBase,
+  // Overrides tableCrud's flat get() — callers (e.g. InvoiceDetail.tsx) expect payments
+  // nested on the invoice, same shape the old backend/src/routes/invoices.js returned.
+  get: async (id: string): Promise<Envelope<any>> => {
+    const row = unwrap(
+      await supabase.from('invoices').select('*').eq('id', id).maybeSingle(),
+    );
+    if (!row) throw new ApiError(404, 'invoices not found');
+    const payments = unwrap(
+      await supabase
+        .from('payments')
+        .select('*')
+        .eq('invoice_id', id)
+        .order('created_at', { ascending: false }),
+    );
+    return { data: { ...(row as any), payments: (payments as any[]) || [] } };
+  },
   listPayments: async (id: string): Promise<Envelope<any[]>> => {
     const rows = unwrap(
       await supabase
@@ -233,11 +249,12 @@ export const invoicesApi = {
     return { data: (rows as any[]) || [] };
   },
   addPayment: async (id: string, body: any): Promise<Envelope<any>> => {
-    const uid = await requireUserId();
+    // `payments` has no user_id column; RLS checks the insert against the parent invoice's
+    // ownership instead (see "Users can insert payments to own invoices" policy).
     const row = unwrap(
       await supabase
         .from('payments')
-        .insert({ ...body, invoice_id: id, user_id: uid })
+        .insert({ ...body, invoice_id: id })
         .select()
         .single(),
     );
@@ -255,13 +272,13 @@ export const tasksApi = tableCrud('tasks');
 export const galleryApi = tableCrud('gallery_images');
 
 export const paymentsApi = {
+  // `payments` has no user_id column — ownership is enforced by RLS via a join back to the
+  // parent invoice (invoices.user_id = auth.uid()), so no extra filter is needed or possible here.
   list: async (): Promise<Envelope<any[]>> => {
-    const uid = await requireUserId();
     const rows = unwrap(
       await supabase
         .from('payments')
         .select('*')
-        .eq('user_id', uid)
         .order('created_at', { ascending: false }),
     );
     return { data: (rows as any[]) || [] };

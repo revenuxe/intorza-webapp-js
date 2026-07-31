@@ -28,37 +28,40 @@ const QuotationResponse = () => {
       }
 
       try {
-        // Get quotation details first
-        const { data: quotation, error: fetchError } = await supabase
-          .from("quotations")
-          .select("quotation_number, status")
-          .eq("id", quotationId)
-          .single();
+        // Anonymous visitors have no RLS access to the quotations table directly (by design —
+        // a table-level anon policy would let anyone with the public anon key enumerate every
+        // tenant's quotations). This RPC does the lookup + atomic accept/reject entirely
+        // server-side, scoped to exactly the one id in the link.
+        const { data, error: rpcError } = await supabase.rpc("respond_to_quotation", {
+          p_id: quotationId,
+          p_action: action,
+        });
 
-        if (fetchError || !quotation) {
-          setError("Quotation not found. It may have been deleted.");
+        if (rpcError || !data) {
+          setError("An unexpected error occurred. Please try again.");
           setLoading(false);
           return;
         }
 
-        setQuotationNumber(quotation.quotation_number);
+        const result = data as {
+          success: boolean;
+          quotation_number?: string;
+          status?: string;
+          error?: string;
+        };
 
-        // Check if already responded
-        if (quotation.status === "accepted" || quotation.status === "rejected") {
-          setError(`This quotation has already been ${quotation.status}.`);
-          setLoading(false);
-          return;
+        if (result.quotation_number) {
+          setQuotationNumber(result.quotation_number);
         }
 
-        // Update the quotation status
-        const newStatus = action === "accept" ? "accepted" : "rejected";
-        const { error: updateError } = await supabase
-          .from("quotations")
-          .update({ status: newStatus, updated_at: new Date().toISOString() })
-          .eq("id", quotationId);
-
-        if (updateError) {
-          setError("Failed to update quotation. Please try again later.");
+        if (!result.success) {
+          if (result.error === "already_responded") {
+            setError(`This quotation has already been ${result.status}.`);
+          } else if (result.error === "not_found") {
+            setError("Quotation not found. It may have been deleted.");
+          } else {
+            setError("Invalid link. Please contact the sender.");
+          }
           setLoading(false);
           return;
         }

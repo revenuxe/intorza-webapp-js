@@ -114,7 +114,6 @@ const InvoiceDetail = () => {
   const loadInvoice = async () => {
     try {
       setLoading(true);
-      // GET /:id returns the invoice with its payments nested (backend/src/routes/invoices.js).
       const { data } = await invoicesApi.get(id!);
       const { payments: pays, ...inv } = data as Invoice & { payments: Payment[] };
       setInvoice(inv);
@@ -165,7 +164,7 @@ const InvoiceDetail = () => {
     try {
       setDeleting(true);
 
-      // Backend cascade-deletes payments with the invoice.
+      // payments.invoice_id has ON DELETE CASCADE, so this also removes its payments.
       await invoicesApi.remove(id!);
 
       toast({
@@ -214,9 +213,9 @@ const InvoiceDetail = () => {
         finalNotes = finalNotes ? `${finalNotes} | Next due: ${nextPaymentDue} - ${currCode} ${nextPaymentAmount.toLocaleString()}` : `Next due: ${nextPaymentDue} - ${currCode} ${nextPaymentAmount.toLocaleString()}`;
       }
 
-      // paid_amount / remaining_amount / status are recomputed server-side
-      // (recalc() in backend/src/routes/invoices.js) — single source of truth
-      // instead of duplicating that logic here.
+      // paid_amount / remaining_amount / status are recomputed by a Postgres
+      // trigger (recalc_invoice_totals, fired on payments changes) — single
+      // source of truth instead of duplicating that logic here.
       await invoicesApi.addPayment(id!, {
         amount: paymentAmount,
         payment_method: paymentMethod,
