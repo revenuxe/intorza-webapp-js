@@ -109,6 +109,21 @@ export const PDFPreviewEditor = ({
   const [showPerfHud, setShowPerfHud] = useState(false);
   const [perfMetrics, setPerfMetrics] = useState<PDFPreviewMetrics | null>(null);
   const canvasRef = useRef<import('./PDFCanvasPreview').PDFCanvasPreviewHandle | null>(null);
+  // The mobile and desktop layouts each render their own copy of PreviewPanel (CSS
+  // just hides whichever isn't active — both stay mounted). Rendering PDFCanvasPreview
+  // in both meant two live instances shared the same canvasRef, so scrollToPage() could
+  // end up acting on the display:none copy instead of the visible one. Track the
+  // breakpoint in JS (matching Tailwind's md: 768px) so only the actually-visible
+  // layout mounts the real preview — the other renders nothing.
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(min-width: 768px)').matches : false
+  );
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 768px)');
+    const onChange = () => setIsDesktop(mql.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
   const [highlightedElement, setHighlightedElement] = useState<string | null>(null);
   const [showItemImages, setShowItemImages] = useState(customizeSettings.showItemImages);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1234,7 +1249,7 @@ export const PDFPreviewEditor = ({
 
         {/* Mobile View */}
         <div className="flex-1 min-h-0 overflow-hidden md:hidden flex flex-col">
-          {showEditor ? EditorPanel() : PreviewPanel()}
+          {showEditor ? EditorPanel() : (!isDesktop && PreviewPanel())}
         </div>
 
         {/* Desktop View */}
@@ -1242,7 +1257,7 @@ export const PDFPreviewEditor = ({
           <div className="w-80 border-r flex flex-col">
             {EditorPanel()}
           </div>
-          {PreviewPanel()}
+          {isDesktop && PreviewPanel()}
         </div>
       </SheetContent>
 
