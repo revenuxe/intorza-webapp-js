@@ -81,14 +81,14 @@ const luxuryDecorations: ThemeDecorations = {
 const floralDecorations: ThemeDecorations = {
   borderStyle: 'ornate', borderWidth: 1.5, showCornerOrnaments: true, cornerStyle: 'floral',
   dividerStyle: 'leaves', showSectionDividers: true, headerDecoration: 'ornamental', showHeaderAccent: true,
-  showPageBorder: true, pageBorderInset: 7, showWatermark: true, watermarkStyle: 'pattern', watermarkOpacity: 0.03,
+  showPageBorder: true, pageBorderInset: 7, showWatermark: false, watermarkStyle: 'none', watermarkOpacity: 0,
   tableHeaderDecoration: 'gradient', showTableRowDividers: true, showFooterDecoration: true, footerStyle: 'ornamental',
 };
 
 const abstractDecorations: ThemeDecorations = {
   borderStyle: 'solid', borderWidth: 2, showCornerOrnaments: true, cornerStyle: 'decorative',
   dividerStyle: 'diamonds', showSectionDividers: true, headerDecoration: 'banner', showHeaderAccent: true,
-  showPageBorder: true, pageBorderInset: 6, showWatermark: true, watermarkStyle: 'pattern', watermarkOpacity: 0.02,
+  showPageBorder: true, pageBorderInset: 6, showWatermark: false, watermarkStyle: 'none', watermarkOpacity: 0,
   tableHeaderDecoration: 'striped', showTableRowDividers: true, showFooterDecoration: true, footerStyle: 'centered',
 };
 
