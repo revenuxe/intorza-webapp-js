@@ -74,6 +74,17 @@ export async function uploadToS3(
 
   if (error) throw new Error(error.message || "Upload failed");
 
+  if (bucket === "room-photos") {
+    // Private bucket — hand back a long-lived signed URL instead.
+    const { data: signed, error: signErr } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(key, 60 * 60 * 24 * 365);
+    if (signErr || !signed?.signedUrl) {
+      throw new Error(signErr?.message || "Could not create file link");
+    }
+    return { key, url: signed.signedUrl, bucket };
+  }
+
   const { data } = supabase.storage.from(bucket).getPublicUrl(key);
   if (!data?.publicUrl) throw new Error("Upload succeeded but URL is missing");
 
