@@ -18,5 +18,3 @@ verify_jwt = false
 [functions.razorpay-cancel-subscription]
 verify_jwt = false
 
-[functions.s3-upload]
-verify_jwt = false
