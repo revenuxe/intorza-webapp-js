@@ -101,6 +101,14 @@ const CreateQuotation = () => {
   const [discountPercentage, setDiscountPercentage] = useState(0);
   const [enableSocialMediaDiscount, setEnableSocialMediaDiscount] = useState(false);
   const [socialMediaDiscountRate, setSocialMediaDiscountRate] = useState(6);
+  // Pricing is only reflected in the bill once the user explicitly applies it
+  const [appliedPricing, setAppliedPricing] = useState({
+    gstEnabled: false,
+    gstRate: "18",
+    discountPercentage: 0,
+    enableSocialMediaDiscount: false,
+    socialMediaDiscountRate: 6,
+  });
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([{
     id: "1",
     stage: "1",
