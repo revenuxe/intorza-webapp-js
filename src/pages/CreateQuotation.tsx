@@ -101,6 +101,14 @@ const CreateQuotation = () => {
   const [discountPercentage, setDiscountPercentage] = useState(0);
   const [enableSocialMediaDiscount, setEnableSocialMediaDiscount] = useState(false);
   const [socialMediaDiscountRate, setSocialMediaDiscountRate] = useState(6);
+  // Pricing is only reflected in the bill once the user explicitly applies it
+  const [appliedPricing, setAppliedPricing] = useState({
+    gstEnabled: false,
+    gstRate: "18",
+    discountPercentage: 0,
+    enableSocialMediaDiscount: false,
+    socialMediaDiscountRate: 6,
+  });
   const [paymentStages, setPaymentStages] = useState<PaymentStage[]>([{
     id: "1",
     stage: "1",
@@ -182,6 +190,7 @@ const CreateQuotation = () => {
         if (formData.discountPercentage !== undefined) setDiscountPercentage(formData.discountPercentage);
         if (formData.enableSocialMediaDiscount !== undefined) setEnableSocialMediaDiscount(formData.enableSocialMediaDiscount);
         if (formData.socialMediaDiscountRate !== undefined) setSocialMediaDiscountRate(formData.socialMediaDiscountRate);
+        if (formData.appliedPricing) setAppliedPricing(formData.appliedPricing);
       }
       setFormRestored(true);
     }
@@ -362,12 +371,19 @@ const CreateQuotation = () => {
       setGstRate(quotation.gst_percentage?.toString() || "18");
 
       // Calculate discount percentage from discount amount
+      let loadedDiscount = 0;
       if (quotation.discount_amount && quotation.subtotal && quotation.subtotal > 0) {
-        const discountPercent = (quotation.discount_amount / quotation.subtotal) * 100;
-        setDiscountPercentage(discountPercent);
-      } else {
-        setDiscountPercentage(0);
+        loadedDiscount = (quotation.discount_amount / quotation.subtotal) * 100;
       }
+      setDiscountPercentage(loadedDiscount);
+
+      // Saved quotations already have their pricing applied
+      setAppliedPricing(prev => ({
+        ...prev,
+        gstEnabled: quotation.gst_enabled || false,
+        gstRate: quotation.gst_percentage?.toString() || "18",
+        discountPercentage: loadedDiscount,
+      }));
 
       // Load sections
       const {
@@ -490,12 +506,37 @@ const CreateQuotation = () => {
   };
   const subtotal = sections.reduce((sum, section) => sum + section.items.reduce((itemSum, item) => itemSum + item.amount, 0), 0);
 
-  // Calculate social media discount based on custom rate
-  const socialMediaDiscountAmount = enableSocialMediaDiscount ? subtotal * (socialMediaDiscountRate / 100) : 0;
-  const discountAmount = enableSocialMediaDiscount ? socialMediaDiscountAmount : subtotal * discountPercentage / 100;
-  const gstAmount = gstEnabled ? (subtotal - discountAmount) * parseFloat(gstRate) / 100 : 0;
+  // Only applied pricing affects the bill
+  const effGstEnabled = appliedPricing.gstEnabled;
+  const effGstRate = appliedPricing.gstRate;
+  const effDiscountPercentage = appliedPricing.discountPercentage;
+  const effSocialEnabled = appliedPricing.enableSocialMediaDiscount;
+  const effSocialRate = appliedPricing.socialMediaDiscountRate;
+
+  const pricingDirty =
+    effGstEnabled !== gstEnabled ||
+    effGstRate !== gstRate ||
+    effDiscountPercentage !== discountPercentage ||
+    effSocialEnabled !== enableSocialMediaDiscount ||
+    effSocialRate !== socialMediaDiscountRate;
+
+  const applyPricing = () => {
+    setAppliedPricing({
+      gstEnabled,
+      gstRate,
+      discountPercentage,
+      enableSocialMediaDiscount,
+      socialMediaDiscountRate,
+    });
+    toast({ title: "Pricing applied", description: "Totals have been updated." });
+  };
+
+  const socialMediaDiscountAmount = effSocialEnabled ? subtotal * (effSocialRate / 100) : 0;
+  const discountAmount = effSocialEnabled ? socialMediaDiscountAmount : subtotal * effDiscountPercentage / 100;
+  const gstAmount = effGstEnabled ? (subtotal - discountAmount) * parseFloat(effGstRate) / 100 : 0;
   const grandTotal = subtotal - discountAmount + gstAmount;
   const getFormData = () => ({
+    appliedPricing,
     sections,
     projectTitle,
     clientName,
@@ -560,8 +601,8 @@ const CreateQuotation = () => {
         warranty: warranty,
         project_type: projectType,
         status,
-        gst_enabled: gstEnabled,
-        gst_percentage: parseFloat(gstRate) || 0,
+        gst_enabled: effGstEnabled,
+        gst_percentage: parseFloat(effGstRate) || 0,
         gst_amount: Number(gstAmount) || 0,
         discount_amount: Number(discountAmount) || 0,
         subtotal: Number(subtotal) || 0,
@@ -595,11 +636,11 @@ const CreateQuotation = () => {
         warranty,
         projectType,
         placeOfProject,
-        gstEnabled,
-        gstRate,
-        discountPercentage,
-        enableSocialMediaDiscount,
-        socialMediaDiscountRate,
+        gstEnabled: effGstEnabled,
+        gstRate: effGstRate,
+        discountPercentage: effDiscountPercentage,
+        enableSocialMediaDiscount: effSocialEnabled,
+        socialMediaDiscountRate: effSocialRate,
       });
 
       // Track item usage for smart suggestions
@@ -806,8 +847,8 @@ const CreateQuotation = () => {
           }))
         })),
         subtotal,
-        gstEnabled,
-        gstRate: parseFloat(gstRate),
+        gstEnabled: effGstEnabled,
+        gstRate: parseFloat(effGstRate),
         gstAmount,
         discount: discountAmount,
         grandTotal,
@@ -819,8 +860,8 @@ const CreateQuotation = () => {
         gstin: profileToUse.gstin,
         professionalAdvantages: profileToUse.professional_advantages,
         signatureUrl: profileToUse.signature_url,
-        enableSocialMediaDiscount,
-        socialMediaDiscountRate,
+        enableSocialMediaDiscount: effSocialEnabled,
+        socialMediaDiscountRate: effSocialRate,
         paymentStages: paymentStages.map(s => ({
           stage: s.stage,
           milestone: s.milestone,
@@ -1186,8 +1227,8 @@ const CreateQuotation = () => {
                         </SelectContent>
                       </Select>}
                   </div>
-                  {gstEnabled && <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{profile.tax_label} ({gstRate}%)</span>
+                  {effGstEnabled && <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{profile.tax_label} ({effGstRate}%)</span>
                       <span className="font-medium">{profile.currency_symbol}{gstAmount.toLocaleString(profile.locale, {
                     minimumFractionDigits: 2
                   })}</span>
@@ -1205,8 +1246,8 @@ const CreateQuotation = () => {
                         <span className="text-sm text-muted-foreground">%</span>
                       </div>}
                   </div>
-                  {enableSocialMediaDiscount && <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Social Media Discount ({socialMediaDiscountRate}%)</span>
+                  {effSocialEnabled && <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Social Media Discount ({effSocialRate}%)</span>
                       <span className="font-medium text-green-600">-{profile.currency_symbol}{socialMediaDiscountAmount.toLocaleString(profile.locale, {
                     minimumFractionDigits: 2
                   })}</span>
@@ -1214,8 +1255,8 @@ const CreateQuotation = () => {
                 </>}
 
               {customizeSettings.showDiscount && !enableSocialMediaDiscount && <>
-                  {discountPercentage > 0 && <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Discount ({discountPercentage}%)</span>
+                  {effDiscountPercentage > 0 && !effSocialEnabled && <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Discount ({effDiscountPercentage}%)</span>
                       <span className="font-medium text-green-600">-{profile.currency_symbol}{discountAmount.toLocaleString(profile.locale, {
                     minimumFractionDigits: 2
                   })}</span>
