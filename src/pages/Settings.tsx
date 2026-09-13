@@ -144,7 +144,7 @@ const Settings = () => {
       console.error('Error uploading logo:', error);
       toast({
         title: "Upload failed",
-        description: "Failed to upload logo. Please try again.",
+        description: (error as Error)?.message || "Failed to upload logo. Please try again.",
         variant: "destructive",
       });
     } finally {
