@@ -371,12 +371,19 @@ const CreateQuotation = () => {
       setGstRate(quotation.gst_percentage?.toString() || "18");
 
       // Calculate discount percentage from discount amount
+      let loadedDiscount = 0;
       if (quotation.discount_amount && quotation.subtotal && quotation.subtotal > 0) {
-        const discountPercent = (quotation.discount_amount / quotation.subtotal) * 100;
-        setDiscountPercentage(discountPercent);
-      } else {
-        setDiscountPercentage(0);
+        loadedDiscount = (quotation.discount_amount / quotation.subtotal) * 100;
       }
+      setDiscountPercentage(loadedDiscount);
+
+      // Saved quotations already have their pricing applied
+      setAppliedPricing(prev => ({
+        ...prev,
+        gstEnabled: quotation.gst_enabled || false,
+        gstRate: quotation.gst_percentage?.toString() || "18",
+        discountPercentage: loadedDiscount,
+      }));
 
       // Load sections
       const {
