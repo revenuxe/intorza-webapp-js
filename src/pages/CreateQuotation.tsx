@@ -847,8 +847,8 @@ const CreateQuotation = () => {
           }))
         })),
         subtotal,
-        gstEnabled,
-        gstRate: parseFloat(gstRate),
+        gstEnabled: effGstEnabled,
+        gstRate: parseFloat(effGstRate),
         gstAmount,
         discount: discountAmount,
         grandTotal,
