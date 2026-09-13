@@ -860,8 +860,8 @@ const CreateQuotation = () => {
         gstin: profileToUse.gstin,
         professionalAdvantages: profileToUse.professional_advantages,
         signatureUrl: profileToUse.signature_url,
-        enableSocialMediaDiscount,
-        socialMediaDiscountRate,
+        enableSocialMediaDiscount: effSocialEnabled,
+        socialMediaDiscountRate: effSocialRate,
         paymentStages: paymentStages.map(s => ({
           stage: s.stage,
           milestone: s.milestone,
