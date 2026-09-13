@@ -506,12 +506,37 @@ const CreateQuotation = () => {
   };
   const subtotal = sections.reduce((sum, section) => sum + section.items.reduce((itemSum, item) => itemSum + item.amount, 0), 0);
 
-  // Calculate social media discount based on custom rate
-  const socialMediaDiscountAmount = enableSocialMediaDiscount ? subtotal * (socialMediaDiscountRate / 100) : 0;
-  const discountAmount = enableSocialMediaDiscount ? socialMediaDiscountAmount : subtotal * discountPercentage / 100;
-  const gstAmount = gstEnabled ? (subtotal - discountAmount) * parseFloat(gstRate) / 100 : 0;
+  // Only applied pricing affects the bill
+  const effGstEnabled = appliedPricing.gstEnabled;
+  const effGstRate = appliedPricing.gstRate;
+  const effDiscountPercentage = appliedPricing.discountPercentage;
+  const effSocialEnabled = appliedPricing.enableSocialMediaDiscount;
+  const effSocialRate = appliedPricing.socialMediaDiscountRate;
+
+  const pricingDirty =
+    effGstEnabled !== gstEnabled ||
+    effGstRate !== gstRate ||
+    effDiscountPercentage !== discountPercentage ||
+    effSocialEnabled !== enableSocialMediaDiscount ||
+    effSocialRate !== socialMediaDiscountRate;
+
+  const applyPricing = () => {
+    setAppliedPricing({
+      gstEnabled,
+      gstRate,
+      discountPercentage,
+      enableSocialMediaDiscount,
+      socialMediaDiscountRate,
+    });
+    toast({ title: "Pricing applied", description: "Totals have been updated." });
+  };
+
+  const socialMediaDiscountAmount = effSocialEnabled ? subtotal * (effSocialRate / 100) : 0;
+  const discountAmount = effSocialEnabled ? socialMediaDiscountAmount : subtotal * effDiscountPercentage / 100;
+  const gstAmount = effGstEnabled ? (subtotal - discountAmount) * parseFloat(effGstRate) / 100 : 0;
   const grandTotal = subtotal - discountAmount + gstAmount;
   const getFormData = () => ({
+    appliedPricing,
     sections,
     projectTitle,
     clientName,
