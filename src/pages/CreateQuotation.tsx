@@ -1255,8 +1255,8 @@ const CreateQuotation = () => {
                 </>}
 
               {customizeSettings.showDiscount && !enableSocialMediaDiscount && <>
-                  {discountPercentage > 0 && <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Discount ({discountPercentage}%)</span>
+                  {effDiscountPercentage > 0 && !effSocialEnabled && <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Discount ({effDiscountPercentage}%)</span>
                       <span className="font-medium text-green-600">-{profile.currency_symbol}{discountAmount.toLocaleString(profile.locale, {
                     minimumFractionDigits: 2
                   })}</span>
