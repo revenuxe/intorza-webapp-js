@@ -1246,8 +1246,8 @@ const CreateQuotation = () => {
                         <span className="text-sm text-muted-foreground">%</span>
                       </div>}
                   </div>
-                  {enableSocialMediaDiscount && <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Social Media Discount ({socialMediaDiscountRate}%)</span>
+                  {effSocialEnabled && <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Social Media Discount ({effSocialRate}%)</span>
                       <span className="font-medium text-green-600">-{profile.currency_symbol}{socialMediaDiscountAmount.toLocaleString(profile.locale, {
                     minimumFractionDigits: 2
                   })}</span>
