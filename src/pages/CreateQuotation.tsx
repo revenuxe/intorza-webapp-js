@@ -636,11 +636,11 @@ const CreateQuotation = () => {
         warranty,
         projectType,
         placeOfProject,
-        gstEnabled,
-        gstRate,
-        discountPercentage,
-        enableSocialMediaDiscount,
-        socialMediaDiscountRate,
+        gstEnabled: effGstEnabled,
+        gstRate: effGstRate,
+        discountPercentage: effDiscountPercentage,
+        enableSocialMediaDiscount: effSocialEnabled,
+        socialMediaDiscountRate: effSocialRate,
       });
 
       // Track item usage for smart suggestions
