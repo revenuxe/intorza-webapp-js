@@ -190,6 +190,7 @@ const CreateQuotation = () => {
         if (formData.discountPercentage !== undefined) setDiscountPercentage(formData.discountPercentage);
         if (formData.enableSocialMediaDiscount !== undefined) setEnableSocialMediaDiscount(formData.enableSocialMediaDiscount);
         if (formData.socialMediaDiscountRate !== undefined) setSocialMediaDiscountRate(formData.socialMediaDiscountRate);
+        if (formData.appliedPricing) setAppliedPricing(formData.appliedPricing);
       }
       setFormRestored(true);
     }
