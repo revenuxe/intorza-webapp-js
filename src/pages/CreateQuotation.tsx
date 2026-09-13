@@ -1227,8 +1227,8 @@ const CreateQuotation = () => {
                         </SelectContent>
                       </Select>}
                   </div>
-                  {gstEnabled && <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{profile.tax_label} ({gstRate}%)</span>
+                  {effGstEnabled && <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{profile.tax_label} ({effGstRate}%)</span>
                       <span className="font-medium">{profile.currency_symbol}{gstAmount.toLocaleString(profile.locale, {
                     minimumFractionDigits: 2
                   })}</span>
