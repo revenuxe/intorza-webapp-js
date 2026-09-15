@@ -146,9 +146,12 @@ export const PDFPreviewEditor = ({
             setBrandColors(colors);
           }
         }
-      } catch (error) {
-        console.error('Error loading brand colors:', error);
+      } catch (error: any) {
+        if (!/not authenticated/i.test(error?.message || '')) {
+          console.error('Error loading brand colors:', error);
+        }
       }
+
     };
 
     loadBrandColors();

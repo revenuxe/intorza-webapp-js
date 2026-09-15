@@ -28,9 +28,13 @@ export const useFontPreferences = () => {
           bodyFont: data.pdf_body_font || DEFAULT_PREFERENCES.bodyFont,
         });
       }
-    } catch (error) {
-      console.error('Error loading font preferences:', error);
+    } catch (error: any) {
+      // Signed-out visitors simply use the defaults — not an error worth logging.
+      if (!/not authenticated/i.test(error?.message || '')) {
+        console.error('Error loading font preferences:', error);
+      }
     } finally {
+
       setLoading(false);
     }
   }, []);
