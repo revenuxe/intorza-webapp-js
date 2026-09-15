@@ -1276,7 +1276,17 @@ const CreateQuotation = () => {
                   minimumFractionDigits: 2
                 })}</span>
                 </div>}
+
+              {pricingDirty && <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    Tax/discount changes are not included in the total yet.
+                  </p>
+                  <Button size="sm" className="w-full rounded-lg" onClick={applyPricing}>
+                    Apply pricing
+                  </Button>
+                </div>}
             </div>
+
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-4">
               <Button variant="outline" className="w-full" onClick={() => requireAuth(async () => { await handleSaveQuotation('draft'); }, 'saveDraft', getFormData())}>

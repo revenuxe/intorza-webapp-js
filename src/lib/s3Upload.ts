@@ -35,8 +35,89 @@ const FOLDERS: Record<S3UploadKind, string> = {
   room: "rooms",
 };
 
+const MAX_DIMENSION: Record<S3UploadKind, number> = {
+  logo: 800,
+  signature: 800,
+  qr: 800,
+  hero: 1920,
+  generic: 1600,
+  gallery: 1600,
+  room: 1600,
+};
+
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
 const sanitize = (name: string) =>
   name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
+
+const loadBitmap = async (file: Blob): Promise<ImageBitmap | HTMLImageElement> => {
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(file);
+    } catch {
+      /* fall through to <img> decoding */
+    }
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.decoding = "async";
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("decode-failed"));
+      img.src = url;
+    });
+    return img;
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+};
+
+/**
+ * Resize + re-encode large phone photos before upload.
+ * Returns the original blob when the browser can't decode it (e.g. HEIC).
+ */
+async function compressImage(
+  file: File | Blob,
+  maxDim: number,
+  transparent: boolean,
+): Promise<{ blob: Blob; ext: string; contentType: string } | null> {
+  try {
+    const bitmap = await loadBitmap(file);
+    const w = (bitmap as ImageBitmap).width;
+    const h = (bitmap as ImageBitmap).height;
+    if (!w || !h) return null;
+
+    const scale = Math.min(1, maxDim / Math.max(w, h));
+    const targetW = Math.max(1, Math.round(w * scale));
+    const targetH = Math.max(1, Math.round(h * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    if (!transparent) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, targetW, targetH);
+    }
+    ctx.drawImage(bitmap as CanvasImageSource, 0, 0, targetW, targetH);
+    if ("close" in bitmap && typeof bitmap.close === "function") bitmap.close();
+
+    const type = transparent ? "image/png" : "image/jpeg";
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, type, transparent ? undefined : 0.85),
+    );
+    if (!blob) return null;
+    return {
+      blob,
+      ext: transparent ? "png" : "jpg",
+      contentType: type,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Upload a file/blob to Supabase Storage and return its public URL.
@@ -54,25 +135,62 @@ export async function uploadToS3(
 
   const original =
     filename ?? (file instanceof File ? file.name : `upload-${Date.now()}`);
-  const ext = (original.split(".").pop() || "bin")
+  let ext = (original.split(".").pop() || "bin")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "") || "bin";
+
+  const declaredType = (file as File).type || "";
+  const looksLikeImage =
+    declaredType.startsWith("image/") ||
+    ["jpg", "jpeg", "png", "webp", "gif", "heic", "heif"].includes(ext);
+
+  let payload: Blob = file;
+  let contentType =
+    declaredType || `image/${ext === "jpg" ? "jpeg" : ext}`;
+
+  if (looksLikeImage && ext !== "svg") {
+    const transparent = ext === "png" || declaredType === "image/png";
+    const compressed = await compressImage(
+      file,
+      MAX_DIMENSION[kind] ?? 1600,
+      transparent,
+    );
+    if (compressed) {
+      payload = compressed.blob;
+      ext = compressed.ext;
+      contentType = compressed.contentType;
+    } else if (["heic", "heif"].includes(ext)) {
+      throw new Error(
+        "This photo format (HEIC) isn't supported. On iPhone, set Camera > Formats to 'Most Compatible', or pick a JPG/PNG image.",
+      );
+    }
+  }
+
+  if (payload.size > MAX_UPLOAD_BYTES) {
+    throw new Error("This file is too large. Please choose an image under 15 MB.");
+  }
 
   const bucket = BUCKETS[kind] ?? BUCKETS.generic;
   const folder = FOLDERS[kind] ?? FOLDERS.generic;
   const base = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const key = `${userId}/${folder}/${sanitize(base)}`;
 
-  const contentType =
-    (file as File).type || `image/${ext === "jpg" ? "jpeg" : ext}`;
-
-  const { error } = await supabase.storage.from(bucket).upload(key, file, {
+  const { error } = await supabase.storage.from(bucket).upload(key, payload, {
     upsert: true,
     cacheControl: "31536000",
     contentType,
   });
 
-  if (error) throw new Error(error.message || "Upload failed");
+  if (error) {
+    const msg = (error as any)?.message || "Upload failed";
+    if (/row-level security|Unauthorized|403/i.test(msg)) {
+      throw new Error("Your session expired. Please sign in again and retry the upload.");
+    }
+    if (/exceeded the maximum allowed size|Payload too large|413/i.test(msg)) {
+      throw new Error("This file is too large for storage. Please choose a smaller image.");
+    }
+    throw new Error(msg);
+  }
 
   if (bucket === "room-photos") {
     // Private bucket — hand back a long-lived signed URL instead.
