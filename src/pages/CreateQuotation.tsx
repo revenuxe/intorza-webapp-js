@@ -289,28 +289,12 @@ const CreateQuotation = () => {
       } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       if (error) throw error;
       if (data) {
-        // Get default templates from My Library
-        const { data: paymentTemplate } = await supabase
-          .from('payment_templates')
-          .select('stages')
-          .eq('user_id', user.id)
-          .eq('is_default', true)
-          .single();
-
-        const { data: termsTemplate } = await supabase
-          .from('terms_templates')
-          .select('content')
-          .eq('user_id', user.id)
-          .eq('is_default', true)
-          .eq('template_type', 'quotation')
-          .single();
-
-        const { data: bankTemplate } = await supabase
-          .from('bank_detail_templates')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('is_default', true)
-          .single();
+        // Get templates from My Library (default first, else latest saved)
+        const [libraryStages, libraryTerms, bankTemplate] = await Promise.all([
+          getLibraryPaymentStages(user.id),
+          getLibraryTerms(user.id, 'quotation'),
+          getLibraryBankTemplate(user.id),
+        ]);
 
         setProfile({
           company_name: data.company_name || "",
@@ -321,7 +305,7 @@ const CreateQuotation = () => {
           gstin: data.gstin || "",
           professional_advantages: data.professional_advantages || "",
           signature_url: data.signature_url || "",
-          terms_conditions: (termsTemplate?.content as any) || data.terms_conditions as any || [],
+          terms_conditions: (libraryTerms as any) || (data.terms_conditions as any) || [],
           bank_name: bankTemplate?.bank_name || (data as any).bank_name || "",
           bank_account_number: bankTemplate?.account_number || (data as any).bank_account_number || "",
           bank_ifsc_code: bankTemplate?.ifsc_code || (data as any).bank_ifsc_code || "",
@@ -338,11 +322,12 @@ const CreateQuotation = () => {
         });
 
         // Load payment stages - prefer template over profile
-        if (paymentTemplate?.stages) {
-          setPaymentStages(paymentTemplate.stages as any);
+        if (libraryStages) {
+          setPaymentStages(libraryStages as any);
         } else if (data.payment_stages) {
           setPaymentStages(data.payment_stages as any);
         }
+
       }
     } catch (error) {
       console.error('Error loading profile:', error);
