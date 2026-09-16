@@ -23,6 +23,7 @@ import { ProductNameInput } from "@/components/quotation/ProductNameInput";
 import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
 import { GalleryImagePicker } from "@/components/quotation/GalleryImagePicker";
 import { GalleryImage } from "@/hooks/useGallery";
+import { getLibraryTerms, getLibraryPaymentStages, getLibraryBankTemplate } from "@/lib/libraryDefaults";
 interface LineItem {
   id: string;
   side: string;
