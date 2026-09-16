@@ -165,7 +165,8 @@ export function buildTechStackSVG(): string {
   <text x="${W - LX}" y="98" fill="${C.muted}" font-size="13" text-anchor="end">Generated ${new Date().toISOString().slice(0, 10)}</text>`;
 
   const footer = `
-  <text x="${LX}" y="${H - 42}" fill="${C.muted}" font-size="13.5">Flow: designer signs in → builds a quotation (sections, items, sq-ft rates, tax applied on confirm) → PDF generated in the browser → shared/accepted → converted to an invoice → payments tracked. All reads/writes go through supabase-js with RLS; files land in Supabase Storage; Pro billing runs through Razorpay edge functions.</text>
+  <text x="${LX}" y="${H - 58}" fill="${C.muted}" font-size="13.5">Flow: designer signs in → builds a quotation (sections, items, sq-ft rates, tax applied only on confirm) → PDF generated in the browser → shared &amp; accepted → converted to an invoice → payments tracked.</text>
+  <text x="${LX}" y="${H - 36}" fill="${C.muted}" font-size="13.5">All reads/writes go through supabase-js with Row Level Security; files land in Supabase Storage; Pro billing runs through Razorpay via Supabase Edge Functions.</text>
   <text x="${W - LX}" y="${H - 42}" fill="${C.stroke}" font-size="13" text-anchor="end">intorza.com</text>`;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Manrope, 'Segoe UI', Helvetica, Arial, sans-serif">
