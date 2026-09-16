@@ -11,7 +11,7 @@ const C = {
   bg: "#0E1116",
   grid: "#171C24",
   panel: "#151A21",
-  panelAlt: "#1B2husk",
+  panelAlt: "#1B222B",
   stroke: "#2A323D",
   text: "#F2F5F9",
   muted: "#93A0B1",
