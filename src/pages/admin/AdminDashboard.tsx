@@ -13,6 +13,7 @@ import {
   AlertTriangle, Bug, ThumbsUp, RefreshCw, Eye, Clock, Crown
 } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { TechStackDialog } from "@/components/TechStackDialog";
 
 interface User {
   id: string;
@@ -592,6 +593,7 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            <TechStackDialog />
             <Button variant="outline" size="icon" onClick={refreshData} className="h-8 w-8">
               <RefreshCw className="h-4 w-4" />
             </Button>
