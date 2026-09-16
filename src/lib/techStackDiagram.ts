@@ -136,8 +136,9 @@ export function buildTechStackSVG(): string {
 
   // Data model strip
   s += `
-  <rect x="${inner}" y="${734}" width="${innerW}" height="48" rx="12" fill="#12171E" stroke="${C.stroke}"/>
-  <text x="${inner + 18}" y="${764}" fill="${C.muted}" font-size="13.5">Core tables: profiles · quotations → quotation_sections → quotation_items · invoices → payments · clients · tasks · team_members · team_member_requests · attendance · site_measurement_projects → rooms → room_photos · gallery_images · *_templates · user_roles · feedback</text>`;
+  <rect x="${inner}" y="${734}" width="${innerW}" height="52" rx="12" fill="#12171E" stroke="${C.stroke}"/>
+  <text x="${inner + 18}" y="${757}" fill="${C.muted}" font-size="13">Core tables: profiles · quotations → quotation_sections → quotation_items · invoices → payments · clients · tasks · gallery_images · feedback</text>
+  <text x="${inner + 18}" y="${776}" fill="${C.muted}" font-size="13">team_members · team_member_requests · attendance · site_measurement_projects → rooms → room_photos · terms/payment/bank/section templates · user_roles</text>`;
 
   // Lane 4 — hosting / services
   const l4 = [
