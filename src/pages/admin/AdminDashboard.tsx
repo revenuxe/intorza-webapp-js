@@ -13,6 +13,7 @@ import {
   AlertTriangle, Bug, ThumbsUp, RefreshCw, Eye, Clock, Crown
 } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import { TechStackDialog } from "@/components/TechStackDialog";
 
 interface User {
   id: string;
