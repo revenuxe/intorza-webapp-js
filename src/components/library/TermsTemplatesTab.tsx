@@ -23,6 +23,7 @@ interface TermsTemplate {
   template_type: 'quotation' | 'invoice';
   content: TermsSection[];
   is_default: boolean;
+  is_enabled?: boolean;
   created_at: string;
 }
 
@@ -127,6 +128,24 @@ export const TermsTemplatesTab = () => {
     } catch (error) {
       console.error('Error setting default:', error);
       toast({ title: "Failed to set default", variant: "destructive" });
+    }
+  };
+
+  const handleToggleEnabled = async (template: TermsTemplate, enabled: boolean) => {
+    setTemplates(prev => prev.map(t => (t.id === template.id ? { ...t, is_enabled: enabled } : t)));
+    try {
+      await libraryApi.terms.update(template.id, { is_enabled: enabled } as any);
+      toast({
+        title: enabled ? "Template enabled" : "Template disabled",
+        description: enabled
+          ? "These terms will appear in the preview and downloaded PDF."
+          : "These terms will be left out of the preview and PDF.",
+      });
+      loadTemplates();
+    } catch (error) {
+      console.error('Error toggling template:', error);
+      setTemplates(prev => prev.map(t => (t.id === template.id ? { ...t, is_enabled: !enabled } : t)));
+      toast({ title: "Failed to update template", variant: "destructive" });
     }
   };
 
