@@ -141,17 +141,10 @@ const QuotationDetail = () => {
           paymentStages = paymentTemplate.stages;
         }
 
-        // Get default terms template
-        const { data: termsTemplate } = await supabase
-          .from('terms_templates')
-          .select('content')
-          .eq('user_id', user.id)
-          .eq('is_default', true)
-          .eq('template_type', 'quotation')
-          .single();
-        
-        if (termsTemplate?.content) {
-          termsConditions = termsTemplate.content;
+        // Get enabled terms template from My Library
+        const libraryTerms = await getLibraryTerms(user.id, 'quotation');
+        if (libraryTerms) {
+          termsConditions = libraryTerms as any;
         }
 
         // Get default bank details template
