@@ -108,7 +108,18 @@ const InvoiceDetail = () => {
 
   const loadProfile = async () => {
     const { data } = await profileApi.get();
-    if (data) setProfile(data);
+    if (!data) return;
+    let merged: any = data;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const libraryTerms = await getLibraryTerms(user.id, 'invoice');
+        if (libraryTerms) merged = { ...merged, invoice_terms_conditions: libraryTerms };
+      }
+    } catch (e) {
+      console.error('Error loading library invoice terms:', e);
+    }
+    setProfile(merged);
   };
 
   const loadInvoice = async () => {
