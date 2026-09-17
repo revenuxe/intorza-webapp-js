@@ -254,6 +254,16 @@ export const TermsTemplatesTab = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2 mr-2">
+                      <Switch
+                        checked={template.is_enabled !== false}
+                        onCheckedChange={(v) => handleToggleEnabled(template, v)}
+                        aria-label="Use these terms in PDFs"
+                      />
+                      <span className="text-xs text-muted-foreground hidden sm:inline">
+                        {template.is_enabled === false ? "Off" : "On"}
+                      </span>
+                    </div>
                     {!template.is_default && (
                       <Button variant="ghost" size="sm" onClick={() => handleSetDefault(template)}>
                         <Star className="h-4 w-4" />
@@ -269,7 +279,10 @@ export const TermsTemplatesTab = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">{template.content.length} section(s)</p>
+                <p className="text-sm text-muted-foreground">
+                  {template.content.length} section(s)
+                  {template.is_enabled === false && " · not shown in PDFs"}
+                </p>
               </CardContent>
             </Card>
           ))}
