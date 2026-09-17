@@ -15,6 +15,7 @@ import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getEditorSettings } from "@/lib/pdfThemes";
 import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
+import { getLibraryTerms } from "@/lib/libraryDefaults";
 
 interface Quotation {
   id: string;

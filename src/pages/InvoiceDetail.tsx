@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
 import { InvoicePreviewEditor } from "@/components/InvoicePreviewEditor";
 import { PDFEditorSettings, InvoiceSettings, getEditorSettings, getInvoiceSettings } from "@/lib/pdfThemes";
+import { getLibraryTerms } from "@/lib/libraryDefaults";
 
 interface Invoice {
   id: string;
