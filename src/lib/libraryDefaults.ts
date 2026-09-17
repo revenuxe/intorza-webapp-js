@@ -23,16 +23,19 @@ export async function getLibraryTerms(
 ): Promise<TermsSection[] | null> {
   const { data } = await supabase
     .from("terms_templates")
-    .select("content, is_default, updated_at")
+    .select("content, is_default, is_enabled, updated_at")
     .eq("user_id", userId)
     .eq("template_type", templateType)
-    .eq("is_enabled", true)
     .order("is_default", { ascending: false })
-    .order("updated_at", { ascending: false })
-    .limit(1);
+    .order("updated_at", { ascending: false });
 
-  const content = data?.[0]?.content as unknown;
-  return isUsableTerms(content) ? (content as TermsSection[]) : null;
+  if (!data || data.length === 0) return null; // no templates saved -> caller falls back
+
+  const enabled = data.filter((t: any) => t.is_enabled !== false);
+  if (enabled.length === 0) return []; // all switched off -> hide terms in PDF
+
+  const content = enabled[0]?.content as unknown;
+  return isUsableTerms(content) ? (content as TermsSection[]) : [];
 }
 
 /** Payment stages: default template, else most recently updated. */
