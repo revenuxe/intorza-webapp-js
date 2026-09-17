@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,7 @@ interface TermsTemplate {
   template_type: 'quotation' | 'invoice';
   content: TermsSection[];
   is_default: boolean;
+  is_enabled?: boolean;
   created_at: string;
 }
 
@@ -126,6 +128,24 @@ export const TermsTemplatesTab = () => {
     } catch (error) {
       console.error('Error setting default:', error);
       toast({ title: "Failed to set default", variant: "destructive" });
+    }
+  };
+
+  const handleToggleEnabled = async (template: TermsTemplate, enabled: boolean) => {
+    setTemplates(prev => prev.map(t => (t.id === template.id ? { ...t, is_enabled: enabled } : t)));
+    try {
+      await libraryApi.terms.update(template.id, { is_enabled: enabled } as any);
+      toast({
+        title: enabled ? "Template enabled" : "Template disabled",
+        description: enabled
+          ? "These terms will appear in the preview and downloaded PDF."
+          : "These terms will be left out of the preview and PDF.",
+      });
+      loadTemplates();
+    } catch (error) {
+      console.error('Error toggling template:', error);
+      setTemplates(prev => prev.map(t => (t.id === template.id ? { ...t, is_enabled: !enabled } : t)));
+      toast({ title: "Failed to update template", variant: "destructive" });
     }
   };
 
@@ -234,6 +254,16 @@ export const TermsTemplatesTab = () => {
                     )}
                   </div>
                   <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2 mr-2">
+                      <Switch
+                        checked={template.is_enabled !== false}
+                        onCheckedChange={(v) => handleToggleEnabled(template, v)}
+                        aria-label="Use these terms in PDFs"
+                      />
+                      <span className="text-xs text-muted-foreground hidden sm:inline">
+                        {template.is_enabled === false ? "Off" : "On"}
+                      </span>
+                    </div>
                     {!template.is_default && (
                       <Button variant="ghost" size="sm" onClick={() => handleSetDefault(template)}>
                         <Star className="h-4 w-4" />
@@ -249,7 +279,10 @@ export const TermsTemplatesTab = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">{template.content.length} section(s)</p>
+                <p className="text-sm text-muted-foreground">
+                  {template.content.length} section(s)
+                  {template.is_enabled === false && " · not shown in PDFs"}
+                </p>
               </CardContent>
             </Card>
           ))}

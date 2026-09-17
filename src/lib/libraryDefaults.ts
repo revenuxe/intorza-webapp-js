@@ -26,6 +26,7 @@ export async function getLibraryTerms(
     .select("content, is_default, updated_at")
     .eq("user_id", userId)
     .eq("template_type", templateType)
+    .eq("is_enabled", true)
     .order("is_default", { ascending: false })
     .order("updated_at", { ascending: false })
     .limit(1);

@@ -15,6 +15,7 @@ import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getEditorSettings } from "@/lib/pdfThemes";
 import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
+import { getLibraryTerms } from "@/lib/libraryDefaults";
 
 interface Quotation {
   id: string;
@@ -135,23 +136,16 @@ const QuotationDetail = () => {
           .select('stages')
           .eq('user_id', user.id)
           .eq('is_default', true)
-          .single();
+          .maybeSingle();
         
         if (paymentTemplate?.stages) {
           paymentStages = paymentTemplate.stages;
         }
 
-        // Get default terms template
-        const { data: termsTemplate } = await supabase
-          .from('terms_templates')
-          .select('content')
-          .eq('user_id', user.id)
-          .eq('is_default', true)
-          .eq('template_type', 'quotation')
-          .single();
-        
-        if (termsTemplate?.content) {
-          termsConditions = termsTemplate.content;
+        // Get enabled terms template from My Library
+        const libraryTerms = await getLibraryTerms(user.id, 'quotation');
+        if (libraryTerms) {
+          termsConditions = libraryTerms as any;
         }
 
         // Get default bank details template
@@ -160,7 +154,7 @@ const QuotationDetail = () => {
           .select('*')
           .eq('user_id', user.id)
           .eq('is_default', true)
-          .single();
+          .maybeSingle();
         
         if (bankTemplate) {
           bankDetails = {

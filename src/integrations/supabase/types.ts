@@ -1483,6 +1483,7 @@ export type Database = {
           created_at: string
           id: string
           is_default: boolean | null
+          is_enabled: boolean
           template_name: string
           template_type: string
           updated_at: string
@@ -1494,6 +1495,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_default?: boolean | null
+          is_enabled?: boolean
           template_name: string
           template_type?: string
           updated_at?: string
@@ -1505,6 +1507,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_default?: boolean | null
+          is_enabled?: boolean
           template_name?: string
           template_type?: string
           updated_at?: string
