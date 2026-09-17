@@ -144,7 +144,7 @@ const QuotationDetail = () => {
 
         // Get enabled terms template from My Library
         const libraryTerms = await getLibraryTerms(user.id, 'quotation');
-        if (libraryTerms) {
+        if (libraryTerms !== null) {
           termsConditions = libraryTerms as any;
         }
 

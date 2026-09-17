@@ -115,7 +115,7 @@ const InvoiceDetail = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const libraryTerms = await getLibraryTerms(user.id, 'invoice');
-        if (libraryTerms) merged = { ...merged, invoice_terms_conditions: libraryTerms };
+        if (libraryTerms !== null) merged = { ...merged, invoice_terms_conditions: libraryTerms };
       }
     } catch (e) {
       console.error('Error loading library invoice terms:', e);

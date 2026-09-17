@@ -749,20 +749,8 @@ const CreateQuotation = () => {
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (!profileData) return null;
 
-    const { data: termsTemplate } = await supabase
-      .from('terms_templates')
-      .select('content')
-      .eq('user_id', user.id)
-      .eq('is_default', true)
-      .eq('template_type', 'quotation')
-      .single();
-
-    const { data: bankTemplate } = await supabase
-      .from('bank_detail_templates')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('is_default', true)
-      .single();
+    const libraryTerms = await getLibraryTerms(user.id, 'quotation');
+    const bankTemplate = await getLibraryBankTemplate(user.id);
 
     return {
       company_name: profileData.company_name || "",
@@ -773,7 +761,7 @@ const CreateQuotation = () => {
       gstin: profileData.gstin || "",
       professional_advantages: profileData.professional_advantages || "",
       signature_url: profileData.signature_url || "",
-      terms_conditions: (termsTemplate?.content as any) || profileData.terms_conditions as any || [],
+      terms_conditions: (libraryTerms !== null ? libraryTerms : (profileData.terms_conditions as any)) || [],
       bank_name: bankTemplate?.bank_name || (profileData as any).bank_name || "",
       bank_account_number: bankTemplate?.account_number || (profileData as any).bank_account_number || "",
       bank_ifsc_code: bankTemplate?.ifsc_code || (profileData as any).bank_ifsc_code || "",
