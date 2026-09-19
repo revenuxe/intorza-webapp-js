@@ -39,6 +39,8 @@ import { FontPreviewPanel } from "./FontPreviewPanel";
 import { PDFCanvasPreview } from "./PDFCanvasPreview";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { profileApi } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
+import { getLibraryTerms } from "@/lib/libraryDefaults";
 
 interface BrandColors {
   primary?: string;
@@ -124,14 +126,25 @@ export const InvoicePreviewEditor = ({
   
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences } = useFontPreferences();
 
-  // Load brand colors and profile
+  // Refresh the profile and enabled library terms whenever the preview opens.
   useEffect(() => {
+    if (!open) return;
+    let active = true;
     const loadData = async () => {
       try {
-        const { data } = await profileApi.get();
+        const [{ data }, { data: authData }] = await Promise.all([
+          profileApi.get(),
+          supabase.auth.getUser(),
+        ]);
 
-        if (data) {
-          setProfile(data);
+        if (data && active) {
+          let previewProfile = data;
+          if (authData.user) {
+            const terms = await getLibraryTerms(authData.user.id, 'invoice');
+            previewProfile = { ...data, invoice_terms_conditions: terms };
+          }
+          if (!active) return;
+          setProfile(previewProfile);
           if (data.brand_colors && typeof data.brand_colors === 'object') {
             const colors = data.brand_colors as unknown as BrandColors;
             if (colors.primary) setBrandColors(colors);
@@ -141,8 +154,9 @@ export const InvoicePreviewEditor = ({
         console.error('Error loading profile:', error);
       }
     };
-    loadData();
-  }, []);
+    void loadData();
+    return () => { active = false; };
+  }, [open]);
 
   useEffect(() => {
     if (open) {

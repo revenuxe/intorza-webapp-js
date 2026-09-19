@@ -306,7 +306,7 @@ const CreateQuotation = () => {
           gstin: data.gstin || "",
           professional_advantages: data.professional_advantages || "",
           signature_url: data.signature_url || "",
-          terms_conditions: (libraryTerms as any) || (data.terms_conditions as any) || [],
+          terms_conditions: libraryTerms as any,
           bank_name: bankTemplate?.bank_name || (data as any).bank_name || "",
           bank_account_number: bankTemplate?.account_number || (data as any).bank_account_number || "",
           bank_ifsc_code: bankTemplate?.ifsc_code || (data as any).bank_ifsc_code || "",
@@ -761,7 +761,7 @@ const CreateQuotation = () => {
       gstin: profileData.gstin || "",
       professional_advantages: profileData.professional_advantages || "",
       signature_url: profileData.signature_url || "",
-      terms_conditions: (libraryTerms !== null ? libraryTerms : (profileData.terms_conditions as any)) || [],
+      terms_conditions: libraryTerms as any,
       bank_name: bankTemplate?.bank_name || (profileData as any).bank_name || "",
       bank_account_number: bankTemplate?.account_number || (profileData as any).bank_account_number || "",
       bank_ifsc_code: bankTemplate?.ifsc_code || (profileData as any).bank_ifsc_code || "",
@@ -793,13 +793,11 @@ const CreateQuotation = () => {
       
       // Use override profile if provided, otherwise use state profile
       // If state profile is empty, fetch fresh data
-      let profileToUse = overrideProfile || profile;
-      if (!profileToUse.company_name && !profileToUse.logo_url) {
+      let profileToUse = overrideProfile;
+      if (!profileToUse) {
         const freshProfile = await fetchFreshProfile();
-        if (freshProfile) {
-          profileToUse = freshProfile;
-          setProfile(freshProfile); // Update state for future use
-        }
+        profileToUse = freshProfile || profile;
+        if (freshProfile) setProfile(freshProfile);
       }
       
       await generateQuotationPDF({

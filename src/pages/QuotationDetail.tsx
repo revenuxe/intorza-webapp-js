@@ -144,9 +144,7 @@ const QuotationDetail = () => {
 
         // Get enabled terms template from My Library
         const libraryTerms = await getLibraryTerms(user.id, 'quotation');
-        if (libraryTerms !== null) {
-          termsConditions = libraryTerms as any;
-        }
+        termsConditions = libraryTerms as any;
 
         // Get default bank details template
         const { data: bankTemplate } = await supabase
