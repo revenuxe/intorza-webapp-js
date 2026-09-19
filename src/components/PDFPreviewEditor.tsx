@@ -37,6 +37,8 @@ import { PDFAdvancedEditor } from "./PDFAdvancedEditor";
 import { PDFCanvasPreview, type PDFPreviewMetrics } from "./PDFCanvasPreview";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { profileApi } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
+import { getLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
 
 interface BrandColors {
   primary?: string;
@@ -107,6 +109,7 @@ export const PDFPreviewEditor = ({
   const [totalPages, setTotalPages] = useState(0);
   const [activePage, setActivePage] = useState(0);
   const [showPerfHud, setShowPerfHud] = useState(false);
+  const [termsConditions, setTermsConditions] = useState<TermsSection[]>([]);
   const [perfMetrics, setPerfMetrics] = useState<PDFPreviewMetrics | null>(null);
   const canvasRef = useRef<import('./PDFCanvasPreview').PDFCanvasPreviewHandle | null>(null);
   // The mobile and desktop layouts each render their own copy of PreviewPanel (CSS
@@ -134,17 +137,27 @@ export const PDFPreviewEditor = ({
   // Load font preferences from database
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences, loading: fontLoading } = useFontPreferences();
 
-  // Load brand colors from profile
+  // Refresh profile styling and enabled library terms whenever the preview opens.
   useEffect(() => {
-    const loadBrandColors = async () => {
+    if (!open) return;
+    let active = true;
+    const loadPreviewData = async () => {
       try {
-        const { data } = await profileApi.get();
+        const [{ data }, { data: authData }] = await Promise.all([
+          profileApi.get(),
+          supabase.auth.getUser(),
+        ]);
 
+        if (!active) return;
         if (data?.brand_colors && typeof data.brand_colors === 'object') {
           const colors = data.brand_colors as unknown as BrandColors;
           if (colors.primary) {
             setBrandColors(colors);
           }
+        }
+        if (authData.user) {
+          const terms = await getLibraryTerms(authData.user.id, 'quotation');
+          if (active) setTermsConditions(terms);
         }
       } catch (error: any) {
         if (!/not authenticated/i.test(error?.message || '')) {
@@ -154,8 +167,9 @@ export const PDFPreviewEditor = ({
 
     };
 
-    loadBrandColors();
-  }, []);
+    void loadPreviewData();
+    return () => { active = false; };
+  }, [open]);
 
   useEffect(() => {
     if (open) {
@@ -271,6 +285,7 @@ export const PDFPreviewEditor = ({
         companyLogo: quotationData.companyLogo,
         companyName: quotationData.companyName || 'Your Company',
         companyAddress: 'Company Address',
+        termsConditions,
         settings: pdfSettings,
         editorSettings: currentEditorSettings,
         previewOnly: true,
@@ -298,7 +313,7 @@ export const PDFPreviewEditor = ({
         setIsGeneratingPdf(false);
       }
     }
-  }, [customizeSettings, quotationData, brandColors]);
+  }, [customizeSettings, quotationData, brandColors, termsConditions]);
 
   // Debounced incremental preview pipeline. Editor changes are saved immediately,
   // but PDF regeneration only receives the latest stable snapshot.

@@ -115,7 +115,7 @@ const InvoiceDetail = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const libraryTerms = await getLibraryTerms(user.id, 'invoice');
-        if (libraryTerms !== null) merged = { ...merged, invoice_terms_conditions: libraryTerms };
+        merged = { ...merged, invoice_terms_conditions: libraryTerms };
       }
     } catch (e) {
       console.error('Error loading library invoice terms:', e);
@@ -269,6 +269,14 @@ const InvoiceDetail = () => {
       let nextDue = invoice.due_date ? formatDate(invoice.due_date) : undefined;
       let nextAmount = invoice.remaining_amount;
 
+      let pdfProfile = profile || {};
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const libraryTerms = await getLibraryTerms(user.id, 'invoice');
+        pdfProfile = { ...pdfProfile, invoice_terms_conditions: libraryTerms };
+        setProfile(pdfProfile);
+      }
+
       await generateInvoicePDF({
         invoiceNumber: invoice.invoice_number,
         invoiceDate: formatDate(invoice.invoice_date),
@@ -288,13 +296,13 @@ const InvoiceDetail = () => {
           payment_method: p.payment_method,
           notes: p.notes
         })),
-        profile: profile || {},
-        localization: profile ? {
-          currencyCode: profile.currency_code || 'INR',
-          currencySymbol: profile.currency_symbol || '₹',
-          locale: profile.locale || 'en-IN',
-          taxLabel: profile.tax_label || 'GST',
-          taxRegistrationLabel: profile.tax_label === 'GST' ? 'GSTIN' : `${profile.tax_label || 'Tax'} No`,
+        profile: pdfProfile,
+        localization: pdfProfile ? {
+          currencyCode: pdfProfile.currency_code || 'INR',
+          currencySymbol: pdfProfile.currency_symbol || '₹',
+          locale: pdfProfile.locale || 'en-IN',
+          taxLabel: pdfProfile.tax_label || 'GST',
+          taxRegistrationLabel: pdfProfile.tax_label === 'GST' ? 'GSTIN' : `${pdfProfile.tax_label || 'Tax'} No`,
         } : undefined,
         editorSettings: editorSettings || getEditorSettings(),
         invoiceSettings: invoiceSettings || getInvoiceSettings()

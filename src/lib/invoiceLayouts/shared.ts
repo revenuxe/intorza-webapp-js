@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { PDFEditorSettings, InvoiceSettings, PDFTheme, getThemeById, hexToRgb, getFontById, applyBrandColorsToTheme } from '../pdfThemes';
 import { getNumericFont, createPDFCurrencyFormatter } from '../pdfCurrencyFormatter';
+import { DEFAULT_INVOICE_TERMS } from '../libraryDefaults';
 
 export interface InvoiceData {
   invoiceNumber: string;
@@ -288,10 +289,16 @@ export const resolveHeroImageSource = (profile: InvoiceData['profile']): HeroIma
 export const renderTermsAndConditions = async (ctx: LayoutContext, startY: number): Promise<number> => {
   const { doc, data, invoiceSettings, COLORS, margin, contentWidth, pageHeight, setHeadingFont, setBodyFont } = ctx;
   let yPosition = startY;
+  const termsToUse = data.profile.invoice_terms_conditions?.length
+    ? data.profile.invoice_terms_conditions
+    : DEFAULT_INVOICE_TERMS;
 
-  if (!(invoiceSettings.showTermsConditions && data.profile.invoice_terms_conditions && data.profile.invoice_terms_conditions.length > 0)) {
+  if (!invoiceSettings.showTermsConditions) {
     return yPosition;
   }
+
+  doc.addPage();
+  yPosition = 15;
 
   const termsLineHeight = 3.2;
   const titleGap = 3.5;
@@ -300,7 +307,7 @@ export const renderTermsAndConditions = async (ctx: LayoutContext, startY: numbe
   const signatureBlockHeight = invoiceSettings.showSignatureArea ? 35 : 0;
 
   let estimatedHeight = headerGap + 4;
-  data.profile.invoice_terms_conditions.forEach(term => {
+  termsToUse.forEach(term => {
     if (!term || !term.title || !term.points) return;
     estimatedHeight += titleGap;
     term.points.forEach((p) => {
@@ -311,12 +318,6 @@ export const renderTermsAndConditions = async (ctx: LayoutContext, startY: numbe
     estimatedHeight += blockGap;
   });
   estimatedHeight += signatureBlockHeight;
-
-  const availableSpace = pageHeight - 20 - yPosition;
-  if (estimatedHeight > availableSpace) {
-    doc.addPage();
-    yPosition = 15;
-  }
 
   setHeadingFont('bold');
   doc.setFontSize(10);
@@ -355,7 +356,7 @@ export const renderTermsAndConditions = async (ctx: LayoutContext, startY: numbe
     yPosition += blockGap;
   };
 
-  data.profile.invoice_terms_conditions.forEach(term => {
+  termsToUse.forEach(term => {
     if (term && term.title && term.points) {
       addBlock(term.title, term.points);
     }

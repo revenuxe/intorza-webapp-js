@@ -6,6 +6,22 @@ export interface TermsSection {
   points: string[];
 }
 
+export const DEFAULT_QUOTATION_TERMS: TermsSection[] = [
+  { id: "1", title: "PROJECT DURATION FOR 30 DAYS (AFTER DESIGN PHASE)", points: ["The execution phase will commence post-design approval and is estimated to be completed within 30 working days, subject to site readiness and material availability."] },
+  { id: "2", title: "MATERIAL DISPATCH & EXECUTION PROCESS", points: ["Materials will be dispatched as per the approved design and timeline.", "Installation will be carried out by trained professionals ensuring quality standards."] },
+  { id: "3", title: "SITE READINESS", points: ["The client must ensure that the site is ready with completed civil work, electrical points, plumbing, and false ceiling before execution begins.", "Any delays due to site unreadiness will extend the project timeline."] },
+  { id: "4", title: "IMPLICATIONS OF PAYMENT DELAY", points: ["Delayed payments may result in project timeline extensions and additional charges.", "Timely payments ensure smooth project execution and delivery."] },
+  { id: "5", title: "DESIGN PHASE TIMELINES & DELAY POLICY", points: ["Design approval is expected within 7-10 working days.", "Delays in design approval will proportionally delay the overall project timeline."] },
+  { id: "6", title: "CHANGES DURING EXECUTION DUE TO TECHNICAL LIMITATION", points: ["Any on-site technical constraints may require minor design modifications.", "Such changes will be communicated and executed with client consent."] },
+  { id: "7", title: "SERVICE WARRANTY & TRANSPARENCY", points: ["We provide a warranty on manufacturing defects and workmanship.", "All materials used will be as per approved specifications with complete transparency."] },
+];
+
+export const DEFAULT_INVOICE_TERMS: TermsSection[] = [
+  { id: "1", title: "PAYMENT TERMS", points: ["Payment is due as per the agreed schedule.", "Please include the invoice number with every payment."] },
+  { id: "2", title: "LATE PAYMENT", points: ["Delayed payments may affect the project schedule and delivery dates."] },
+  { id: "3", title: "PAYMENT CONFIRMATION", points: ["A payment is considered complete after the funds are received and confirmed."] },
+];
+
 const isUsableTerms = (value: any): value is TermsSection[] =>
   Array.isArray(value) &&
   value.length > 0 &&
@@ -20,8 +36,9 @@ const isUsableTerms = (value: any): value is TermsSection[] =>
 export async function getLibraryTerms(
   userId: string,
   templateType: "quotation" | "invoice",
-): Promise<TermsSection[] | null> {
-  const { data } = await supabase
+): Promise<TermsSection[]> {
+  const fallback = templateType === "invoice" ? DEFAULT_INVOICE_TERMS : DEFAULT_QUOTATION_TERMS;
+  const { data, error } = await supabase
     .from("terms_templates")
     .select("content, is_default, is_enabled, updated_at")
     .eq("user_id", userId)
@@ -29,13 +46,18 @@ export async function getLibraryTerms(
     .order("is_default", { ascending: false })
     .order("updated_at", { ascending: false });
 
-  if (!data || data.length === 0) return null; // no templates saved -> caller falls back
+  if (error) {
+    console.error(`Error loading ${templateType} terms:`, error);
+    return fallback;
+  }
+
+  if (!data || data.length === 0) return fallback;
 
   const enabled = data.filter((t: any) => t.is_enabled !== false);
-  if (enabled.length === 0) return []; // all switched off -> hide terms in PDF
+  if (enabled.length === 0) return fallback;
 
-  const content = enabled[0]?.content as unknown;
-  return isUsableTerms(content) ? (content as TermsSection[]) : [];
+  const template = enabled.find((item: any) => isUsableTerms(item.content));
+  return template ? (template.content as unknown as TermsSection[]) : fallback;
 }
 
 /** Payment stages: default template, else most recently updated. */
