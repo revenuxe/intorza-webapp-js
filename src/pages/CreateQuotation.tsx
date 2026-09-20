@@ -778,7 +778,7 @@ const CreateQuotation = () => {
     };
   };
 
-  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, overrideQuotationId?: string, overrideProfile?: typeof profile) => {
+  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, overrideQuotationId?: string, overrideProfile?: typeof profile, editorTerms?: import("@/lib/libraryDefaults").TermsSection[]) => {
     setIsDownloading(true);
     try {
       if (!clientName || !clientAddress) {
@@ -839,7 +839,7 @@ const CreateQuotation = () => {
           milestone: s.milestone,
           percentage: s.percentage
         })),
-        termsConditions: profileToUse.terms_conditions,
+        termsConditions: editorTerms || profileToUse.terms_conditions,
         bankDetails: {
           bankName: profileToUse.bank_name,
           accountNumber: profileToUse.bank_account_number,
@@ -1301,7 +1301,7 @@ const CreateQuotation = () => {
         </Card>
 
         {/* PDF Preview Editor */}
-        <PDFPreviewEditor open={showPreview} onClose={() => setShowPreview(false)} onDownload={settings => handleDownloadPDF(settings)} quotationData={quotationPreviewData} customizeSettings={customizeSettings} />
+        <PDFPreviewEditor open={showPreview} onClose={() => setShowPreview(false)} onDownload={(settings, terms) => handleDownloadPDF(settings, undefined, undefined, terms)} quotationData={quotationPreviewData} customizeSettings={customizeSettings} />
         
         {/* Gallery Image Picker */}
         <GalleryImagePicker

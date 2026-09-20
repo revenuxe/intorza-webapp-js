@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { resolveTermsTemplate, type ResolvedTerms } from "@/lib/termsResolver";
 
 export interface TermsSection {
   id: string;
@@ -22,11 +23,6 @@ export const DEFAULT_INVOICE_TERMS: TermsSection[] = [
   { id: "3", title: "PAYMENT CONFIRMATION", points: ["A payment is considered complete after the funds are received and confirmed."] },
 ];
 
-const isUsableTerms = (value: any): value is TermsSection[] =>
-  Array.isArray(value) &&
-  value.length > 0 &&
-  value.some((s) => s && s.title && Array.isArray(s.points) && s.points.some((p: string) => (p || "").trim()));
-
 /**
  * Terms & Conditions for a document type.
  * Prefers the template flagged as default, otherwise falls back to the most
@@ -37,10 +33,17 @@ export async function getLibraryTerms(
   userId: string,
   templateType: "quotation" | "invoice",
 ): Promise<TermsSection[]> {
+  return (await getResolvedLibraryTerms(userId, templateType)).terms;
+}
+
+export async function getResolvedLibraryTerms(
+  userId: string,
+  templateType: "quotation" | "invoice",
+): Promise<ResolvedTerms> {
   const fallback = templateType === "invoice" ? DEFAULT_INVOICE_TERMS : DEFAULT_QUOTATION_TERMS;
   const { data, error } = await supabase
     .from("terms_templates")
-    .select("content, is_default, is_enabled, updated_at")
+    .select("id, template_name, content, is_default, is_enabled, updated_at")
     .eq("user_id", userId)
     .eq("template_type", templateType)
     .order("is_default", { ascending: false })
@@ -48,16 +51,9 @@ export async function getLibraryTerms(
 
   if (error) {
     console.error(`Error loading ${templateType} terms:`, error);
-    return fallback;
+    return { terms: fallback, templateId: null, templateName: `Default ${templateType} terms`, source: "default" };
   }
-
-  if (!data || data.length === 0) return fallback;
-
-  const enabled = data.filter((t: any) => t.is_enabled !== false);
-  if (enabled.length === 0) return fallback;
-
-  const template = enabled.find((item: any) => isUsableTerms(item.content));
-  return template ? (template.content as unknown as TermsSection[]) : fallback;
+  return resolveTermsTemplate(data || [], fallback, `Default ${templateType} terms`);
 }
 
 /** Payment stages: default template, else most recently updated. */

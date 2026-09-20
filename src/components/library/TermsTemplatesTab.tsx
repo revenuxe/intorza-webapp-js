@@ -134,14 +134,17 @@ export const TermsTemplatesTab = () => {
   const handleToggleEnabled = async (template: TermsTemplate, enabled: boolean) => {
     setTemplates(prev => prev.map(t => (t.id === template.id ? { ...t, is_enabled: enabled } : t)));
     try {
-      await libraryApi.terms.update(template.id, { is_enabled: enabled } as any);
+      const { data: saved } = await libraryApi.terms.update(template.id, { is_enabled: enabled } as any);
+      if ((saved as any)?.is_enabled !== enabled) {
+        throw new Error("The saved template state did not match your selection");
+      }
       toast({
         title: enabled ? "Template enabled" : "Template disabled",
         description: enabled
           ? "These terms will appear in the preview and downloaded PDF."
           : "These terms will be left out of the preview and PDF.",
       });
-      loadTemplates();
+      await loadTemplates();
     } catch (error) {
       console.error('Error toggling template:', error);
       setTemplates(prev => prev.map(t => (t.id === template.id ? { ...t, is_enabled: !enabled } : t)));
