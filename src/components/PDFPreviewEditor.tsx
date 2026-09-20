@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal } from "lucide-react";
+import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, ListTree } from "lucide-react";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -38,7 +38,8 @@ import { PDFCanvasPreview, type PDFPreviewMetrics } from "./PDFCanvasPreview";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { profileApi } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
-import { getLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
+import { getResolvedLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
+import { TermsBlockEditor } from "@/components/pdf/TermsBlockEditor";
 
 interface BrandColors {
   primary?: string;
@@ -51,7 +52,7 @@ interface BrandColors {
 interface PDFPreviewEditorProps {
   open: boolean;
   onClose: () => void;
-  onDownload: (settings: PDFEditorSettings) => void;
+  onDownload: (settings: PDFEditorSettings, terms: TermsSection[]) => void;
   quotationData: {
     quotationTitle: string;
     clientName: string;
@@ -110,6 +111,9 @@ export const PDFPreviewEditor = ({
   const [activePage, setActivePage] = useState(0);
   const [showPerfHud, setShowPerfHud] = useState(false);
   const [termsConditions, setTermsConditions] = useState<TermsSection[]>([]);
+  const [libraryTerms, setLibraryTerms] = useState<TermsSection[]>([]);
+  const [termsTemplateName, setTermsTemplateName] = useState("Loading terms…");
+  const [usingFallbackTerms, setUsingFallbackTerms] = useState(false);
   const [perfMetrics, setPerfMetrics] = useState<PDFPreviewMetrics | null>(null);
   const canvasRef = useRef<import('./PDFCanvasPreview').PDFCanvasPreviewHandle | null>(null);
   // The mobile and desktop layouts each render their own copy of PreviewPanel (CSS
@@ -156,8 +160,13 @@ export const PDFPreviewEditor = ({
           }
         }
         if (authData.user) {
-          const terms = await getLibraryTerms(authData.user.id, 'quotation');
-          if (active) setTermsConditions(terms);
+          const resolved = await getResolvedLibraryTerms(authData.user.id, 'quotation');
+          if (active) {
+            setTermsConditions(resolved.terms);
+            setLibraryTerms(resolved.terms);
+            setTermsTemplateName(resolved.templateName);
+            setUsingFallbackTerms(resolved.source === 'default');
+          }
         }
       } catch (error: any) {
         if (!/not authenticated/i.test(error?.message || '')) {
@@ -320,7 +329,7 @@ export const PDFPreviewEditor = ({
   useEffect(() => {
     if (!open) return;
 
-    const payload = JSON.stringify({ editorSettings, customizeSettings, showItemImages, quotationData, brandColors });
+    const payload = JSON.stringify({ editorSettings, customizeSettings, showItemImages, quotationData, brandColors, termsConditions });
     if (payload === latestPreviewPayloadRef.current && pdfBlobUrl) return;
     latestPreviewPayloadRef.current = payload;
 
@@ -370,7 +379,7 @@ export const PDFPreviewEditor = ({
       ...editorSettings,
       brandColors: editorSettings.useBrandColors && brandColors ? brandColors : editorSettings.brandColors,
     };
-    onDownload(downloadSettings);
+    onDownload(downloadSettings, termsConditions);
     onClose();
   };
 
@@ -435,7 +444,11 @@ export const PDFPreviewEditor = ({
   const EditorPanel = () => (
     <div className="flex flex-col h-full overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid grid-cols-5 m-4 flex-shrink-0">
+        <TabsList className="grid grid-cols-6 m-4 flex-shrink-0">
+          <TabsTrigger value="content" className="text-xs">
+            <ListTree className="h-3 w-3 mr-1" />
+            Content
+          </TabsTrigger>
           <TabsTrigger value="themes" className="text-xs">
             <Palette className="h-3 w-3 mr-1" />
             Themes
@@ -459,6 +472,15 @@ export const PDFPreviewEditor = ({
         </TabsList>
 
         <div className="flex-1 min-h-0 overflow-auto px-4">
+          <TabsContent value="content" className="mt-0">
+            <TermsBlockEditor
+              value={termsConditions}
+              templateName={termsTemplateName}
+              usingFallback={usingFallbackTerms}
+              onChange={setTermsConditions}
+              onReset={() => setTermsConditions(libraryTerms)}
+            />
+          </TabsContent>
           {/* THEMES TAB */}
           <TabsContent value="themes" className="mt-0 space-y-4">
             {/* Category Filter Tabs */}

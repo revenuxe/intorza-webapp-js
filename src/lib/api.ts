@@ -60,9 +60,10 @@ function tableCrud<T = any>(table: string, opts: { userScoped?: boolean } = { us
       return { data: row as T };
     },
     update: async (id: string, body: Partial<T>): Promise<Envelope<T>> => {
-      const row = unwrap(
-        await supabase.from(table as any).update(body as any).eq('id', id).select().single(),
-      );
+      let query = supabase.from(table as any).update(body as any).eq('id', id);
+      if (scoped) query = query.eq('user_id', await requireUserId());
+      const row = unwrap(await query.select().maybeSingle());
+      if (!row) throw new ApiError(404, `${table} not found or could not be updated`);
       return { data: row as T };
     },
     remove: async (id: string): Promise<void> => {
