@@ -42,7 +42,6 @@ import { profileApi } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
 import { getResolvedLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
 import { TermsBlockEditor } from "@/components/pdf/TermsBlockEditor";
-import { FileText } from "lucide-react";
 
 interface BrandColors {
   primary?: string;
