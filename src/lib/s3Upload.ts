@@ -129,9 +129,15 @@ export async function uploadToS3(
   kind: S3UploadKind = "generic",
   filename?: string,
 ): Promise<S3UploadResult> {
-  const { data: auth } = await supabase.auth.getUser();
-  const userId = auth?.user?.id;
-  if (!userId) throw new Error("You must be signed in to upload files.");
+  // getSession reads the local session (works on flaky mobile networks);
+  // fall back to a server check only if it's missing.
+  const { data: sessionData } = await supabase.auth.getSession();
+  let userId = sessionData?.session?.user?.id;
+  if (!userId) {
+    const { data: auth } = await supabase.auth.getUser();
+    userId = auth?.user?.id;
+  }
+  if (!userId) throw new Error("Please sign in (or confirm your email) before uploading a logo.");
 
   const original =
     filename ?? (file instanceof File ? file.name : `upload-${Date.now()}`);

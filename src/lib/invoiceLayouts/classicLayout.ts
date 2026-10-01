@@ -261,7 +261,7 @@ export const renderClassicHeaderAndSummary = async (ctx: LayoutContext): Promise
         doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
       }
     },
-    margin: { left: margin, right: margin },
+    margin: { left: margin, right: margin, top: 20, bottom: 22 },
   });
 
   yPosition = (doc as any).lastAutoTable.finalY + 10;
@@ -355,7 +355,7 @@ export const renderClassicHeaderAndSummary = async (ctx: LayoutContext): Promise
           doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
         }
       },
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, top: 20, bottom: 22 },
     });
 
     yPosition = (doc as any).lastAutoTable.finalY + 15;

@@ -47,6 +47,8 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
       toast.error(error.message || "Failed to upload logo");
     } finally {
       setUploading(false);
+      // Allow choosing the same photo again after a failed attempt.
+      if (e.target) e.target.value = "";
     }
   };
 
