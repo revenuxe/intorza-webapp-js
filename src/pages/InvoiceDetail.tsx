@@ -260,7 +260,7 @@ const InvoiceDetail = () => {
     }
   };
 
-  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, invoiceSettings?: InvoiceSettings) => {
+  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, invoiceSettings?: InvoiceSettings, editedTerms?: any[]) => {
     if (!invoice) return;
     
     try {
@@ -270,11 +270,15 @@ const InvoiceDetail = () => {
       let nextAmount = invoice.remaining_amount;
 
       let pdfProfile = profile || {};
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const libraryTerms = await getLibraryTerms(user.id, 'invoice');
-        pdfProfile = { ...pdfProfile, invoice_terms_conditions: libraryTerms };
-        setProfile(pdfProfile);
+      if (editedTerms && editedTerms.length) {
+        pdfProfile = { ...pdfProfile, invoice_terms_conditions: editedTerms };
+      } else {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const libraryTerms = await getLibraryTerms(user.id, 'invoice');
+          pdfProfile = { ...pdfProfile, invoice_terms_conditions: libraryTerms };
+          setProfile(pdfProfile);
+        }
       }
 
       await generateInvoicePDF({
