@@ -150,7 +150,7 @@ export const renderHeroBannerHeaderAndSummary = async (ctx: LayoutContext): Prom
         doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
       }
     },
-    margin: { left: margin, right: pageWidth - margin - mainWidth },
+    margin: { left: margin, right: pageWidth - margin - mainWidth, top: 20, bottom: 22 },
   });
 
   const leftBottom = (doc as any).lastAutoTable.finalY;
@@ -287,7 +287,7 @@ export const renderHeroBannerHeaderAndSummary = async (ctx: LayoutContext): Prom
           doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
         }
       },
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, top: 20, bottom: 22 },
     });
 
     yPosition = (doc as any).lastAutoTable.finalY + 15;

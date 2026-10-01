@@ -435,7 +435,7 @@ export const renderSignatureArea = async (ctx: LayoutContext, startY: number): P
 
   if (!invoiceSettings.showSignatureArea) return yPosition;
 
-  if (yPosition > pageHeight - 35) {
+  if (yPosition > pageHeight - 50) {
     doc.addPage();
     yPosition = 15;
   } else {

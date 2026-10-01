@@ -154,7 +154,7 @@ export const renderMinimalModernHeaderAndSummary = async (ctx: LayoutContext): P
         doc.setTextColor(COLORS.ACCENT[0], COLORS.ACCENT[1], COLORS.ACCENT[2]);
       }
     },
-    margin: { left: margin, right: margin },
+    margin: { left: margin, right: margin, top: 20, bottom: 22 },
   });
 
   yPosition = (doc as any).lastAutoTable.finalY + 10;
@@ -219,7 +219,7 @@ export const renderMinimalModernHeaderAndSummary = async (ctx: LayoutContext): P
         }
         if (hookData.column.index === 3) hookData.cell.styles.font = NUMERIC_FONT;
       },
-      margin: { left: margin, right: margin },
+      margin: { left: margin, right: margin, top: 20, bottom: 22 },
     });
 
     yPosition = (doc as any).lastAutoTable.finalY + 15;
