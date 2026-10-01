@@ -40,7 +40,8 @@ import { PDFCanvasPreview } from "./PDFCanvasPreview";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { profileApi } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
-import { getLibraryTerms } from "@/lib/libraryDefaults";
+import { getResolvedLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
+import { TermsBlockEditor } from "@/components/pdf/TermsBlockEditor";
 
 interface BrandColors {
   primary?: string;
@@ -53,7 +54,7 @@ interface BrandColors {
 interface InvoicePreviewEditorProps {
   open: boolean;
   onClose: () => void;
-  onDownload: (editorSettings: PDFEditorSettings, invoiceSettings: InvoiceSettings) => void;
+  onDownload: (editorSettings: PDFEditorSettings, invoiceSettings: InvoiceSettings, terms?: TermsSection[]) => void;
   invoiceData: {
     invoiceNumber: string;
     clientName: string;
@@ -119,6 +120,14 @@ export const InvoicePreviewEditor = ({
     try { return localStorage.getItem(USE_QUOTATION_DESIGN_KEY) === 'true'; } catch { return false; }
   });
   const [profile, setProfile] = useState<any>(null);
+  const [termsConditions, setTermsConditions] = useState<TermsSection[]>([]);
+  const [libraryTerms, setLibraryTerms] = useState<TermsSection[]>([]);
+  const [termsTemplateName, setTermsTemplateName] = useState("Loading terms…");
+  const [usingFallbackTerms, setUsingFallbackTerms] = useState(false);
+  const updateTerms = (terms: TermsSection[]) => {
+    setTermsConditions(terms);
+    setProfile((current: any) => (current ? { ...current, invoice_terms_conditions: terms } : current));
+  };
   const [uploadingHero, setUploadingHero] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -140,8 +149,14 @@ export const InvoicePreviewEditor = ({
         if (data && active) {
           let previewProfile = data;
           if (authData.user) {
-            const terms = await getLibraryTerms(authData.user.id, 'invoice');
-            previewProfile = { ...data, invoice_terms_conditions: terms };
+            const resolved = await getResolvedLibraryTerms(authData.user.id, 'invoice');
+            previewProfile = { ...data, invoice_terms_conditions: resolved.terms };
+            if (active) {
+              setTermsConditions(resolved.terms);
+              setLibraryTerms(resolved.terms);
+              setTermsTemplateName(resolved.templateName);
+              setUsingFallbackTerms(resolved.source === 'default');
+            }
           }
           if (!active) return;
           setProfile(previewProfile);
@@ -243,7 +258,7 @@ export const InvoicePreviewEditor = ({
       ...editorSettings,
       brandColors: editorSettings.useBrandColors && brandColors ? brandColors : editorSettings.brandColors,
     };
-    onDownload(downloadSettings, invoiceSettings);
+    onDownload(downloadSettings, invoiceSettings, termsConditions);
     onClose();
   };
 
@@ -343,7 +358,11 @@ export const InvoicePreviewEditor = ({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid grid-cols-5 m-4 flex-shrink-0">
+        <TabsList className="grid grid-cols-6 m-4 flex-shrink-0">
+          <TabsTrigger value="terms" className="text-xs">
+            <FileText className="h-3 w-3 mr-1" />
+            Terms
+          </TabsTrigger>
           <TabsTrigger value="themes" className="text-xs">
             <Palette className="h-3 w-3 mr-1" />
             Themes
@@ -367,8 +386,18 @@ export const InvoicePreviewEditor = ({
         </TabsList>
 
         <div className="flex-1 min-h-0 overflow-auto px-4">
+          <TabsContent value="terms" className="mt-0">
+            <TermsBlockEditor
+              value={termsConditions}
+              templateName={termsTemplateName}
+              usingFallback={usingFallbackTerms}
+              onChange={updateTerms}
+              onReset={() => updateTerms(libraryTerms)}
+            />
+          </TabsContent>
           {/* THEMES TAB */}
           <TabsContent value="themes" className="mt-0 space-y-4">
+
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Category</Label>
               <div className="flex flex-wrap gap-1.5">
