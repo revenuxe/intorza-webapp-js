@@ -262,9 +262,9 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // Filled elements (info cards, table headers) sitting right at the same offset as the
   // border line read as "touching" it even a few mm out, so bordered themes get a
   // noticeably wider clearance than the flat 15mm used everywhere else.
-  const margin = hasBorderDecoration ? Math.max(20, borderInset + 12) : 15;
+  const margin = hasBorderDecoration ? Math.max(20, borderInset + 14) : 15;
   const contentWidth = pageWidth - (margin * 2);
-  const pageTopY = hasBorderDecoration ? borderInset + 12 : 15;
+  const pageTopY = hasBorderDecoration ? borderInset + 16 : 15;
   // Two separate boundaries, not one shared value: FOOTER_CLEARANCE is how far the
   // footer sits from the page edge/border — for bordered themes, 24mm clears the
   // corner ornaments (they draw inward from borderInset + 2 by up to ~12-18mm
@@ -274,7 +274,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // ending right where the footer text sits — that's what was letting the last table
   // row overlap "Page X of Y".
   const FOOTER_CLEARANCE = hasBorderDecoration ? borderInset + 24 : 10;
-  const pageBottomY = pageHeight - FOOTER_CLEARANCE - 10;
+  const pageBottomY = pageHeight - FOOTER_CLEARANCE - (hasBorderDecoration ? 16 : 10);
   let yPosition = pageTopY;
 
   // --- Design System Colors (from theme) ---
@@ -1115,7 +1115,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         doc.setTextColor(COLORS.HIGHLIGHT_TEXT[0], COLORS.HIGHLIGHT_TEXT[1], COLORS.HIGHLIGHT_TEXT[2]);
       }
     },
-    margin: { left: margin, right: margin, bottom: pageHeight - pageBottomY }
+    margin: { left: margin, right: margin, top: pageTopY, bottom: pageHeight - pageBottomY }
   });
 
   yPosition = (doc as any).lastAutoTable.finalY + 15;
@@ -1172,7 +1172,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
          // Amount column - fixed width, right-aligned, numeric-safe, BOLD
          3: { cellWidth: 42, halign: 'right', font: NUMERIC_FONT, fontStyle: 'bold', fontSize: 8, overflow: 'hidden' as const, minCellWidth: 42, valign: 'middle' }
        },
-      margin: { left: margin, right: margin, bottom: pageHeight - pageBottomY }
+      margin: { left: margin, right: margin, top: pageTopY, bottom: pageHeight - pageBottomY }
     });
 
     yPosition = (doc as any).lastAutoTable.finalY + 15;
