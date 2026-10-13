@@ -284,7 +284,7 @@ export const renderClassicHeaderAndSummary = async (ctx: LayoutContext): Promise
     doc.text(`Date: ${data.nextPaymentDue}`, margin + 6, yPosition + 14);
 
     if (data.nextPaymentAmount) {
-      setBodyFont('bold');
+      doc.setFont(NUMERIC_FONT, 'bold');
       doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
       doc.text(fmtCurrency(data.nextPaymentAmount), pageWidth - margin - 6, yPosition + 11, { align: 'right' });
     }

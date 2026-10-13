@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import { PDFEditorSettings, InvoiceSettings, PDFTheme, getThemeById, hexToRgb, getFontById, applyBrandColorsToTheme } from '../pdfThemes';
-import { getNumericFont, createPDFCurrencyFormatter } from '../pdfCurrencyFormatter';
+import { getNumericFont, createPDFCurrencyFormatter, registerPDFCurrencyFont } from '../pdfCurrencyFormatter';
 import { DEFAULT_INVOICE_TERMS } from '../libraryDefaults';
 import { normalizeTermsSections } from '../termsResolver';
 
@@ -162,6 +162,7 @@ export const buildLayoutContext = (data: InvoiceData): LayoutContext => {
     format: 'a4',
     compress: true,
   });
+  registerPDFCurrencyFont(doc);
 
   const editorSettings = data.editorSettings;
   const invoiceSettings: InvoiceSettings = {

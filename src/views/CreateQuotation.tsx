@@ -20,6 +20,7 @@ import { useQuotationAutomation } from "@/hooks/useQuotationAutomation";
 import { CustomizeFieldsDrawer, QuotationSettings, getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
 import { PDFPreviewEditor } from "@/components/PDFPreviewEditor";
 import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
+import { normalizeWarrantyInput } from "@/lib/warrantyFormatter";
 import { ClientSelector } from "@/components/quotation/ClientSelector";
 import { ProductNameInput } from "@/components/quotation/ProductNameInput";
 import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
@@ -188,7 +189,7 @@ const CreateQuotation = () => {
         if (formData.quotationValidTill) setQuotationValidTill(formData.quotationValidTill);
         if (formData.projectDeadline) setProjectDeadline(formData.projectDeadline);
         if (formData.placeOfProject) setPlaceOfProject(formData.placeOfProject);
-        if (formData.warranty) setWarranty(formData.warranty);
+        if (formData.warranty) setWarranty(normalizeWarrantyInput(formData.warranty));
         if (formData.projectType) setProjectType(formData.projectType);
         if (formData.gstEnabled !== undefined) setGstEnabled(formData.gstEnabled);
         if (formData.gstRate) setGstRate(formData.gstRate);
@@ -207,7 +208,7 @@ const CreateQuotation = () => {
       const defaults = getSmartDefaults();
       setDateOfProposal(defaults.dateOfProposal);
       setQuotationValidTill(defaults.quotationValidTill);
-      setWarranty(defaults.warranty);
+      setWarranty(normalizeWarrantyInput(defaults.warranty));
       setProjectType(defaults.projectType);
       setPlaceOfProject(defaults.placeOfProject);
       setGstEnabled(defaults.gstEnabled);
@@ -356,7 +357,7 @@ const CreateQuotation = () => {
       setQuotationValidTill(quotation.valid_till || "");
       setProjectDeadline(quotation.project_deadline || "");
       setPlaceOfProject(quotation.place_of_project || "");
-      setWarranty(quotation.warranty || "10");
+      setWarranty(normalizeWarrantyInput(quotation.warranty || "10"));
       setProjectType(quotation.project_type || "");
       setGstEnabled(quotation.gst_enabled || false);
       setGstRate(quotation.gst_percentage?.toString() || "18");
@@ -910,10 +911,16 @@ const CreateQuotation = () => {
   // it's passed straight into PDFPreviewEditor's live-preview effect, which
   // treats a new reference as "data changed" and restarts PDF regeneration.
   const quotationPreviewData = useMemo(() => ({
+    quotationId: quotationId || undefined,
     quotationTitle: projectTitle,
     clientName,
     clientAddress,
     dateOfProposal,
+    quotationValidTill,
+    projectDeadline,
+    placeOfProject,
+    warranty,
+    projectType,
     sections: sections.map(section => ({
       ...section,
       items: section.items.map(item => ({
@@ -923,9 +930,67 @@ const CreateQuotation = () => {
     })),
     subtotal,
     grandTotal,
+    gstEnabled: effGstEnabled,
+    gstRate: parseFloat(effGstRate),
+    gstAmount,
+    discount: discountAmount,
+    enableSocialMediaDiscount: effSocialEnabled,
+    socialMediaDiscountRate: effSocialRate,
+    paymentStages: paymentStages.map(stage => ({
+      stage: stage.stage,
+      milestone: stage.milestone,
+      percentage: stage.percentage,
+    })),
     companyName: profile.company_name,
-    companyLogo: profile.logo_url
-  }), [projectTitle, clientName, clientAddress, dateOfProposal, sections, itemImages, subtotal, grandTotal, profile.company_name, profile.logo_url]);
+    companyLogo: profile.logo_url,
+    companyAddress: profile.address,
+    companyPhone: profile.phone,
+    companyEmail: profile.email,
+    gstin: profile.gstin,
+    professionalAdvantages: profile.professional_advantages,
+    signatureUrl: profile.signature_url,
+    bankDetails: {
+      bankName: profile.bank_name,
+      accountNumber: profile.bank_account_number,
+      ifscCode: profile.bank_ifsc_code,
+      accountHolder: profile.bank_account_holder,
+      upiId: profile.upi_id,
+      qrCodeUrl: profile.payment_qr_url,
+    },
+    localization: {
+      currencyCode: profile.currency_code,
+      currencySymbol: profile.currency_symbol,
+      locale: profile.locale,
+      taxLabel: profile.tax_label,
+      taxRegistrationLabel: profile.tax_label === 'GST' ? 'GSTIN' : `${profile.tax_label} No`,
+      areaUnit: profile.measurement_system === 'metric' ? 'Square Meters' : 'Square Feet',
+      areaUnitShort: profile.measurement_system === 'metric' ? 'SQM' : 'Sq.Ft',
+      countryCode: profile.country_code,
+    },
+  }), [
+    quotationId,
+    projectTitle,
+    clientName,
+    clientAddress,
+    dateOfProposal,
+    quotationValidTill,
+    projectDeadline,
+    placeOfProject,
+    warranty,
+    projectType,
+    sections,
+    itemImages,
+    subtotal,
+    grandTotal,
+    effGstEnabled,
+    effGstRate,
+    gstAmount,
+    discountAmount,
+    effSocialEnabled,
+    effSocialRate,
+    paymentStages,
+    profile,
+  ]);
   return <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8 relative">
       {/* Download Loader Overlay */}
       {isDownloading && (

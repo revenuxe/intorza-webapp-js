@@ -23,10 +23,8 @@ import {
   getAllThemes,
   rgbToHex,
   PDFTheme,
-  PDF_FONTS,
-  getFontById,
-  getHeadingFonts,
-  getBodyFonts,
+  PDF_SELECTABLE_FONTS,
+  getSelectableFontId,
   InvoiceSettings,
   getInvoiceSettings,
   saveInvoiceSettings,
@@ -69,7 +67,7 @@ interface InvoicePreviewEditorProps {
 }
 
 type ThemeCategory = 'all' | 'minimal' | 'professional' | 'luxury' | 'floral' | 'abstract' | 'decoration';
-type FontCategory = 'all' | 'serif' | 'sans-serif' | 'display' | 'monospace';
+type FontCategory = 'all' | 'serif' | 'sans-serif' | 'monospace';
 
 const CATEGORY_CONFIG: { value: ThemeCategory; label: string; icon: React.ElementType }[] = [
   { value: 'all', label: 'All', icon: Palette },
@@ -85,7 +83,6 @@ const FONT_CATEGORY_CONFIG: { value: FontCategory; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'sans-serif', label: 'Sans-Serif' },
   { value: 'serif', label: 'Serif' },
-  { value: 'display', label: 'Display' },
   { value: 'monospace', label: 'Monospace' },
 ];
 
@@ -134,8 +131,9 @@ export const InvoicePreviewEditor = ({
   const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevBlobUrlRef = useRef<string | null>(null);
+  const editorSettingsInitializedRef = useRef(false);
   
-  const { preferences: fontPreferences, updatePreferences: saveFontPreferences } = useFontPreferences();
+  const { preferences: fontPreferences, updatePreferences: saveFontPreferences, loading: fontLoading } = useFontPreferences();
 
   // Refresh the profile and enabled library terms whenever the preview opens.
   useEffect(() => {
@@ -215,24 +213,35 @@ export const InvoicePreviewEditor = ({
   }, [open]);
 
   useEffect(() => {
-    if (open) {
-      const savedSettings = getEditorSettings();
-      setEditorSettings({
-        ...savedSettings,
-        headingFont: fontPreferences.headingFont || savedSettings.headingFont || 'times',
-        bodyFont: fontPreferences.bodyFont || savedSettings.bodyFont || 'helvetica',
-        brandColors: brandColors || savedSettings.brandColors,
-      });
-      setInvoiceSettings(getInvoiceSettings());
-      setShowEditor(false);
-    } else {
+    if (!open) {
+      editorSettingsInitializedRef.current = false;
       if (prevBlobUrlRef.current) {
         URL.revokeObjectURL(prevBlobUrlRef.current);
         prevBlobUrlRef.current = null;
       }
       setPdfBlobUrl(null);
+      return;
     }
-  }, [open, fontPreferences, brandColors]);
+    if (fontLoading || editorSettingsInitializedRef.current) return;
+
+    editorSettingsInitializedRef.current = true;
+    const savedSettings = getEditorSettings();
+    setEditorSettings({
+      ...savedSettings,
+      headingFont: getSelectableFontId(fontPreferences.headingFont || savedSettings.headingFont || 'times'),
+      bodyFont: getSelectableFontId(fontPreferences.bodyFont || savedSettings.bodyFont || 'helvetica'),
+      brandColors: brandColors || savedSettings.brandColors,
+    });
+    setInvoiceSettings(getInvoiceSettings());
+    setShowEditor(false);
+  }, [open, fontLoading, fontPreferences, brandColors]);
+
+  useEffect(() => {
+    if (!open || !brandColors) return;
+    setEditorSettings((current) => current.brandColors === brandColors
+      ? current
+      : { ...current, brandColors });
+  }, [open, brandColors]);
 
   // Handle "use quotation design" toggle
   const handleUseQuotationDesign = (checked: boolean) => {
@@ -241,18 +250,27 @@ export const InvoicePreviewEditor = ({
     if (checked) {
       // Load quotation editor settings (they share the same storage key)
       const quotationSettings = getEditorSettings();
-      setEditorSettings(quotationSettings);
+      setEditorSettings({
+        ...quotationSettings,
+        headingFont: getSelectableFontId(quotationSettings.headingFont),
+        bodyFont: getSelectableFontId(quotationSettings.bodyFont),
+      });
     }
   };
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
-    const newSettings = { ...editorSettings, ...updates };
+    const normalizedUpdates = {
+      ...updates,
+      ...(updates.headingFont ? { headingFont: getSelectableFontId(updates.headingFont) } : {}),
+      ...(updates.bodyFont ? { bodyFont: getSelectableFontId(updates.bodyFont) } : {}),
+    };
+    const newSettings = { ...editorSettings, ...normalizedUpdates };
     setEditorSettings(newSettings);
     saveEditorSettings(newSettings);
-    if (updates.headingFont || updates.bodyFont) {
+    if (normalizedUpdates.headingFont || normalizedUpdates.bodyFont) {
       saveFontPreferences({
-        headingFont: updates.headingFont || editorSettings.headingFont || 'times',
-        bodyFont: updates.bodyFont || editorSettings.bodyFont || 'helvetica',
+        headingFont: newSettings.headingFont,
+        bodyFont: newSettings.bodyFont,
       });
     }
   };
@@ -402,29 +420,29 @@ export const InvoicePreviewEditor = ({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid grid-cols-6 m-4 flex-shrink-0">
-          <TabsTrigger value="terms" className="text-xs">
-            <FileText className="h-3 w-3 mr-1" />
+        <TabsList aria-label="Invoice PDF settings sections" className="flex h-11 shrink-0 justify-start gap-1 mx-3 my-3 overflow-x-auto overflow-y-hidden px-1.5 py-1">
+          <TabsTrigger value="terms" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <FileText className="h-3 w-3 shrink-0" />
             Terms
           </TabsTrigger>
-          <TabsTrigger value="themes" className="text-xs">
-            <Palette className="h-3 w-3 mr-1" />
+          <TabsTrigger value="themes" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Palette className="h-3 w-3 shrink-0" />
             Themes
           </TabsTrigger>
-          <TabsTrigger value="decor" className="text-xs">
-            <Sparkles className="h-3 w-3 mr-1" />
+          <TabsTrigger value="decor" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Sparkles className="h-3 w-3 shrink-0" />
             Decor
           </TabsTrigger>
-          <TabsTrigger value="layout" className="text-xs">
-            <Layout className="h-3 w-3 mr-1" />
+          <TabsTrigger value="layout" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Layout className="h-3 w-3 shrink-0" />
             Layout
           </TabsTrigger>
-          <TabsTrigger value="style" className="text-xs">
-            <Eye className="h-3 w-3 mr-1" />
+          <TabsTrigger value="style" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Eye className="h-3 w-3 shrink-0" />
             Style
           </TabsTrigger>
-          <TabsTrigger value="fields" className="text-xs">
-            <Sliders className="h-3 w-3 mr-1" />
+          <TabsTrigger value="fields" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Sliders className="h-3 w-3 shrink-0" />
             Fields
           </TabsTrigger>
         </TabsList>
@@ -758,6 +776,9 @@ export const InvoicePreviewEditor = ({
                 <Type className="h-4 w-4 text-primary" />
                 <Label className="text-sm font-semibold">Font Selection</Label>
               </div>
+              <p className="text-xs text-muted-foreground">
+                These embedded typefaces update the live PDF preview.
+              </p>
               
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -775,7 +796,7 @@ export const InvoicePreviewEditor = ({
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Heading Font</Label>
                 <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-                  {PDF_FONTS
+                  {PDF_SELECTABLE_FONTS
                     .filter(f => f.recommended === 'heading' || f.recommended === 'both')
                     .filter(f => selectedFontCategory === 'all' || f.category === selectedFontCategory)
                     .filter(f => fontSearchQuery === '' || f.name.toLowerCase().includes(fontSearchQuery.toLowerCase()))
@@ -792,7 +813,7 @@ export const InvoicePreviewEditor = ({
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Body Font</Label>
                 <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-                  {PDF_FONTS
+                  {PDF_SELECTABLE_FONTS
                     .filter(f => f.recommended === 'body' || f.recommended === 'both')
                     .filter(f => selectedFontCategory === 'all' || f.category === selectedFontCategory)
                     .filter(f => fontSearchQuery === '' || f.name.toLowerCase().includes(fontSearchQuery.toLowerCase()))

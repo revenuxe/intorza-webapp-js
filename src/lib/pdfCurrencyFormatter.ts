@@ -1,10 +1,23 @@
+import type { jsPDF } from 'jspdf';
+import { NOTO_SANS_CURRENCY_BOLD_FONT_BASE64 } from './notoSansCurrencyBoldFont';
+import { NOTO_SANS_CURRENCY_FONT_BASE64 } from './notoSansCurrencyFont';
+
 // Professional PDF Currency & Number Formatting Utility
 // Ensures perfect alignment, no overflow, and currency-safe rendering
 
-// Currency-safe fonts available in jsPDF core.
-// We intentionally default numeric rendering to a *tabular* (monospaced) font to guarantee alignment.
-export const NUMERIC_SAFE_FONTS = ['courier', 'helvetica', 'times'] as const;
-export const DEFAULT_NUMERIC_FONT = 'helvetica';
+// Numeric fonts supported by jsPDF, including the bundled Unicode currency font.
+export const NUMERIC_SAFE_FONTS = ['courier', 'helvetica', 'times', 'NotoSansCurrency'] as const;
+export const DEFAULT_NUMERIC_FONT = 'NotoSansCurrency';
+
+const CURRENCY_FONT_FILE = 'NotoSansCurrency.ttf';
+const CURRENCY_BOLD_FONT_FILE = 'NotoSansCurrency-Bold.ttf';
+
+export function registerPDFCurrencyFont(doc: jsPDF): void {
+  doc.addFileToVFS(CURRENCY_FONT_FILE, NOTO_SANS_CURRENCY_FONT_BASE64);
+  doc.addFileToVFS(CURRENCY_BOLD_FONT_FILE, NOTO_SANS_CURRENCY_BOLD_FONT_BASE64);
+  doc.addFont(CURRENCY_FONT_FILE, DEFAULT_NUMERIC_FONT, 'normal');
+  doc.addFont(CURRENCY_BOLD_FONT_FILE, DEFAULT_NUMERIC_FONT, 'bold');
+}
 
 // Country to currency symbol mapping for fail-safe rendering
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -68,7 +81,6 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 };
 
 // Country-to-currency-code mapping used for PDFs.
-// We render currency as a code prefix (e.g., "INR") to avoid broken symbol glyphs.
 const COUNTRY_TO_CURRENCY_CODE: Record<string, string> = {
   IN: 'INR',
   US: 'USD',
@@ -180,15 +192,17 @@ export function formatPDFCurrency(
 ): string {
   const {
     currencyCode,
-    currencySymbol: _currencySymbol, // ignored for PDFs (prevents broken currency glyphs)
+    currencySymbol,
     countryCode = 'IN',
     locale = 'en-IN',
     showDecimals = false,
     decimalPlaces = showDecimals ? 2 : 0,
   } = options;
 
-  // Always prefer a currency *code* prefix (INR/USD/AED/...), never a symbol.
-  const prefix = (currencyCode || getCurrencyCodeForCountry(countryCode) || 'USD').toUpperCase();
+  const code = (currencyCode || getCurrencyCodeForCountry(countryCode) || 'USD').toUpperCase();
+  const prefix = code === 'INR' && (!currencySymbol || currencySymbol === '₹')
+    ? '₹'
+    : code;
 
   // Get locale format - fallback to standard format
   const format = LOCALE_FORMATS[locale] || LOCALE_FORMATS['en-US'] || {
@@ -208,11 +222,11 @@ export function formatPDFCurrency(
     formattedNumber = formatStandardNumber(absoluteAmount, format, decimalPlaces);
   }
 
-  // Non‑breaking space to guarantee the prefix never detaches from the number.
-  const nbsp = '\u00A0';
+  // Narrow no-break space keeps the symbol attached without an oversized gap.
+  const currencySpace = '\u202F';
 
   // Format with currency code BEFORE the amount
-  const result = `${prefix}${nbsp}${formattedNumber}`;
+  const result = `${prefix}${currencySpace}${formattedNumber}`;
 
   return isNegative ? `-${result}` : result;
 }

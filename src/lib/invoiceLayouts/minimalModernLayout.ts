@@ -166,6 +166,7 @@ export const renderMinimalModernHeaderAndSummary = async (ctx: LayoutContext): P
     doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
     doc.text(`Next payment due ${data.nextPaymentDue}`, margin, yPosition);
     if (data.nextPaymentAmount) {
+      doc.setFont(NUMERIC_FONT, 'bold');
       doc.text(fmtCurrency(data.nextPaymentAmount), pageWidth - margin, yPosition, { align: 'right' });
     }
     yPosition += 10;

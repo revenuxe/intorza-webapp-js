@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, ListTree } from "lucide-react";
-import { generateQuotationPDF } from "@/lib/pdfGenerator";
+import { generateQuotationPDF, type QuotationData } from "@/lib/pdfGenerator";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -22,12 +22,8 @@ import {
   getAllThemes,
   rgbToHex,
   PDFTheme,
-  PDF_FONTS,
-  PDFFont,
-  getFontById,
-  getFontsByCategory,
-  getHeadingFonts,
-  getBodyFonts,
+  PDF_SELECTABLE_FONTS,
+  getSelectableFontId,
   applyBrandColorsToTheme,
 } from "@/lib/pdfThemes";
 import { QuotationSettings } from "./CustomizeFieldsDrawer";
@@ -55,21 +51,78 @@ interface PDFPreviewEditorProps {
   onClose: () => void;
   onDownload: (settings: PDFEditorSettings, terms: TermsSection[]) => void;
   quotationData: {
+    quotationId?: string;
     quotationTitle: string;
     clientName: string;
     clientAddress: string;
     dateOfProposal: string;
-    sections: any[];
+    quotationValidTill?: string;
+    projectDeadline?: string;
+    placeOfProject?: string;
+    warranty?: string;
+    projectType?: string;
+    sections: Array<{
+      section_name?: string;
+      title?: string;
+      items: Array<{
+        side?: string;
+        product_name?: string;
+        productName?: string;
+        product_details?: string;
+        productDetails?: string;
+        width_ft?: number;
+        widthFt?: number;
+        height_ft?: number;
+        heightFt?: number;
+        sft_area?: number;
+        sftArea?: number;
+        rate_per_sft?: number;
+        ratePerSft?: number;
+        amount?: number;
+        imageUrls?: string[];
+      }>;
+    }>;
     subtotal: number;
     grandTotal: number;
+    gstEnabled?: boolean;
+    gstRate?: number;
+    gstAmount?: number;
+    discount?: number;
+    enableSocialMediaDiscount?: boolean;
+    socialMediaDiscountRate?: number;
+    paymentStages?: { stage: string; milestone: string; percentage: number }[];
     companyName?: string;
     companyLogo?: string;
+    companyAddress?: string;
+    companyPhone?: string;
+    companyEmail?: string;
+    gstin?: string;
+    professionalAdvantages?: string;
+    signatureUrl?: string;
+    bankDetails?: {
+      bankName?: string;
+      accountNumber?: string;
+      ifscCode?: string;
+      accountHolder?: string;
+      upiId?: string;
+      qrCodeUrl?: string;
+    };
+    localization?: {
+      currencyCode: string;
+      currencySymbol: string;
+      locale: string;
+      taxLabel: string;
+      taxRegistrationLabel: string;
+      areaUnit: string;
+      areaUnitShort: string;
+      countryCode?: string;
+    };
   };
   customizeSettings: QuotationSettings;
 }
 
 type ThemeCategory = 'all' | 'minimal' | 'professional' | 'luxury' | 'floral' | 'abstract' | 'decoration';
-type FontCategory = 'all' | 'serif' | 'sans-serif' | 'display' | 'monospace';
+type FontCategory = 'all' | 'serif' | 'sans-serif' | 'monospace';
 
 const CATEGORY_CONFIG: { value: ThemeCategory; label: string; icon: React.ElementType }[] = [
   { value: 'all', label: 'All', icon: Palette },
@@ -85,7 +138,6 @@ const FONT_CATEGORY_CONFIG: { value: FontCategory; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'sans-serif', label: 'Sans-Serif' },
   { value: 'serif', label: 'Serif' },
-  { value: 'display', label: 'Display' },
   { value: 'monospace', label: 'Monospace' },
 ];
 
@@ -108,6 +160,8 @@ export const PDFPreviewEditor = ({
   const [brandColors, setBrandColors] = useState<BrandColors | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewRetryKey, setPreviewRetryKey] = useState(0);
   const [previewZoom, setPreviewZoom] = useState(100);
   const [fitWidth, setFitWidth] = useState(true);
   const [totalPages, setTotalPages] = useState(0);
@@ -139,10 +193,41 @@ export const PDFPreviewEditor = ({
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pdfGenerationIdRef = useRef(0);
   const latestPreviewPayloadRef = useRef<string>("");
+  const editorSettingsInitializedRef = useRef(false);
+  const prevBlobUrlRef = useRef<string | null>(null);
 
   
   // Load font preferences from database
   const { preferences: fontPreferences, updatePreferences: saveFontPreferences, loading: fontLoading } = useFontPreferences();
+
+  useEffect(() => {
+    if (!open) {
+      editorSettingsInitializedRef.current = false;
+      return;
+    }
+    if (fontLoading || editorSettingsInitializedRef.current) return;
+
+    editorSettingsInitializedRef.current = true;
+    const savedSettings = getEditorSettings();
+    setEditorSettings({
+      ...savedSettings,
+      headingFont: getSelectableFontId(fontPreferences.headingFont || savedSettings.headingFont || 'times'),
+      bodyFont: getSelectableFontId(fontPreferences.bodyFont || savedSettings.bodyFont || 'helvetica'),
+      brandColors: brandColors || savedSettings.brandColors,
+    });
+    setShowEditor(false);
+  }, [open, fontLoading, fontPreferences, brandColors]);
+
+  useEffect(() => {
+    if (!open || !brandColors) return;
+    setEditorSettings((current) => current.brandColors === brandColors
+      ? current
+      : { ...current, brandColors });
+  }, [open, brandColors]);
+
+  useEffect(() => {
+    setShowItemImages(customizeSettings.showItemImages);
+  }, [customizeSettings.showItemImages]);
 
   // Refresh profile styling and enabled library terms whenever the preview opens.
   useEffect(() => {
@@ -215,16 +300,7 @@ export const PDFPreviewEditor = ({
   }, [open]);
 
   useEffect(() => {
-    if (open) {
-      const savedSettings = getEditorSettings();
-      setEditorSettings({
-        ...savedSettings,
-        headingFont: fontPreferences.headingFont || savedSettings.headingFont || 'times',
-        bodyFont: fontPreferences.bodyFont || savedSettings.bodyFont || 'helvetica',
-        brandColors: brandColors || savedSettings.brandColors,
-      });
-      setShowEditor(false);
-    } else {
+    if (!open) {
       // Cleanup blob URL when closing
       if (prevBlobUrlRef.current) {
         URL.revokeObjectURL(prevBlobUrlRef.current);
@@ -232,10 +308,7 @@ export const PDFPreviewEditor = ({
       }
       setPdfBlobUrl(null);
     }
-  }, [open, fontPreferences, brandColors]);
-
-  // Track previous blob URL for cleanup without causing re-renders
-  const prevBlobUrlRef = useRef<string | null>(null);
+  }, [open]);
 
   // Generate live PDF preview from an explicit snapshot so typing/sliders can
   // update editor state instantly while the expensive PDF work stays debounced.
@@ -284,21 +357,23 @@ export const PDFPreviewEditor = ({
         showItemImages: itemImagesSnapshot,
       };
 
-      // Transform quotationData to match the generator's expected format with settings embedded
-      const pdfData = {
-        quotationTitle: quotationData.quotationTitle || 'Sample Quotation',
-        clientName: quotationData.clientName || 'Client Name',
-        clientAddress: quotationData.clientAddress || 'Client Address',
-        dateOfProposal: quotationData.dateOfProposal || new Date().toLocaleDateString(),
-        quotationValidTill: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-        placeOfProject: 'Project Location',
-        warranty: '1 Year',
-        projectType: 'Interior',
-        sections: quotationData.sections.length > 0 ? quotationData.sections.map(s => ({
-          title: s.section_name || s.title || 'Section',
-          items: (s.items || []).map((item: any) => ({
+      // Use the same current quotation values as the download path.
+      const pdfData: QuotationData = {
+        ...quotationData,
+        quotationTitle: quotationData.quotationTitle || '',
+        clientName: quotationData.clientName || '',
+        clientAddress: quotationData.clientAddress || '',
+        dateOfProposal: quotationData.dateOfProposal || '',
+        quotationValidTill: quotationData.quotationValidTill || '',
+        projectDeadline: quotationData.projectDeadline || '',
+        placeOfProject: quotationData.placeOfProject || '',
+        warranty: quotationData.warranty || '',
+        projectType: quotationData.projectType || '',
+        sections: quotationData.sections.map(s => ({
+          title: s.section_name || s.title || '',
+          items: s.items.map(item => ({
             side: item.side || '',
-            productName: item.product_name || item.productName || 'Product',
+            productName: item.product_name || item.productName || '',
             productDetails: item.product_details || item.productDetails || '',
             widthFt: item.width_ft || item.widthFt || 0,
             heightFt: item.height_ft || item.heightFt || 0,
@@ -307,34 +382,33 @@ export const PDFPreviewEditor = ({
             amount: item.amount || 0,
             imageUrls: item.imageUrls || [],
           }))
-        })) : [{
-          title: 'Sample Section',
-          items: [{
-            side: 'Left',
-            productName: 'Sample Product',
-            productDetails: 'Product details here',
-            widthFt: 4,
-            heightFt: 8,
-            sftArea: 32,
-            ratePerSft: 850,
-            amount: 27200,
-          }]
-        }],
-        subtotal: quotationData.subtotal || 50000,
-        gstEnabled: true,
-        gstRate: 18,
-        gstAmount: (quotationData.subtotal || 50000) * 0.18,
-        grandTotal: quotationData.grandTotal || 55460,
+        })),
+        subtotal: quotationData.subtotal,
+        gstEnabled: quotationData.gstEnabled ?? false,
+        gstRate: quotationData.gstRate ?? 18,
+        gstAmount: quotationData.gstAmount,
+        discount: quotationData.discount,
+        grandTotal: quotationData.grandTotal,
+        enableSocialMediaDiscount: quotationData.enableSocialMediaDiscount,
+        socialMediaDiscountRate: quotationData.socialMediaDiscountRate,
+        paymentStages: quotationData.paymentStages,
         companyLogo: quotationData.companyLogo,
-        companyName: quotationData.companyName || 'Your Company',
-        companyAddress: 'Company Address',
+        companyName: quotationData.companyName || '',
+        companyAddress: quotationData.companyAddress || '',
+        companyPhone: quotationData.companyPhone,
+        companyEmail: quotationData.companyEmail,
+        gstin: quotationData.gstin,
+        professionalAdvantages: quotationData.professionalAdvantages,
+        signatureUrl: quotationData.signatureUrl,
+        bankDetails: quotationData.bankDetails,
+        localization: quotationData.localization,
         termsConditions,
         settings: pdfSettings,
         editorSettings: currentEditorSettings,
         previewOnly: true,
       };
 
-      const doc = await generateQuotationPDF(pdfData as any);
+      const doc = await generateQuotationPDF(pdfData);
       if (!doc) {
         throw new Error('Failed to generate PDF document');
       }
@@ -351,6 +425,10 @@ export const PDFPreviewEditor = ({
       }
     } catch (error) {
       console.error('Error generating live PDF preview:', error);
+      if (jobId === pdfGenerationIdRef.current) {
+        latestPreviewPayloadRef.current = '';
+        setPreviewError('Could not update the preview. Try again, or check the edited content.');
+      }
     } finally {
       if (jobId === pdfGenerationIdRef.current) {
         setIsGeneratingPdf(false);
@@ -363,9 +441,10 @@ export const PDFPreviewEditor = ({
   useEffect(() => {
     if (!open || !termsReady) return;
 
-    const payload = JSON.stringify({ editorSettings, customizeSettings, showItemImages, quotationData, brandColors, termsConditions });
-    if (payload === latestPreviewPayloadRef.current && pdfBlobUrl) return;
+    const payload = JSON.stringify({ editorSettings, customizeSettings, showItemImages, quotationData, brandColors, termsConditions, previewRetryKey });
+    if (payload === latestPreviewPayloadRef.current && prevBlobUrlRef.current) return;
     latestPreviewPayloadRef.current = payload;
+    setPreviewError(null);
 
     if (pdfGenerationTimer.current) {
       clearTimeout(pdfGenerationTimer.current);
@@ -374,7 +453,7 @@ export const PDFPreviewEditor = ({
     const jobId = ++pdfGenerationIdRef.current;
     const settingsSnapshot = editorSettings;
     const itemImagesSnapshot = showItemImages;
-    const debounceMs = pdfBlobUrl ? 500 : 80;
+    const debounceMs = prevBlobUrlRef.current ? 350 : 80;
     setIsGeneratingPdf(true);
 
     pdfGenerationTimer.current = setTimeout(() => {
@@ -385,19 +464,25 @@ export const PDFPreviewEditor = ({
       if (pdfGenerationTimer.current) {
         clearTimeout(pdfGenerationTimer.current);
       }
+      pdfGenerationIdRef.current += 1;
     };
-  }, [open, termsReady, editorSettings, customizeSettings, quotationData, brandColors, showItemImages, pdfBlobUrl, generateLivePdf]);
+  }, [open, termsReady, editorSettings, customizeSettings, quotationData, brandColors, showItemImages, termsConditions, generateLivePdf, previewRetryKey]);
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
-    const newSettings = { ...editorSettings, ...updates };
+    const normalizedUpdates = {
+      ...updates,
+      ...(updates.headingFont ? { headingFont: getSelectableFontId(updates.headingFont) } : {}),
+      ...(updates.bodyFont ? { bodyFont: getSelectableFontId(updates.bodyFont) } : {}),
+    };
+    const newSettings = { ...editorSettings, ...normalizedUpdates };
     setEditorSettings(newSettings);
     saveEditorSettings(newSettings);
     
     // Save font preferences to database if font changed
-    if (updates.headingFont || updates.bodyFont) {
+    if (normalizedUpdates.headingFont || normalizedUpdates.bodyFont) {
       saveFontPreferences({
-        headingFont: updates.headingFont || editorSettings.headingFont || 'times',
-        bodyFont: updates.bodyFont || editorSettings.bodyFont || 'helvetica',
+        headingFont: newSettings.headingFont,
+        bodyFont: newSettings.bodyFont,
       });
     }
   };
@@ -479,29 +564,29 @@ export const PDFPreviewEditor = ({
   const EditorPanel = () => (
     <div className="flex flex-col h-full overflow-hidden">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid grid-cols-6 m-4 flex-shrink-0">
-          <TabsTrigger value="content" className="text-xs">
-            <ListTree className="h-3 w-3 mr-1" />
+        <TabsList aria-label="Quotation PDF settings sections" className="flex h-11 shrink-0 justify-start gap-1 mx-3 my-3 overflow-x-auto overflow-y-hidden px-1.5 py-1">
+          <TabsTrigger value="content" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <ListTree className="h-3 w-3 shrink-0" />
             Content
           </TabsTrigger>
-          <TabsTrigger value="themes" className="text-xs">
-            <Palette className="h-3 w-3 mr-1" />
+          <TabsTrigger value="themes" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Palette className="h-3 w-3 shrink-0" />
             Themes
           </TabsTrigger>
-          <TabsTrigger value="decor" className="text-xs">
-            <Sparkles className="h-3 w-3 mr-1" />
+          <TabsTrigger value="decor" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Sparkles className="h-3 w-3 shrink-0" />
             Decor
           </TabsTrigger>
-          <TabsTrigger value="layout" className="text-xs">
-            <Layout className="h-3 w-3 mr-1" />
+          <TabsTrigger value="layout" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Layout className="h-3 w-3 shrink-0" />
             Layout
           </TabsTrigger>
-          <TabsTrigger value="style" className="text-xs">
-            <Eye className="h-3 w-3 mr-1" />
+          <TabsTrigger value="style" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Eye className="h-3 w-3 shrink-0" />
             Style
           </TabsTrigger>
-          <TabsTrigger value="advanced" className="text-xs">
-            <Sliders className="h-3 w-3 mr-1" />
+          <TabsTrigger value="advanced" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Sliders className="h-3 w-3 shrink-0" />
             Edit
           </TabsTrigger>
         </TabsList>
@@ -920,6 +1005,18 @@ export const PDFPreviewEditor = ({
                     onCheckedChange={(v) => updateSettings({ highlightAmounts: v })}
                   />
                 </div>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <Label className="text-sm">Bold Amounts</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Bold the full amount, including its currency symbol
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editorSettings.boldAmounts}
+                    onCheckedChange={(v) => updateSettings({ boldAmounts: v })}
+                  />
+                </div>
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-sm">Show Borders</Label>
@@ -955,6 +1052,9 @@ export const PDFPreviewEditor = ({
                 <Type className="h-4 w-4 text-primary" />
                 <Label className="text-sm font-semibold">Font Selection</Label>
               </div>
+              <p className="text-xs text-muted-foreground">
+                These embedded typefaces update the live PDF preview.
+              </p>
               
               {/* Font Search */}
               <div className="relative">
@@ -988,7 +1088,7 @@ export const PDFPreviewEditor = ({
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Heading Font</Label>
                 <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-                  {PDF_FONTS
+                  {PDF_SELECTABLE_FONTS
                     .filter(f => f.recommended === 'heading' || f.recommended === 'both')
                     .filter(f => selectedFontCategory === 'all' || f.category === selectedFontCategory)
                     .filter(f => fontSearchQuery === '' || 
@@ -1017,7 +1117,7 @@ export const PDFPreviewEditor = ({
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Body Font</Label>
                 <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-                  {PDF_FONTS
+                  {PDF_SELECTABLE_FONTS
                     .filter(f => f.recommended === 'body' || f.recommended === 'both')
                     .filter(f => selectedFontCategory === 'all' || f.category === selectedFontCategory)
                     .filter(f => fontSearchQuery === '' || 
@@ -1051,7 +1151,7 @@ export const PDFPreviewEditor = ({
 
             <div className="space-y-3 pt-4 border-t">
               <Label className="text-sm font-semibold">Font Size</Label>
-              <Select value={editorSettings.fontSize} onValueChange={(v) => updateSettings({ fontSize: v as any })}>
+              <Select value={editorSettings.fontSize} onValueChange={(v) => updateSettings({ fontSize: v as PDFEditorSettings['fontSize'] })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1065,7 +1165,7 @@ export const PDFPreviewEditor = ({
 
             <div className="space-y-3 pt-4 border-t">
               <Label className="text-sm font-semibold">Table Style</Label>
-              <Select value={editorSettings.tableStyle} onValueChange={(v) => updateSettings({ tableStyle: v as any })}>
+              <Select value={editorSettings.tableStyle} onValueChange={(v) => updateSettings({ tableStyle: v as PDFEditorSettings['tableStyle'] })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1080,7 +1180,7 @@ export const PDFPreviewEditor = ({
 
             <div className="space-y-3 pt-4 border-t">
               <Label className="text-sm font-semibold">Header Style</Label>
-              <Select value={editorSettings.headerStyle} onValueChange={(v) => updateSettings({ headerStyle: v as any })}>
+              <Select value={editorSettings.headerStyle} onValueChange={(v) => updateSettings({ headerStyle: v as PDFEditorSettings['headerStyle'] })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1095,7 +1195,7 @@ export const PDFPreviewEditor = ({
 
             <div className="space-y-3 pt-4 border-t">
               <Label className="text-sm font-semibold">Summary Position</Label>
-              <Select value={editorSettings.summaryStyle} onValueChange={(v) => updateSettings({ summaryStyle: v as any })}>
+              <Select value={editorSettings.summaryStyle} onValueChange={(v) => updateSettings({ summaryStyle: v as PDFEditorSettings['summaryStyle'] })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1109,7 +1209,7 @@ export const PDFPreviewEditor = ({
 
             <div className="space-y-3 pt-4 border-t">
               <Label className="text-sm font-semibold">Page Margins</Label>
-              <Select value={editorSettings.pageMargins} onValueChange={(v) => updateSettings({ pageMargins: v as any })}>
+              <Select value={editorSettings.pageMargins} onValueChange={(v) => updateSettings({ pageMargins: v as PDFEditorSettings['pageMargins'] })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -1241,7 +1341,22 @@ export const PDFPreviewEditor = ({
 
         {/* PDF Preview */}
         <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
-          {(!termsReady || isGeneratingPdf) && !pdfBlobUrl ? (
+            {previewError && (
+              <div role="alert" className="mx-auto mb-3 flex max-w-[900px] items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm">
+                <span>{previewError}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setPreviewError(null);
+                    setPreviewRetryKey((current) => current + 1);
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+            {(!termsReady || isGeneratingPdf) && !pdfBlobUrl ? (
             <div className="h-full flex items-center justify-center min-h-[300px]">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
