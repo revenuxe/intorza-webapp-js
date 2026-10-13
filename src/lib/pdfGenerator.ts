@@ -5,6 +5,8 @@ import { DEFAULT_QUOTATION_TERMS } from './libraryDefaults';
 import { PDFEditorSettings, getThemeById, hexToRgb, PDFTheme, getFontById, applyBrandColorsToTheme, defaultAdvancedSettings } from './pdfThemes';
 import { drawAllDecorations, drawSectionDivider, drawFooterDecoration } from './pdfDecorations';
 import { formatPDFCurrency, formatPDFNumber, getNumericFont, createPDFCurrencyFormatter } from './pdfCurrencyFormatter';
+import { normalizeTermsSections } from './termsResolver';
+import { fitFixedColumnWidths } from './pdfTableLayout';
 
 // --- Settings Interface ---
 export interface QuotationPdfSettings {
@@ -780,12 +782,29 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       // Dynamic column styles based on visible columns and advanced settings
       // When images are shown, compress other columns slightly to make room
       const imgCompact = hasAnyImages;
+      const minDetailsWidth = showDetails ? Math.min(30, contentWidth * 0.2) : 0;
+      const imageColumnWidths = fitFixedColumnWidths([
+        ...(showSide ? [Math.min(advSettings!.columnWidths.side, 12)] : []),
+        showDetails ? Math.min(advSettings!.columnWidths.product, 26) : 34,
+        ...(hasAnyImages ? [14] : []),
+        ...(showSizeColumns
+          ? [
+              Math.min(advSettings!.columnWidths.width, 14),
+              Math.min(advSettings!.columnWidths.height, 14),
+              Math.min(advSettings!.columnWidths.area, 16),
+            ]
+          : []),
+        Math.min(advSettings!.columnWidths.rate, 23),
+        Math.min(advSettings!.columnWidths.amount, 24),
+      ], contentWidth, minDetailsWidth);
+      let imageWidthIndex = 0;
+      const nextImageWidth = () => imageColumnWidths[imageWidthIndex++];
       const colStyles: any = {};
       let colIndex = 0;
       // Side column
       if (showSide) { 
         colStyles[colIndex++] = { 
-          cellWidth: imgCompact ? Math.min(advSettings!.columnWidths.side, 16) : advSettings!.columnWidths.side, 
+          cellWidth: imgCompact ? nextImageWidth() : advSettings!.columnWidths.side,
           halign: 'center', 
           fontSize: 6, 
           valign: 'middle' 
@@ -794,7 +813,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       // Product column
       colStyles[colIndex++] = { 
         cellWidth: imgCompact 
-          ? (showDetails ? Math.min(advSettings!.columnWidths.product, 28) : 36)
+          ? nextImageWidth()
           : (showDetails ? advSettings!.columnWidths.product : 42), 
         fontStyle: 'bold', 
         fontSize: advSettings!.fontSizes.productName, 
@@ -804,6 +823,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       if (showDetails) { 
         colStyles[colIndex++] = { 
           cellWidth: 'auto', 
+          ...(imgCompact ? { minCellWidth: minDetailsWidth } : {}),
           fontSize: advSettings!.fontSizes.details, 
           valign: 'middle' 
         }; 
@@ -811,7 +831,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       // Image column - compact 14mm
       if (hasAnyImages) {
         colStyles[colIndex++] = {
-          cellWidth: 14,
+          cellWidth: nextImageWidth(),
           halign: 'center',
           valign: 'middle',
           cellPadding: { top: 1, right: 1, bottom: 1, left: 1 },
@@ -819,16 +839,16 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       }
       // Size columns
       if (showSizeColumns) {
-        const wWidth = imgCompact ? Math.min(advSettings!.columnWidths.width, 16) : advSettings!.columnWidths.width;
-        const hWidth = imgCompact ? Math.min(advSettings!.columnWidths.height, 16) : advSettings!.columnWidths.height;
-        const aWidth = imgCompact ? Math.min(advSettings!.columnWidths.area, 18) : advSettings!.columnWidths.area;
+        const wWidth = imgCompact ? nextImageWidth() : advSettings!.columnWidths.width;
+        const hWidth = imgCompact ? nextImageWidth() : advSettings!.columnWidths.height;
+        const aWidth = imgCompact ? nextImageWidth() : advSettings!.columnWidths.area;
         colStyles[colIndex++] = { cellWidth: wWidth, halign: 'center', fontSize: 6, valign: 'middle' };
         colStyles[colIndex++] = { cellWidth: hWidth, halign: 'center', fontSize: 6, valign: 'middle' };
         colStyles[colIndex++] = { cellWidth: aWidth, halign: 'center', fontSize: 6, valign: 'middle' };
       }
       // Rate column
       colStyles[colIndex++] = { 
-        cellWidth: imgCompact ? Math.min(advSettings!.columnWidths.rate, 26) : advSettings!.columnWidths.rate, 
+        cellWidth: imgCompact ? nextImageWidth() : advSettings!.columnWidths.rate,
         halign: 'right', 
         fontSize: advSettings!.fontSizes.amounts, 
         overflow: 'hidden' as const, 
@@ -836,7 +856,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       };
       // Amount column
       colStyles[colIndex++] = { 
-        cellWidth: imgCompact ? Math.min(advSettings!.columnWidths.amount, 28) : advSettings!.columnWidths.amount, 
+        cellWidth: imgCompact ? nextImageWidth() : advSettings!.columnWidths.amount,
         halign: 'right', 
         fontSize: advSettings!.fontSizes.amounts, 
         overflow: 'hidden' as const, 
@@ -872,7 +892,12 @@ export const generateQuotationPDF = async (data: QuotationData) => {
           textColor: COLORS.TEXT_SECONDARY,
           lineColor: COLORS.BORDER,
           lineWidth: advSettings!.tableBorderWidth,
-          cellPadding: { top: Math.max(advSettings!.rowPadding, 3), right: 4, bottom: Math.max(advSettings!.rowPadding, 3), left: 4 },
+          cellPadding: {
+            top: Math.max(advSettings!.rowPadding, 3),
+            right: hasAnyImages ? 2 : 4,
+            bottom: Math.max(advSettings!.rowPadding, 3),
+            left: hasAnyImages ? 2 : 4,
+          },
           valign: 'middle',
           minCellHeight: hasAnyImages ? 12 : 8,
         },
@@ -1179,7 +1204,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   // --- 6. Terms & Conditions ---
-  if (settings.showTermsConditions) {
+  const termsToUse = normalizeTermsSections(data.termsConditions ?? DEFAULT_QUOTATION_TERMS);
+  if (settings.showTermsConditions && termsToUse.length > 0) {
     // Always start Terms & Conditions on its own fresh page rather than
     // wherever the previous section (e.g. payment summary) happened to end —
     // otherwise it visually reads as part of the quotation instead of its
@@ -1240,13 +1266,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     yPosition += 2;
   };
 
-  // Use custom terms if provided, otherwise use default terms
-  const termsToUse = data.termsConditions ?? DEFAULT_QUOTATION_TERMS;
-
   termsToUse.forEach(term => {
-    if (term && term.title && term.points) {
-      addBlock(term.title, term.points);
-    }
+    addBlock(term.title, term.points);
   });
   } // End of showTermsConditions
 

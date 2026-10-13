@@ -149,19 +149,21 @@ export const PDFPreviewEditor = ({
     if (!open) return;
     setTermsReady(false);
     setTermsError('');
+    setTermsConditions(DEFAULT_QUOTATION_TERMS);
+    setLibraryTerms(DEFAULT_QUOTATION_TERMS);
+    setTermsTemplateName('Default quotation terms');
+    setUsingFallbackTerms(true);
     let active = true;
+    const fallbackTimer = window.setTimeout(() => {
+      if (!active) return;
+      setTermsError("Saved quotation terms are taking too long to load. Built-in terms are shown instead.");
+      setTermsReady(true);
+    }, 8000);
+
     const loadPreviewData = async () => {
       try {
-        const { data: authData } = await supabase.auth.getUser();
-        const { data } = authData.user ? await profileApi.get() : { data: null };
-
-        if (!active) return;
-        if (data?.brand_colors && typeof data.brand_colors === 'object') {
-          const colors = data.brand_colors as unknown as BrandColors;
-          if (colors.primary) {
-            setBrandColors(colors);
-          }
-        }
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
         if (authData.user) {
           const resolved = await getResolvedLibraryTerms(authData.user.id, 'quotation');
           if (active) {
@@ -169,26 +171,47 @@ export const PDFPreviewEditor = ({
             setLibraryTerms(resolved.terms);
             setTermsTemplateName(resolved.templateName);
             setUsingFallbackTerms(resolved.source === 'default');
+            setTermsError('');
             setTermsReady(true);
+            window.clearTimeout(fallbackTimer);
           }
         } else {
+          if (active) {
+            setTermsReady(true);
+            window.clearTimeout(fallbackTimer);
+          }
+        }
+
+        if (authData.user) {
+          try {
+            const { data } = await profileApi.get();
+            if (active && data?.brand_colors && typeof data.brand_colors === 'object') {
+              const colors = data.brand_colors as unknown as BrandColors;
+              if (colors.primary) setBrandColors(colors);
+            }
+          } catch (error) {
+            console.error('Error loading quotation preview brand colors:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading quotation preview data:', error);
+        if (active) {
+          window.clearTimeout(fallbackTimer);
           setTermsConditions(DEFAULT_QUOTATION_TERMS);
           setLibraryTerms(DEFAULT_QUOTATION_TERMS);
           setTermsTemplateName('Default quotation terms');
           setUsingFallbackTerms(true);
+          setTermsError('Saved quotation terms could not be loaded. Built-in terms are shown instead.');
           setTermsReady(true);
         }
-      } catch (error: any) {
-        if (active) setTermsError(error?.message || 'Could not load terms. Close and reopen the preview to retry.');
-        if (!/not authenticated/i.test(error?.message || '')) {
-          console.error('Error loading brand colors:', error);
-        }
       }
-
     };
 
     void loadPreviewData();
-    return () => { active = false; };
+    return () => {
+      active = false;
+      window.clearTimeout(fallbackTimer);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -1218,11 +1241,13 @@ export const PDFPreviewEditor = ({
 
         {/* PDF Preview */}
         <div className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
-          {isGeneratingPdf && !pdfBlobUrl ? (
+          {(!termsReady || isGeneratingPdf) && !pdfBlobUrl ? (
             <div className="h-full flex items-center justify-center min-h-[300px]">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Generating preview...</p>
+                <p className="text-sm text-muted-foreground">
+                  {termsReady ? 'Generating preview...' : 'Loading terms for preview...'}
+                </p>
               </div>
             </div>
           ) : (

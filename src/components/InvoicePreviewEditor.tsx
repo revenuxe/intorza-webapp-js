@@ -40,7 +40,7 @@ import { PDFCanvasPreview } from "./next/PDFCanvasPreviewClient";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { profileApi } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
-import { getResolvedLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
+import { DEFAULT_INVOICE_TERMS, getResolvedLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
 import { TermsBlockEditor } from "@/components/pdf/TermsBlockEditor";
 
 interface BrandColors {
@@ -142,41 +142,76 @@ export const InvoicePreviewEditor = ({
     if (!open) return;
     setTermsReady(false);
     setTermsError('');
+    setTermsConditions(DEFAULT_INVOICE_TERMS);
+    setLibraryTerms(DEFAULT_INVOICE_TERMS);
+    setTermsTemplateName('Default invoice terms');
+    setUsingFallbackTerms(true);
     let active = true;
-    const loadData = async () => {
-      try {
-        const [{ data }, { data: authData }] = await Promise.all([
-          profileApi.get(),
-          supabase.auth.getUser(),
-        ]);
+    let previewTerms = DEFAULT_INVOICE_TERMS;
+    const fallbackTimer = window.setTimeout(() => {
+      if (!active) return;
+      previewTerms = DEFAULT_INVOICE_TERMS;
+      setProfile((current: any) => current ? { ...current, invoice_terms_conditions: previewTerms } : current);
+      setTermsError("Saved invoice terms are taking too long to load. Built-in terms are shown instead.");
+      setTermsReady(true);
+    }, 8000);
 
-        if (data && active) {
-          let previewProfile = data;
-          if (authData.user) {
-            const resolved = await getResolvedLibraryTerms(authData.user.id, 'invoice');
-            previewProfile = { ...data, invoice_terms_conditions: resolved.terms };
-            if (active) {
-              setTermsConditions(resolved.terms);
-              setLibraryTerms(resolved.terms);
-              setTermsTemplateName(resolved.templateName);
-              setUsingFallbackTerms(resolved.source === 'default');
-              setTermsReady(true);
-            }
+    const loadTerms = async () => {
+      try {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        if (authData.user) {
+          const resolved = await getResolvedLibraryTerms(authData.user.id, 'invoice');
+          if (active) {
+            previewTerms = resolved.terms;
+            setTermsConditions(resolved.terms);
+            setLibraryTerms(resolved.terms);
+            setTermsTemplateName(resolved.templateName);
+            setUsingFallbackTerms(resolved.source === 'default');
+            setTermsError('');
+            setProfile((current: any) => current ? { ...current, invoice_terms_conditions: resolved.terms } : current);
+            setTermsReady(true);
+            window.clearTimeout(fallbackTimer);
           }
-          if (!active) return;
-          setProfile(previewProfile);
-          if (data.brand_colors && typeof data.brand_colors === 'object') {
-            const colors = data.brand_colors as unknown as BrandColors;
-            if (colors.primary) setBrandColors(colors);
-          }
+        } else if (active) {
+          setTermsReady(true);
+          window.clearTimeout(fallbackTimer);
         }
       } catch (error) {
-        if (active) setTermsError((error as Error).message || 'Could not load terms. Close and reopen to retry.');
-        console.error('Error loading profile:', error);
+        console.error('Error loading invoice preview terms:', error);
+        if (active) {
+          window.clearTimeout(fallbackTimer);
+          previewTerms = DEFAULT_INVOICE_TERMS;
+          setTermsConditions(DEFAULT_INVOICE_TERMS);
+          setLibraryTerms(DEFAULT_INVOICE_TERMS);
+          setTermsTemplateName('Default invoice terms');
+          setUsingFallbackTerms(true);
+          setTermsError('Saved invoice terms could not be loaded. Built-in terms are shown instead.');
+          setProfile((current: any) => current ? { ...current, invoice_terms_conditions: previewTerms } : current);
+          setTermsReady(true);
+        }
       }
     };
-    void loadData();
-    return () => { active = false; };
+    const loadProfile = async () => {
+      try {
+        const { data } = await profileApi.get();
+        if (!active || !data) return;
+        setProfile({ ...data, invoice_terms_conditions: previewTerms });
+        if (data.brand_colors && typeof data.brand_colors === 'object') {
+          const colors = data.brand_colors as unknown as BrandColors;
+          if (colors.primary) setBrandColors(colors);
+        }
+      } catch (error) {
+        console.error('Error loading invoice preview profile:', error);
+      }
+    };
+
+    void loadTerms();
+    void loadProfile();
+    return () => {
+      active = false;
+      window.clearTimeout(fallbackTimer);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -870,11 +905,13 @@ export const InvoicePreviewEditor = ({
       </div>
 
       <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
-        {isGeneratingPdf && !pdfBlobUrl ? (
+        {(!termsReady || isGeneratingPdf) && !pdfBlobUrl ? (
           <div className="h-full flex items-center justify-center min-h-[300px]">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Generating preview...</p>
+              <p className="text-sm text-muted-foreground">
+                {termsReady ? 'Generating preview...' : 'Loading terms for preview...'}
+              </p>
             </div>
           </div>
         ) : (

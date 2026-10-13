@@ -20,18 +20,31 @@ export interface ResolvedTerms {
   source: "library" | "default" | "disabled";
 }
 
-export const isUsableTerms = (value: unknown): value is TermsSection[] =>
-  Array.isArray(value) &&
-  value.length > 0 &&
-  value.some((section) => {
-    if (!section || typeof section !== "object") return false;
+export function normalizeTermsSections(value: unknown): TermsSection[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((section, index) => {
+    if (!section || typeof section !== "object") return [];
     const candidate = section as Partial<TermsSection>;
-    return Boolean(
-      typeof candidate.title === 'string' && candidate.title.trim() &&
-      Array.isArray(candidate.points) &&
-      candidate.points.some((point) => typeof point === "string" && point.trim()),
-    );
+    const title = typeof candidate.title === "string" ? candidate.title.trim() : "";
+    const points = Array.isArray(candidate.points)
+      ? candidate.points.filter((point): point is string => typeof point === "string")
+        .map((point) => point.trim()).filter(Boolean)
+      : [];
+    if (!title || !points.length) return [];
+
+    return [{
+      id: typeof candidate.id === "string" && candidate.id.trim()
+        ? candidate.id
+        : `terms-${index + 1}`,
+      title,
+      points,
+    }];
   });
+}
+
+export const isUsableTerms = (value: unknown): value is TermsSection[] =>
+  normalizeTermsSections(value).length > 0;
 
 export function resolveTermsTemplate(
   templates: TermsTemplateRecord[],
@@ -48,11 +61,11 @@ export function resolveTermsTemplate(
   if (templates.length && templates.every(template => template.is_enabled === false)) {
     return { terms: [], templateId: null, templateName: 'Library terms disabled', source: 'disabled' };
   }
-  if (!selected || !isUsableTerms(selected.content)) {
-    return { terms: fallback, templateId: null, templateName: fallbackName, source: "default" };
+  if (!selected) {
+    return { terms: normalizeTermsSections(fallback), templateId: null, templateName: fallbackName, source: "default" };
   }
   return {
-    terms: selected.content,
+    terms: normalizeTermsSections(selected.content),
     templateId: selected.id || null,
     templateName: selected.template_name?.trim() || "My Library terms",
     source: "library",
