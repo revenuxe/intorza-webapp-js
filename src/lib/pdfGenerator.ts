@@ -189,8 +189,7 @@ const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: numb
       img.src = imageUrl;
     } else {
       // For remote URLs, try with timestamp to avoid cache issues
-      const separator = imageUrl.includes('?') ? '&' : '?';
-      img.src = `${imageUrl}${separator}t=${Date.now()}`;
+      img.src = imageUrl;
     }
   });
 };
@@ -949,17 +948,16 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       // Pre-load images for the image column
       const itemImageCache: Map<number, string> = new Map();
       if (hasAnyImages) {
-        for (let i = 0; i < section.items.length; i++) {
-          const item = section.items[i];
-          if (item.imageUrls && item.imageUrls.length > 0) {
-            try {
-              const compressed = await compressImage(item.imageUrls[0], 120, 120);
-              itemImageCache.set(i, compressed);
-            } catch (e) {
-              console.error('Failed to load item image:', e);
-            }
+        await Promise.all(section.items.map(async (item, index) => {
+          const imageUrl = item.imageUrls?.[0];
+          if (!imageUrl) return;
+
+          try {
+            itemImageCache.set(index, await compressImage(imageUrl, 120, 120));
+          } catch (error) {
+            console.error('Failed to load item image:', error);
           }
-        }
+        }));
       }
 
       renderTable({

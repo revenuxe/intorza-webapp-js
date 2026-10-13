@@ -316,14 +316,13 @@ export const PDFCanvasPreview = memo(
             }
             pdfDocRef.current = pdf;
 
-            const metas: RenderedPage[] = [];
-            for (let i = 1; i <= pdf.numPages; i++) {
-              const page = await pdf.getPage(i);
-              if (taskId !== renderTaskRef.current) return;
-              const viewport = page.getViewport({ scale: 1 });
-              metas.push({ width: viewport.width, height: viewport.height });
-              await nextFrame();
-            }
+            const metas: RenderedPage[] = await Promise.all(
+              Array.from({ length: pdf.numPages }, async (_, index) => {
+                const page = await pdf.getPage(index + 1);
+                const viewport = page.getViewport({ scale: 1 });
+                return { width: viewport.width, height: viewport.height };
+              })
+            );
 
             if (taskId !== renderTaskRef.current) return;
 

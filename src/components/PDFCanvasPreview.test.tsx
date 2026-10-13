@@ -3,22 +3,35 @@ import { render, screen, act } from "@testing-library/react";
 import React from "react";
 
 // Mock pdfjs-dist BEFORE importing the component under test.
+let deferPageMetadata = false;
+let pendingPageResolvers: Array<() => void> = [];
+
+const makeFakePage = () => ({
+  getViewport: ({ scale = 1 }: { scale?: number }) => ({
+    width: 595 * scale,
+    height: 842 * scale,
+  }),
+  render: () => ({ promise: Promise.resolve() }),
+});
+
 const makeFakeDoc = (numPages: number) => ({
   numPages,
-  getPage: jest.fn(async (n: number) => ({
-    getViewport: ({ scale = 1 }: { scale?: number }) => ({
-      width: 595 * scale,
-      height: 842 * scale,
-    }),
-    render: () => ({ promise: Promise.resolve() }),
-  })),
+  getPage: jest.fn((_n: number): Promise<ReturnType<typeof makeFakePage>> => {
+    const page = makeFakePage();
+    if (!deferPageMetadata) return Promise.resolve(page);
+    return new Promise((resolve) => pendingPageResolvers.push(() => resolve(page)));
+  }),
   destroy: jest.fn(),
 });
+let lastFakeDoc: ReturnType<typeof makeFakeDoc>;
 
 jest.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: { workerSrc: "" },
   version: "test",
-  getDocument: jest.fn(() => ({ promise: Promise.resolve(makeFakeDoc(3)) })),
+  getDocument: jest.fn(() => {
+    lastFakeDoc = makeFakeDoc(3);
+    return { promise: Promise.resolve(lastFakeDoc) };
+  }),
 }));
 
 // URL.createObjectURL isn't in jsdom.
@@ -46,6 +59,8 @@ const flush = async (ms = 100) => {
 describe("PDFCanvasPreview scroll preservation", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    deferPageMetadata = false;
+    pendingPageResolvers = [];
   });
 
   it("keeps the user's scroll position when the PDF is regenerated after an edit", async () => {
@@ -92,5 +107,19 @@ describe("PDFCanvasPreview scroll preservation", () => {
     // Regression assertion: scroll must NOT have snapped back to 0.
     // (Anchoring may nudge slightly but never to the top of doc.)
     expect(scrollRoot.scrollTop).toBeGreaterThan(0);
+  });
+
+  it("loads page dimensions concurrently instead of delaying the preview page by page", async () => {
+    deferPageMetadata = true;
+    const { PDFCanvasPreview } = await import("./PDFCanvasPreview");
+
+    render(<PDFCanvasPreview pdfBlobUrl="blob:v1" zoom={100} />);
+    await flush(20);
+
+    expect(lastFakeDoc.getPage).toHaveBeenCalledTimes(3);
+
+    deferPageMetadata = false;
+    pendingPageResolvers.splice(0).forEach((resolve) => resolve());
+    await flush(150);
   });
 });

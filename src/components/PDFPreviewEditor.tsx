@@ -439,7 +439,7 @@ export const PDFPreviewEditor = ({
   // Debounced incremental preview pipeline. Editor changes are saved immediately,
   // but PDF regeneration only receives the latest stable snapshot.
   useEffect(() => {
-    if (!open || !termsReady) return;
+    if (!open) return;
 
     const payload = JSON.stringify({ editorSettings, customizeSettings, showItemImages, quotationData, brandColors, termsConditions, previewRetryKey });
     if (payload === latestPreviewPayloadRef.current && prevBlobUrlRef.current) return;
@@ -466,7 +466,7 @@ export const PDFPreviewEditor = ({
       }
       pdfGenerationIdRef.current += 1;
     };
-  }, [open, termsReady, editorSettings, customizeSettings, quotationData, brandColors, showItemImages, termsConditions, generateLivePdf, previewRetryKey]);
+  }, [open, editorSettings, customizeSettings, quotationData, brandColors, showItemImages, termsConditions, generateLivePdf, previewRetryKey]);
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
     const normalizedUpdates = {
@@ -1356,13 +1356,11 @@ export const PDFPreviewEditor = ({
                 </Button>
               </div>
             )}
-            {(!termsReady || isGeneratingPdf) && !pdfBlobUrl ? (
+            {isGeneratingPdf && !pdfBlobUrl ? (
             <div className="h-full flex items-center justify-center min-h-[300px]">
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">
-                  {termsReady ? 'Generating preview...' : 'Loading terms for preview...'}
-                </p>
+                <p className="text-sm text-muted-foreground">Generating preview...</p>
               </div>
             </div>
           ) : (
