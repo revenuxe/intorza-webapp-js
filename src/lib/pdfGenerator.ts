@@ -1241,9 +1241,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   };
 
   // Use custom terms if provided, otherwise use default terms
-  const termsToUse = data.termsConditions && data.termsConditions.length > 0 
-    ? data.termsConditions 
-    : DEFAULT_QUOTATION_TERMS;
+  const termsToUse = data.termsConditions ?? DEFAULT_QUOTATION_TERMS;
 
   termsToUse.forEach(term => {
     if (term && term.title && term.points) {

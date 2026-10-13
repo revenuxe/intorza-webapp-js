@@ -17,8 +17,10 @@ describe("resolveTermsTemplate", () => {
     const r = resolveTermsTemplate([t("a", { is_default: true, is_enabled: false }), t("b", {})], fb, "Default");
     expect(r.templateId).toBe("b");
   });
-  it("falls back when all disabled or unusable", () => {
-    expect(resolveTermsTemplate([t("a", { is_enabled: false })], fb, "Default").source).toBe("default");
+  it("omits terms when all templates are disabled, without replacing them with generic terms", () => {
+    expect(resolveTermsTemplate([t("a", { is_enabled: false })], fb, "Default").terms).toEqual([]);
+  });
+  it("falls back when no usable templates exist", () => {
     expect(resolveTermsTemplate([{ id: "c", content: [{ title: "", points: [] }] }], fb, "Default").terms).toBe(fb);
   });
 });

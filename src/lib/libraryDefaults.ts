@@ -50,8 +50,7 @@ export async function getResolvedLibraryTerms(
     .order("updated_at", { ascending: false });
 
   if (error) {
-    console.error(`Error loading ${templateType} terms:`, error);
-    return { terms: fallback, templateId: null, templateName: `Default ${templateType} terms`, source: "default" };
+    throw new Error(`Could not load your ${templateType} terms. Please retry before downloading. ${error.message}`);
   }
   return resolveTermsTemplate(data || [], fallback, `Default ${templateType} terms`);
 }

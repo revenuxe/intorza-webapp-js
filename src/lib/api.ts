@@ -251,7 +251,14 @@ export const paymentsApi = {
 
 // ---------------------- library ----------------------
 export const libraryApi = {
-  terms: tableCrud('terms_templates'),
+  terms: {
+    ...tableCrud('terms_templates'),
+    select: async (id: string): Promise<Envelope<any>> => {
+      await requireUserId();
+      const data = unwrap(await supabase.rpc('select_terms_template' as any, { p_id: id }));
+      return { data };
+    },
+  },
   warranty: tableCrud('warranty_templates'),
   bankDetails: tableCrud('bank_detail_templates'),
   paymentTemplates: tableCrud('payment_templates'),

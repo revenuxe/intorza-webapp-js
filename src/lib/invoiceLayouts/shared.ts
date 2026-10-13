@@ -289,11 +289,9 @@ export const resolveHeroImageSource = (profile: InvoiceData['profile']): HeroIma
 export const renderTermsAndConditions = async (ctx: LayoutContext, startY: number): Promise<number> => {
   const { doc, data, invoiceSettings, COLORS, margin, contentWidth, pageHeight, setHeadingFont, setBodyFont } = ctx;
   let yPosition = startY;
-  const termsToUse = data.profile.invoice_terms_conditions?.length
-    ? data.profile.invoice_terms_conditions
-    : DEFAULT_INVOICE_TERMS;
+  const termsToUse = data.profile.invoice_terms_conditions ?? DEFAULT_INVOICE_TERMS;
 
-  if (!invoiceSettings.showTermsConditions) {
+  if (!invoiceSettings.showTermsConditions || !termsToUse.length) {
     return yPosition;
   }
 

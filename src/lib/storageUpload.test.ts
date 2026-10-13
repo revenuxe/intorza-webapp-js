@@ -34,7 +34,17 @@ describe('Supabase uploads and database references', () => {
   });
   it('rejects empty or unsupported uploads before storage access', async () => {
     await expect(uploadToStorage(new File([], 'empty.png', { type: 'image/png' }), 'logo')).rejects.toThrow('empty');
-    await expect(uploadToStorage(new File(['svg'], 'test.svg', { type: 'image/svg+xml' }), 'logo')).rejects.toThrow('choose');
+    await expect(uploadToStorage(new File(['html'], 'test.html', { type: 'text/html' }), 'logo')).rejects.toThrow('choose');
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+  it('supports missing browser MIME metadata and JPEG aliases', async () => {
+    await uploadToStorage(new File(['image'], 'logo.png'), 'logo');
+    await uploadToStorage(new File(['image'], 'logo.jpg', { type: 'image/jpg' }), 'logo');
+    expect(mockUpload.mock.calls[0][2]).toMatchObject({ contentType: 'image/png' });
+    expect(mockUpload.mock.calls[1][2]).toMatchObject({ contentType: 'image/jpeg' });
+  });
+  it('never stores raw SVG if safe rasterization fails', async () => {
+    await expect(uploadToStorage(new File(['svg'], 'logo.svg', { type: 'image/svg+xml' }), 'logo')).rejects.toThrow('export your logo as PNG');
     expect(mockUpload).not.toHaveBeenCalled();
   });
 });

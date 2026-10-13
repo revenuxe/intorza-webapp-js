@@ -272,7 +272,7 @@ const InvoiceDetail = () => {
       let nextAmount = invoice.remaining_amount;
 
       let pdfProfile = profile || {};
-      if (editedTerms && editedTerms.length) {
+      if (editedTerms !== undefined) {
         pdfProfile = { ...pdfProfile, invoice_terms_conditions: editedTerms };
       } else {
         const { data: { user } } = await supabase.auth.getUser();

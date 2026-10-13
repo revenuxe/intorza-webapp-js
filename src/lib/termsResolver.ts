@@ -17,7 +17,7 @@ export interface ResolvedTerms {
   terms: TermsSection[];
   templateId: string | null;
   templateName: string;
-  source: "library" | "default";
+  source: "library" | "default" | "disabled";
 }
 
 export const isUsableTerms = (value: unknown): value is TermsSection[] =>
@@ -27,7 +27,7 @@ export const isUsableTerms = (value: unknown): value is TermsSection[] =>
     if (!section || typeof section !== "object") return false;
     const candidate = section as Partial<TermsSection>;
     return Boolean(
-      candidate.title?.trim() &&
+      typeof candidate.title === 'string' && candidate.title.trim() &&
       Array.isArray(candidate.points) &&
       candidate.points.some((point) => typeof point === "string" && point.trim()),
     );
@@ -45,6 +45,9 @@ export function resolveTermsTemplate(
       return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
     });
   const selected = enabled[0];
+  if (templates.length && templates.every(template => template.is_enabled === false)) {
+    return { terms: [], templateId: null, templateName: 'Library terms disabled', source: 'disabled' };
+  }
   if (!selected || !isUsableTerms(selected.content)) {
     return { terms: fallback, templateId: null, templateName: fallbackName, source: "default" };
   }

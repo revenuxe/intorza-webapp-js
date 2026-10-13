@@ -105,6 +105,8 @@ export const InvoicePreviewEditor = ({
   invoiceData
 }: InvoicePreviewEditorProps) => {
   const [editorSettings, setEditorSettings] = useState<PDFEditorSettings>(getEditorSettings());
+  const [termsReady, setTermsReady] = useState(false);
+  const [termsError, setTermsError] = useState('');
   const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>(getInvoiceSettings());
   const [activeTab, setActiveTab] = useState("themes");
   const [showEditor, setShowEditor] = useState(false);
@@ -138,6 +140,8 @@ export const InvoicePreviewEditor = ({
   // Refresh the profile and enabled library terms whenever the preview opens.
   useEffect(() => {
     if (!open) return;
+    setTermsReady(false);
+    setTermsError('');
     let active = true;
     const loadData = async () => {
       try {
@@ -156,6 +160,7 @@ export const InvoicePreviewEditor = ({
               setLibraryTerms(resolved.terms);
               setTermsTemplateName(resolved.templateName);
               setUsingFallbackTerms(resolved.source === 'default');
+              setTermsReady(true);
             }
           }
           if (!active) return;
@@ -166,6 +171,7 @@ export const InvoicePreviewEditor = ({
           }
         }
       } catch (error) {
+        if (active) setTermsError((error as Error).message || 'Could not load terms. Close and reopen to retry.');
         console.error('Error loading profile:', error);
       }
     };
@@ -256,6 +262,7 @@ export const InvoicePreviewEditor = ({
   };
 
   const handleDownload = () => {
+    if (!termsReady) return;
     const downloadSettings: PDFEditorSettings = {
       ...editorSettings,
       brandColors: editorSettings.useBrandColors && brandColors ? brandColors : editorSettings.brandColors,
@@ -331,11 +338,11 @@ export const InvoicePreviewEditor = ({
 
   // Debounced PDF generation
   useEffect(() => {
-    if (!open) return;
+    if (!open || !termsReady) return;
     if (pdfGenerationTimer.current) clearTimeout(pdfGenerationTimer.current);
     pdfGenerationTimer.current = setTimeout(() => { generateLivePdf(); }, 800);
     return () => { if (pdfGenerationTimer.current) clearTimeout(pdfGenerationTimer.current); };
-  }, [open, generateLivePdf]);
+  }, [open, termsReady, generateLivePdf]);
 
   // Editor Panel — rendered as a JSX element (not a nested component) so React
   // reconciles it in place instead of remounting on every render. Remounting
@@ -907,7 +914,8 @@ export const InvoicePreviewEditor = ({
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Reset
               </Button>
-              <Button size="sm" onClick={handleDownload}>
+              {termsError && <p role="alert" className="text-sm text-destructive">{termsError}</p>}
+              <Button size="sm" onClick={handleDownload} disabled={!termsReady}>
                 <Download className="h-4 w-4 mr-1 md:mr-2" />
                 <span className="hidden sm:inline">Download PDF</span>
                 <span className="sm:hidden">Download</span>

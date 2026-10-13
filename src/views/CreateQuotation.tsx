@@ -777,8 +777,8 @@ const CreateQuotation = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (!profileData) return null;
+    const { data: profileData, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    if (error || !profileData) throw new Error('Could not load company profile. Please retry before downloading.');
 
     const libraryTerms = await getLibraryTerms(user.id, 'quotation');
     const bankTemplate = await getLibraryBankTemplate(user.id);

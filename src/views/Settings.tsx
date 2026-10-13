@@ -115,12 +115,13 @@ const Settings = () => {
   };
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
     try {
       setUploading(true);
       const file = event.target.files?.[0];
       if (!file) return;
 
-      if (!file.type.startsWith('image/')) {
+      if (file.type && !file.type.startsWith('image/')) {
         toast({
           title: "Invalid file type",
           description: "Please upload an image file",
@@ -129,16 +130,13 @@ const Settings = () => {
         return;
       }
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `logo-${Date.now()}.${fileExt}`;
-
       const { uploadAndSave } = await import('@/lib/storageUpload');
       const publicUrl = await uploadAndSave(file, 'logo', async ({ url }) => {
         await profileApi.update({ logo_url: url });
         return url;
       });
 
-      setProfile({ ...profile, logo_url: publicUrl });
+      setProfile(current => ({ ...current, logo_url: publicUrl }));
       toast({
         title: "Logo uploaded",
         description: "Your company logo has been updated successfully",
@@ -151,17 +149,19 @@ const Settings = () => {
         variant: "destructive",
       });
     } finally {
+      input.value = '';
       setUploading(false);
     }
   };
 
   const handleSignatureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
     try {
       setUploadingSignature(true);
       const file = event.target.files?.[0];
       if (!file) return;
 
-      if (!file.type.startsWith('image/')) {
+      if (file.type && !file.type.startsWith('image/')) {
         toast({
           title: "Invalid file type",
           description: "Please upload an image file",
@@ -170,16 +170,13 @@ const Settings = () => {
         return;
       }
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `signature-${Date.now()}.${fileExt}`;
-
       const { uploadAndSave } = await import('@/lib/storageUpload');
       const publicUrl = await uploadAndSave(file, 'signature', async ({ url }) => {
         await profileApi.update({ signature_url: url });
         return url;
       });
 
-      setProfile({ ...profile, signature_url: publicUrl });
+      setProfile(current => ({ ...current, signature_url: publicUrl }));
       toast({
         title: "Signature uploaded",
         description: "Your signature has been updated successfully",
@@ -192,6 +189,7 @@ const Settings = () => {
         variant: "destructive",
       });
     } finally {
+      input.value = '';
       setUploadingSignature(false);
     }
   };
@@ -444,7 +442,7 @@ const Settings = () => {
                 disabled={uploading}
                 className="flex-1"
               />
-              <Button disabled={uploading}>
+              <Button disabled={uploading} onClick={() => document.getElementById('logo')?.click()}>
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 {uploading ? "Uploading..." : "Upload"}
               </Button>
@@ -481,7 +479,7 @@ const Settings = () => {
                 disabled={uploadingSignature}
                 className="flex-1"
               />
-              <Button disabled={uploadingSignature}>
+              <Button disabled={uploadingSignature} onClick={() => document.getElementById('signature')?.click()}>
                 {uploadingSignature ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                 {uploadingSignature ? "Uploading..." : "Upload"}
               </Button>

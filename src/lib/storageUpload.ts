@@ -148,9 +148,10 @@ export async function uploadToStorage(
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "") || "bin";
 
-  const declaredType = (file as File).type || "";
-  if (!['image/jpeg','image/png','image/webp','image/gif','image/heic','image/heif'].includes(declaredType)) {
-    throw new Error('Please choose a JPG, PNG, WebP, GIF, or HEIC image.');
+  const inferredTypes: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', heic: 'image/heic', heif: 'image/heif', svg: 'image/svg+xml' };
+  const declaredType = file.type === 'image/jpg' ? 'image/jpeg' : (file.type || inferredTypes[ext] || '');
+  if (!Object.values(inferredTypes).includes(declaredType)) {
+    throw new Error('Please choose a JPG, PNG, WebP, GIF, SVG, or HEIC image.');
   }
   const looksLikeImage =
     declaredType.startsWith("image/") ||
@@ -160,8 +161,8 @@ export async function uploadToStorage(
   let contentType =
     declaredType || `image/${ext === "jpg" ? "jpeg" : ext}`;
 
-  if (looksLikeImage && ext !== "svg") {
-    const transparent = ext === "png" || declaredType === "image/png";
+  if (looksLikeImage) {
+    const transparent = ['image/png', 'image/svg+xml', 'image/webp'].includes(declaredType);
     const compressed = await compressImage(
       file,
       MAX_DIMENSION[kind] ?? 1600,
@@ -171,6 +172,8 @@ export async function uploadToStorage(
       payload = compressed.blob;
       ext = compressed.ext;
       contentType = compressed.contentType;
+    } else if (declaredType === 'image/svg+xml') {
+      throw new Error('This SVG could not be converted to a safe image. Please export your logo as PNG.');
     } else if (["heic", "heif"].includes(ext)) {
       throw new Error(
         "This photo format (HEIC) isn't supported. On iPhone, set Camera > Formats to 'Most Compatible', or pick a JPG/PNG image.",

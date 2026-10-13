@@ -39,7 +39,7 @@ import { PDFCanvasPreview } from "./next/PDFCanvasPreviewClient";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { profileApi } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
-import { getResolvedLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
+import { DEFAULT_QUOTATION_TERMS, getResolvedLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
 import { TermsBlockEditor } from "@/components/pdf/TermsBlockEditor";
 
 interface BrandColors {
@@ -97,6 +97,8 @@ export const PDFPreviewEditor = ({
   customizeSettings
 }: PDFPreviewEditorProps) => {
   const [editorSettings, setEditorSettings] = useState<PDFEditorSettings>(getEditorSettings());
+  const [termsReady, setTermsReady] = useState(false);
+  const [termsError, setTermsError] = useState('');
   const [activeTab, setActiveTab] = useState("themes");
   const [showEditor, setShowEditor] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<ThemeCategory>('all');
@@ -145,13 +147,13 @@ export const PDFPreviewEditor = ({
   // Refresh profile styling and enabled library terms whenever the preview opens.
   useEffect(() => {
     if (!open) return;
+    setTermsReady(false);
+    setTermsError('');
     let active = true;
     const loadPreviewData = async () => {
       try {
-        const [{ data }, { data: authData }] = await Promise.all([
-          profileApi.get(),
-          supabase.auth.getUser(),
-        ]);
+        const { data: authData } = await supabase.auth.getUser();
+        const { data } = authData.user ? await profileApi.get() : { data: null };
 
         if (!active) return;
         if (data?.brand_colors && typeof data.brand_colors === 'object') {
@@ -167,9 +169,17 @@ export const PDFPreviewEditor = ({
             setLibraryTerms(resolved.terms);
             setTermsTemplateName(resolved.templateName);
             setUsingFallbackTerms(resolved.source === 'default');
+            setTermsReady(true);
           }
+        } else {
+          setTermsConditions(DEFAULT_QUOTATION_TERMS);
+          setLibraryTerms(DEFAULT_QUOTATION_TERMS);
+          setTermsTemplateName('Default quotation terms');
+          setUsingFallbackTerms(true);
+          setTermsReady(true);
         }
       } catch (error: any) {
+        if (active) setTermsError(error?.message || 'Could not load terms. Close and reopen the preview to retry.');
         if (!/not authenticated/i.test(error?.message || '')) {
           console.error('Error loading brand colors:', error);
         }
@@ -328,7 +338,7 @@ export const PDFPreviewEditor = ({
   // Debounced incremental preview pipeline. Editor changes are saved immediately,
   // but PDF regeneration only receives the latest stable snapshot.
   useEffect(() => {
-    if (!open) return;
+    if (!open || !termsReady) return;
 
     const payload = JSON.stringify({ editorSettings, customizeSettings, showItemImages, quotationData, brandColors, termsConditions });
     if (payload === latestPreviewPayloadRef.current && pdfBlobUrl) return;
@@ -353,7 +363,7 @@ export const PDFPreviewEditor = ({
         clearTimeout(pdfGenerationTimer.current);
       }
     };
-  }, [open, editorSettings, customizeSettings, quotationData, brandColors, showItemImages, pdfBlobUrl, generateLivePdf]);
+  }, [open, termsReady, editorSettings, customizeSettings, quotationData, brandColors, showItemImages, pdfBlobUrl, generateLivePdf]);
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
     const newSettings = { ...editorSettings, ...updates };
@@ -375,6 +385,7 @@ export const PDFPreviewEditor = ({
   };
 
   const handleDownload = () => {
+    if (!termsReady) return;
     // Ensure brand colors are included if enabled
     const downloadSettings: PDFEditorSettings = {
       ...editorSettings,
@@ -1276,7 +1287,8 @@ export const PDFPreviewEditor = ({
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Reset
               </Button>
-              <Button size="sm" onClick={handleDownload}>
+              {termsError && <p role="alert" className="text-sm text-destructive">{termsError}</p>}
+              <Button size="sm" onClick={handleDownload} disabled={!termsReady}>
                 <Download className="h-4 w-4 mr-1 md:mr-2" />
                 <span className="hidden sm:inline">Download PDF</span>
                 <span className="sm:hidden">Download</span>
