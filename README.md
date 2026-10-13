@@ -63,5 +63,8 @@ target, so a hosting domain change requires updating that allowlist.
 
 ## Migration details and rollout
 
+See [Supabase integration](docs/supabase-integration.md) for connection checks,
+CLI linking, the schema inventory, and remaining database rollout work.
+
 See [the migration guide](docs/nextjs-migration.md) for the routing,
 authentication, offline behavior, and release verification requirements.

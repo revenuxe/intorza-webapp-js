@@ -4,6 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "supabase:check": "node scripts/check-supabase.mjs",
+    "supabase:check:online": "node scripts/check-supabase.mjs --online",
+    "supabase:link": "npx --no-install supabase link --project-ref gclsgkhtwqurniitfeir",
+    "supabase:migrations": "npx --no-install supabase migration list --linked",
+    "supabase:inspect": "npx --no-install supabase db query --linked --file supabase/checks/integration.sql",
     "predev": "node scripts/prepare-pdf-worker.mjs",
     "prebuild": "node scripts/prepare-pdf-worker.mjs",
     "dev": "next dev --port 8080",

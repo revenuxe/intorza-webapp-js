@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { crypto } from "https://deno.land/std@0.168.0/crypto/mod.ts";
-import { encode as hexEncode } from "https://deno.land/std@0.168.0/encoding/hex.ts";
 
 const RAZORPAY_WEBHOOK_SECRET = Deno.env.get('RAZORPAY_WEBHOOK_SECRET');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
@@ -14,7 +13,17 @@ serve(async (req) => {
   }
 
   try {
+    if (req.method !== 'POST') {
+      return new Response('Method not allowed', { status: 405, headers: { Allow: 'POST' } });
+    }
+    if (!RAZORPAY_WEBHOOK_SECRET) {
+      console.error('Webhook secret is not configured');
+      return new Response(JSON.stringify({ error: 'Webhook is not configured' }), { status: 503 });
+    }
     const signature = req.headers.get('x-razorpay-signature');
+    if (!signature || !/^[a-f0-9]{64}$/i.test(signature)) {
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), { status: 401 });
+    }
     const body = await req.text();
     
     console.log('Webhook received, verifying signature...');
@@ -30,13 +39,13 @@ serve(async (req) => {
         keyData,
         { name: "HMAC", hash: "SHA-256" },
         false,
-        ["sign"]
+        ["verify"]
       );
       
-      const signatureBytes = await crypto.subtle.sign("HMAC", cryptoKey, messageData);
-      const expectedSignature = new TextDecoder().decode(hexEncode(new Uint8Array(signatureBytes)));
-      
-      if (expectedSignature !== signature) {
+      const suppliedSignature = Uint8Array.from(signature.match(/.{2}/g)!, hex => parseInt(hex, 16));
+      const verified = await crypto.subtle.verify('HMAC', cryptoKey, suppliedSignature, messageData);
+
+      if (!verified) {
         console.error('Webhook signature verification failed');
         return new Response(JSON.stringify({ error: 'Invalid signature' }), {
           status: 400,

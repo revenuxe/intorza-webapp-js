@@ -1,13 +1,15 @@
 import { readFileSync } from 'node:fs';
+import { resolvePublicSupabase } from './src/config/resolve-public-supabase.mjs';
 
 const publicSupabase = JSON.parse(readFileSync(new URL('./src/config/public-supabase.json', import.meta.url), 'utf8'));
+const resolvedSupabase = resolvePublicSupabase(process.env, publicSupabase);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
   env: {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || publicSupabase.url,
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || publicSupabase.publishableKey,
+    NEXT_PUBLIC_SUPABASE_URL: resolvedSupabase.url,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: resolvedSupabase.publishableKey,
   },
   async redirects() {
     return [
