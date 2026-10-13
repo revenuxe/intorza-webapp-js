@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Warm beige background with soft grey accents */
+    --background: 32 25% 96%;
+    --foreground: 210 15% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 15% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 15% 20%;
+
+    /* Brand terracotta/rust orange */
+    --primary: 11 54% 49%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Navy blue for contrast */
+    --secondary: 212 50% 25%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Soft warm grey */
+    --muted: 30 15% 92%;
+    --muted-foreground: 210 10% 45%;
+
+    /* Soft gold accent */
+    --accent: 42 78% 65%;
+    --accent-foreground: 210 15% 20%;
+
+    --destructive: 0 84.2% 60.2%;
+    
+    /* Toast colors - Brand navy */
+    --toast-bg: 215 47% 22%;
+    --toast-foreground: 0 0% 100%;
+    --toast-success-bg: 142 71% 35%;
+    --toast-success-foreground: 0 0% 100%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 20% 88%;
+    --input: 30 20% 88%;
+    --ring: 11 54% 49%;
+
+    --radius: 0.75rem;
+    
+    /* Custom design tokens */
+    --charcoal: 210 15% 20%;
+    --warm-beige: 32 25% 96%;
+    --soft-grey: 30 15% 92%;
+    --terracotta: 11 54% 49%;
+    --navy: 212 50% 25%;
+    --gold: 42 78% 65%;
+    
+    /* Shadows */
+    --shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.08);
+    
+    /* Transitions */
+    --transition-base: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 210 20% 12%;
+    --foreground: 30 15% 92%;
+
+    --card: 210 20% 15%;
+    --card-foreground: 30 15% 92%;
+
+    --popover: 210 20% 15%;
+    --popover-foreground: 30 15% 92%;
+
+    --primary: 11 54% 49%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 212 50% 25%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 20% 18%;
+    --muted-foreground: 30 10% 60%;
+
+    --accent: 42 78% 65%;
+    --accent-foreground: 210 20% 12%;
+
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 20% 22%;
+    --input: 210 20% 22%;
+    --ring: 11 54% 49%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Professional number formatting */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* Mobile-first compact form styling */
+@layer components {
+  /* Compact inputs on mobile */
+  @media (max-width: 639px) {
+    .sm\:p-6, [class*="DialogContent"], [class*="SheetContent"] {
+      --form-gap: 0.75rem;
+    }
+  }
+}
+
+/* Custom loader animations */
+@keyframes loader-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.8; }
+}
+
+@keyframes loader-ring {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { opacity: 0.3; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+.animate-loader-pulse {
+  animation: loader-pulse 1.5s ease-in-out infinite;
+}
+
+.animate-loader-ring {
+  animation: loader-ring 1.5s ease-out infinite;
+}

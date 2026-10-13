@@ -1,0 +1,1817 @@
+// Comprehensive global country configuration for taxes, currencies, measurements
+// Includes major countries across different regions
+
+export interface CountryConfig {
+  code: string;
+  name: string;
+  flag: string;
+  currency: {
+    code: string;
+    symbol: string;
+    position: 'before' | 'after';
+    locale: string;
+    decimalPlaces: number;
+  };
+  tax: {
+    label: string;
+    shortLabel: string;
+    defaultRate: number;
+    commonRates: number[];
+    registrationLabel: string; // e.g., "GSTIN", "VAT ID", "Tax ID"
+  };
+  measurement: {
+    system: 'metric' | 'imperial';
+    areaUnit: string;
+    areaUnitShort: string;
+    lengthUnit: string;
+    lengthUnitShort: string;
+  };
+  dateFormat: string;
+  numberFormat: {
+    thousandSeparator: string;
+    decimalSeparator: string;
+  };
+  phoneCode: string;
+}
+
+export const COUNTRY_CONFIGS: CountryConfig[] = [
+  // SOUTH ASIA
+  {
+    code: 'IN',
+    name: 'India',
+    flag: '🇮🇳',
+    currency: {
+      code: 'INR',
+      symbol: '₹',
+      position: 'before',
+      locale: 'en-IN',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Goods and Services Tax',
+      shortLabel: 'GST',
+      defaultRate: 18,
+      commonRates: [5, 12, 18, 28],
+      registrationLabel: 'GSTIN',
+    },
+    measurement: {
+      system: 'imperial',
+      areaUnit: 'Square Feet',
+      areaUnitShort: 'SFT',
+      lengthUnit: 'Feet',
+      lengthUnitShort: 'Ft',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+91',
+  },
+  {
+    code: 'PK',
+    name: 'Pakistan',
+    flag: '🇵🇰',
+    currency: {
+      code: 'PKR',
+      symbol: 'Rs',
+      position: 'before',
+      locale: 'en-PK',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Sales Tax',
+      shortLabel: 'ST',
+      defaultRate: 17,
+      commonRates: [5, 10, 17],
+      registrationLabel: 'NTN',
+    },
+    measurement: {
+      system: 'imperial',
+      areaUnit: 'Square Feet',
+      areaUnitShort: 'SFT',
+      lengthUnit: 'Feet',
+      lengthUnitShort: 'Ft',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+92',
+  },
+  {
+    code: 'BD',
+    name: 'Bangladesh',
+    flag: '🇧🇩',
+    currency: {
+      code: 'BDT',
+      symbol: '৳',
+      position: 'before',
+      locale: 'bn-BD',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 15,
+      commonRates: [5, 7.5, 10, 15],
+      registrationLabel: 'TIN',
+    },
+    measurement: {
+      system: 'imperial',
+      areaUnit: 'Square Feet',
+      areaUnitShort: 'SFT',
+      lengthUnit: 'Feet',
+      lengthUnitShort: 'Ft',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+880',
+  },
+  {
+    code: 'LK',
+    name: 'Sri Lanka',
+    flag: '🇱🇰',
+    currency: {
+      code: 'LKR',
+      symbol: 'Rs',
+      position: 'before',
+      locale: 'si-LK',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 18,
+      commonRates: [8, 12, 18],
+      registrationLabel: 'TIN',
+    },
+    measurement: {
+      system: 'imperial',
+      areaUnit: 'Square Feet',
+      areaUnitShort: 'SFT',
+      lengthUnit: 'Feet',
+      lengthUnitShort: 'Ft',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+94',
+  },
+  {
+    code: 'NP',
+    name: 'Nepal',
+    flag: '🇳🇵',
+    currency: {
+      code: 'NPR',
+      symbol: 'Rs',
+      position: 'before',
+      locale: 'ne-NP',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 13,
+      commonRates: [5, 13],
+      registrationLabel: 'PAN',
+    },
+    measurement: {
+      system: 'imperial',
+      areaUnit: 'Square Feet',
+      areaUnitShort: 'SFT',
+      lengthUnit: 'Feet',
+      lengthUnitShort: 'Ft',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+977',
+  },
+  // MIDDLE EAST
+  {
+    code: 'AE',
+    name: 'United Arab Emirates',
+    flag: '🇦🇪',
+    currency: {
+      code: 'AED',
+      symbol: 'AED',
+      position: 'before',
+      locale: 'ar-AE',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 5,
+      commonRates: [0, 5],
+      registrationLabel: 'TRN',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+971',
+  },
+  {
+    code: 'SA',
+    name: 'Saudi Arabia',
+    flag: '🇸🇦',
+    currency: {
+      code: 'SAR',
+      symbol: 'SAR',
+      position: 'before',
+      locale: 'ar-SA',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 15,
+      commonRates: [0, 15],
+      registrationLabel: 'VAT No',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+966',
+  },
+  {
+    code: 'QA',
+    name: 'Qatar',
+    flag: '🇶🇦',
+    currency: {
+      code: 'QAR',
+      symbol: 'QAR',
+      position: 'before',
+      locale: 'ar-QA',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Tax',
+      shortLabel: 'Tax',
+      defaultRate: 0,
+      commonRates: [0],
+      registrationLabel: 'Tax ID',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+974',
+  },
+  {
+    code: 'KW',
+    name: 'Kuwait',
+    flag: '🇰🇼',
+    currency: {
+      code: 'KWD',
+      symbol: 'KD',
+      position: 'before',
+      locale: 'ar-KW',
+      decimalPlaces: 3,
+    },
+    tax: {
+      label: 'Tax',
+      shortLabel: 'Tax',
+      defaultRate: 0,
+      commonRates: [0],
+      registrationLabel: 'Tax ID',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+965',
+  },
+  {
+    code: 'OM',
+    name: 'Oman',
+    flag: '🇴🇲',
+    currency: {
+      code: 'OMR',
+      symbol: 'OMR',
+      position: 'before',
+      locale: 'ar-OM',
+      decimalPlaces: 3,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 5,
+      commonRates: [0, 5],
+      registrationLabel: 'VAT No',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+968',
+  },
+  {
+    code: 'BH',
+    name: 'Bahrain',
+    flag: '🇧🇭',
+    currency: {
+      code: 'BHD',
+      symbol: 'BD',
+      position: 'before',
+      locale: 'ar-BH',
+      decimalPlaces: 3,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 10,
+      commonRates: [0, 5, 10],
+      registrationLabel: 'VAT No',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+973',
+  },
+  // NORTH AMERICA
+  {
+    code: 'US',
+    name: 'United States',
+    flag: '🇺🇸',
+    currency: {
+      code: 'USD',
+      symbol: '$',
+      position: 'before',
+      locale: 'en-US',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Sales Tax',
+      shortLabel: 'Tax',
+      defaultRate: 8,
+      commonRates: [0, 5, 6, 7, 8, 9, 10],
+      registrationLabel: 'Tax ID',
+    },
+    measurement: {
+      system: 'imperial',
+      areaUnit: 'Square Feet',
+      areaUnitShort: 'SFT',
+      lengthUnit: 'Feet',
+      lengthUnitShort: 'Ft',
+    },
+    dateFormat: 'MM/DD/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+1',
+  },
+  {
+    code: 'CA',
+    name: 'Canada',
+    flag: '🇨🇦',
+    currency: {
+      code: 'CAD',
+      symbol: 'CA$',
+      position: 'before',
+      locale: 'en-CA',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'GST/HST',
+      shortLabel: 'GST',
+      defaultRate: 5,
+      commonRates: [5, 13, 15],
+      registrationLabel: 'GST/HST No',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Feet',
+      areaUnitShort: 'SFT',
+      lengthUnit: 'Feet',
+      lengthUnitShort: 'Ft',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+1',
+  },
+  {
+    code: 'MX',
+    name: 'Mexico',
+    flag: '🇲🇽',
+    currency: {
+      code: 'MXN',
+      symbol: 'MX$',
+      position: 'before',
+      locale: 'es-MX',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'IVA',
+      shortLabel: 'IVA',
+      defaultRate: 16,
+      commonRates: [0, 8, 16],
+      registrationLabel: 'RFC',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+52',
+  },
+  // EUROPE
+  {
+    code: 'GB',
+    name: 'United Kingdom',
+    flag: '🇬🇧',
+    currency: {
+      code: 'GBP',
+      symbol: '£',
+      position: 'before',
+      locale: 'en-GB',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 20,
+      commonRates: [0, 5, 20],
+      registrationLabel: 'VAT No',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+44',
+  },
+  {
+    code: 'DE',
+    name: 'Germany',
+    flag: '🇩🇪',
+    currency: {
+      code: 'EUR',
+      symbol: '€',
+      position: 'after',
+      locale: 'de-DE',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Mehrwertsteuer',
+      shortLabel: 'MwSt',
+      defaultRate: 19,
+      commonRates: [7, 19],
+      registrationLabel: 'USt-IdNr',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD.MM.YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+49',
+  },
+  {
+    code: 'FR',
+    name: 'France',
+    flag: '🇫🇷',
+    currency: {
+      code: 'EUR',
+      symbol: '€',
+      position: 'after',
+      locale: 'fr-FR',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'TVA',
+      shortLabel: 'TVA',
+      defaultRate: 20,
+      commonRates: [5.5, 10, 20],
+      registrationLabel: 'N° TVA',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ' ',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+33',
+  },
+  {
+    code: 'IT',
+    name: 'Italy',
+    flag: '🇮🇹',
+    currency: {
+      code: 'EUR',
+      symbol: '€',
+      position: 'after',
+      locale: 'it-IT',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'IVA',
+      shortLabel: 'IVA',
+      defaultRate: 22,
+      commonRates: [4, 10, 22],
+      registrationLabel: 'P.IVA',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+39',
+  },
+  {
+    code: 'ES',
+    name: 'Spain',
+    flag: '🇪🇸',
+    currency: {
+      code: 'EUR',
+      symbol: '€',
+      position: 'after',
+      locale: 'es-ES',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'IVA',
+      shortLabel: 'IVA',
+      defaultRate: 21,
+      commonRates: [4, 10, 21],
+      registrationLabel: 'NIF',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+34',
+  },
+  {
+    code: 'NL',
+    name: 'Netherlands',
+    flag: '🇳🇱',
+    currency: {
+      code: 'EUR',
+      symbol: '€',
+      position: 'before',
+      locale: 'nl-NL',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'BTW',
+      shortLabel: 'BTW',
+      defaultRate: 21,
+      commonRates: [9, 21],
+      registrationLabel: 'BTW-nr',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD-MM-YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+31',
+  },
+  {
+    code: 'BE',
+    name: 'Belgium',
+    flag: '🇧🇪',
+    currency: {
+      code: 'EUR',
+      symbol: '€',
+      position: 'before',
+      locale: 'nl-BE',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'TVA/BTW',
+      shortLabel: 'TVA',
+      defaultRate: 21,
+      commonRates: [6, 12, 21],
+      registrationLabel: 'TVA/BTW',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+32',
+  },
+  {
+    code: 'CH',
+    name: 'Switzerland',
+    flag: '🇨🇭',
+    currency: {
+      code: 'CHF',
+      symbol: 'CHF',
+      position: 'before',
+      locale: 'de-CH',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'MWST/TVA',
+      shortLabel: 'MWST',
+      defaultRate: 8.1,
+      commonRates: [2.6, 3.8, 8.1],
+      registrationLabel: 'UID',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD.MM.YYYY',
+    numberFormat: {
+      thousandSeparator: "'",
+      decimalSeparator: '.',
+    },
+    phoneCode: '+41',
+  },
+  {
+    code: 'AT',
+    name: 'Austria',
+    flag: '🇦🇹',
+    currency: {
+      code: 'EUR',
+      symbol: '€',
+      position: 'before',
+      locale: 'de-AT',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'USt',
+      shortLabel: 'USt',
+      defaultRate: 20,
+      commonRates: [10, 13, 20],
+      registrationLabel: 'UID',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD.MM.YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+43',
+  },
+  {
+    code: 'PL',
+    name: 'Poland',
+    flag: '🇵🇱',
+    currency: {
+      code: 'PLN',
+      symbol: 'zł',
+      position: 'after',
+      locale: 'pl-PL',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'VAT',
+      shortLabel: 'VAT',
+      defaultRate: 23,
+      commonRates: [5, 8, 23],
+      registrationLabel: 'NIP',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD.MM.YYYY',
+    numberFormat: {
+      thousandSeparator: ' ',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+48',
+  },
+  {
+    code: 'SE',
+    name: 'Sweden',
+    flag: '🇸🇪',
+    currency: {
+      code: 'SEK',
+      symbol: 'kr',
+      position: 'after',
+      locale: 'sv-SE',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Moms',
+      shortLabel: 'Moms',
+      defaultRate: 25,
+      commonRates: [6, 12, 25],
+      registrationLabel: 'Org.nr',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'YYYY-MM-DD',
+    numberFormat: {
+      thousandSeparator: ' ',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+46',
+  },
+  {
+    code: 'NO',
+    name: 'Norway',
+    flag: '🇳🇴',
+    currency: {
+      code: 'NOK',
+      symbol: 'kr',
+      position: 'after',
+      locale: 'nb-NO',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'MVA',
+      shortLabel: 'MVA',
+      defaultRate: 25,
+      commonRates: [12, 15, 25],
+      registrationLabel: 'Org.nr',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD.MM.YYYY',
+    numberFormat: {
+      thousandSeparator: ' ',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+47',
+  },
+  {
+    code: 'DK',
+    name: 'Denmark',
+    flag: '🇩🇰',
+    currency: {
+      code: 'DKK',
+      symbol: 'kr',
+      position: 'after',
+      locale: 'da-DK',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Moms',
+      shortLabel: 'Moms',
+      defaultRate: 25,
+      commonRates: [25],
+      registrationLabel: 'CVR',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD-MM-YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+45',
+  },
+  {
+    code: 'FI',
+    name: 'Finland',
+    flag: '🇫🇮',
+    currency: {
+      code: 'EUR',
+      symbol: '€',
+      position: 'after',
+      locale: 'fi-FI',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'ALV',
+      shortLabel: 'ALV',
+      defaultRate: 24,
+      commonRates: [10, 14, 24],
+      registrationLabel: 'Y-tunnus',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD.MM.YYYY',
+    numberFormat: {
+      thousandSeparator: ' ',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+358',
+  },
+  {
+    code: 'PT',
+    name: 'Portugal',
+    flag: '🇵🇹',
+    currency: {
+      code: 'EUR',
+      symbol: '€',
+      position: 'after',
+      locale: 'pt-PT',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'IVA',
+      shortLabel: 'IVA',
+      defaultRate: 23,
+      commonRates: [6, 13, 23],
+      registrationLabel: 'NIF',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+351',
+  },
+  {
+    code: 'IE',
+    name: 'Ireland',
+    flag: '🇮🇪',
+    currency: {
+      code: 'EUR',
+      symbol: '€',
+      position: 'before',
+      locale: 'en-IE',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'VAT',
+      shortLabel: 'VAT',
+      defaultRate: 23,
+      commonRates: [9, 13.5, 23],
+      registrationLabel: 'VAT No',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+353',
+  },
+  // ASIA-PACIFIC
+  {
+    code: 'AU',
+    name: 'Australia',
+    flag: '🇦🇺',
+    currency: {
+      code: 'AUD',
+      symbol: 'A$',
+      position: 'before',
+      locale: 'en-AU',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Goods and Services Tax',
+      shortLabel: 'GST',
+      defaultRate: 10,
+      commonRates: [0, 10],
+      registrationLabel: 'ABN',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+61',
+  },
+  {
+    code: 'NZ',
+    name: 'New Zealand',
+    flag: '🇳🇿',
+    currency: {
+      code: 'NZD',
+      symbol: 'NZ$',
+      position: 'before',
+      locale: 'en-NZ',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Goods and Services Tax',
+      shortLabel: 'GST',
+      defaultRate: 15,
+      commonRates: [0, 15],
+      registrationLabel: 'GST No',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+64',
+  },
+  {
+    code: 'SG',
+    name: 'Singapore',
+    flag: '🇸🇬',
+    currency: {
+      code: 'SGD',
+      symbol: 'S$',
+      position: 'before',
+      locale: 'en-SG',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Goods and Services Tax',
+      shortLabel: 'GST',
+      defaultRate: 9,
+      commonRates: [0, 9],
+      registrationLabel: 'GST Reg No',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Feet',
+      areaUnitShort: 'SFT',
+      lengthUnit: 'Feet',
+      lengthUnitShort: 'Ft',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+65',
+  },
+  {
+    code: 'MY',
+    name: 'Malaysia',
+    flag: '🇲🇾',
+    currency: {
+      code: 'MYR',
+      symbol: 'RM',
+      position: 'before',
+      locale: 'ms-MY',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Sales and Service Tax',
+      shortLabel: 'SST',
+      defaultRate: 6,
+      commonRates: [0, 6, 10],
+      registrationLabel: 'SST No',
+    },
+    measurement: {
+      system: 'imperial',
+      areaUnit: 'Square Feet',
+      areaUnitShort: 'SFT',
+      lengthUnit: 'Feet',
+      lengthUnitShort: 'Ft',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+60',
+  },
+  {
+    code: 'TH',
+    name: 'Thailand',
+    flag: '🇹🇭',
+    currency: {
+      code: 'THB',
+      symbol: '฿',
+      position: 'before',
+      locale: 'th-TH',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 7,
+      commonRates: [0, 7],
+      registrationLabel: 'Tax ID',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+66',
+  },
+  {
+    code: 'ID',
+    name: 'Indonesia',
+    flag: '🇮🇩',
+    currency: {
+      code: 'IDR',
+      symbol: 'Rp',
+      position: 'before',
+      locale: 'id-ID',
+      decimalPlaces: 0,
+    },
+    tax: {
+      label: 'PPN',
+      shortLabel: 'PPN',
+      defaultRate: 11,
+      commonRates: [0, 11],
+      registrationLabel: 'NPWP',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+62',
+  },
+  {
+    code: 'PH',
+    name: 'Philippines',
+    flag: '🇵🇭',
+    currency: {
+      code: 'PHP',
+      symbol: '₱',
+      position: 'before',
+      locale: 'en-PH',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 12,
+      commonRates: [0, 12],
+      registrationLabel: 'TIN',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'MM/DD/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+63',
+  },
+  {
+    code: 'VN',
+    name: 'Vietnam',
+    flag: '🇻🇳',
+    currency: {
+      code: 'VND',
+      symbol: '₫',
+      position: 'after',
+      locale: 'vi-VN',
+      decimalPlaces: 0,
+    },
+    tax: {
+      label: 'VAT',
+      shortLabel: 'VAT',
+      defaultRate: 10,
+      commonRates: [5, 10],
+      registrationLabel: 'Tax Code',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+84',
+  },
+  {
+    code: 'JP',
+    name: 'Japan',
+    flag: '🇯🇵',
+    currency: {
+      code: 'JPY',
+      symbol: '¥',
+      position: 'before',
+      locale: 'ja-JP',
+      decimalPlaces: 0,
+    },
+    tax: {
+      label: 'Consumption Tax',
+      shortLabel: 'Tax',
+      defaultRate: 10,
+      commonRates: [8, 10],
+      registrationLabel: 'Invoice No',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'YYYY/MM/DD',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+81',
+  },
+  {
+    code: 'KR',
+    name: 'South Korea',
+    flag: '🇰🇷',
+    currency: {
+      code: 'KRW',
+      symbol: '₩',
+      position: 'before',
+      locale: 'ko-KR',
+      decimalPlaces: 0,
+    },
+    tax: {
+      label: 'VAT',
+      shortLabel: 'VAT',
+      defaultRate: 10,
+      commonRates: [0, 10],
+      registrationLabel: 'BRN',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'YYYY.MM.DD',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+82',
+  },
+  {
+    code: 'CN',
+    name: 'China',
+    flag: '🇨🇳',
+    currency: {
+      code: 'CNY',
+      symbol: '¥',
+      position: 'before',
+      locale: 'zh-CN',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'VAT',
+      shortLabel: 'VAT',
+      defaultRate: 13,
+      commonRates: [6, 9, 13],
+      registrationLabel: 'Tax ID',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'YYYY/MM/DD',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+86',
+  },
+  {
+    code: 'HK',
+    name: 'Hong Kong',
+    flag: '🇭🇰',
+    currency: {
+      code: 'HKD',
+      symbol: 'HK$',
+      position: 'before',
+      locale: 'zh-HK',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Tax',
+      shortLabel: 'Tax',
+      defaultRate: 0,
+      commonRates: [0],
+      registrationLabel: 'BR No',
+    },
+    measurement: {
+      system: 'imperial',
+      areaUnit: 'Square Feet',
+      areaUnitShort: 'SFT',
+      lengthUnit: 'Feet',
+      lengthUnitShort: 'Ft',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+852',
+  },
+  {
+    code: 'TW',
+    name: 'Taiwan',
+    flag: '🇹🇼',
+    currency: {
+      code: 'TWD',
+      symbol: 'NT$',
+      position: 'before',
+      locale: 'zh-TW',
+      decimalPlaces: 0,
+    },
+    tax: {
+      label: 'VAT',
+      shortLabel: 'VAT',
+      defaultRate: 5,
+      commonRates: [0, 5],
+      registrationLabel: 'Tax ID',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Ping',
+      areaUnitShort: 'Ping',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'YYYY/MM/DD',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+886',
+  },
+  // AFRICA
+  {
+    code: 'ZA',
+    name: 'South Africa',
+    flag: '🇿🇦',
+    currency: {
+      code: 'ZAR',
+      symbol: 'R',
+      position: 'before',
+      locale: 'en-ZA',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 15,
+      commonRates: [0, 15],
+      registrationLabel: 'VAT No',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+27',
+  },
+  {
+    code: 'NG',
+    name: 'Nigeria',
+    flag: '🇳🇬',
+    currency: {
+      code: 'NGN',
+      symbol: '₦',
+      position: 'before',
+      locale: 'en-NG',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 7.5,
+      commonRates: [0, 7.5],
+      registrationLabel: 'TIN',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+234',
+  },
+  {
+    code: 'EG',
+    name: 'Egypt',
+    flag: '🇪🇬',
+    currency: {
+      code: 'EGP',
+      symbol: 'E£',
+      position: 'before',
+      locale: 'ar-EG',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 14,
+      commonRates: [0, 5, 14],
+      registrationLabel: 'Tax ID',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+20',
+  },
+  {
+    code: 'KE',
+    name: 'Kenya',
+    flag: '🇰🇪',
+    currency: {
+      code: 'KES',
+      symbol: 'KSh',
+      position: 'before',
+      locale: 'en-KE',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'Value Added Tax',
+      shortLabel: 'VAT',
+      defaultRate: 16,
+      commonRates: [0, 8, 16],
+      registrationLabel: 'PIN',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+254',
+  },
+  // SOUTH AMERICA
+  {
+    code: 'BR',
+    name: 'Brazil',
+    flag: '🇧🇷',
+    currency: {
+      code: 'BRL',
+      symbol: 'R$',
+      position: 'before',
+      locale: 'pt-BR',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'ICMS/IPI',
+      shortLabel: 'ICMS',
+      defaultRate: 18,
+      commonRates: [7, 12, 18, 25],
+      registrationLabel: 'CNPJ',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+55',
+  },
+  {
+    code: 'AR',
+    name: 'Argentina',
+    flag: '🇦🇷',
+    currency: {
+      code: 'ARS',
+      symbol: '$',
+      position: 'before',
+      locale: 'es-AR',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'IVA',
+      shortLabel: 'IVA',
+      defaultRate: 21,
+      commonRates: [10.5, 21, 27],
+      registrationLabel: 'CUIT',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+54',
+  },
+  {
+    code: 'CL',
+    name: 'Chile',
+    flag: '🇨🇱',
+    currency: {
+      code: 'CLP',
+      symbol: '$',
+      position: 'before',
+      locale: 'es-CL',
+      decimalPlaces: 0,
+    },
+    tax: {
+      label: 'IVA',
+      shortLabel: 'IVA',
+      defaultRate: 19,
+      commonRates: [0, 19],
+      registrationLabel: 'RUT',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD-MM-YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+56',
+  },
+  {
+    code: 'CO',
+    name: 'Colombia',
+    flag: '🇨🇴',
+    currency: {
+      code: 'COP',
+      symbol: '$',
+      position: 'before',
+      locale: 'es-CO',
+      decimalPlaces: 0,
+    },
+    tax: {
+      label: 'IVA',
+      shortLabel: 'IVA',
+      defaultRate: 19,
+      commonRates: [0, 5, 19],
+      registrationLabel: 'NIT',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+    },
+    phoneCode: '+57',
+  },
+  {
+    code: 'PE',
+    name: 'Peru',
+    flag: '🇵🇪',
+    currency: {
+      code: 'PEN',
+      symbol: 'S/',
+      position: 'before',
+      locale: 'es-PE',
+      decimalPlaces: 2,
+    },
+    tax: {
+      label: 'IGV',
+      shortLabel: 'IGV',
+      defaultRate: 18,
+      commonRates: [0, 18],
+      registrationLabel: 'RUC',
+    },
+    measurement: {
+      system: 'metric',
+      areaUnit: 'Square Meters',
+      areaUnitShort: 'SQM',
+      lengthUnit: 'Meters',
+      lengthUnitShort: 'M',
+    },
+    dateFormat: 'DD/MM/YYYY',
+    numberFormat: {
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+    },
+    phoneCode: '+51',
+  },
+];
+
+// Helper functions
+export const getCountryByCode = (code: string): CountryConfig | undefined => {
+  return COUNTRY_CONFIGS.find(c => c.code === code);
+};
+
+export const getDefaultCountry = (): CountryConfig => {
+  return COUNTRY_CONFIGS.find(c => c.code === 'IN')!;
+};
+
+export const formatCurrencyByCountry = (amount: number, countryCode: string): string => {
+  const country = getCountryByCode(countryCode) || getDefaultCountry();
+  const { symbol, position, locale, decimalPlaces } = country.currency;
+  
+  const formattedNumber = amount.toLocaleString(locale, {
+    minimumFractionDigits: decimalPlaces,
+    maximumFractionDigits: decimalPlaces,
+  });
+  
+  if (position === 'before') {
+    return `${symbol} ${formattedNumber}`;
+  }
+  return `${formattedNumber} ${symbol}`;
+};
+
+// Format large currency amounts with abbreviations
+export const formatCurrencyShort = (amount: number, countryCode: string): string => {
+  const country = getCountryByCode(countryCode) || getDefaultCountry();
+  const { symbol, locale } = country.currency;
+  
+  // Use region-specific abbreviations
+  if (['IN', 'PK', 'BD', 'LK', 'NP'].includes(countryCode)) {
+    // South Asian notation: Crore (Cr) and Lakh (L)
+    if (amount >= 10000000) {
+      return `${symbol}${(amount / 10000000).toFixed(2)} Cr`;
+    }
+    if (amount >= 100000) {
+      return `${symbol}${(amount / 100000).toFixed(2)} L`;
+    }
+  } else {
+    // International notation: M (millions), K (thousands)
+    if (amount >= 1000000) {
+      return `${symbol}${(amount / 1000000).toFixed(2)}M`;
+    }
+    if (amount >= 1000) {
+      return `${symbol}${(amount / 1000).toFixed(1)}K`;
+    }
+  }
+  
+  return `${symbol}${amount.toLocaleString(locale, { maximumFractionDigits: 0 })}`;
+};
+
+// Format date according to country settings
+export const formatDateByCountry = (date: Date | string, countryCode: string): string => {
+  const country = getCountryByCode(countryCode) || getDefaultCountry();
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const day = d.getDate().toString().padStart(2, '0');
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
+  
+  switch (country.dateFormat) {
+    case 'MM/DD/YYYY':
+      return `${month}/${day}/${year}`;
+    case 'YYYY-MM-DD':
+      return `${year}-${month}-${day}`;
+    case 'DD.MM.YYYY':
+      return `${day}.${month}.${year}`;
+    default: // DD/MM/YYYY
+      return `${day}/${month}/${year}`;
+  }
+};
+
+export const getCountryGroups = (): { region: string; countries: CountryConfig[] }[] => {
+  return [
+    {
+      region: 'South Asia',
+      countries: COUNTRY_CONFIGS.filter(c => ['IN', 'PK', 'BD', 'LK', 'NP'].includes(c.code)),
+    },
+    {
+      region: 'Middle East',
+      countries: COUNTRY_CONFIGS.filter(c => ['AE', 'SA', 'QA', 'KW', 'OM', 'BH'].includes(c.code)),
+    },
+    {
+      region: 'North America',
+      countries: COUNTRY_CONFIGS.filter(c => ['US', 'CA', 'MX'].includes(c.code)),
+    },
+    {
+      region: 'Europe',
+      countries: COUNTRY_CONFIGS.filter(c => 
+        ['GB', 'DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'PL', 'SE', 'NO', 'DK', 'FI', 'PT', 'IE'].includes(c.code)
+      ),
+    },
+    {
+      region: 'Asia Pacific',
+      countries: COUNTRY_CONFIGS.filter(c => 
+        ['AU', 'NZ', 'SG', 'MY', 'TH', 'ID', 'PH', 'VN', 'JP', 'KR', 'CN', 'HK', 'TW'].includes(c.code)
+      ),
+    },
+    {
+      region: 'Africa',
+      countries: COUNTRY_CONFIGS.filter(c => ['ZA', 'NG', 'EG', 'KE'].includes(c.code)),
+    },
+    {
+      region: 'South America',
+      countries: COUNTRY_CONFIGS.filter(c => ['BR', 'AR', 'CL', 'CO', 'PE'].includes(c.code)),
+    },
+  ];
+};
