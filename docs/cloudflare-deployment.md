@@ -55,8 +55,9 @@ npm run deploy
 ```
 
 `deploy` runs `build:cloudflare` through its `predeploy` hook, then publishes
-the worker named `intorza`. Choose the intended Cloudflare account when
-authenticating. For CI, set `CLOUDFLARE_API_TOKEN` and
+the worker named `intorza-webapp-js`. The self-reference service binding must
+use this same name. Choose the intended Cloudflare account when authenticating.
+For CI, set `CLOUDFLARE_API_TOKEN` and
 `CLOUDFLARE_ACCOUNT_ID` in the build system's secret settings.
 
 In Workers Builds use build command `npm run build` and deploy
@@ -67,7 +68,8 @@ asset binding, rather than a static Pages upload.
 The adapter invokes `npm run build:next` internally. Keep the deploy command
 as `npx opennextjs-cloudflare deploy` so it uses the adapter's deployment flow.
 
-The self-reference service binding must always match the worker name. No
+The `workers_dev` and `preview_urls` settings are disabled to match the
+existing custom-domain Worker configuration. No
 R2 cache binding is configured because the app loads tenant data directly
 from Supabase and does not use ISR or on-demand server revalidation. Add an
 appropriate cache binding before introducing those server caching features.

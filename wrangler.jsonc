@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "intorza",
+  "name": "intorza-webapp-js",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
@@ -9,7 +9,8 @@
     "binding": "ASSETS"
   },
   "services": [
-    { "binding": "WORKER_SELF_REFERENCE", "service": "intorza" }
+    { "binding": "WORKER_SELF_REFERENCE", "service": "intorza-webapp-js" }
   ],
-  "workers_dev": true
+  "workers_dev": false,
+  "preview_urls": false
 }
