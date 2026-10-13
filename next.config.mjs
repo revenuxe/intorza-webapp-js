@@ -1,6 +1,14 @@
+import { readFileSync } from 'node:fs';
+
+const publicSupabase = JSON.parse(readFileSync(new URL('./src/config/public-supabase.json', import.meta.url), 'utf8'));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  env: {
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || publicSupabase.url,
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || publicSupabase.publishableKey,
+  },
   async redirects() {
     return [
       { source: '/quotation/:id', destination: '/quotations/:id', permanent: false },

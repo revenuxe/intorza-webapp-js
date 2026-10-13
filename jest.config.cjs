@@ -5,5 +5,5 @@ module.exports = nextJest({ dir: './' })({
   roots: ['<rootDir>/src'],
   setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
   moduleNameMapper: { '^@/(.*)$': '<rootDir>/src/$1' },
-  testMatch: ['<rootDir>/src/**/*.test.[tj]s?(x)'],
+  testMatch: ['**/*.test.[tj]s?(x)'],
 });

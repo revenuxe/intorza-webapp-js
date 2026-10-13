@@ -8,7 +8,8 @@ on another hosting provider.
 
 ## Build and preview
 
-Use Node.js 22.12 or newer. Configure `.env.local` using `.env.example`, then:
+Use Node.js 22.12 or newer. The included public configuration targets the
+current Supabase project; override it with `.env.local` for another project:
 
 ```sh
 npm ci
@@ -30,7 +31,10 @@ Use a Linux build environment or WSL if a native Windows adapter build fails.
 
 ## Public build variables
 
-Configure these variables in Workers Builds before the build runs:
+The repository includes the current project's browser-safe URL and
+publishable/anon key in `src/config/public-supabase.json`. A clean checkout
+can build without a local `.env`. No service-role or payment secret is included.
+To use another Supabase project, override both values in Workers Builds:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
@@ -55,10 +59,13 @@ the worker named `intorza`. Choose the intended Cloudflare account when
 authenticating. For CI, set `CLOUDFLARE_API_TOKEN` and
 `CLOUDFLARE_ACCOUNT_ID` in the build system's secret settings.
 
-In Workers Builds use build command `npm run build:cloudflare` and deploy
+In Workers Builds use build command `npm run build` and deploy
 command `npx opennextjs-cloudflare deploy` to avoid building twice. Root
 directory is this repository. This is a Workers application with a bundled
 asset binding, rather than a static Pages upload.
+`npm run build` and `npm run build:cloudflare` both generate the Worker.
+The adapter invokes `npm run build:next` internally. Keep the deploy command
+as `npx opennextjs-cloudflare deploy` so it uses the adapter's deployment flow.
 
 The self-reference service binding must always match the worker name. No
 R2 cache binding is configured because the app loads tenant data directly

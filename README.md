@@ -7,8 +7,9 @@ their existing Supabase integrations.
 
 ## Local development
 
-Use Node.js 22.12 or later and npm. Copy `.env.example` to `.env.local` and
-provide your Supabase project's public URL and publishable/anon key.
+Use Node.js 22.12 or later and npm. The current project's browser-safe
+Supabase configuration is included. To use another project, copy `.env.example`
+to `.env.local` and override both the public URL and publishable/anon key.
 
 ```sh
 npm ci
@@ -31,7 +32,8 @@ npm run test:e2e
 
 Browser tests use the production build on port 3100 and mock external
 integrations; they never write to the live database or charge payments.
-Run the build before browser tests. Jest uses Next.js's compiler for unit tests.
+`npm run build` produces the Cloudflare Worker and the Next.js output used by
+browser tests. Jest uses Next.js's compiler for unit tests.
 
 ## Cloudflare Workers deployment
 
