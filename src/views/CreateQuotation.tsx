@@ -62,6 +62,8 @@ const CreateQuotation = () => {
   const continueAction = searchParams.get('continueAction');
   const [actionExecuted, setActionExecuted] = useState(false);
   const smartDefaultsApplied = useRef(false);
+  const quotationSaveInProgress = useRef(false);
+  const savedQuotationIdRef = useRef<string | null>(null);
   
   // Use automation hook
   const {
@@ -218,6 +220,7 @@ const CreateQuotation = () => {
   }, [automationLoading, quotationId, continueAction, getSmartDefaults]);
 
   useEffect(() => {
+    savedQuotationIdRef.current = quotationId;
     loadProfile();
     if (quotationId) {
       loadQuotation(quotationId);
@@ -407,6 +410,17 @@ const CreateQuotation = () => {
       if (loadedSections.length > 0) {
         setSections(loadedSections);
       }
+      const loadedItemIds = loadedSections.flatMap(section => section.items.map(item => item.id));
+      const restoredImages: Record<string, GalleryImage[]> = {};
+      if (loadedItemIds.length) {
+        const { data: links, error } = await supabase.from('quotation_item_images')
+          .select('quotation_item_id, sort_order, gallery_images(*)').in('quotation_item_id', loadedItemIds).order('sort_order');
+        if (error) throw error;
+        for (const link of links || []) {
+          if (link.gallery_images) (restoredImages[link.quotation_item_id] ||= []).push(link.gallery_images as GalleryImage);
+        }
+      }
+      setItemImages(restoredImages);
       toast({
         title: "Quotation loaded",
         description: "Existing quotation data has been loaded for editing"
@@ -542,6 +556,8 @@ const CreateQuotation = () => {
     socialMediaDiscountRate
   });
   const handleSaveQuotation = async (status: string, showShare: boolean = false): Promise<string | null> => {
+    if (quotationSaveInProgress.current) return null;
+    quotationSaveInProgress.current = true;
     try {
       if (!clientName || !projectTitle) {
         toast({
@@ -562,9 +578,12 @@ const CreateQuotation = () => {
 
       // Build the quotation payload for the Supabase API.
       const payloadSections = sections.map((section, sIdx) => ({
+        id: section.id,
         section_name: section.title || `Section ${sIdx + 1}`,
         sort_order: sIdx,
         items: section.items.map((item, iIdx) => ({
+          id: item.id,
+          gallery_image_ids: (itemImages[item.id] || []).map(image => image.id),
           product_name: item.productName || "",
           product_details: item.productDetails ?? null,
           side: item.side ?? null,
@@ -598,9 +617,10 @@ const CreateQuotation = () => {
         sections: payloadSections,
       };
 
-      if (quotationId) {
-        const { data: updated } = await quotationsApi.update(quotationId, basePayload);
-        savedQuotationId = updated?.id || quotationId;
+      const existingId = quotationId || savedQuotationIdRef.current;
+      if (existingId) {
+        const { data: updated } = await quotationsApi.update(existingId, basePayload);
+        savedQuotationId = updated?.id || existingId;
         toast({
           title: "Quotation updated",
           description: "Quotation has been updated successfully",
@@ -612,6 +632,12 @@ const CreateQuotation = () => {
           quotation_number: quotationNumber,
         });
         savedQuotationId = created?.id ?? null;
+        savedQuotationIdRef.current = savedQuotationId;
+        if (savedQuotationId && !showShare) {
+          const params = new URLSearchParams(searchParams);
+          params.set('id', savedQuotationId);
+          setSearchParams(params, { replace: true });
+        }
         toast({
           title: "Quotation saved",
           description: `Quotation ${quotationNumber} has been saved successfully`,
@@ -704,6 +730,7 @@ const CreateQuotation = () => {
         }
         
         setClientName("");
+        savedQuotationIdRef.current = null;
         setClientAddress("");
         setDateOfProposal("");
         setQuotationValidTill("");
@@ -740,6 +767,8 @@ const CreateQuotation = () => {
         variant: "destructive"
       });
       return null;
+    } finally {
+      quotationSaveInProgress.current = false;
     }
   };
   

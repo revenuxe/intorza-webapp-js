@@ -9,7 +9,7 @@ where n.nspname = 'public' and c.relkind = 'r'
 union all
 select 'required_functions' as check_name, jsonb_agg(jsonb_build_object(
   'function', name, 'exists', exists(select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = name)
-)) as result from (values ('is_admin'), ('respond_to_quotation')) f(name)
+)) as result from (values ('is_admin'), ('respond_to_quotation'), ('save_quotation')) f(name)
 union all
 select 'storage_buckets' as check_name, jsonb_agg(jsonb_build_object('id', id, 'public', public) order by id) as result from storage.buckets
 union all

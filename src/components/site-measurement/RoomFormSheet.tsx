@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Camera, X, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { uploadAndSave, resolveRoomPhotoUrl, removeStoredUpload } from '@/lib/storageUpload';
+import { storageObjectPath } from '@/lib/storage-path';
 
 const ROOM_TYPES = [
   "Kitchen",
@@ -36,6 +38,7 @@ interface RoomPhoto {
   id: string;
   photo_url: string;
   caption: string | null;
+  storage_key?: string;
 }
 
 interface RoomFormSheetProps {
@@ -49,7 +52,9 @@ interface RoomFormSheetProps {
 const compressImage = async (file: File, maxWidth = 1200, quality = 0.7): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
     img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
       const canvas = document.createElement('canvas');
       let { width, height } = img;
       
@@ -82,8 +87,8 @@ const compressImage = async (file: File, maxWidth = 1200, quality = 0.7): Promis
         quality
       );
     };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = URL.createObjectURL(file);
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Failed to load image')); };
+    img.src = objectUrl;
   });
 };
 
@@ -116,31 +121,23 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
   }, [room, open]);
 
   const fetchPhotos = async (roomId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('room_photos')
       .select('*')
       .eq('room_id', roomId)
       .order('created_at');
     
+    if (error) { toast.error('Could not load room photos'); return; }
     if (data) {
       // Generate signed URLs for each photo
       const photosWithSignedUrls = await Promise.all(
         data.map(async (photo) => {
-          // Extract file path from stored URL
-          const urlParts = photo.photo_url.split('/room-photos/');
-          const filePath = urlParts[1]?.split('?')[0]; // Remove any existing query params
-          
-          if (filePath) {
-            const { data: signedData } = await supabase.storage
-              .from('room-photos')
-              .createSignedUrl(filePath, 3600); // 1 hour expiry
-            
-            return {
-              ...photo,
-              photo_url: signedData?.signedUrl || photo.photo_url
-            };
+          try {
+            return { ...photo, storage_key: storageObjectPath(photo.photo_url, 'room-photos') || undefined, photo_url: await resolveRoomPhotoUrl(photo.photo_url) };
+          } catch {
+            toast.error('A room photo could not be opened');
+            return { ...photo, photo_url: '' };
           }
-          return photo;
         })
       );
       setPhotos(photosWithSignedUrls);
@@ -168,6 +165,7 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
     if (!files || files.length === 0 || !room?.id) return;
 
     setUploading(true);
+    let savedCount = 0;
     
     try {
       for (const file of Array.from(files)) {
@@ -181,46 +179,29 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
         const compressedBlob = await compressImage(file);
         const fileName = `${room.id}-${Date.now()}.webp`;
 
-        // Upload to Supabase Storage
-        let storedPath: string;
-        try {
-          const { uploadToStorage } = await import('@/lib/storageUpload');
-          const { url } = await uploadToStorage(compressedBlob, 'room', fileName);
-          storedPath = url;
-        } catch (uploadError: any) {
-          console.error('Upload error:', uploadError);
-          toast.error(`Failed to upload ${file.name}`);
-          continue;
-        }
-
-        // Save to room_photos table with the path reference
-        const { data: photoData, error: dbError } = await supabase
+        const photoData = await uploadAndSave(compressedBlob, 'room', async ({ key }) => {
+          const { data, error } = await supabase
           .from('room_photos')
           .insert({
             room_id: room.id,
-            photo_url: storedPath, // Store the path for reference
+            photo_url: key,
           })
           .select()
           .single();
 
-        if (dbError) {
-          console.error('DB error:', dbError);
-          toast.error(`Failed to save ${file.name}`);
-          continue;
-        }
-
-        // Generate signed URL for immediate display
-        const { data: signedData } = await supabase.storage
-          .from('room-photos')
-          .createSignedUrl(fileName, 3600);
-
+          if (error) throw error;
+          return data;
+        });
+        const displayUrl = await resolveRoomPhotoUrl(photoData.photo_url);
         setPhotos(prev => [...prev, { 
           ...photoData, 
-          photo_url: signedData?.signedUrl || storedPath 
+          storage_key: photoData.photo_url,
+          photo_url: displayUrl
         }]);
+        savedCount++;
       }
       
-      toast.success('Photos uploaded successfully');
+      if (savedCount) toast.success(`${savedCount} photo(s) uploaded successfully`);
     } catch (error) {
       console.error('Error uploading photos:', error);
       toast.error('Failed to upload photos');
@@ -234,20 +215,16 @@ export function RoomFormSheet({ open, onOpenChange, room, onSave }: RoomFormShee
 
   const handleDeletePhoto = async (photo: RoomPhoto) => {
     try {
-      // Extract file path from URL
-      const urlParts = photo.photo_url.split('/room-photos/');
-      const filePath = urlParts[1];
-
-      if (filePath) {
-        await supabase.storage
-          .from('room-photos')
-          .remove([filePath]);
-      }
-
-      await supabase
+      const { data, error } = await supabase
         .from('room_photos')
         .delete()
-        .eq('id', photo.id);
+        .eq('id', photo.id).select('id');
+      if (error || !data?.length) throw error || new Error('Photo could not be deleted');
+      const key = photo.storage_key || storageObjectPath(photo.photo_url, 'room-photos');
+      if (key) {
+        try { await removeStoredUpload({ bucket: 'room-photos', key }); }
+        catch { toast.error('Photo removed, but its storage file could not be cleaned up'); }
+      }
 
       setPhotos(prev => prev.filter(p => p.id !== photo.id));
       toast.success('Photo deleted');

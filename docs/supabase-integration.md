@@ -55,14 +55,47 @@ history based on timestamps alone. Retrieve and compare the remote SQL, then
 reconcile an approved baseline. Required features already exist remotely;
 their presence does not establish equivalence of all local migrations.
 
-Remote functions `uploadToS3` and `s3-upload` still exist. The current app
-does not call them. Confirm that no other clients depend on them before
-deleting them; this change does not delete remote functions or storage.
+On October 14, 2026, the explicitly unwanted legacy upload functions were
+deleted, along with their obsolete provider secrets. Database counts found
+no legacy-provider URLs in logos, signatures, hero images, gallery images,
+room photos, or bank QR codes. Existing Supabase storage objects are retained.
+
+## Reliable saving and uploads
+
+`save_quotation` saves quotation headers, sections, items, and selected gallery
+references in one authenticated, RLS-enforced transaction. Existing section and
+item IDs are preserved, and invalid nested saves roll back completely. The
+additive migration `20261013200000` was installed and recorded as applied on
+the linked project without replaying older migrations. Verify it with
+`npm run supabase:test:saves`; synthetic auth/gallery/quotation records all roll
+back at the end. Old migration-history differences still require reconciliation.
+
+Logos, signatures, hero images, gallery uploads, room photos, and bank QR
+images use the central Supabase upload helper. File validation and unique
+owner-prefixed object keys are shared. Profile, gallery, and room-photo flows
+remove the new upload if saving its database reference fails. Storage and SQL
+cannot share a transaction; cleanup failures are surfaced/logged and may need
+manual cleanup. Old profile image files are retained to avoid breaking already
+shared documents. Bank QR uploads remain staged until their template is saved.
+
+New room-photo records store durable object keys rather than expiring links.
+Display uses one-hour signed URLs; legacy Supabase signed URLs are supported
+by extracting their object key and signing it again. Gallery and room-photo
+deletion check database errors and attempt storage cleanup after record removal.
+Quotation gallery selections are persisted and restored when editing.
+
+Generic owner-scoped CRUD pins creation to the current owner, prevents owner
+reassignment during updates, and checks deletion results. Team members use
+`company_id` ownership; tasks rely on their company/assignee RLS because the
+table has no `user_id`. Invoice-payment deletion also checks the parent ID.
 
 Local Razorpay webhook code now rejects missing secrets/signatures and checks
 HMAC with Web Crypto verification before accessing the database. This source
 fix requires a separate Edge Function deployment and Razorpay test-mode check;
 publishing the Cloudflare frontend does not deploy Supabase functions.
+The project secret-name inventory currently has no `RAZORPAY_WEBHOOK_SECRET`.
+Configure the matching Razorpay endpoint secret in Supabase before deploying
+that hardened webhook. Its value must not be added to browser configuration.
 
 Set the deployed app origin's `/auth` and `/team/login` in Supabase's allowed
 redirect URLs. A successful provider-settings check does not test Google OAuth

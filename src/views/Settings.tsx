@@ -132,10 +132,11 @@ const Settings = () => {
       const fileExt = file.name.split('.').pop();
       const fileName = `logo-${Date.now()}.${fileExt}`;
 
-      const { uploadToStorage } = await import('@/lib/storageUpload');
-      const { url: publicUrl } = await uploadToStorage(file, 'logo', fileName);
-
-      await profileApi.update({ logo_url: publicUrl });
+      const { uploadAndSave } = await import('@/lib/storageUpload');
+      const publicUrl = await uploadAndSave(file, 'logo', async ({ url }) => {
+        await profileApi.update({ logo_url: url });
+        return url;
+      });
 
       setProfile({ ...profile, logo_url: publicUrl });
       toast({
@@ -172,10 +173,11 @@ const Settings = () => {
       const fileExt = file.name.split('.').pop();
       const fileName = `signature-${Date.now()}.${fileExt}`;
 
-      const { uploadToStorage } = await import('@/lib/storageUpload');
-      const { url: publicUrl } = await uploadToStorage(file, 'signature', fileName);
-
-      await profileApi.update({ signature_url: publicUrl });
+      const { uploadAndSave } = await import('@/lib/storageUpload');
+      const publicUrl = await uploadAndSave(file, 'signature', async ({ url }) => {
+        await profileApi.update({ signature_url: url });
+        return url;
+      });
 
       setProfile({ ...profile, signature_url: publicUrl });
       toast({

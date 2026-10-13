@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize, Copy, Image as ImageIcon, X, Upload } from "lucide-react";
 import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
-import { uploadToStorage } from "@/lib/storageUpload";
+import { uploadAndSave } from "@/lib/storageUpload";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -219,8 +219,10 @@ export const InvoicePreviewEditor = ({
   const handleHeroImageUpload = async (file: File) => {
     setUploadingHero(true);
     try {
-      const { url } = await uploadToStorage(file, 'hero', file.name);
-      await profileApi.update({ hero_image_url: url });
+      const url = await uploadAndSave(file, 'hero', async ({ url }) => {
+        await profileApi.update({ hero_image_url: url });
+        return url;
+      });
       setProfile((prev: any) => ({ ...(prev || {}), hero_image_url: url }));
     } catch (error) {
       console.error('Hero image upload failed:', error);

@@ -1615,6 +1615,10 @@ export type Database = {
       }
     }
     Functions: {
+      save_quotation: {
+        Args: { p_id: string | null; p_payload: Json }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

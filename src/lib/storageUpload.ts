@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { storageObjectPath } from './storage-path';
 
 export type StorageUploadKind =
   | "logo"
@@ -137,7 +138,9 @@ export async function uploadToStorage(
     const { data: auth } = await supabase.auth.getUser();
     userId = auth?.user?.id;
   }
-  if (!userId) throw new Error("Please sign in (or confirm your email) before uploading a logo.");
+  if (!userId) throw new Error("Please sign in before uploading a file.");
+  if (!file.size) throw new Error('The selected file is empty.');
+  if (file.size > MAX_UPLOAD_BYTES) throw new Error('Please choose an image under 15 MB.');
 
   const original =
     filename ?? (file instanceof File ? file.name : `upload-${Date.now()}`);
@@ -146,6 +149,9 @@ export async function uploadToStorage(
     .replace(/[^a-z0-9]/g, "") || "bin";
 
   const declaredType = (file as File).type || "";
+  if (!['image/jpeg','image/png','image/webp','image/gif','image/heic','image/heif'].includes(declaredType)) {
+    throw new Error('Please choose a JPG, PNG, WebP, GIF, or HEIC image.');
+  }
   const looksLikeImage =
     declaredType.startsWith("image/") ||
     ["jpg", "jpeg", "png", "webp", "gif", "heic", "heif"].includes(ext);
@@ -182,7 +188,7 @@ export async function uploadToStorage(
   const key = `${userId}/${folder}/${sanitize(base)}`;
 
   const { error } = await supabase.storage.from(bucket).upload(key, payload, {
-    upsert: true,
+    upsert: false,
     cacheControl: "31536000",
     contentType,
   });
@@ -202,8 +208,9 @@ export async function uploadToStorage(
     // Private bucket — hand back a long-lived signed URL instead.
     const { data: signed, error: signErr } = await supabase.storage
       .from(bucket)
-      .createSignedUrl(key, 60 * 60 * 24 * 365);
+      .createSignedUrl(key, 3600);
     if (signErr || !signed?.signedUrl) {
+      try { await removeStoredUpload({ bucket, key }); } catch (error) { console.error('Upload cleanup failed', error); }
       throw new Error(signErr?.message || "Could not create file link");
     }
     return { key, url: signed.signedUrl, bucket };
@@ -213,4 +220,28 @@ export async function uploadToStorage(
   if (!data?.publicUrl) throw new Error("Upload succeeded but URL is missing");
 
   return { key, url: data.publicUrl, bucket };
+}
+
+export async function removeStoredUpload(upload: Pick<StorageUploadResult, 'bucket' | 'key'>) {
+  const { error } = await supabase.storage.from(upload.bucket).remove([upload.key]);
+  if (error) throw error;
+}
+
+/** Commit a storage upload's DB reference; compensate if the DB save fails. */
+export async function uploadAndSave<T>(file: File | Blob, kind: StorageUploadKind, save: (upload: StorageUploadResult) => Promise<T>) {
+  const upload = await uploadToStorage(file, kind);
+  try { return await save(upload); }
+  catch (error) {
+    try { await removeStoredUpload(upload); }
+    catch (cleanupError) { console.error('Could not clean up unreferenced upload', cleanupError); }
+    throw error;
+  }
+}
+
+export async function resolveRoomPhotoUrl(value: string) {
+  const key = storageObjectPath(value, 'room-photos');
+  if (!key) throw new Error('Room photo does not reference Supabase Storage.');
+  const { data, error } = await supabase.storage.from('room-photos').createSignedUrl(key, 3600);
+  if (error || !data?.signedUrl) throw error || new Error('Could not open room photo.');
+  return data.signedUrl;
 }

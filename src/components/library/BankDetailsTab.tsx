@@ -196,21 +196,8 @@ export const BankDetailsTab = () => {
     
     try {
       setUploading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/bank-qr-${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('company-logos')
-        .upload(fileName, file, { upsert: true });
-      
-      if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from('company-logos')
-        .getPublicUrl(fileName);
+      const { uploadToStorage } = await import('@/lib/storageUpload');
+      const { url: publicUrl } = await uploadToStorage(file, 'qr');
       
       setFormData({ ...formData, qr_code_url: publicUrl });
       toast({ title: "QR code uploaded" });
