@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
+import dynamic from 'next/dynamic';
 import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon, Mic, ArrowRight } from "lucide-react";
 import { getCountryByCode } from "@/lib/countryConfig";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,7 @@ import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
 import { GalleryImagePicker } from "@/components/quotation/GalleryImagePicker";
 import { GalleryImage } from "@/hooks/useGallery";
 import { getLibraryTerms, getLibraryPaymentStages, getLibraryBankTemplate } from "@/lib/libraryDefaults";
-import { VoiceQuotationAssistant } from "@/components/quotation/VoiceQuotationAssistant";
+const VoiceQuotationAssistant = dynamic(() => import('@/components/quotation/RealtimeQuotationAssistant').then(module => module.RealtimeQuotationAssistant), { ssr: false });
 import { fromQuotation, toQuotation, lineAmount, quotationTotals, reviewDraft, type VoiceDraft } from "@/lib/quotation-ai/domain";
 interface LineItem {
   id: string;

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { z } from 'zod';
+import { openAIError } from '@/lib/quotation-ai/openai-errors';
 export const dynamic = 'force-dynamic';
 const schema = z.object({ text: z.string().trim().min(1).max(1500), language: z.enum(['en-IN','hi-IN']) }).strict();
 type Env = { OPENAI_API_KEY?: string; OPENAI_TTS_MODEL?: string; QUOTATION_AI_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> } };
@@ -35,7 +36,10 @@ export async function POST(request: Request) {
     const key = (env.OPENAI_API_KEY || process.env.OPENAI_API_KEY)?.trim();
     if (!key) return json('Configure OPENAI_API_KEY as a Cloudflare runtime secret.',503);
     const response = await fetch('https://api.openai.com/v1/audio/speech', { method: 'POST', signal: AbortSignal.any([request.signal, AbortSignal.timeout(20000)]), headers: { Authorization: `Bearer ${key}`, 'Content-Type':'application/json' }, body: JSON.stringify({ model: env.OPENAI_TTS_MODEL || process.env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts', voice: 'coral', input: input.data.text, response_format: 'mp3', instructions: input.data.language === 'hi-IN' ? 'Speak natural, clear conversational Hindi. Read the provided text exactly. Use a warm concise interviewer voice.' : 'Speak clear conversational Indian English. Read the provided text exactly.' }) });
-    if (!response.ok) return json(response.status === 429 ? 'OpenAI speech quota or rate limit reached.' : 'OpenAI speech is unavailable. Check the server key, model and API billing.', response.status === 429 ? 429 : 502);
+    if (!response.ok) {
+      const error = await openAIError(response);
+      return Response.json({ error: error.message, code: error.code, providerCode: error.providerCode, upstreamStatus: error.upstreamStatus, providerRequestId: error.providerRequestId, retryAfterSeconds: error.retryAfterSeconds }, { status: error.status, headers: { 'Cache-Control': 'no-store', ...(error.retryAfterSeconds ? { 'Retry-After': String(error.retryAfterSeconds) } : {}) } });
+    }
     return new Response(response.body, { headers: { 'Content-Type':'audio/mpeg','Cache-Control':'private, no-store' } });
   } catch { return json('Spoken question could not load. Read the English question and try again.',502); }
 }

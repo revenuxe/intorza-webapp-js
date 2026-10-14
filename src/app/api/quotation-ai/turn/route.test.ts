@@ -29,6 +29,23 @@ beforeEach(() => {
   propose.mockResolvedValue({ reply: 'What is the quotation title?', clarification: null, operations: [{ type: 'update_project', fields: { clientName: 'Rahul' } }] });
 });
 describe('authenticated quotation AI boundary', () => {
+  it('returns retry timing only for temporary provider limits', async () => {
+    const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const quota = new ProviderError('Check billing', 429, 'OPENAI_QUOTA_EXHAUSTED', 429);
+      quota.providerCode = 'insufficient_quota';
+      propose.mockRejectedValueOnce(quota);
+      const exhausted = await POST(request());
+      expect(exhausted.headers.get('Retry-After')).toBeNull();
+      expect(await exhausted.json()).toMatchObject({ code: 'OPENAI_QUOTA_EXHAUSTED', providerCode: 'insufficient_quota' });
+      const rate = new ProviderError('Wait', 429, 'OPENAI_RATE_LIMITED', 429);
+      rate.retryAfterSeconds = 12;
+      propose.mockRejectedValueOnce(rate);
+      const limited = await POST(request());
+      expect(limited.headers.get('Retry-After')).toBe('12');
+      expect(await limited.json()).toMatchObject({ code: 'OPENAI_RATE_LIMITED', retryAfterSeconds: 12 });
+    } finally { warning.mockRestore(); }
+  });
   it('selects OpenAI and prevents existing Hindi sections from surviving an accepted update', async () => {
     const payload = input(); payload.draft.sections[0].title = 'बेडरूम';
     const response = await POST(request(payload));

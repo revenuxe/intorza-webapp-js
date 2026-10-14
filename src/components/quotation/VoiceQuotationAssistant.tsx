@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Mic, Pause, Send, Undo2, Volume2, X } from 'lucide-react';
+import { Loader2, Mic, Pause, Send, Undo2, X } from 'lucide-react';
+import { QuestionPlayback } from './QuestionPlayback';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
@@ -124,6 +125,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
     if (!mounted.current || !active.current || inFlight.current) return;
     stopAudio(); setError('');
     let final = '';
+    let lastInterim = '';
     let uncertain = false;
     const finalSegments = new Map<number, string>();
     try {
@@ -144,16 +146,17 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
           else interim += event.results[i][0].transcript;
         }
         final = [...finalSegments.entries()].sort(([a], [b]) => a - b).map(([, text]) => text).join(' ');
+        lastInterim = interim;
         setHeard(romanLetters((final + interim).trim().slice(0, 3000)));
         if (silenceTimer.current) clearTimeout(silenceTimer.current);
-        if (final) silenceTimer.current = setTimeout(() => { if (recognition.current === current) current.stop(); }, interim ? 1400 : 850);
+        if (final || interim) silenceTimer.current = setTimeout(() => { if (recognition.current === current) current.stop(); }, interim ? 1200 : 600);
       };
       current.onerror = event => {
         if (recognition.current !== current) return;
         active.current = false; stopAudio(); setStatus('paused');
         setInput(romanLetters(final.trim().slice(0, 3000)));
         setError(latest.current.language === 'hi-IN'
-          ? event.error === 'not-allowed' ? 'ब्राउज़र सेटिंग में माइक्रोफ़ोन की अनुमति दें, या अपना जवाब लिखिए।' : 'आपका जवाब साफ़ नहीं सुनाई दिया। फिर से बोलिए या जवाब लिखिए।'
+          ? event.error === 'not-allowed' ? 'à¤¬à¥à¤°à¤¾à¤‰à¤œà¤¼à¤° à¤¸à¥‡à¤Ÿà¤¿à¤‚à¤— à¤®à¥‡à¤‚ à¤®à¤¾à¤‡à¤•à¥à¤°à¥‹à¤«à¤¼à¥‹à¤¨ à¤•à¥€ à¤…à¤¨à¥à¤®à¤¤à¤¿ à¤¦à¥‡à¤‚, à¤¯à¤¾ à¤…à¤ªà¤¨à¤¾ à¤œà¤µà¤¾à¤¬ à¤²à¤¿à¤–à¤¿à¤à¥¤' : 'à¤†à¤ªà¤•à¤¾ à¤œà¤µà¤¾à¤¬ à¤¸à¤¾à¤«à¤¼ à¤¨à¤¹à¥€à¤‚ à¤¸à¥à¤¨à¤¾à¤ˆ à¤¦à¤¿à¤¯à¤¾à¥¤ à¤«à¤¿à¤° à¤¸à¥‡ à¤¬à¥‹à¤²à¤¿à¤ à¤¯à¤¾ à¤œà¤µà¤¾à¤¬ à¤²à¤¿à¤–à¤¿à¤à¥¤'
           : event.error === 'not-allowed' ? 'Allow microphone access in browser settings, or type your answer.' : 'Could not hear your answer clearly. Tap Speak to retry, or type below.');
       };
       current.onend = () => {
@@ -162,6 +165,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
         if (silenceTimer.current) clearTimeout(silenceTimer.current);
         if (idleTimer.current) clearTimeout(idleTimer.current);
         if (!active.current || !mounted.current) return;
+        if (!final.trim() && lastInterim.trim()) { final = lastInterim; uncertain = true; }
         const kind = classifySpeechTurn(final, latest.current.question);
         if (kind !== 'answer') {
           setHeard('');
@@ -174,7 +178,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
         ignoredTurns.current = 0;
         if ((uncertain || latest.current.reviewSpeech) && final.trim()) {
           active.current = false; setStatus('paused'); setInput(romanLetters(final.trim().slice(0, 3000)));
-          setError(latest.current.language === 'hi-IN' ? 'नीचे लिखा जवाब जाँचकर भेजें।' : 'Check the answer below before sending.');
+          setError(latest.current.language === 'hi-IN' ? 'à¤¨à¥€à¤šà¥‡ à¤²à¤¿à¤–à¤¾ à¤œà¤µà¤¾à¤¬ à¤œà¤¾à¤à¤šà¤•à¤° à¤­à¥‡à¤œà¥‡à¤‚à¥¤' : 'Check the answer below before sending.');
           return;
         }
         if (final.trim()) { setInput(romanLetters(final.trim().slice(0, 3000))); void send(final.trim().slice(0, 3000)); }
@@ -201,7 +205,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
         body: JSON.stringify({ draft: before, message, language: latest.current.language, history: history.current.slice(-8) }),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(`${body.error || 'Could not process your answer.'}${body.upstreamStatus ? ` Provider HTTP ${body.upstreamStatus}.` : ''}${body.code ? ` [${body.code}]` : ''}${body.requestId ? ` Reference: ${body.requestId}` : ''}`);
+      if (!response.ok) throw new Error(`${body.error || 'Could not process your answer.'}${body.retryAfterSeconds ? ` Retry after ${body.retryAfterSeconds} seconds.` : ''}${body.providerCode ? ` Provider reason: ${body.providerCode}.` : ''}${body.code ? ` [${body.code}]` : ''}${body.requestId ? ` Reference: ${body.requestId}` : ''}`);
       const next = draftSchema.parse(body.draft);
       if (abort.signal.aborted || !mounted.current) return;
       if (typeof body.reply !== 'string') throw new Error('Invalid assistant response.');
@@ -232,7 +236,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
       draft.current = entry.draft; snapshot.current = after; history.current = [];
       undo.current.pop();
       if (undo.current.length) undo.current[undo.current.length - 1].after = after;
-      setUndoCount(undo.current.length); setQuestion(t('Last voice change undone. What would you like to change?', 'पिछला बदलाव हटा दिया है। अब क्या बदलना है?')); setError('');
+      setUndoCount(undo.current.length); setQuestion(t('Last voice change undone. What would you like to change?', 'à¤ªà¤¿à¤›à¤²à¤¾ à¤¬à¤¦à¤²à¤¾à¤µ à¤¹à¤Ÿà¤¾ à¤¦à¤¿à¤¯à¤¾ à¤¹à¥ˆà¥¤ à¤…à¤¬ à¤•à¥à¤¯à¤¾ à¤¬à¤¦à¤²à¤¨à¤¾ à¤¹à¥ˆ?')); setError('');
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not undo this change.'); }
   }
   const working = status === 'thinking';
@@ -241,33 +245,32 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
       <button type="button" aria-label={status === 'paused' ? 'Start voice conversation' : 'Pause voice conversation'} disabled={!supported || working} onClick={() => { if (status !== 'paused') pause(); else { active.current = true; speak(spokenQuestion.current); } }} className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white shadow-sm disabled:opacity-50 ${status === 'listening' ? 'animate-pulse ring-4 ring-orange-200 dark:ring-orange-900' : ''}`}>
         {working ? <Loader2 className="h-5 w-5 animate-spin" /> : status === 'paused' ? <Mic className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
       </button>
-      <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="text-sm font-semibold">{t('Quotation voice assistant', 'कोटेशन वॉइस सहायक')}</h2><span role="status" className="text-xs text-muted-foreground">{status === 'thinking' ? t('Updating fields...', 'जानकारी भर रहे हैं...') : status === 'listening' ? t('Listening...', 'सुन रहे हैं...') : status === 'speaking' ? t('Speaking...', 'बोल रहे हैं...') : t('Ready', 'तैयार')}</span></div>
+      <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="text-sm font-semibold">{t('Quotation voice assistant', 'à¤•à¥‹à¤Ÿà¥‡à¤¶à¤¨ à¤µà¥‰à¤‡à¤¸ à¤¸à¤¹à¤¾à¤¯à¤•')}</h2><span role="status" className="text-xs text-muted-foreground">{status === 'thinking' ? t('Updating fields...', 'à¤œà¤¾à¤¨à¤•à¤¾à¤°à¥€ à¤­à¤° à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...') : status === 'listening' ? t('Listening...', 'à¤¸à¥à¤¨ à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...') : status === 'speaking' ? t('Speaking...', 'à¤¬à¥‹à¤² à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...') : t('Ready', 'à¤¤à¥ˆà¤¯à¤¾à¤°')}</span></div>
         <p aria-live="polite" className="mt-1 text-sm">{question}</p>
         {heard && <p className="mt-1 truncate text-xs text-muted-foreground" title={heard}>You: {heard}</p>}
-        {updated && <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">{t('Quotation fields updated below. You can edit them anytime.', 'नीचे कोटेशन की जानकारी भर दी गई है। आप इसे बदल भी सकते हैं।')}</p>}
+        {updated && <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">{t('Quotation fields updated below. You can edit them anytime.', 'à¤¨à¥€à¤šà¥‡ à¤•à¥‹à¤Ÿà¥‡à¤¶à¤¨ à¤•à¥€ à¤œà¤¾à¤¨à¤•à¤¾à¤°à¥€ à¤­à¤° à¤¦à¥€ à¤—à¤ˆ à¤¹à¥ˆà¥¤ à¤†à¤ª à¤‡à¤¸à¥‡ à¤¬à¤¦à¤² à¤­à¥€ à¤¸à¤•à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤')}</p>}
       </div>
       <Button type="button" variant="ghost" size="icon" aria-label="Close voice assistant" className="h-8 w-8 shrink-0" onClick={onClose}><X className="h-4 w-4" /></Button>
     </div>
     {needsEnglish && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span>Existing quotation text needs English translation.</span><Button size="sm" variant="outline" disabled={status !== 'paused'} onClick={() => { active.current = false; void send('Translate all existing quotation section titles, product names, descriptions, project details and client names into English or Roman proper-name spellings. Preserve IDs, measurements, prices and pricing.'); }}>Convert existing text to English</Button></div>}
     <div className="mt-3 flex flex-wrap items-center gap-2">
-      <Button type="button" size="sm" variant="outline" disabled={!supported || working} onClick={() => { if (status !== 'paused') pause(); else { active.current = true; listen(); } }}>{status === 'paused' ? <Mic className="h-4 w-4" /> : <Pause className="h-4 w-4" />}{status === 'paused' ? t('Speak', 'बोलिए') : t('Pause', 'रोकें')}</Button>
-      <Button type="button" size="sm" variant="ghost" disabled={working || status !== 'paused'} onClick={() => { active.current = true; speak(spokenQuestion.current, false); }}><Volume2 className="h-4 w-4" />{t('Read question', 'सवाल सुनें')}</Button>
-      <Button type="button" size="sm" variant="ghost" disabled={!undoCount || status !== 'paused'} onClick={undoLast}><Undo2 className="h-4 w-4" />{t('Undo', 'पिछला बदलाव हटाएँ')}</Button>
+      <Button type="button" size="sm" variant="outline" disabled={!supported || working} onClick={() => { if (status !== 'paused') pause(); else { active.current = true; listen(); } }}>{status === 'paused' ? <Mic className="h-4 w-4" /> : <Pause className="h-4 w-4" />}{status === 'paused' ? t('Speak', 'à¤¬à¥‹à¤²à¤¿à¤') : t('Pause', 'à¤°à¥‹à¤•à¥‡à¤‚')}</Button>
+      <QuestionPlayback text={spokenQuestion.current} language={language} disabled={working || status !== 'paused'} onStart={pause} />
+      <Button type="button" size="sm" variant="ghost" disabled={!undoCount || status !== 'paused'} onClick={undoLast}><Undo2 className="h-4 w-4" />{t('Undo', 'à¤ªà¤¿à¤›à¤²à¤¾ à¤¬à¤¦à¤²à¤¾à¤µ à¤¹à¤Ÿà¤¾à¤à¤')}</Button>
       <label className="sr-only" htmlFor="voice-language">Speech language</label><select id="voice-language" value={language} disabled={status !== 'paused'} onChange={event => {
         const nextLanguage = event.target.value as VoiceLanguage;
         setLanguage(nextLanguage); spokenQuestion.current = initialQuestion(latest.current.getCurrentDraft(), nextLanguage); setQuestion(initialQuestion(latest.current.getCurrentDraft(), 'en-IN')); history.current = []; setSpeechNotice('');
         try { localStorage.setItem('quotation-voice-language', nextLanguage); } catch { /* Optional preference. */ }
       }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hindi</option></select>
     </div>
-    <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={reviewSpeech} disabled={status !== 'paused'} onChange={event => setReviewSpeech(event.target.checked)} />{t('Noisy surroundings: review each spoken answer before sending', 'शोर वाली जगह: हर बोले हुए जवाब को भेजने से पहले जाँचें')}</label>
+    <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={reviewSpeech} disabled={status !== 'paused'} onChange={event => setReviewSpeech(event.target.checked)} />{t('Noisy surroundings: review each spoken answer before sending', 'à¤¶à¥‹à¤° à¤µà¤¾à¤²à¥€ à¤œà¤—à¤¹: à¤¹à¤° à¤¬à¥‹à¤²à¥‡ à¤¹à¥à¤ à¤œà¤µà¤¾à¤¬ à¤•à¥‹ à¤­à¥‡à¤œà¤¨à¥‡ à¤¸à¥‡ à¤ªà¤¹à¤²à¥‡ à¤œà¤¾à¤à¤šà¥‡à¤‚')}</label>
     <form className="mt-2 flex gap-2" onSubmit={event => { event.preventDefault(); active.current = false; stopAudio(); void send(input); }}>
-      <label className="sr-only" htmlFor="voice-answer">Your answer</label><Input id="voice-answer" value={input} maxLength={3000} disabled={status !== 'paused'} onChange={event => setInput(event.target.value)} placeholder={t('Or type your answer or correction...', 'या अपना जवाब / सुधार लिखिए...')} className="h-9 bg-background text-sm" />
+      <label className="sr-only" htmlFor="voice-answer">Your answer</label><Input id="voice-answer" value={input} maxLength={3000} disabled={status !== 'paused'} onChange={event => setInput(event.target.value)} placeholder={t('Or type your answer or correction...', 'à¤¯à¤¾ à¤…à¤ªà¤¨à¤¾ à¤œà¤µà¤¾à¤¬ / à¤¸à¥à¤§à¤¾à¤° à¤²à¤¿à¤–à¤¿à¤...')} className="h-9 bg-background text-sm" />
       <Button type="submit" size="sm" disabled={!input.trim() || status !== 'paused'} aria-label="Send answer"><Send className="h-4 w-4" /></Button>
     </form>
     {error && <p role="alert" className="mt-2 text-sm text-destructive">{romanLetters(error)}</p>}
     {speechNotice && <p role="status" className="mt-2 text-xs text-muted-foreground">{romanLetters(speechNotice)}</p>}
-    {!supported && <p className="mt-2 text-xs text-muted-foreground">{t('Voice recognition is unavailable in this browser. You can type your answers.', 'इस ब्राउज़र में वॉइस पहचान उपलब्ध नहीं है। अपना जवाब लिख सकते हैं।')}</p>}
-    <p className="mt-2 text-xs text-muted-foreground">{t('Speech uses your browser recognition service. Check measurements and prices before saving. Tax and discount changes still need Apply pricing.', 'आवाज़ की पहचान आपके ब्राउज़र से होती है। सेव करने से पहले माप और कीमत जाँच लें। टैक्स और छूट के बदलाव के लिए Apply pricing दबाएँ।')}</p>
-    <p className="mt-1 text-xs text-muted-foreground">Spoken replies are AI-generated by OpenAI. Hindi speech uses English text on screen.</p>
+    {!supported && <p className="mt-2 text-xs text-muted-foreground">{t('Voice recognition is unavailable in this browser. You can type your answers.', 'à¤‡à¤¸ à¤¬à¥à¤°à¤¾à¤‰à¤œà¤¼à¤° à¤®à¥‡à¤‚ à¤µà¥‰à¤‡à¤¸ à¤ªà¤¹à¤šà¤¾à¤¨ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤ à¤…à¤ªà¤¨à¤¾ à¤œà¤µà¤¾à¤¬ à¤²à¤¿à¤– à¤¸à¤•à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤')}</p>}
+    <details className="mt-2 text-xs text-muted-foreground"><summary>Voice details</summary><p>AI-generated OpenAI voice.</p></details>
   </section>;
 }

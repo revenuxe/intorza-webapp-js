@@ -118,7 +118,7 @@ describe('compact live voice assistant', () => {
       const recognition: BrowserRecognition = { lang: '', continuous: true, interimResults: true, onresult: null, onend: null, onerror: null, start: jest.fn(), stop: jest.fn(), abort: jest.fn() };
       const view = render(<VoiceQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} speechInput={{ available: () => true, create: () => recognition }} />);
       fireEvent.click(screen.getByRole('button', { name: 'Speak' }));
-      act(() => { recognition.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: 'Eight feet' } }] }); jest.advanceTimersByTime(849); });
+      act(() => { recognition.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: 'Eight feet' } }] }); jest.advanceTimersByTime(599); });
       expect(recognition.stop).not.toHaveBeenCalled();
       act(() => jest.advanceTimersByTime(1)); expect(recognition.stop).toHaveBeenCalledTimes(1);
       view.unmount(); act(() => jest.advanceTimersByTime(20000)); expect(recognition.stop).toHaveBeenCalledTimes(1);

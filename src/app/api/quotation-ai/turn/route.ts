@@ -84,8 +84,11 @@ export async function POST(request: Request) {
     return json({ draft, reply: proposal.clarification || proposal.reply, displayReply: proposal.displayReply, transcript: proposal.transcript, review: reviewDraft(draft), changed: operations.length > 0 }, 200, `provider;dur=${providerDuration.toFixed(1)}, total;dur=${(performance.now() - started).toFixed(1)}`);
   } catch (error) {
     if (error instanceof ProviderError) {
-      console.warn('quotation_ai_failure', { requestId, code: error.code, upstreamStatus: error.upstreamStatus });
-      return json({ error: error.message, code: error.code, requestId, upstreamStatus: error.upstreamStatus }, error.status);
+      console.warn('quotation_ai_failure', { requestId, code: error.code, upstreamStatus: error.upstreamStatus, ...(error.providerCode ? { providerCode: error.providerCode } : {}), ...(error.providerRequestId ? { providerRequestId: error.providerRequestId } : {}) });
+      const response = json({ error: error.message, code: error.code, requestId, upstreamStatus: error.upstreamStatus, providerCode: error.providerCode, providerRequestId: error.providerRequestId, retryAfterSeconds: error.retryAfterSeconds }, error.status);
+      if (error.retryAfterSeconds) response.headers.set('Retry-After', String(error.retryAfterSeconds));
+      else response.headers.delete('Retry-After');
+      return response;
     }
     return json({ error: 'Could not process this turn. Your quotation has not changed.' }, 500);
   }

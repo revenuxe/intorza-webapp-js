@@ -1,8 +1,30 @@
-# Gemini + browser voice quotation assistant
+# Quotation voice assistant
 
 Implemented foundation, 2026-10-14. This document supersedes provider/transport choices in `voice-quotation-plan.md`.
 
-## Current OpenAI integration (2026-10-15)
+## Current guided field entry (2026-10-15)
+
+Latest update: OpenAI question speech is enabled by default, with the free device voice available under collapsed Voice options. Short prompts are cached in memory for replay. Explain simply and Ask by voice call the authenticated/rate-limited `explain` action with the current field and a bounded help question, without sending customer/draft data. The configured OpenAI text model returns a short English display explanation and Hindi/English spoken explanation. No quotation operations are exposed to this help call. Voice questions use bounded browser recognition (eight-second idle, 900ms settled answer), release capture before inference, and cancel on field change/unmount. Explanation playback interrupts the field prompt. Verbose footer paragraphs are removed; AI voice identification and billing remain in Voice options. Actual voice quality and latency require device/account testing.
+
+The default mounted assistant is now a deterministic, one-field-at-a-time guide. It asks for customer/project details, an existing or new section, product/details/position, measurement method, dimensions or direct square-foot area, per-square-foot rate, additional items/sections, GST and standard/social-media discounts, then presents a review. Entering an answer updates the unsaved main quotation immediately through the existing callback. Optional fields can be skipped. Back restores the preceding step/draft; manual edits trigger conflict protection and require restarting from the latest form. Missing billable details in existing items are collected before pricing; an empty quotation cannot finish. Text input must use English/Latin letters. No LLM, speech recognition or microphone access is required for this mode.
+
+Device speech reads each question in the chosen language after Start/Next. Hindi speech requires a Hindi system voice; absence is reported explicitly. Optional OpenAI question audio uses the existing authenticated speech endpoint and is paid, opt-in, with automatic reading after Start/Next. The Read question control exposes Play question when mobile autoplay is blocked; replay uses a small in-memory audio cache. Changing prompts/language, pausing or closing stops playback and pending requests. Guidance and labels remain English. The final review stops question progression and asks the user to review terms/payment information and apply pricing before saving. Terms/payment settings remain in the main quotation form.
+
+The quotation assistant is lazy-loaded when opened. Optional live mode validates unsaved patches using the same pure domain/English validator as the server, so field updates avoid a per-turn authentication/network round trip. The server apply endpoint remains available, but the live client does not use it. Persistent storage still uses the normal authenticated quotation save flow. Responses are requested after audio is committed rather than immediately on speech-stopped events. On completion or explicit conversation end, capture stops immediately; the connection closes after final playback (with a 15-second safety timeout). Browser recognition silence timing is 600ms after final text and 1200ms for interim text; interim-only output requires review rather than leaving capture running indefinitely.
+
+## Optional Realtime conversation (2026-10-15)
+
+Optional live conversation uses OpenAI Realtime over WebRTC, with a selectable browser/Responses/TTS mode. Runtime `OPENAI_REALTIME_MODEL=gpt-realtime-2.1-mini` is optional; that is the default. The existing runtime `OPENAI_API_KEY` is reused, without exposing it to the browser. Verify this model is available to the key's API project. Realtime audio is billed separately from the text/TTS flow; API billing must be active.
+
+`POST /api/quotation-ai/realtime` authenticates and rate-limits both actions. `session` validates the current draft and creates a 60-second ephemeral connection credential. The microphone sends audio directly to OpenAI through a persistent WebRTC connection, and remote speech streams immediately rather than waiting for a complete MP3. Echo cancellation, browser noise suppression and provider near-field noise reduction are enabled. Semantic VAD with high eagerness detects completed answers; noisy mode uses a higher-threshold server VAD. Interruptions are enabled. Client response creation is serialized around tool validation so overlapping answers cannot launch conflicting model responses.
+
+`update_quotation` emits compact domain operations plus English question/transcript translations. The `apply` action validates domain commands and the complete resulting draft, rejects non-Latin text, suppresses edits during clarification, and returns the same fixed-point quotation review. It makes no additional model call. The client rejects concurrent manual edits, deduplicates tool IDs, retains nullable measurements, supports undo and updates the existing form callback. Saving and applying pricing remain explicit. Raw Hindi transcripts are never displayed; the validated English translation is shown. Spoken output remains Hindi when selected. Translation meaning and name spelling still require review.
+
+Microphone tracks, WebRTC, audio and requests are released on pause, close, unmount, page hide and sign-out. Late permission/API results cannot revive a stopped session. Connection timeout is 20 seconds; client idle timeout is 60 seconds; the client ends a session after five minutes. These client timers are usability/cost controls, not a server-enforced account spending cap. Configure API project spend limits separately. No fine-tuning has been performed, and noise filtering cannot guarantee elimination of nearby speakers.
+
+Validated in unit/component tests and production build. Real microphone quality, Hindi pronunciation, actual latency, Realtime project access and live billing require deployment/account testing. Sources: https://developers.openai.com/api/docs/guides/voice-webrtc ; https://developers.openai.com/api/docs/guides/realtime-vad ; https://developers.openai.com/api/docs/guides/realtime-conversations ; https://developers.openai.com/api/docs/models/gpt-realtime-2.1-mini .
+
+## OpenAI browser mode (2026-10-15)
 
 This section supersedes all Gemini configuration below. The active provider is OpenAI, with `gpt-5.4-mini` as the configurable text default and `gpt-4o-mini-tts` for spoken playback. Gemini is disabled in the factory; `/api/quotation-ai/live` returns 410 and cannot issue Google tokens. Old Gemini source modules remain for historical reference/tests but are not used by the mounted quotation flow.
 
@@ -12,6 +34,7 @@ Cloudflare runtime configuration:
 OPENAI_API_KEY=your-server-only-secret
 OPENAI_MODEL=gpt-5.4-mini
 OPENAI_TTS_MODEL=gpt-4o-mini-tts
+OPENAI_REALTIME_MODEL=gpt-realtime-2.1-mini
 ```
 
 The key is never public or returned to the browser. Existing `GEMINI_*` and `QUOTATION_AI_PROVIDER=gemini` overrides are ignored by the active endpoint. OpenAI usage requires API-project access/credit; it is not supplied by an unrelated subscription or a Gemini free tier. No credentials have been provisioned by this implementation.
