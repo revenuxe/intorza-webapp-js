@@ -7,7 +7,8 @@ export type ProviderConfiguration = { provider: string; apiKey?: string; model: 
 class FallbackProvider implements QuotationAIProvider {
   constructor(private primary: QuotationAIProvider, private fallback?: QuotationAIProvider) {}
   async propose(input: Parameters<QuotationAIProvider['propose']>[0], signal?: AbortSignal) {
-    try { return await this.primary.propose(input, signal); } catch (error) { if (!this.fallback || signal?.aborted) throw error; return this.fallback.propose(input, signal); }
+    try { return { ...(await this.primary.propose(input, signal)), provider: 'Meta' as const }; }
+    catch (error) { if (!this.fallback || signal?.aborted) throw error; return { ...(await this.fallback.propose(input, signal)), provider: 'OpenAI' as const }; }
   }
 }
 export function createQuotationProvider(config: ProviderConfiguration): QuotationAIProvider {
@@ -18,7 +19,8 @@ export function createQuotationProvider(config: ProviderConfiguration): Quotatio
   }
   if (config.provider === 'openai') {
     if (!config.apiKey) throw new ProviderError('Configure OPENAI_API_KEY as a Cloudflare runtime secret.', 503, 'OPENAI_KEY_MISSING');
-    return new OpenAIQuotationProvider(config.apiKey, config.model);
+    const openAI = new OpenAIQuotationProvider(config.apiKey, config.model);
+    return { propose: async (input, signal) => ({ ...(await openAI.propose(input, signal)), provider: 'OpenAI' as const }) };
   }
   throw new ProviderError('Unsupported quotation AI provider.', 503, 'AI_PROVIDER_DISABLED');
 }

@@ -84,7 +84,8 @@ export async function POST(request: Request) {
     try { draft = applyOperations(input.data.draft, operations); }
     catch { throw new ProviderError('The proposed change could not be validated. Please clarify the item or measurement.', 502, 'QUOTATION_CHANGE_INVALID'); }
     if (operations.length && hasNonEnglishDraft(draft)) throw new ProviderError('Some quotation text still needs English translation. No fields changed; use Convert existing text to English and try again.', 502, 'AI_LANGUAGE_INVALID');
-    return json({ draft, reply: proposal.clarification || proposal.reply, displayReply: proposal.displayReply, transcript: proposal.transcript, review: reviewDraft(draft), changed: operations.length > 0 }, 200, `provider;dur=${providerDuration.toFixed(1)}, total;dur=${(performance.now() - started).toFixed(1)}`);
+    const providerName = (proposal as typeof proposal & { provider?: 'Meta' | 'OpenAI' }).provider || (metaKey ? 'Meta' : 'OpenAI');
+    return json({ draft, reply: proposal.clarification || proposal.reply, displayReply: proposal.displayReply, transcript: proposal.transcript, review: reviewDraft(draft), changed: operations.length > 0, provider: providerName }, 200, `provider;dur=${providerDuration.toFixed(1)}, total;dur=${(performance.now() - started).toFixed(1)}`);
   } catch (error) {
     if (error instanceof ProviderError) {
       console.warn('quotation_ai_failure', { requestId, code: error.code, upstreamStatus: error.upstreamStatus, ...(error.providerCode ? { providerCode: error.providerCode } : {}), ...(error.providerRequestId ? { providerRequestId: error.providerRequestId } : {}) });

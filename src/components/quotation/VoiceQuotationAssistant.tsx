@@ -34,6 +34,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
   const [undoCount, setUndoCount] = useState(0);
   const [updated, setUpdated] = useState(false);
   const [needsEnglish, setNeedsEnglish] = useState(() => hasNonEnglishDraft(initialDraft));
+  const [modelProvider, setModelProvider] = useState<'Meta' | 'OpenAI'>('Meta');
   const playback = useRef<HTMLAudioElement | null>(null);
   const speechUrl = useRef<string | null>(null);
   const speechRequest = useRef<AbortController | null>(null);
@@ -207,6 +208,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
       const body = await response.json();
       if (!response.ok) throw new Error(`${body.error || 'Could not process your answer.'}${body.retryAfterSeconds ? ` Retry after ${body.retryAfterSeconds} seconds.` : ''}${body.providerCode ? ` Provider reason: ${body.providerCode}.` : ''}${body.code ? ` [${body.code}]` : ''}${body.requestId ? ` Reference: ${body.requestId}` : ''}`);
       const next = draftSchema.parse(body.draft);
+      if (body.provider === 'Meta' || body.provider === 'OpenAI') setModelProvider(body.provider);
       if (abort.signal.aborted || !mounted.current) return;
       if (typeof body.reply !== 'string') throw new Error('Invalid assistant response.');
       if (JSON.stringify(latest.current.getCurrentDraft()) !== expected) throw new Error('You edited the form while I was thinking. Your edits are safe; send your answer again to continue from them.');
@@ -246,6 +248,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
         {working ? <Loader2 className="h-5 w-5 animate-spin" /> : status === 'paused' ? <Mic className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
       </button>
       <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="text-sm font-semibold">{t('Quotation voice assistant', 'à¤•à¥‹à¤Ÿà¥‡à¤¶à¤¨ à¤µà¥‰à¤‡à¤¸ à¤¸à¤¹à¤¾à¤¯à¤•')}</h2><span role="status" className="text-xs text-muted-foreground">{status === 'thinking' ? t('Updating fields...', 'à¤œà¤¾à¤¨à¤•à¤¾à¤°à¥€ à¤­à¤° à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...') : status === 'listening' ? t('Listening...', 'à¤¸à¥à¤¨ à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...') : status === 'speaking' ? t('Speaking...', 'à¤¬à¥‹à¤² à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...') : t('Ready', 'à¤¤à¥ˆà¤¯à¤¾à¤°')}</span></div>
+        <p aria-label={`AI model: ${modelProvider}`} className="mt-0.5 text-[11px] text-muted-foreground">{modelProvider === 'Meta' ? 'Meta Spark' : 'OpenAI fallback'}</p>
         <p aria-live="polite" className="mt-1 text-sm">{question}</p>
         {heard && <p className="mt-1 truncate text-xs text-muted-foreground" title={heard}>You: {heard}</p>}
         {updated && <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">{t('Quotation fields updated below. You can edit them anytime.', 'à¤¨à¥€à¤šà¥‡ à¤•à¥‹à¤Ÿà¥‡à¤¶à¤¨ à¤•à¥€ à¤œà¤¾à¤¨à¤•à¤¾à¤°à¥€ à¤­à¤° à¤¦à¥€ à¤—à¤ˆ à¤¹à¥ˆà¥¤ à¤†à¤ª à¤‡à¤¸à¥‡ à¤¬à¤¦à¤² à¤­à¥€ à¤¸à¤•à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤')}</p>}

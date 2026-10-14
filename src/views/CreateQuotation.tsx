@@ -28,7 +28,7 @@ import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
 import { GalleryImagePicker } from "@/components/quotation/GalleryImagePicker";
 import { GalleryImage } from "@/hooks/useGallery";
 import { getLibraryTerms, getLibraryPaymentStages, getLibraryBankTemplate } from "@/lib/libraryDefaults";
-const VoiceQuotationAssistant = dynamic(() => import('@/components/quotation/RealtimeQuotationAssistant').then(module => module.RealtimeQuotationAssistant), { ssr: false });
+const VoiceQuotationAssistant = dynamic(() => import('@/components/quotation/VoiceQuotationAssistant').then(module => module.VoiceQuotationAssistant), { ssr: false });
 import { fromQuotation, toQuotation, lineAmount, quotationTotals, reviewDraft, type VoiceDraft } from "@/lib/quotation-ai/domain";
 interface LineItem {
   id: string;
