@@ -92,7 +92,7 @@ export function buildTechStackSVG(): string {
   const l1 = [
     ["Mobile browser (primary)", "Designers on site — mobile-first UI"],
     ["Desktop browser", "Quotation & PDF editing"],
-    ["Installable PWA", "vite-plugin-pwa, offline shell"],
+    ["Installable PWA", "Private-safe offline fallback"],
     ["Team / Admin consoles", "/team, /admin routes"],
   ];
   l1.forEach((b, i) => {
@@ -102,9 +102,9 @@ export function buildTechStackSVG(): string {
 
   // Lane 2 — frontend
   const l2a = [
-    ["React 18 + TypeScript 5", "Vite 5 build, SWC"],
+    ["React + TypeScript 5", "Next.js 16, Turbopack"],
     ["Tailwind CSS 3 + shadcn/ui", "Radix primitives, design tokens"],
-    ["React Router 6", "Route-level code split"],
+    ["Next.js App Router", "Route-level code split"],
     ["TanStack Query + Context", "Auth, Subscription, Localization"],
   ];
   l2a.forEach((b, i) => {
@@ -142,8 +142,8 @@ export function buildTechStackSVG(): string {
 
   // Lane 4 — hosting / services
   const l4 = [
-    ["Lovable hosting + CDN", "Preview & published app"],
-    ["AWS Amplify (alt deploy)", "amplify.yml, SPA rewrites"],
+    ["Cloudflare Workers + CDN", "Next.js App Router via OpenNext"],
+    ["Wrangler deployment", "Worker runtime and static assets"],
     ["Razorpay", "Pro subscription checkout & webhooks"],
     ["Signed URLs / CDN assets", "Private buckets, 1-year signed links"],
   ];

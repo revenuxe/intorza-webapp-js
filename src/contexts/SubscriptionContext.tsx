@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -22,31 +22,9 @@ interface SubscriptionContextType extends SubscriptionState {
 
 const STORAGE_KEY = 'intorza_pro_status';
 
-// Load initial state from localStorage to prevent flicker
+// Always start from a consistent SSR-safe state. Browser storage is not proof
+// of entitlement, and must not carry Pro status across account changes.
 const getInitialState = (): SubscriptionState => {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Check if expiry is still valid
-      if (parsed.expiry) {
-        const expiry = new Date(parsed.expiry);
-        if (expiry > new Date()) {
-          return {
-            isPro: parsed.isPro || false,
-            plan: parsed.plan || null,
-            expiry: parsed.expiry || null,
-            proSince: parsed.proSince || null,
-            status: parsed.status || 'inactive',
-            loading: true,
-            initialLoadComplete: false,
-          };
-        }
-      }
-    }
-  } catch (e) {
-    console.error('Error reading stored subscription:', e);
-  }
   return {
     isPro: false,
     plan: null,
@@ -61,7 +39,8 @@ const getInitialState = (): SubscriptionState => {
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, session } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
+  const requestVersion = useRef(0);
   const [state, setState] = useState<SubscriptionState>(getInitialState);
   const [paywallOpen, setPaywallOpenState] = useState(false);
   const [paywallAction, setPaywallAction] = useState('');
@@ -83,6 +62,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   const refreshSubscription = useCallback(async () => {
+    const version = ++requestVersion.current;
     if (!session?.access_token) {
       const newState = { 
         isPro: false, 
@@ -105,7 +85,10 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         },
       });
 
-      if (error) {
+      // A response from a previous account or request cannot restore its status.
+      if (version !== requestVersion.current) return;
+
+      if (error || !data || typeof data.isPro !== 'boolean') {
         console.error('Error fetching subscription status:', error);
         setState(prev => ({ ...prev, loading: false, initialLoadComplete: true }));
         return;
@@ -124,6 +107,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setState(newState);
       persistStatus(newState);
     } catch (error) {
+      if (version !== requestVersion.current) return;
       console.error('Failed to refresh subscription:', error);
       setState(prev => ({ ...prev, loading: false, initialLoadComplete: true }));
     }
@@ -131,6 +115,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Fetch subscription status on mount and when user changes
   useEffect(() => {
+    if (authLoading) return;
+    setState(getInitialState());
+    setPaywallOpenState(false);
     if (user && session) {
       refreshSubscription();
     } else {
@@ -143,17 +130,20 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         loading: false,
         initialLoadComplete: true,
       });
-      localStorage.removeItem(STORAGE_KEY);
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* Storage may be unavailable. */ }
     }
-  }, [user, session, refreshSubscription]);
+    return () => { requestVersion.current++; };
+  }, [user?.id, session?.access_token, authLoading, refreshSubscription]);
 
   // Listen for payment success event
   useEffect(() => {
+    let pollInterval: ReturnType<typeof setInterval> | undefined;
     const handlePaymentSuccess = () => {
+      if (pollInterval) clearInterval(pollInterval);
       let attempts = 0;
       const maxAttempts = 10;
       
-      const pollInterval = setInterval(async () => {
+      pollInterval = setInterval(async () => {
         attempts++;
         await refreshSubscription();
         
@@ -162,11 +152,13 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         }
       }, 3000);
 
-      return () => clearInterval(pollInterval);
     };
 
     window.addEventListener('subscription-payment-success', handlePaymentSuccess);
-    return () => window.removeEventListener('subscription-payment-success', handlePaymentSuccess);
+    return () => {
+      window.removeEventListener('subscription-payment-success', handlePaymentSuccess);
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [refreshSubscription, state.isPro]);
 
   const setPaywallOpen = useCallback((open: boolean, actionName?: string) => {

@@ -942,6 +942,17 @@ export const getFontById = (fontId: string): PDFFont => {
   return PDF_FONTS.find(f => f.id === fontId) || PDF_FONTS[0];
 };
 
+export const PDF_SELECTABLE_FONTS: PDFFont[] = [
+  { id: 'helvetica', name: 'Helvetica', family: 'helvetica', category: 'sans-serif', description: 'Clean sans-serif', recommended: 'both' },
+  { id: 'times', name: 'Times New Roman', family: 'times', category: 'serif', description: 'Traditional serif', recommended: 'both' },
+  { id: 'courier', name: 'Courier New', family: 'courier', category: 'monospace', description: 'Monospaced typewriter', recommended: 'both' },
+];
+
+export const getSelectableFontId = (fontId: string): string => {
+  const family = getFontById(fontId).family;
+  return PDF_SELECTABLE_FONTS.find(font => font.family === family)?.id || PDF_SELECTABLE_FONTS[0].id;
+};
+
 export const getFontsByCategory = (category: PDFFont['category']): PDFFont[] => {
   return PDF_FONTS.filter(f => f.category === category);
 };
@@ -969,6 +980,7 @@ export interface PDFEditorSettings {
   bodyFont: string; // Font ID for body text
   logoPlacement: 'left' | 'center' | 'right';
   highlightAmounts: boolean;
+  boldAmounts: boolean;
   showBorders: boolean;
   compactMode: boolean;
   fontSize: 'small' | 'medium' | 'large';
@@ -1072,6 +1084,7 @@ export const defaultEditorSettings: PDFEditorSettings = {
   bodyFont: 'helvetica',
   logoPlacement: 'left',
   highlightAmounts: true,
+  boldAmounts: false,
   showBorders: true,
   compactMode: false,
   fontSize: 'medium',

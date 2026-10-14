@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize, Copy, Image as ImageIcon, X, Upload } from "lucide-react";
 import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
-import { uploadToS3 } from "@/lib/s3Upload";
+import { uploadAndSave } from "@/lib/storageUpload";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -23,10 +23,8 @@ import {
   getAllThemes,
   rgbToHex,
   PDFTheme,
-  PDF_FONTS,
-  getFontById,
-  getHeadingFonts,
-  getBodyFonts,
+  PDF_SELECTABLE_FONTS,
+  getSelectableFontId,
   InvoiceSettings,
   getInvoiceSettings,
   saveInvoiceSettings,
@@ -36,11 +34,11 @@ import {
 } from "@/lib/pdfThemes";
 import { CustomThemeBuilder } from "./CustomThemeBuilder";
 import { FontPreviewPanel } from "./FontPreviewPanel";
-import { PDFCanvasPreview } from "./PDFCanvasPreview";
+import { PDFCanvasPreview } from "./next/PDFCanvasPreviewClient";
 import { useFontPreferences } from "@/hooks/useFontPreferences";
 import { profileApi } from "@/lib/api";
 import { supabase } from "@/integrations/supabase/client";
-import { getResolvedLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
+import { DEFAULT_INVOICE_TERMS, getResolvedLibraryTerms, type TermsSection } from "@/lib/libraryDefaults";
 import { TermsBlockEditor } from "@/components/pdf/TermsBlockEditor";
 
 interface BrandColors {
@@ -69,7 +67,7 @@ interface InvoicePreviewEditorProps {
 }
 
 type ThemeCategory = 'all' | 'minimal' | 'professional' | 'luxury' | 'floral' | 'abstract' | 'decoration';
-type FontCategory = 'all' | 'serif' | 'sans-serif' | 'display' | 'monospace';
+type FontCategory = 'all' | 'serif' | 'sans-serif' | 'monospace';
 
 const CATEGORY_CONFIG: { value: ThemeCategory; label: string; icon: React.ElementType }[] = [
   { value: 'all', label: 'All', icon: Palette },
@@ -85,7 +83,6 @@ const FONT_CATEGORY_CONFIG: { value: FontCategory; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'sans-serif', label: 'Sans-Serif' },
   { value: 'serif', label: 'Serif' },
-  { value: 'display', label: 'Display' },
   { value: 'monospace', label: 'Monospace' },
 ];
 
@@ -105,6 +102,8 @@ export const InvoicePreviewEditor = ({
   invoiceData
 }: InvoicePreviewEditorProps) => {
   const [editorSettings, setEditorSettings] = useState<PDFEditorSettings>(getEditorSettings());
+  const [termsReady, setTermsReady] = useState(false);
+  const [termsError, setTermsError] = useState('');
   const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>(getInvoiceSettings());
   const [activeTab, setActiveTab] = useState("themes");
   const [showEditor, setShowEditor] = useState(false);
@@ -132,66 +131,117 @@ export const InvoicePreviewEditor = ({
   const previewRef = useRef<HTMLDivElement>(null);
   const pdfGenerationTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevBlobUrlRef = useRef<string | null>(null);
+  const editorSettingsInitializedRef = useRef(false);
   
-  const { preferences: fontPreferences, updatePreferences: saveFontPreferences } = useFontPreferences();
+  const { preferences: fontPreferences, updatePreferences: saveFontPreferences, loading: fontLoading } = useFontPreferences();
 
   // Refresh the profile and enabled library terms whenever the preview opens.
   useEffect(() => {
     if (!open) return;
+    setTermsReady(false);
+    setTermsError('');
+    setTermsConditions(DEFAULT_INVOICE_TERMS);
+    setLibraryTerms(DEFAULT_INVOICE_TERMS);
+    setTermsTemplateName('Default invoice terms');
+    setUsingFallbackTerms(true);
     let active = true;
-    const loadData = async () => {
-      try {
-        const [{ data }, { data: authData }] = await Promise.all([
-          profileApi.get(),
-          supabase.auth.getUser(),
-        ]);
+    let previewTerms = DEFAULT_INVOICE_TERMS;
+    const fallbackTimer = window.setTimeout(() => {
+      if (!active) return;
+      previewTerms = DEFAULT_INVOICE_TERMS;
+      setProfile((current: any) => current ? { ...current, invoice_terms_conditions: previewTerms } : current);
+      setTermsError("Saved invoice terms are taking too long to load. Built-in terms are shown instead.");
+      setTermsReady(true);
+    }, 8000);
 
-        if (data && active) {
-          let previewProfile = data;
-          if (authData.user) {
-            const resolved = await getResolvedLibraryTerms(authData.user.id, 'invoice');
-            previewProfile = { ...data, invoice_terms_conditions: resolved.terms };
-            if (active) {
-              setTermsConditions(resolved.terms);
-              setLibraryTerms(resolved.terms);
-              setTermsTemplateName(resolved.templateName);
-              setUsingFallbackTerms(resolved.source === 'default');
-            }
+    const loadTerms = async () => {
+      try {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        if (authData.user) {
+          const resolved = await getResolvedLibraryTerms(authData.user.id, 'invoice');
+          if (active) {
+            previewTerms = resolved.terms;
+            setTermsConditions(resolved.terms);
+            setLibraryTerms(resolved.terms);
+            setTermsTemplateName(resolved.templateName);
+            setUsingFallbackTerms(resolved.source === 'default');
+            setTermsError('');
+            setProfile((current: any) => current ? { ...current, invoice_terms_conditions: resolved.terms } : current);
+            setTermsReady(true);
+            window.clearTimeout(fallbackTimer);
           }
-          if (!active) return;
-          setProfile(previewProfile);
-          if (data.brand_colors && typeof data.brand_colors === 'object') {
-            const colors = data.brand_colors as unknown as BrandColors;
-            if (colors.primary) setBrandColors(colors);
-          }
+        } else if (active) {
+          setTermsReady(true);
+          window.clearTimeout(fallbackTimer);
         }
       } catch (error) {
-        console.error('Error loading profile:', error);
+        console.error('Error loading invoice preview terms:', error);
+        if (active) {
+          window.clearTimeout(fallbackTimer);
+          previewTerms = DEFAULT_INVOICE_TERMS;
+          setTermsConditions(DEFAULT_INVOICE_TERMS);
+          setLibraryTerms(DEFAULT_INVOICE_TERMS);
+          setTermsTemplateName('Default invoice terms');
+          setUsingFallbackTerms(true);
+          setTermsError('Saved invoice terms could not be loaded. Built-in terms are shown instead.');
+          setProfile((current: any) => current ? { ...current, invoice_terms_conditions: previewTerms } : current);
+          setTermsReady(true);
+        }
       }
     };
-    void loadData();
-    return () => { active = false; };
+    const loadProfile = async () => {
+      try {
+        const { data } = await profileApi.get();
+        if (!active || !data) return;
+        setProfile({ ...data, invoice_terms_conditions: previewTerms });
+        if (data.brand_colors && typeof data.brand_colors === 'object') {
+          const colors = data.brand_colors as unknown as BrandColors;
+          if (colors.primary) setBrandColors(colors);
+        }
+      } catch (error) {
+        console.error('Error loading invoice preview profile:', error);
+      }
+    };
+
+    void loadTerms();
+    void loadProfile();
+    return () => {
+      active = false;
+      window.clearTimeout(fallbackTimer);
+    };
   }, [open]);
 
   useEffect(() => {
-    if (open) {
-      const savedSettings = getEditorSettings();
-      setEditorSettings({
-        ...savedSettings,
-        headingFont: fontPreferences.headingFont || savedSettings.headingFont || 'times',
-        bodyFont: fontPreferences.bodyFont || savedSettings.bodyFont || 'helvetica',
-        brandColors: brandColors || savedSettings.brandColors,
-      });
-      setInvoiceSettings(getInvoiceSettings());
-      setShowEditor(false);
-    } else {
+    if (!open) {
+      editorSettingsInitializedRef.current = false;
       if (prevBlobUrlRef.current) {
         URL.revokeObjectURL(prevBlobUrlRef.current);
         prevBlobUrlRef.current = null;
       }
       setPdfBlobUrl(null);
+      return;
     }
-  }, [open, fontPreferences, brandColors]);
+    if (fontLoading || editorSettingsInitializedRef.current) return;
+
+    editorSettingsInitializedRef.current = true;
+    const savedSettings = getEditorSettings();
+    setEditorSettings({
+      ...savedSettings,
+      headingFont: getSelectableFontId(fontPreferences.headingFont || savedSettings.headingFont || 'times'),
+      bodyFont: getSelectableFontId(fontPreferences.bodyFont || savedSettings.bodyFont || 'helvetica'),
+      brandColors: brandColors || savedSettings.brandColors,
+    });
+    setInvoiceSettings(getInvoiceSettings());
+    setShowEditor(false);
+  }, [open, fontLoading, fontPreferences, brandColors]);
+
+  useEffect(() => {
+    if (!open || !brandColors) return;
+    setEditorSettings((current) => current.brandColors === brandColors
+      ? current
+      : { ...current, brandColors });
+  }, [open, brandColors]);
 
   // Handle "use quotation design" toggle
   const handleUseQuotationDesign = (checked: boolean) => {
@@ -200,18 +250,27 @@ export const InvoicePreviewEditor = ({
     if (checked) {
       // Load quotation editor settings (they share the same storage key)
       const quotationSettings = getEditorSettings();
-      setEditorSettings(quotationSettings);
+      setEditorSettings({
+        ...quotationSettings,
+        headingFont: getSelectableFontId(quotationSettings.headingFont),
+        bodyFont: getSelectableFontId(quotationSettings.bodyFont),
+      });
     }
   };
 
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
-    const newSettings = { ...editorSettings, ...updates };
+    const normalizedUpdates = {
+      ...updates,
+      ...(updates.headingFont ? { headingFont: getSelectableFontId(updates.headingFont) } : {}),
+      ...(updates.bodyFont ? { bodyFont: getSelectableFontId(updates.bodyFont) } : {}),
+    };
+    const newSettings = { ...editorSettings, ...normalizedUpdates };
     setEditorSettings(newSettings);
     saveEditorSettings(newSettings);
-    if (updates.headingFont || updates.bodyFont) {
+    if (normalizedUpdates.headingFont || normalizedUpdates.bodyFont) {
       saveFontPreferences({
-        headingFont: updates.headingFont || editorSettings.headingFont || 'times',
-        bodyFont: updates.bodyFont || editorSettings.bodyFont || 'helvetica',
+        headingFont: newSettings.headingFont,
+        bodyFont: newSettings.bodyFont,
       });
     }
   };
@@ -219,8 +278,10 @@ export const InvoicePreviewEditor = ({
   const handleHeroImageUpload = async (file: File) => {
     setUploadingHero(true);
     try {
-      const { url } = await uploadToS3(file, 'hero', file.name);
-      await profileApi.update({ hero_image_url: url });
+      const url = await uploadAndSave(file, 'hero', async ({ url }) => {
+        await profileApi.update({ hero_image_url: url });
+        return url;
+      });
       setProfile((prev: any) => ({ ...(prev || {}), hero_image_url: url }));
     } catch (error) {
       console.error('Hero image upload failed:', error);
@@ -254,6 +315,7 @@ export const InvoicePreviewEditor = ({
   };
 
   const handleDownload = () => {
+    if (!termsReady) return;
     const downloadSettings: PDFEditorSettings = {
       ...editorSettings,
       brandColors: editorSettings.useBrandColors && brandColors ? brandColors : editorSettings.brandColors,
@@ -329,11 +391,11 @@ export const InvoicePreviewEditor = ({
 
   // Debounced PDF generation
   useEffect(() => {
-    if (!open) return;
+    if (!open || !termsReady) return;
     if (pdfGenerationTimer.current) clearTimeout(pdfGenerationTimer.current);
     pdfGenerationTimer.current = setTimeout(() => { generateLivePdf(); }, 800);
     return () => { if (pdfGenerationTimer.current) clearTimeout(pdfGenerationTimer.current); };
-  }, [open, generateLivePdf]);
+  }, [open, termsReady, generateLivePdf]);
 
   // Editor Panel — rendered as a JSX element (not a nested component) so React
   // reconciles it in place instead of remounting on every render. Remounting
@@ -358,29 +420,29 @@ export const InvoicePreviewEditor = ({
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid grid-cols-6 m-4 flex-shrink-0">
-          <TabsTrigger value="terms" className="text-xs">
-            <FileText className="h-3 w-3 mr-1" />
+        <TabsList aria-label="Invoice PDF settings sections" className="flex h-11 shrink-0 justify-start gap-1 mx-3 my-3 overflow-x-auto overflow-y-hidden px-1.5 py-1">
+          <TabsTrigger value="terms" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <FileText className="h-3 w-3 shrink-0" />
             Terms
           </TabsTrigger>
-          <TabsTrigger value="themes" className="text-xs">
-            <Palette className="h-3 w-3 mr-1" />
+          <TabsTrigger value="themes" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Palette className="h-3 w-3 shrink-0" />
             Themes
           </TabsTrigger>
-          <TabsTrigger value="decor" className="text-xs">
-            <Sparkles className="h-3 w-3 mr-1" />
+          <TabsTrigger value="decor" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Sparkles className="h-3 w-3 shrink-0" />
             Decor
           </TabsTrigger>
-          <TabsTrigger value="layout" className="text-xs">
-            <Layout className="h-3 w-3 mr-1" />
+          <TabsTrigger value="layout" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Layout className="h-3 w-3 shrink-0" />
             Layout
           </TabsTrigger>
-          <TabsTrigger value="style" className="text-xs">
-            <Eye className="h-3 w-3 mr-1" />
+          <TabsTrigger value="style" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Eye className="h-3 w-3 shrink-0" />
             Style
           </TabsTrigger>
-          <TabsTrigger value="fields" className="text-xs">
-            <Sliders className="h-3 w-3 mr-1" />
+          <TabsTrigger value="fields" className="shrink-0 gap-1 px-2.5 py-1.5 text-xs">
+            <Sliders className="h-3 w-3 shrink-0" />
             Fields
           </TabsTrigger>
         </TabsList>
@@ -714,6 +776,9 @@ export const InvoicePreviewEditor = ({
                 <Type className="h-4 w-4 text-primary" />
                 <Label className="text-sm font-semibold">Font Selection</Label>
               </div>
+              <p className="text-xs text-muted-foreground">
+                These embedded typefaces update the live PDF preview.
+              </p>
               
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -731,7 +796,7 @@ export const InvoicePreviewEditor = ({
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Heading Font</Label>
                 <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-                  {PDF_FONTS
+                  {PDF_SELECTABLE_FONTS
                     .filter(f => f.recommended === 'heading' || f.recommended === 'both')
                     .filter(f => selectedFontCategory === 'all' || f.category === selectedFontCategory)
                     .filter(f => fontSearchQuery === '' || f.name.toLowerCase().includes(fontSearchQuery.toLowerCase()))
@@ -748,7 +813,7 @@ export const InvoicePreviewEditor = ({
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Body Font</Label>
                 <div className="grid grid-cols-2 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
-                  {PDF_FONTS
+                  {PDF_SELECTABLE_FONTS
                     .filter(f => f.recommended === 'body' || f.recommended === 'both')
                     .filter(f => selectedFontCategory === 'all' || f.category === selectedFontCategory)
                     .filter(f => fontSearchQuery === '' || f.name.toLowerCase().includes(fontSearchQuery.toLowerCase()))
@@ -861,11 +926,13 @@ export const InvoicePreviewEditor = ({
       </div>
 
       <div className="flex-1 overflow-auto p-2 sm:p-4 md:p-6">
-        {isGeneratingPdf && !pdfBlobUrl ? (
+        {(!termsReady || isGeneratingPdf) && !pdfBlobUrl ? (
           <div className="h-full flex items-center justify-center min-h-[300px]">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Generating preview...</p>
+              <p className="text-sm text-muted-foreground">
+                {termsReady ? 'Generating preview...' : 'Loading terms for preview...'}
+              </p>
             </div>
           </div>
         ) : (
@@ -905,7 +972,8 @@ export const InvoicePreviewEditor = ({
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Reset
               </Button>
-              <Button size="sm" onClick={handleDownload}>
+              {termsError && <p role="alert" className="text-sm text-destructive">{termsError}</p>}
+              <Button size="sm" onClick={handleDownload} disabled={!termsReady}>
                 <Download className="h-4 w-4 mr-1 md:mr-2" />
                 <span className="hidden sm:inline">Download PDF</span>
                 <span className="sm:hidden">Download</span>

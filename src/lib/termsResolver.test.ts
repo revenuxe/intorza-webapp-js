@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { resolveTermsTemplate } from "./termsResolver";
+import { describe, expect, it } from "@jest/globals";
+import { normalizeTermsSections, resolveTermsTemplate } from "./termsResolver";
 
 const fb = [{ id: "f", title: "FALLBACK", points: ["x"] }];
 const t = (id: string, extra: object) => ({ id, template_name: id, content: [{ id: "1", title: id, points: ["p"] }], ...extra });
@@ -17,8 +17,22 @@ describe("resolveTermsTemplate", () => {
     const r = resolveTermsTemplate([t("a", { is_default: true, is_enabled: false }), t("b", {})], fb, "Default");
     expect(r.templateId).toBe("b");
   });
-  it("falls back when all disabled or unusable", () => {
-    expect(resolveTermsTemplate([t("a", { is_enabled: false })], fb, "Default").source).toBe("default");
-    expect(resolveTermsTemplate([{ id: "c", content: [{ title: "", points: [] }] }], fb, "Default").terms).toBe(fb);
+  it("omits terms when all templates are disabled, without replacing them with generic terms", () => {
+    expect(resolveTermsTemplate([t("a", { is_enabled: false })], fb, "Default").terms).toEqual([]);
+  });
+  it("falls back when no usable templates exist", () => {
+    expect(resolveTermsTemplate([{ id: "c", content: [{ title: "", points: [] }] }], fb, "Default").terms).toEqual(fb);
+  });
+  it("removes malformed sections and empty points before rendering", () => {
+    expect(normalizeTermsSections([
+      null,
+      { id: "bad", title: "Missing points", points: null },
+      { id: 7, title: "  Valid terms  ", points: [" keep this ", null, " "] },
+    ])).toEqual([{ id: "terms-3", title: "Valid terms", points: ["keep this"] }]);
+  });
+  it("falls back when enabled templates contain no renderable sections", () => {
+    expect(resolveTermsTemplate([
+      { id: "c", content: [{ title: "Empty", points: [" ", null] }] },
+    ], fb, "Default").terms).toEqual(fb);
   });
 });

@@ -14,9 +14,11 @@ import { Navigation } from "./Navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import logo from "@/assets/intorza-logo.webp";
+import { useNavigate } from "@/lib/navigation";
 import { format } from "date-fns";
 
 export const Sidebar = () => {
+  const navigate = useNavigate();
   const { user, signOut, isAuthenticated } = useAuth();
   const { isPro, expiry, setPaywallOpen } = useSubscription();
 
@@ -47,7 +49,7 @@ export const Sidebar = () => {
     <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card h-screen sticky top-0">
       <div className="flex h-16 items-center justify-between border-b border-border px-6 shrink-0">
         <img 
-          src={logo} 
+          src={logo.src}
           alt="INTORZA" 
           className="h-8 w-auto object-contain"
         />
@@ -108,7 +110,7 @@ export const Sidebar = () => {
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
@@ -120,7 +122,7 @@ export const Sidebar = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button variant="default" className="w-full" onClick={() => window.location.href = '/auth'}>
+          <Button variant="default" className="w-full" onClick={() => navigate('/auth')}>
             <LogIn className="mr-2 h-4 w-4" />
             Login
           </Button>

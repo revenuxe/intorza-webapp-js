@@ -3,10 +3,12 @@ import { WifiOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 export const OfflineIndicator = () => {
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [isOffline, setIsOffline] = useState(false);
   const wasOfflineRef = useRef(false);
 
   useEffect(() => {
+    setIsOffline(!navigator.onLine);
+    wasOfflineRef.current = !navigator.onLine;
     const handleOnline = () => {
       setIsOffline(false);
       // Only show toast if user was previously offline

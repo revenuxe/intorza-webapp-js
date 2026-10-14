@@ -48,7 +48,7 @@ function PageLoader({ message = "Loading..." }: { message?: string }) {
         <div className="absolute w-20 h-20 rounded-xl border-4 border-secondary/20 animate-loader-ring" style={{ animationDelay: '0.5s' }} />
         <div className="relative w-16 h-16 flex items-center justify-center animate-loader-pulse">
           <img 
-            src={intorzaLoaderLogo} 
+            src={intorzaLoaderLogo.src}
             alt="Loading" 
             className="w-12 h-12 object-contain"
           />

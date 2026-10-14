@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "@/lib/navigation";
 import { Menu, LogOut, Settings, ChevronDown, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,7 @@ import logo from "@/assets/intorza-logo.webp";
 import { format } from "date-fns";
 
 export const Header = () => {
+  const navigate = useNavigate();
   const { user, signOut, isAuthenticated } = useAuth();
   const { isPro, expiry, setPaywallOpen } = useSubscription();
   
@@ -65,7 +67,7 @@ export const Header = () => {
           
           {/* Logo - only show on mobile */}
           <img 
-            src={logo} 
+            src={logo.src}
             alt="INTORZA" 
             className="h-7 w-auto object-contain lg:hidden"
           />
@@ -128,7 +130,7 @@ export const Header = () => {
                   )}
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
+                <DropdownMenuItem onClick={() => navigate('/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
                 </DropdownMenuItem>
@@ -143,7 +145,7 @@ export const Header = () => {
             <Button 
               variant="default" 
               size="sm"
-              onClick={() => window.location.href = '/auth'}
+              onClick={() => navigate('/auth')}
               className="h-9"
             >
               Login

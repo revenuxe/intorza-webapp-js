@@ -38,8 +38,11 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
       const fileExt = file.name.split('.').pop();
       const fileName = `logo-${Date.now()}.${fileExt}`;
 
-      const { uploadToS3 } = await import('@/lib/s3Upload');
-      const { url: publicUrl } = await uploadToS3(file, 'logo', fileName);
+      const { uploadAndSave } = await import('@/lib/storageUpload');
+      const publicUrl = await uploadAndSave(file, 'logo', async ({ url }) => {
+        await profileApi.update({ logo_url: url });
+        return url;
+      });
 
       setLogoUrl(publicUrl);
       toast.success("Logo uploaded successfully!");

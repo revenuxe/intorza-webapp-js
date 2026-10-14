@@ -1,5 +1,9 @@
 project_id = "gclsgkhtwqurniitfeir"
 
+# User-facing functions validate the caller with auth.getUser inside the handler.
+# The Razorpay webhook authenticates the raw request using its HMAC signature.
+# CLI account login and project linking are local state in ignored supabase/.temp.
+
 [functions.create-team-member-auth]
 verify_jwt = false
 

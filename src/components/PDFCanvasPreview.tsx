@@ -3,7 +3,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import { Loader2 } from 'lucide-react';
 
 // Configure worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 export interface PDFCanvasPreviewHandle {
   scrollToPage: (pageIndex: number) => void;
@@ -316,14 +316,13 @@ export const PDFCanvasPreview = memo(
             }
             pdfDocRef.current = pdf;
 
-            const metas: RenderedPage[] = [];
-            for (let i = 1; i <= pdf.numPages; i++) {
-              const page = await pdf.getPage(i);
-              if (taskId !== renderTaskRef.current) return;
-              const viewport = page.getViewport({ scale: 1 });
-              metas.push({ width: viewport.width, height: viewport.height });
-              await nextFrame();
-            }
+            const metas: RenderedPage[] = await Promise.all(
+              Array.from({ length: pdf.numPages }, async (_, index) => {
+                const page = await pdf.getPage(index + 1);
+                const viewport = page.getViewport({ scale: 1 });
+                return { width: viewport.width, height: viewport.height };
+              })
+            );
 
             if (taskId !== renderTaskRef.current) return;
 
@@ -474,7 +473,7 @@ export const PDFCanvasPreview = memo(
             return (
             <div
               key={i}
-              ref={el => (pageRefs.current[i] = el)}
+              ref={el => { pageRefs.current[i] = el; }}
               data-page-idx={i}
               data-testid={`pdf-page-${i}`}
               className="relative rounded-lg shadow-lg border bg-white scroll-mt-4 overflow-hidden select-none"

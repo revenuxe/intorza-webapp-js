@@ -1,10 +1,8 @@
 /**
  * Intorza API client — Supabase-backed.
  *
- * Previously this file talked to an external AWS backend at api.intorza.com,
- * which was returning CORS/ERR_FAILED for every request. Everything now goes
- * directly to Supabase, using the same `{ data }` envelope surface that the
- * rest of the app already imports, so no call-site changes are required.
+ * Requests go directly to Supabase, using the `{ data }` envelope surface
+ * imported by the rest of the application.
  */
 import { supabase as supabaseTyped } from '@/integrations/supabase/client';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,39 +34,47 @@ function unwrap<T>(res: { data: T | null; error: any }): T {
 }
 
 /** Generic user-scoped CRUD helper for simple tables (has a user_id column). */
-function tableCrud<T = any>(table: string, opts: { userScoped?: boolean } = { userScoped: true }) {
+function tableCrud<T = any>(table: string, opts: { userScoped?: boolean; ownerColumn?: 'user_id' | 'company_id' } = { userScoped: true }) {
   const scoped = opts.userScoped !== false;
+  const ownerColumn = opts.ownerColumn || 'user_id';
   return {
     list: async (): Promise<Envelope<T[]>> => {
       let q: any = supabase.from(table as any).select('*').order('created_at', { ascending: false });
       if (scoped) {
         const uid = await requireUserId();
-        q = q.eq('user_id', uid);
+        q = q.eq(ownerColumn, uid);
       }
       const rows = unwrap(await q);
       return { data: (rows as T[]) || [] };
     },
     get: async (id: string): Promise<Envelope<T>> => {
-      const row = unwrap(await supabase.from(table as any).select('*').eq('id', id).maybeSingle());
+      let query = supabase.from(table as any).select('*').eq('id', id);
+      if (scoped) query = query.eq(ownerColumn, await requireUserId());
+      const row = unwrap(await query.maybeSingle());
       if (!row) throw new ApiError(404, `${table} not found`);
       return { data: row as T };
     },
     create: async (body: Partial<T>): Promise<Envelope<T>> => {
       const payload: any = { ...body };
-      if (scoped && !payload.user_id) payload.user_id = await requireUserId();
+      if (scoped) payload[ownerColumn] = await requireUserId();
       const row = unwrap(await supabase.from(table as any).insert(payload).select().single());
       return { data: row as T };
     },
     update: async (id: string, body: Partial<T>): Promise<Envelope<T>> => {
-      let query = supabase.from(table as any).update(body as any).eq('id', id);
-      if (scoped) query = query.eq('user_id', await requireUserId());
+      const { id: _id, user_id: _owner, created_at: _created, ...updates } = body as any;
+      if (scoped) delete updates[ownerColumn];
+      let query = supabase.from(table as any).update(updates).eq('id', id);
+      if (scoped) query = query.eq(ownerColumn, await requireUserId());
       const row = unwrap(await query.select().maybeSingle());
       if (!row) throw new ApiError(404, `${table} not found or could not be updated`);
       return { data: row as T };
     },
     remove: async (id: string): Promise<void> => {
-      const { error } = await supabase.from(table as any).delete().eq('id', id);
+      let query = supabase.from(table as any).delete().eq('id', id);
+      if (scoped) query = query.eq(ownerColumn, await requireUserId());
+      const { data, error } = await query.select('id');
       if (error) throw new ApiError(400, error.message, error);
+      if (!data?.length) throw new ApiError(404, `${table} not found or could not be deleted`);
     },
   };
 }
@@ -113,39 +119,6 @@ export const profileApi = {
 };
 
 // ---------------------- quotations (with sections + items) ----------------------
-async function insertSections(quotationId: string, sections: any[]) {
-  for (let sIdx = 0; sIdx < (sections || []).length; sIdx++) {
-    const section = sections[sIdx];
-    const sec = unwrap(
-      await supabase
-        .from('quotation_sections')
-        .insert({
-          quotation_id: quotationId,
-          section_name: section.section_name || section.title || `Section ${sIdx + 1}`,
-          sort_order: section.sort_order ?? sIdx,
-        })
-        .select()
-        .single(),
-    );
-    const items = (section.items || []).map((item: any, iIdx: number) => ({
-      section_id: (sec as any).id,
-      product_name: item.product_name ?? item.productName ?? '',
-      product_details: item.product_details ?? item.productDetails ?? null,
-      side: item.side ?? null,
-      width_ft: Number(item.width_ft ?? item.widthFt ?? 0),
-      height_ft: Number(item.height_ft ?? item.heightFt ?? 0),
-      sft_area: Number(item.sft_area ?? item.sftArea ?? 0),
-      rate_per_sft: Number(item.rate_per_sft ?? item.ratePerSft ?? 0),
-      amount: Number(item.amount ?? 0),
-      sort_order: item.sort_order ?? iIdx,
-    }));
-    if (items.length) {
-      const { error } = await supabase.from('quotation_items').insert(items);
-      if (error) throw new ApiError(400, error.message, error);
-    }
-  }
-}
-
 export const quotationsApi = {
   list: async (): Promise<Envelope<any[]>> => {
     const uid = await requireUserId();
@@ -179,43 +152,20 @@ export const quotationsApi = {
     return { data: { ...(row as any), sections: normalized } };
   },
   create: async (body: any): Promise<Envelope<any>> => {
-    const uid = await requireUserId();
-    const { sections, ...rest } = body || {};
-    const payload: any = { ...rest, user_id: uid };
-    const row = unwrap(
-      await supabase.from('quotations').insert(payload).select().single(),
-    );
-    try {
-      await insertSections((row as any).id, sections || []);
-    } catch (e) {
-      // Best-effort: keep the quotation; surface the error so caller sees it.
-      throw e;
-    }
+    await requireUserId();
+    const row = unwrap(await supabase.rpc('save_quotation', { p_id: null, p_payload: body }));
     return { data: row };
   },
   update: async (id: string, body: any): Promise<Envelope<any>> => {
-    const { sections, ...rest } = body || {};
-    let row: any = null;
-    if (Object.keys(rest).length) {
-      row = unwrap(
-        await supabase.from('quotations').update(rest).eq('id', id).select().single(),
-      );
-    } else {
-      row = unwrap(await supabase.from('quotations').select('*').eq('id', id).single());
-    }
-    if (sections !== undefined) {
-      const { error } = await supabase
-        .from('quotation_sections')
-        .delete()
-        .eq('quotation_id', id);
-      if (error) throw new ApiError(400, error.message, error);
-      await insertSections(id, sections || []);
-    }
+    await requireUserId();
+    const row = unwrap(await supabase.rpc('save_quotation', { p_id: id, p_payload: body }));
     return { data: row };
   },
   remove: async (id: string): Promise<void> => {
-    const { error } = await supabase.from('quotations').delete().eq('id', id);
+    const uid = await requireUserId();
+    const { data, error } = await supabase.from('quotations').delete().eq('id', id).eq('user_id', uid).select('id');
     if (error) throw new ApiError(400, error.message, error);
+    if (!data?.length) throw new ApiError(404, 'Quotation not found or access denied');
   },
 };
 
@@ -262,14 +212,16 @@ export const invoicesApi = {
     return { data: row };
   },
   removePayment: async (_id: string, paymentId: string): Promise<void> => {
-    const { error } = await supabase.from('payments').delete().eq('id', paymentId);
+    const { error } = await supabase.from('payments').delete().eq('id', paymentId).eq('invoice_id', _id);
     if (error) throw new ApiError(400, error.message, error);
   },
 };
 
 // ---------------------- other resources ----------------------
 export const clientsApi = tableCrud('clients');
-export const tasksApi = tableCrud('tasks');
+// Tasks are shared with assigned team members; their company/assignee RLS
+// policies govern visibility. This table has company_id, not user_id.
+export const tasksApi = tableCrud('tasks', { userScoped: false });
 export const galleryApi = tableCrud('gallery_images');
 
 export const paymentsApi = {
@@ -299,7 +251,14 @@ export const paymentsApi = {
 
 // ---------------------- library ----------------------
 export const libraryApi = {
-  terms: tableCrud('terms_templates'),
+  terms: {
+    ...tableCrud('terms_templates'),
+    select: async (id: string): Promise<Envelope<any>> => {
+      await requireUserId();
+      const data = unwrap(await supabase.rpc('select_terms_template' as any, { p_id: id }));
+      return { data };
+    },
+  },
   warranty: tableCrud('warranty_templates'),
   bankDetails: tableCrud('bank_detail_templates'),
   paymentTemplates: tableCrud('payment_templates'),
@@ -337,7 +296,7 @@ export const libraryApi = {
 
 // ---------------------- team ----------------------
 export const teamApi = {
-  members: tableCrud('team_members'),
+  members: tableCrud('team_members', { ownerColumn: 'company_id' }),
   assignments: tableCrud('team_project_assignments', { userScoped: false }),
   attendance: tableCrud('attendance', { userScoped: false }),
   requests: {
@@ -388,19 +347,21 @@ export const siteMeasurementsApi = {
     );
     return { data: row };
   },
-  updateRoom: async (_projectId: string, roomId: string, body: any): Promise<Envelope<any>> => {
+  updateRoom: async (projectId: string, roomId: string, body: any): Promise<Envelope<any>> => {
+    const { id: _id, project_id: _project, ...updates } = body;
     const row = unwrap(
       await supabase
         .from('site_measurement_rooms')
-        .update(body)
+        .update(updates)
         .eq('id', roomId)
+        .eq('project_id', projectId)
         .select()
         .single(),
     );
     return { data: row };
   },
-  removeRoom: async (_projectId: string, roomId: string): Promise<void> => {
-    const { error } = await supabase.from('site_measurement_rooms').delete().eq('id', roomId);
+  removeRoom: async (projectId: string, roomId: string): Promise<void> => {
+    const { error } = await supabase.from('site_measurement_rooms').delete().eq('id', roomId).eq('project_id', projectId);
     if (error) throw new ApiError(400, error.message, error);
   },
   addPhoto: async (
@@ -436,14 +397,4 @@ export const feedbackApi = {
     );
     return { data: row };
   },
-};
-
-// Legacy generic HTTP helpers kept as no-ops so any stray imports don't crash.
-// Prefer the typed resource helpers above.
-export const api = {
-  get:    async <T = unknown>(_p: string): Promise<T> => { throw new ApiError(410, 'HTTP api disabled; use resource helpers'); },
-  post:   async <T = unknown>(_p: string, _b?: unknown): Promise<T> => { throw new ApiError(410, 'HTTP api disabled'); },
-  put:    async <T = unknown>(_p: string, _b?: unknown): Promise<T> => { throw new ApiError(410, 'HTTP api disabled'); },
-  patch:  async <T = unknown>(_p: string, _b?: unknown): Promise<T> => { throw new ApiError(410, 'HTTP api disabled'); },
-  delete: async <T = unknown>(_p: string): Promise<T> => { throw new ApiError(410, 'HTTP api disabled'); },
 };

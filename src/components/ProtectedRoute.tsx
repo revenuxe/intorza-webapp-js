@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Fragment, useEffect } from "react";
+import { useNavigate, useLocation } from "@/lib/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { GlobalLoader } from "@/components/GlobalLoader";
 
@@ -8,14 +8,16 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      navigate("/auth");
+      sessionStorage.setItem('returnPath', location.pathname + location.search);
+      navigate("/auth", { replace: true });
     }
-  }, [isAuthenticated, loading, navigate]);
+  }, [isAuthenticated, loading, navigate, location.pathname, location.search]);
 
   if (loading) {
     return <GlobalLoader message="Loading..." fullScreen={false} />;
@@ -25,5 +27,5 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return null;
   }
 
-  return <>{children}</>;
+  return <Fragment key={user.id}>{children}</Fragment>;
 };

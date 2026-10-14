@@ -16,7 +16,7 @@ export const GlobalLoader = ({ message = "Loading...", fullScreen = true }: Glob
         {/* Logo container with pulse */}
         <div className="relative w-20 h-20 flex items-center justify-center animate-loader-pulse">
           <img 
-            src={intorzaLoaderLogo} 
+            src={intorzaLoaderLogo.src}
             alt="Loading" 
             className="w-16 h-16 object-contain"
           />

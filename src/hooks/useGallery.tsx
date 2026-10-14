@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
+import { removeStoredUpload } from '@/lib/storageUpload';
+import { storageObjectPath } from '@/lib/storage-path';
 
 export interface GalleryImage {
   id: string;
@@ -31,7 +33,7 @@ export const useGallery = () => {
   const [uploading, setUploading] = useState(false);
 
   const loadImages = useCallback(async () => {
-    if (!user) return;
+    if (!user) { setImages([]); setLoading(false); return; }
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -57,13 +59,13 @@ export const useGallery = () => {
       const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-      const { uploadToS3 } = await import('@/lib/s3Upload');
-      const { url: imageUrl } = await uploadToS3(file, 'gallery', fileName);
+      const { uploadAndSave } = await import('@/lib/storageUpload');
 
       // Get image dimensions
       const dims = await getImageDimensions(file);
 
-      const { data, error } = await supabase.from('gallery_images').insert({
+      const data = await uploadAndSave(file, 'gallery', async ({ url: imageUrl }) => {
+        const { data, error } = await supabase.from('gallery_images').insert({
         user_id: user.id,
         image_url: imageUrl,
         filename: file.name,
@@ -74,7 +76,9 @@ export const useGallery = () => {
         height: dims.height,
       }).select().single();
 
-      if (error) throw error;
+        if (error) throw error;
+        return data;
+      });
       setImages(prev => [data as GalleryImage, ...prev]);
       return data as GalleryImage;
     } catch (error: any) {
@@ -98,9 +102,17 @@ export const useGallery = () => {
 
   const deleteImage = useCallback(async (id: string) => {
     try {
-      const { error } = await supabase.from('gallery_images').delete().eq('id', id);
+      const { data, error } = await supabase.from('gallery_images').delete().eq('id', id).select('image_url');
       if (error) throw error;
+      if (!data?.length) throw new Error('Image not found or access denied');
       setImages(prev => prev.filter(img => img.id !== id));
+      for (const image of data) {
+        const key = storageObjectPath(image.image_url, 'gallery-images');
+        if (key) {
+          try { await removeStoredUpload({ bucket: 'gallery-images', key }); }
+          catch { toast({ title: 'Storage cleanup incomplete', variant: 'destructive' }); }
+        }
+      }
     } catch (error: any) {
       toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
     }
@@ -108,9 +120,17 @@ export const useGallery = () => {
 
   const deleteMultiple = useCallback(async (ids: string[]) => {
     try {
-      const { error } = await supabase.from('gallery_images').delete().in('id', ids);
+      const { data, error } = await supabase.from('gallery_images').delete().in('id', ids).select('id,image_url');
       if (error) throw error;
-      setImages(prev => prev.filter(img => !ids.includes(img.id)));
+      const removed = new Set(data?.map(image => image.id));
+      setImages(prev => prev.filter(img => !removed.has(img.id)));
+      for (const image of data || []) {
+        const key = storageObjectPath(image.image_url, 'gallery-images');
+        if (key) {
+          try { await removeStoredUpload({ bucket: 'gallery-images', key }); }
+          catch { toast({ title: 'Storage cleanup incomplete', variant: 'destructive' }); }
+        }
+      }
     } catch (error: any) {
       toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
     }
@@ -134,7 +154,8 @@ export const useGallery = () => {
   const incrementUsage = useCallback(async (id: string) => {
     const img = images.find(i => i.id === id);
     if (!img) return;
-    await supabase.from('gallery_images').update({ usage_count: img.usage_count + 1 }).eq('id', id);
+    const { error } = await supabase.from('gallery_images').update({ usage_count: img.usage_count + 1 }).eq('id', id);
+    if (error) { console.error('Gallery usage update failed', error); return; }
     setImages(prev => prev.map(i => i.id === id ? { ...i, usage_count: i.usage_count + 1 } : i));
   }, [images]);
 
@@ -149,7 +170,7 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => { resolve({ width: img.width, height: img.height }); URL.revokeObjectURL(img.src); };
-    img.onerror = () => resolve({ width: 0, height: 0 });
+    img.onerror = () => { URL.revokeObjectURL(img.src); resolve({ width: 0, height: 0 }); };
     img.src = URL.createObjectURL(file);
   });
 }

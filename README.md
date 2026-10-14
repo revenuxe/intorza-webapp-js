@@ -1,73 +1,70 @@
-# Welcome to your Lovable project
+# INTORZA
 
-## Project info
+INTORZA runs on Next.js 16 App Router, React 19, TypeScript, Tailwind CSS,
+shadcn/ui, TanStack Query, and Supabase. Quotations, invoices, measurements,
+team management, PDF generation, and Razorpay subscription workflows retain
+their existing Supabase integrations.
 
-**URL**: https://lovable.dev/projects/879aef9d-a297-4da4-8666-f48952b51f52
+## Local development
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/879aef9d-a297-4da4-8666-f48952b51f52) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Use Node.js 22.12 or later and npm. The current project's browser-safe
+Supabase configuration is included. To use another project, copy `.env.example`
+to `.env.local` and override both the public URL and publishable/anon key.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+npm ci
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app serves at `http://localhost:8080`. Public environment variables are
+embedded at build time. Never put a Supabase service-role key, Razorpay
+secret, or any backend credential in a `NEXT_PUBLIC_` variable.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Verification
 
-**Use GitHub Codespaces**
+```sh
+npm run typecheck
+npm test
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Browser tests use the production build on port 3100 and mock external
+integrations; they never write to the live database or charge payments.
+`npm run build` produces the Cloudflare Worker and the Next.js output used by
+browser tests. Jest uses Next.js's compiler for unit tests.
 
-## What technologies are used for this project?
+## Cloudflare Workers deployment
 
-This project is built with:
+```sh
+npm run build:cloudflare
+npm run preview
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The app deploys to Cloudflare Workers through `@opennextjs/cloudflare` and
+Wrangler. `wrangler.jsonc` binds the generated worker and static assets in
+`.open-next/`; `open-next.config.ts` configures the adapter. Set the public
+Supabase variables and `NEXT_PUBLIC_SITE_URL` in your Workers Builds environment
+before building. The PDF worker is copied from the installed pdf.js package.
 
-## How can I deploy this project?
+After authenticating your Cloudflare account, publish with `npm run deploy`.
+The deploy script builds the worker first. See
+[the Cloudflare deployment guide](docs/cloudflare-deployment.md) for setup,
+CI commands, environment variables, and verification. This setup uses the
+existing Next.js compiler and has no Vite dependency.
 
-Simply open [Lovable](https://lovable.dev/projects/879aef9d-a297-4da4-8666-f48952b51f52) and click on Share -> Publish.
+Supabase database migrations, RLS policies, storage, and Edge Functions
+remain in `supabase/`. Razorpay subscription creation, verification, and
+webhooks continue to run in those functions; their secrets stay there.
+Keep the deployed origin's `/auth` and `/team/login` URLs in Supabase's
+allowed auth redirect URLs. The current origin remains the OAuth callback
+target, so a hosting domain change requires updating that allowlist.
 
-## Can I connect a custom domain to my Lovable project?
+## Migration details and rollout
 
-Yes, you can!
+See [Supabase integration](docs/supabase-integration.md) for connection checks,
+CLI linking, the schema inventory, and remaining database rollout work.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+See [the migration guide](docs/nextjs-migration.md) for the routing,
+authentication, offline behavior, and release verification requirements.

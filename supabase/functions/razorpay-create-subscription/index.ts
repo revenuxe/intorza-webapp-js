@@ -59,6 +59,9 @@ serve(async (req) => {
       });
     }
 
+    const { data: allowed, error: limitError } = await supabase.rpc('consume_user_api_limit', { p_user: user.id, p_operation: 'razorpay-create-subscription' });
+    if (limitError) throw new Error('Request limit could not be checked');
+    if (!allowed) return new Response(JSON.stringify({ error: 'Too many payment attempts. Please wait a minute.' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' } });
     const { plan = 'monthly' } = await req.json();
     const planConfig = PLAN_CONFIG[plan as keyof typeof PLAN_CONFIG];
     
@@ -123,7 +126,6 @@ serve(async (req) => {
       });
 
       const customerData = await customerResponse.json();
-      console.log('Customer creation response:', customerData);
       
       if (!customerResponse.ok) {
         throw new Error(`Failed to create customer: ${JSON.stringify(customerData)}`);
@@ -160,7 +162,6 @@ serve(async (req) => {
     });
 
     const orderData = await orderResponse.json();
-    console.log('Order creation response:', orderData);
     
     if (!orderResponse.ok) {
       throw new Error(`Failed to create order: ${JSON.stringify(orderData)}`);

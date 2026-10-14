@@ -1601,20 +1601,31 @@ export type Database = {
       companies_public: {
         Row: {
           company_name: string | null
+          country_name: string | null
+          org_code: string | null
           id: string | null
         }
         Insert: {
           company_name?: string | null
+          country_name?: string | null
+          org_code?: string | null
           id?: string | null
         }
         Update: {
           company_name?: string | null
+          country_name?: string | null
+          org_code?: string | null
           id?: string | null
         }
         Relationships: []
       }
     }
     Functions: {
+      submit_pending_team_join: { Args: never; Returns: string | null }
+      save_quotation: {
+        Args: { p_id: string | null; p_payload: Json }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

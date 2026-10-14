@@ -90,6 +90,9 @@ Deno.serve(async (req) => {
     if (authError || !requestingUser) {
       throw new Error('Unauthorized');
     }
+    const { data: allowed, error: limitError } = await supabaseAdmin.rpc('consume_user_api_limit', { p_user: requestingUser.id, p_operation: 'create-team-member-auth' });
+    if (limitError) throw new Error('Request limit could not be checked');
+    if (!allowed) return new Response(JSON.stringify({ error: 'Too many account creation attempts. Please wait a minute.' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' } });
 
     // Parse and validate input
     const requestBody = await req.json();
@@ -114,13 +117,31 @@ Deno.serve(async (req) => {
       throw new Error('You can only create team members for your own company');
     }
 
+    // The service-role client bypasses RLS: validate the target, not just the
+    // company ID supplied by the caller, before creating any auth account.
+    const { data: member, error: memberError } = await supabaseAdmin
+      .from('team_members')
+      .select('id, company_id, user_id, email, name')
+      .eq('id', team_member_id)
+      .eq('company_id', requestingUser.id)
+      .is('user_id', null)
+      .maybeSingle();
+    if (memberError || !member || member.email?.toLowerCase() !== email.toLowerCase()) {
+      throw new Error('Team member not found, already linked, or identity does not match');
+    }
+    const { data: entitled, error: entitlementError } = await supabaseAdmin
+      .rpc('is_pro_user', { _user_id: requestingUser.id });
+    if (entitlementError || entitled !== true) {
+      throw new Error('An active Pro subscription is required');
+    }
+
     // Create the auth user with admin API
     const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true, // Auto-confirm the email
       user_metadata: {
-        full_name: name,
+        full_name: member.name,
         is_team_member: true,
         company_id: company_id
       }
@@ -134,12 +155,16 @@ Deno.serve(async (req) => {
     console.log('Auth user created:', authData.user.id);
 
     // Update the team_members record with the user_id
-    const { error: updateError } = await supabaseAdmin
+    const { data: linkedMember, error: updateError } = await supabaseAdmin
       .from('team_members')
       .update({ user_id: authData.user.id })
-      .eq('id', team_member_id);
+      .eq('id', team_member_id)
+      .eq('company_id', requestingUser.id)
+      .is('user_id', null)
+      .select('id')
+      .maybeSingle();
 
-    if (updateError) {
+    if (updateError || !linkedMember) {
       console.error('Error updating team member:', updateError);
       // Try to clean up the created user
       await supabaseAdmin.auth.admin.deleteUser(authData.user.id);

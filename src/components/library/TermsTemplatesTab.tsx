@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { libraryApi } from "@/lib/api";
+import { isUsableTerms } from "@/lib/termsResolver";
 
 interface TermsSection {
   id: string;
@@ -58,12 +59,17 @@ export const TermsTemplatesTab = () => {
       })));
     } catch (error) {
       console.error('Error loading templates:', error);
+      toast({ title: "Could not load terms templates", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
+    if (!isUsableTerms(formData.content)) {
+      toast({ title: "Add a section title and at least one terms point", variant: "destructive" });
+      return;
+    }
     if (!formData.template_name.trim()) {
       toast({ title: "Please enter a template name", variant: "destructive" });
       return;
@@ -115,15 +121,8 @@ export const TermsTemplatesTab = () => {
 
   const handleSetDefault = async (template: TermsTemplate) => {
     try {
-      // Clear default on same-type templates, then set this one (no bulk
-      // endpoint, so do it client-side).
-      await Promise.all(
-        templates
-          .filter(t => t.template_type === template.template_type && t.is_default && t.id !== template.id)
-          .map(t => libraryApi.terms.update(t.id, { is_default: false })),
-      );
-      await libraryApi.terms.update(template.id, { is_default: true });
-      toast({ title: "Default template updated" });
+      await libraryApi.terms.select(template.id);
+      toast({ title: "Template selected for preview and PDF" });
       loadTemplates();
     } catch (error) {
       console.error('Error setting default:', error);
@@ -134,7 +133,9 @@ export const TermsTemplatesTab = () => {
   const handleToggleEnabled = async (template: TermsTemplate, enabled: boolean) => {
     setTemplates(prev => prev.map(t => (t.id === template.id ? { ...t, is_enabled: enabled } : t)));
     try {
-      const { data: saved } = await libraryApi.terms.update(template.id, { is_enabled: enabled } as any);
+      const { data: saved } = enabled
+        ? await libraryApi.terms.select(template.id)
+        : await libraryApi.terms.update(template.id, { is_enabled: false, is_default: false } as any);
       if ((saved as any)?.is_enabled !== enabled) {
         throw new Error("The saved template state did not match your selection");
       }
@@ -213,7 +214,7 @@ export const TermsTemplatesTab = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold">Terms & Conditions Templates</h3>
-          <p className="text-sm text-muted-foreground">Create reusable T&C for quotations and invoices</p>
+          <p className="text-sm text-muted-foreground">Select the default terms used in previews and PDFs. Selecting a template replaces the default for that document type.</p>
         </div>
         <div className="flex items-center gap-2">
           <Tabs value={filterType} onValueChange={(v) => setFilterType(v as any)}>
@@ -268,7 +269,7 @@ export const TermsTemplatesTab = () => {
                       </span>
                     </div>
                     {!template.is_default && (
-                      <Button variant="ghost" size="sm" onClick={() => handleSetDefault(template)}>
+                      <Button variant="ghost" size="sm" aria-label={`Use ${template.template_name} as default`} onClick={() => handleSetDefault(template)}>
                         <Star className="h-4 w-4" />
                       </Button>
                     )}

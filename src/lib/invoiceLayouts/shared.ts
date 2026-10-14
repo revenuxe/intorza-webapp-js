@@ -1,7 +1,8 @@
 import jsPDF from 'jspdf';
 import { PDFEditorSettings, InvoiceSettings, PDFTheme, getThemeById, hexToRgb, getFontById, applyBrandColorsToTheme } from '../pdfThemes';
-import { getNumericFont, createPDFCurrencyFormatter } from '../pdfCurrencyFormatter';
+import { getNumericFont, createPDFCurrencyFormatter, registerPDFCurrencyFont } from '../pdfCurrencyFormatter';
 import { DEFAULT_INVOICE_TERMS } from '../libraryDefaults';
+import { normalizeTermsSections } from '../termsResolver';
 
 export interface InvoiceData {
   invoiceNumber: string;
@@ -161,6 +162,7 @@ export const buildLayoutContext = (data: InvoiceData): LayoutContext => {
     format: 'a4',
     compress: true,
   });
+  registerPDFCurrencyFont(doc);
 
   const editorSettings = data.editorSettings;
   const invoiceSettings: InvoiceSettings = {
@@ -289,11 +291,9 @@ export const resolveHeroImageSource = (profile: InvoiceData['profile']): HeroIma
 export const renderTermsAndConditions = async (ctx: LayoutContext, startY: number): Promise<number> => {
   const { doc, data, invoiceSettings, COLORS, margin, contentWidth, pageHeight, setHeadingFont, setBodyFont } = ctx;
   let yPosition = startY;
-  const termsToUse = data.profile.invoice_terms_conditions?.length
-    ? data.profile.invoice_terms_conditions
-    : DEFAULT_INVOICE_TERMS;
+  const termsToUse = normalizeTermsSections(data.profile.invoice_terms_conditions ?? DEFAULT_INVOICE_TERMS);
 
-  if (!invoiceSettings.showTermsConditions) {
+  if (!invoiceSettings.showTermsConditions || !termsToUse.length) {
     return yPosition;
   }
 

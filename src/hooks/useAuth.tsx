@@ -1,8 +1,12 @@
-import { useEffect, useState, useCallback } from "react";
+"use client";
+
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
-export const useAuth = () => {
+const AuthContext = createContext<ReturnType<typeof useAuthSession> | undefined>(undefined);
+
+const useAuthSession = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +30,8 @@ export const useAuth = () => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+    }).catch(() => {
+      if (mounted) setLoading(false);
     });
 
     return () => {
@@ -47,3 +53,14 @@ export const useAuth = () => {
     isAuthenticated: !!user,
   };
 };
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const value = useAuthSession();
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const value = useContext(AuthContext);
+  if (!value) throw new Error('useAuth must be used within AuthProvider');
+  return value;
+}

@@ -1,24 +1,37 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { render, screen, act } from "@testing-library/react";
 import React from "react";
 
 // Mock pdfjs-dist BEFORE importing the component under test.
-const makeFakeDoc = (numPages: number) => ({
-  numPages,
-  getPage: vi.fn(async (n: number) => ({
-    getViewport: ({ scale = 1 }: { scale?: number }) => ({
-      width: 595 * scale,
-      height: 842 * scale,
-    }),
-    render: () => ({ promise: Promise.resolve() }),
-  })),
-  destroy: vi.fn(),
+let deferPageMetadata = false;
+let pendingPageResolvers: Array<() => void> = [];
+
+const makeFakePage = () => ({
+  getViewport: ({ scale = 1 }: { scale?: number }) => ({
+    width: 595 * scale,
+    height: 842 * scale,
+  }),
+  render: () => ({ promise: Promise.resolve() }),
 });
 
-vi.mock("pdfjs-dist", () => ({
+const makeFakeDoc = (numPages: number) => ({
+  numPages,
+  getPage: jest.fn((_n: number): Promise<ReturnType<typeof makeFakePage>> => {
+    const page = makeFakePage();
+    if (!deferPageMetadata) return Promise.resolve(page);
+    return new Promise((resolve) => pendingPageResolvers.push(() => resolve(page)));
+  }),
+  destroy: jest.fn(),
+});
+let lastFakeDoc: ReturnType<typeof makeFakeDoc>;
+
+jest.mock("pdfjs-dist", () => ({
   GlobalWorkerOptions: { workerSrc: "" },
   version: "test",
-  getDocument: vi.fn(() => ({ promise: Promise.resolve(makeFakeDoc(3)) })),
+  getDocument: jest.fn(() => {
+    lastFakeDoc = makeFakeDoc(3);
+    return { promise: Promise.resolve(lastFakeDoc) };
+  }),
 }));
 
 // URL.createObjectURL isn't in jsdom.
@@ -32,7 +45,7 @@ if (!("createObjectURL" in URL)) {
   Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) });
 
 // canvas.toBlob shim
-HTMLCanvasElement.prototype.getContext = vi.fn(() => ({})) as any;
+HTMLCanvasElement.prototype.getContext = jest.fn(() => ({})) as any;
 HTMLCanvasElement.prototype.toBlob = function (cb: BlobCallback) {
   cb(new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }));
 } as any;
@@ -45,7 +58,9 @@ const flush = async (ms = 100) => {
 
 describe("PDFCanvasPreview scroll preservation", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    jest.clearAllMocks();
+    deferPageMetadata = false;
+    pendingPageResolvers = [];
   });
 
   it("keeps the user's scroll position when the PDF is regenerated after an edit", async () => {
@@ -66,7 +81,7 @@ describe("PDFCanvasPreview scroll preservation", () => {
       </div>
     );
 
-    const onActive = vi.fn();
+    const onActive = jest.fn();
     const { rerender } = render(<Harness url="blob:v1" onActive={onActive} />);
     await flush(150);
     await flush(150);
@@ -92,5 +107,19 @@ describe("PDFCanvasPreview scroll preservation", () => {
     // Regression assertion: scroll must NOT have snapped back to 0.
     // (Anchoring may nudge slightly but never to the top of doc.)
     expect(scrollRoot.scrollTop).toBeGreaterThan(0);
+  });
+
+  it("loads page dimensions concurrently instead of delaying the preview page by page", async () => {
+    deferPageMetadata = true;
+    const { PDFCanvasPreview } = await import("./PDFCanvasPreview");
+
+    render(<PDFCanvasPreview pdfBlobUrl="blob:v1" zoom={100} />);
+    await flush(20);
+
+    expect(lastFakeDoc.getPage).toHaveBeenCalledTimes(3);
+
+    deferPageMetadata = false;
+    pendingPageResolvers.splice(0).forEach((resolve) => resolve());
+    await flush(150);
   });
 });
