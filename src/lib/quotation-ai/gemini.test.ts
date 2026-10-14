@@ -32,4 +32,23 @@ describe('Gemini provider adapter', () => {
     global.fetch = jest.fn().mockResolvedValue(new Response('private provider details', { status: status as number }));
     await expect(new GeminiQuotationProvider('secret', 'gemini-2.0-flash').propose(input)).rejects.toThrow(expected as string);
   });
+  it('retries a transient 503 once and returns a traceable upstream status if it still fails', async () => {
+    global.fetch = jest.fn().mockImplementation(() => Promise.resolve(new Response('{}', { status: 503 })));
+    await expect(new GeminiQuotationProvider('secret', 'gemini-3.8-flash').propose(input)).rejects.toMatchObject({ code: 'GEMINI_UPSTREAM_FAILED', upstreamStatus: 503 });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect((global.fetch as jest.Mock).mock.calls[0][1].signal).toBe((global.fetch as jest.Mock).mock.calls[1][1].signal);
+  });
+  it('identifies invalid keys from safe metadata without exposing Google error messages', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ error: { message: 'private key details', details: [{ reason: 'API_KEY_INVALID' }] } }), { status: 400 }));
+    await expect(new GeminiQuotationProvider('secret', 'gemini-3.8-flash').propose(input)).rejects.toMatchObject({ code: 'GEMINI_KEY_INVALID', upstreamStatus: 400 });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+  it('instructs natural Hindi and normalizes spoken digits before extraction', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify({ reply: 'प्रति वर्ग फुट कीमत कितनी है?', clarification: null, operations: [] }) }] } }] })));
+    await new GeminiQuotationProvider('secret', 'gemini-3.8-flash').propose({ ...input, language: 'hi-IN', message: 'चौड़ाई ६ फीट' });
+    const payload = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(payload.systemInstruction.parts[0].text).toContain('साढ़े छह फीट = 6.5 feet');
+    expect(payload.systemInstruction.parts[0].text).toContain('write reply and clarification in natural Hindi');
+    expect(JSON.parse(payload.contents[0].parts[0].text).message).toBe('चौड़ाई 6 फीट');
+  });
 });

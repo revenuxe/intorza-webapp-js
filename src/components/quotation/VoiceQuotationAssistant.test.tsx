@@ -13,6 +13,7 @@ function fixture(): VoiceDraft { return { version: 1, revision: 0,
 }; }
 const unsupported = { available: () => false, create: jest.fn() };
 describe('compact live voice assistant', () => {
+  beforeEach(() => { localStorage.clear(); });
   it('renders inline with typed fallback and populates incomplete fields immediately', async () => {
     let current = fixture();
     const next = { ...fixture(), project: { ...fixture().project, clientName: 'Rahul' } };
@@ -70,5 +71,54 @@ describe('compact live voice assistant', () => {
     view.unmount();
     Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: previousSynthesis });
     window.SpeechSynthesisUtterance = previousUtterance;
+  });
+  it('switches the initial question and controls to Hindi and keeps the preference', () => {
+    render(<VoiceQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} speechInput={unsupported} />);
+    fireEvent.change(screen.getByLabelText('Speech language'), { target: { value: 'hi-IN' } });
+    expect(screen.getByText('यह कोटेशन किसके लिए बनाना है?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'बोलिए' })).toBeInTheDocument();
+    expect(localStorage.getItem('quotation-voice-language')).toBe('hi-IN');
+  });
+  it('requires review instead of automatically sending low-confidence speech', () => {
+    const recognition: BrowserRecognition = { lang: '', continuous: false, interimResults: true, onresult: null, onend: null, onerror: null, start: jest.fn(), stop: jest.fn(), abort: jest.fn() };
+    global.fetch = jest.fn();
+    render(<VoiceQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} speechInput={{ available: () => true, create: () => recognition }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Speak' }));
+    act(() => { recognition.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: 'six six', confidence: 0.3 } }] }); recognition.onend?.(); });
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Your answer')).toHaveValue('six six');
+    expect(screen.getByRole('alert')).toHaveTextContent('Check the answer');
+  });
+  it('does not send filler-only utterances to Gemini', () => {
+    const recognition: BrowserRecognition = { lang: '', continuous: true, interimResults: true, onresult: null, onend: null, onerror: null, start: jest.fn(), stop: jest.fn(), abort: jest.fn() };
+    global.fetch = jest.fn();
+    const view = render(<VoiceQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} speechInput={{ available: () => true, create: () => recognition }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Speak' }));
+    act(() => { recognition.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: 'hmm um' } }] }); recognition.onend?.(); });
+    expect(global.fetch).not.toHaveBeenCalled(); view.unmount();
+  });
+  it('waits for a settled final answer and cancels the endpoint timer when closed', () => {
+    jest.useFakeTimers();
+    try {
+      const recognition: BrowserRecognition = { lang: '', continuous: true, interimResults: true, onresult: null, onend: null, onerror: null, start: jest.fn(), stop: jest.fn(), abort: jest.fn() };
+      const view = render(<VoiceQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} speechInput={{ available: () => true, create: () => recognition }} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Speak' }));
+      act(() => { recognition.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: 'Eight feet' } }] }); jest.advanceTimersByTime(849); });
+      expect(recognition.stop).not.toHaveBeenCalled();
+      act(() => jest.advanceTimersByTime(1)); expect(recognition.stop).toHaveBeenCalledTimes(1);
+      view.unmount(); act(() => jest.advanceTimersByTime(20000)); expect(recognition.stop).toHaveBeenCalledTimes(1);
+    } finally { jest.useRealTimers(); }
+  });
+  it('lets users review high-confidence speech in noisy surroundings and avoids duplicated result events', () => {
+    const recognition: BrowserRecognition = { lang: '', continuous: true, interimResults: true, onresult: null, onend: null, onerror: null, start: jest.fn(), stop: jest.fn(), abort: jest.fn() };
+    global.fetch = jest.fn();
+    render(<VoiceQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} speechInput={{ available: () => true, create: () => recognition }} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: /Noisy surroundings/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Speak' }));
+    act(() => {
+      const event = { resultIndex: 0, results: [{ isFinal: true, 0: { transcript: 'For Rahul', confidence: 0.95 } }] };
+      recognition.onresult?.(event); recognition.onresult?.(event); recognition.onend?.();
+    });
+    expect(global.fetch).not.toHaveBeenCalled(); expect(screen.getByLabelText('Your answer')).toHaveValue('For Rahul');
   });
 });

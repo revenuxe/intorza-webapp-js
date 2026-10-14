@@ -6,5 +6,5 @@ export interface QuotationAIProvider {
 }
 
 export class ProviderError extends Error {
-  constructor(message: string, public status = 502) { super(message); }
+  constructor(message: string, public status = 502, public code = 'AI_PROVIDER_ERROR', public upstreamStatus?: number) { super(message); }
 }

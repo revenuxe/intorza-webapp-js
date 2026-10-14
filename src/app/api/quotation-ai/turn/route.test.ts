@@ -3,6 +3,7 @@ import { POST } from './route';
 import { createQuotationProvider } from '@/lib/quotation-ai/provider-factory';
 import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { ProviderError } from '@/lib/quotation-ai/provider';
 
 jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }));
 jest.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: jest.fn() }));
@@ -28,6 +29,18 @@ beforeEach(() => {
   propose.mockResolvedValue({ reply: 'What is the quotation title?', clarification: null, operations: [{ type: 'update_project', fields: { clientName: 'Rahul' } }] });
 });
 describe('authenticated quotation AI boundary', () => {
+  it('returns a traceable safe upstream error without logging credentials or quotation text', async () => {
+    const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      propose.mockRejectedValueOnce(new ProviderError('Gemini temporarily unavailable', 502, 'GEMINI_UPSTREAM_FAILED', 503));
+      const response = await POST(request()); const body = await response.json();
+      expect(response.status).toBe(502);
+      expect(body).toMatchObject({ code: 'GEMINI_UPSTREAM_FAILED', upstreamStatus: 503, requestId: expect.any(String) });
+      expect(warning).toHaveBeenCalledWith('quotation_ai_failure', { requestId: body.requestId, code: body.code, upstreamStatus: 503 });
+      expect(JSON.stringify(warning.mock.calls)).not.toContain('test-token');
+      expect(JSON.stringify(warning.mock.calls)).not.toContain('For Rahul');
+    } finally { warning.mockRestore(); }
+  });
   it('requires a verified user before calling AI', async () => {
     expect((await POST(request(input(), false))).status).toBe(401);
     getUser.mockResolvedValueOnce({ data: { user: null }, error: new Error('invalid') });

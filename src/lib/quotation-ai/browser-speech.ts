@@ -1,6 +1,6 @@
 export interface RecognitionResult {
   isFinal: boolean;
-  0: { transcript: string };
+  0: { transcript: string; confidence?: number };
 }
 export interface BrowserRecognition {
   lang: string; continuous: boolean; interimResults: boolean;
@@ -25,7 +25,7 @@ export const browserSpeechInput: SpeechInputProvider = {
     if (!Recognition) throw new Error('Voice recognition is unavailable in this browser. You can type your answers.');
     const recognition = new Recognition();
     recognition.lang = language;
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
     return recognition;
   },

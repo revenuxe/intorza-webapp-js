@@ -48,11 +48,13 @@ async function readBody(request: Request) {
     throw new ProviderError('Invalid request body.', 400);
   } finally { reader.releaseLock(); }
 }
-function json(value: unknown, status = 200) {
-  return Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store', ...(status === 429 ? { 'Retry-After': '60' } : {}) } });
+function json(value: unknown, status = 200, serverTiming?: string) {
+  return Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store', ...(serverTiming ? { 'Server-Timing': serverTiming } : {}), ...(status === 429 ? { 'Retry-After': '60' } : {}) } });
 }
 
 export async function POST(request: Request) {
+  const requestId = crypto.randomUUID();
+  const started = performance.now();
   try {
     const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
     if (!token) return json({ error: 'Sign in to create a quotation with AI.' }, 401);
@@ -68,17 +70,22 @@ export async function POST(request: Request) {
     try { applyOperations(input.data.draft, []); }
     catch { return json({ error: 'The quotation draft has duplicate identifiers or exceeds its item limits.' }, 400); }
     const providerName = env.QUOTATION_AI_PROVIDER || process.env.QUOTATION_AI_PROVIDER || 'gemini';
-    const key = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    const provider = createQuotationProvider({ provider: providerName, apiKey: key, model: env.GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash' });
+    const key = (env.GEMINI_API_KEY || process.env.GEMINI_API_KEY)?.trim();
+    const provider = createQuotationProvider({ provider: providerName.trim(), apiKey: key, model: (env.GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim() });
+    const providerStarted = performance.now();
     const proposal = await provider.propose({ draft: input.data.draft, message: input.data.message, history: input.data.history.map(turn => ({ role: turn.role, text: turn.text })), language: input.data.language }, request.signal);
+    const providerDuration = performance.now() - providerStarted;
     // A clarification never mutates state, even if the model also suggests edits.
     const operations = proposal.clarification ? [] : proposal.operations;
     let draft;
     try { draft = applyOperations(input.data.draft, operations); }
-    catch { throw new ProviderError('The proposed change could not be validated. Please clarify the item or measurement.'); }
-    return json({ draft, reply: proposal.clarification || proposal.reply, review: reviewDraft(draft), changed: operations.length > 0 });
+    catch { throw new ProviderError('The proposed change could not be validated. Please clarify the item or measurement.', 502, 'QUOTATION_CHANGE_INVALID'); }
+    return json({ draft, reply: proposal.clarification || proposal.reply, review: reviewDraft(draft), changed: operations.length > 0 }, 200, `provider;dur=${providerDuration.toFixed(1)}, total;dur=${(performance.now() - started).toFixed(1)}`);
   } catch (error) {
-    if (error instanceof ProviderError) return json({ error: error.message }, error.status);
+    if (error instanceof ProviderError) {
+      console.warn('quotation_ai_failure', { requestId, code: error.code, upstreamStatus: error.upstreamStatus });
+      return json({ error: error.message, code: error.code, requestId, upstreamStatus: error.upstreamStatus }, error.status);
+    }
     return json({ error: 'Could not process this turn. Your quotation has not changed.' }, 500);
   }
 }

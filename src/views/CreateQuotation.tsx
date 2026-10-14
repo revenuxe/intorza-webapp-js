@@ -27,7 +27,7 @@ import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
 import { GalleryImagePicker } from "@/components/quotation/GalleryImagePicker";
 import { GalleryImage } from "@/hooks/useGallery";
 import { getLibraryTerms, getLibraryPaymentStages, getLibraryBankTemplate } from "@/lib/libraryDefaults";
-import { VoiceQuotationAssistant } from "@/components/quotation/VoiceQuotationAssistant";
+import { QuotationVoiceAssistant as VoiceQuotationAssistant } from "@/components/quotation/LiveQuotationAssistant";
 import { fromQuotation, toQuotation, lineAmount, quotationTotals, reviewDraft, type VoiceDraft } from "@/lib/quotation-ai/domain";
 interface LineItem {
   id: string;
