@@ -51,7 +51,9 @@ export const AuthCaptcha = forwardRef<AuthCaptchaHandle>(function AuthCaptcha(_p
       if (!active || !element.current || !window.turnstile) return;
       widget.current = window.turnstile.render(element.current, {
         sitekey: siteKey,
-        size: 'flexible',
+        size: 'normal',
+        theme: 'light',
+        appearance: 'interaction-only',
         callback: (value: string) => { if (active) { token.current = value; setError(''); } },
         'expired-callback': () => { token.current = undefined; },
         'error-callback': () => { token.current = undefined; if (active) setError('Security check failed. Please retry.'); },
@@ -65,5 +67,5 @@ export const AuthCaptcha = forwardRef<AuthCaptchaHandle>(function AuthCaptcha(_p
     };
   }, [siteKey]);
   if (!siteKey) return null;
-  return <div><div ref={element} aria-label="Security verification" />{error && <p role="alert" className="text-sm text-destructive">{error}</p>}</div>;
+  return <div className="flex flex-col items-center gap-2"><div ref={element} aria-label="Security verification" />{error && <p role="alert" className="text-sm text-destructive">{error}</p>}</div>;
 });

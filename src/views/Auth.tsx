@@ -437,7 +437,6 @@ const Auth = () => {
 
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4 mt-4">
-                  <AuthCaptcha ref={loginCaptcha} />
                   <GoogleButton 
                     onClick={handleGoogleLogin} 
                     loading={googleLoading} 
@@ -485,6 +484,7 @@ const Auth = () => {
                       <p className="text-xs text-destructive">{errors.login_password}</p>
                     )}
                   </div>
+                  <AuthCaptcha ref={loginCaptcha} />
                   <Button type="submit" className="w-full" disabled={loading || googleLoading}>
                     {loading ? "Logging in..." : "Login"}
                   </Button>
@@ -493,7 +493,6 @@ const Auth = () => {
 
               <TabsContent value="signup">
                 <form onSubmit={handleSignup} className="space-y-4 mt-4">
-                  <AuthCaptcha ref={signupCaptcha} />
                   <GoogleButton 
                     onClick={handleGoogleLogin} 
                     loading={googleLoading} 
@@ -568,6 +567,7 @@ const Auth = () => {
                       <p className="text-xs text-destructive">{errors.signup_password}</p>
                     )}
                   </div>
+                  <AuthCaptcha ref={signupCaptcha} />
                   <Button type="submit" className="w-full" disabled={loading || googleLoading}>
                     {loading ? "Creating account..." : "Sign Up"}
                   </Button>
