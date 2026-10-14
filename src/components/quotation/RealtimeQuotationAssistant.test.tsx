@@ -80,6 +80,14 @@ describe('Realtime quotation lifecycle', () => {
     event(tool()); expect(onChange).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Close voice assistant' })); expect(trackStop).toHaveBeenCalled(); expect(close).toHaveBeenCalled();
   });
+  it('clears the quotation and restarts a new AI conversation', async () => {
+    let current = fixture(); const onChange = jest.fn((draft: VoiceDraft) => { current = draft; return JSON.stringify(draft); });
+    render(<RealtimeQuotationAssistant initialDraft={current} getCurrentDraft={() => current} onChange={onChange} onClose={jest.fn()} />);
+    await start(); event(tool()); expect(current.project.clientName).toBe('Rahul');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear quotation and restart AI' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
+    expect(current.project.clientName).toBe(''); expect(current.sections).toEqual([{ id: 'room', title: '', items: [] }]); expect(trackStop).toHaveBeenCalled();
+  });
   it('requests microphone permission automatically and has no separate explanation buttons', async () => {
     render(<RealtimeQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} />);
     await start(); expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { Mic, Send, Volume2, X } from 'lucide-react';
+import { Mic, RotateCcw, Send, Volume2, X } from 'lucide-react';
 import { prepareVoiceAudio } from '@/lib/quotation-ai/audio-compat';
 
 
@@ -23,6 +23,13 @@ type RealtimeVoiceLanguage = VoiceLanguage | 'hi-IN-native';
 const isNativeHindi = (language: RealtimeVoiceLanguage) => language === 'hi-IN-native';
 const openingSpeech = (draft: VoiceDraft, language: RealtimeVoiceLanguage) => language === 'hi-IN' ? guidedPrompts[nextGuidedState(draft).step].hindi : initialQuestion(draft, isNativeHindi(language) ? 'hi-IN' : language);
 const languageName = (language: RealtimeVoiceLanguage) => language === 'hi-IN' ? 'Hinglish' : isNativeHindi(language) ? 'Hindi' : 'English';
+function emptyQuotationDraft(draft: VoiceDraft): VoiceDraft {
+  return draftSchema.parse({ version: 1, revision: draft.revision + 1,
+    project: { projectTitle: '', clientName: '', clientAddress: '', placeOfProject: '', projectType: '' },
+    pricing: { gstEnabled: false, gstRate: 18, discountPercentage: 0, enableSocialMediaDiscount: false, socialMediaDiscountRate: 6 },
+    sections: [{ id: draft.sections[0]?.id || crypto.randomUUID(), title: '', items: [] }],
+  });
+}
 export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onChange, onClose }: VoiceAssistantProps) {
   const [language, setLanguage] = useState<RealtimeVoiceLanguage>(() => { try { const saved = localStorage.getItem('quotation-voice-language'); return saved === 'en-IN' || saved === 'hi-IN-native' || saved === 'hi-IN' ? saved : 'hi-IN'; } catch { return 'hi-IN'; } });
   const noisy = false;
@@ -92,6 +99,22 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   }
   function fail(message: string) { stop(); if (mounted.current) setError(message); }
   function hold() { stop(); if (mounted.current) { setHolding(true); setStatus('On hold'); setError(''); } }
+  function restartConversation() {
+    // This is an explicit destructive restart control: start a brand-new
+    // quotation and conversation, retaining no field or model context.
+    stop();
+    const previous = latest.current.getCurrentDraft();
+    const draft = emptyQuotationDraft(previous);
+    const expected = JSON.stringify(previous);
+    snapshot.current = latest.current.onChange(draft, expected);
+    currentDraft.current = draft;
+    const next = nextGuidedState(draft);
+    pendingNext.current = null; conversationContext.current = { question: initialQuestion(draft, 'en-IN'), heard: '' };
+    hasUserAnswer.current = false; undo.current = []; seen.current.clear();
+    setReviewFields([]); setHeard(''); setError(''); setFieldState(next); setFieldValue(guidedDefault(next, draft));
+    setQuestion(initialQuestion(draft, 'en-IN')); setSpokenQuestion(openingSpeech(draft, language));
+    queueMicrotask(() => { if (mounted.current) void startCurrent.current(); });
+  }
   function finish() { hold(); }
   function emit(value: unknown) { if (channel.current?.readyState === 'open') channel.current.send(JSON.stringify(value)); }
   function repeatQuestion() {
@@ -347,6 +370,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         : <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (fieldState.step === 'sectionChoice') { emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `Use section ${fieldValue}` }] } }); respond(); setStatus('Thinking'); } else enterField(fieldValue); }}><Input id="conversation-field" value={fieldValue} maxLength={focusedPrompt.numeric ? 20 : 1000} inputMode={focusedPrompt.numeric ? 'decimal' : 'text'} onChange={event => setFieldValue(event.target.value)} placeholder={focusedPrompt.numeric ? `Enter ${focusedPrompt.label.toLowerCase()}` : `Type ${focusedPrompt.label.toLowerCase()} or say it`} /><Button type="submit" size="sm" aria-label="Continue" disabled={status !== 'Listening' || !fieldValue.trim()}><Send className="h-4 w-4" /></Button></form>}
     </div>}
     <div className="mt-2 flex items-center gap-1">
+      <Button type="button" size="sm" variant="ghost" aria-label="Clear quotation and restart AI" title="Clear quotation and restart AI" disabled={status === 'Connecting' || status === 'Allow microphone'} onClick={restartConversation}><RotateCcw className="h-4 w-4" /></Button>
       {running && <Button type="button" size="sm" variant="outline" onClick={hold}>Hold</Button>}
       {audioBlocked && <Button type="button" size="sm" onClick={() => void enableVoice()}><Volume2 className="h-4 w-4" />Enable voice</Button>}
       {connected && !audioBlocked && !finishing.current && <Button type="button" size="sm" variant="ghost" aria-label="Read question" onClick={repeatQuestion} disabled={status !== 'Listening'}><Volume2 className="h-4 w-4" /></Button>}
