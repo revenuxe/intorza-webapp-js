@@ -16,6 +16,18 @@ it('permits an empty opening transcript only in explicit startup context without
   expect(() => validateRealtimeChange(draft, opening)).toThrow('English transcript');
   expect(() => validateRealtimeChange(draft, { ...opening, operationsJson: JSON.stringify([{ type: 'update_project', fields: { clientName: 'Changed' } }]) }, { allowEmptyTranscript: true })).toThrow('English transcript');
 });
+it('normalizes only the redundant operations wrapper and rejects other object shapes safely', () => {
+  const base = { reply: 'Quotation title kya rakhein?', displayReply: 'What is the quotation title?', transcript: 'My name is Rahul.', clarification: null, endConversation: false, focus: 'projectTitle' };
+  const result = validateRealtimeChange(draft, { ...base, operationsJson: JSON.stringify({ operations: [{ type: 'update_project', fields: { clientName: 'Rahul' } }] }) });
+  expect(result.draft.project.clientName).toBe('Rahul');
+  expect(() => validateRealtimeChange(draft, { ...base, operationsJson: JSON.stringify({ unexpected: [] }) })).toThrow('invalid quotation update');
+});
+it('enforces the selected audio reply language while retaining English quotation text', () => {
+  const base = { displayReply: 'What is the quotation title?', transcript: 'My name is Rahul.', clarification: null, operationsJson: '[]', endConversation: false, focus: 'projectTitle' };
+  expect(() => validateRealtimeChange(draft, { ...base, reply: 'What is the quotation title?' }, { spokenLanguage: 'hi-IN-native' })).toThrow('not in Hindi');
+  expect(() => validateRealtimeChange(draft, { ...base, reply: 'कोटेशन का नाम क्या रखें?' }, { spokenLanguage: 'hi-IN' })).toThrow('wrong language');
+  expect(validateRealtimeChange(draft, { ...base, reply: 'Quotation ka title kya rakhein?' }, { spokenLanguage: 'hi-IN' }).changed).toBe(false);
+});
 it('keeps a completed item conversation open for tax, discounts and more items', () => {
   const result = validateRealtimeChange(draft, { reply: 'GST add karna hai?', displayReply: 'Should we add GST?', transcript: 'The wardrobe details are complete.', clarification: null, operationsJson: '[]', endConversation: false, focus: 'gstEnabled' });
   expect(result.complete).toBe(false); expect(result.focus).toBe('gstEnabled'); expect(result.review.missing).toEqual([]);

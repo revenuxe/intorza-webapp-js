@@ -163,7 +163,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         // another network/authentication hop for every spoken answer.
         rejectedProposal = JSON.parse(call.arguments);
         if (rejectedLanguageProposal.current && !isFaithfulLanguageRepair(rejectedLanguageProposal.current, rejectedProposal)) throw new Error('The translation retry changed quotation details. No fields changed. Please reconnect and repeat the answer.');
-        const body = validateRealtimeChange(before, rejectedProposal, { allowEmptyTranscript: !hasUserAnswer.current });
+        const body = validateRealtimeChange(before, rejectedProposal, { allowEmptyTranscript: !hasUserAnswer.current, spokenLanguage: language });
         languageFailures.current = 0;
         rejectedLanguageProposal.current = null;
         if (version !== generation.current || signal.aborted) return;
@@ -212,7 +212,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
           rejectedLanguageProposal.current = rejectedProposal;
           applying.current = false; responsePending.current = false; setStatus('Translating answer');
           emit({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: failedCallId,
-            output: JSON.stringify({ success: false, code: 'AI_LANGUAGE_INVALID', changed: false, instruction: 'No fields changed. Retry the same rejected tool call ONCE. Translate displayReply and transcript into English sentences in Latin letters. Translate quotation text into English, Roman proper names only. Keep reply Hinglish if selected. Preserve every numeric value, ID and user intent; do not add operations or facts. If there was no user answer, use empty transcript with no operations.' }) } });
+            output: JSON.stringify({ success: false, code: 'AI_LANGUAGE_INVALID', changed: false, instruction: `No fields changed. Retry the same rejected tool call ONCE. Translate displayReply and transcript into English sentences in Latin letters. Translate quotation text into English, Roman proper names only. Keep reply strictly in ${languageName(language)}. Preserve every numeric value, ID and user intent; do not add operations or facts. If there was no user answer, use empty transcript with no operations.` }) } });
           respond(); armIdle();
         } else {
           fail(failure instanceof ProviderError && failure.code === 'AI_LANGUAGE_INVALID' ? 'Could not translate that answer into English. Your fields are unchanged. Tap Reconnect and try again.' : failure instanceof Error ? failure.message : 'Quotation update failed.');
