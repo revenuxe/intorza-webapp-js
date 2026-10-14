@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { draftSchema, reviewDraft, type VoiceDraft } from '@/lib/quotation-ai/domain';
 import { browserSpeechInput, type BrowserRecognition, type SpeechInputProvider } from '@/lib/quotation-ai/browser-speech';
 import type { ConversationTurn } from '@/lib/quotation-ai/provider';
-import { initialQuestion, romanLetters, type VoiceLanguage } from '@/lib/quotation-ai/language';
+import { initialQuestion, romanLetters, selectSpeechVoice, type VoiceLanguage } from '@/lib/quotation-ai/language';
 import { classifySpeechTurn } from '@/lib/quotation-ai/turn-policy';
 import { hasNonEnglishDraft } from '@/lib/quotation-ai/english-output';
 
@@ -22,13 +22,13 @@ export type VoiceAssistantProps = {
 };
 export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChange, onClose, speechInput = browserSpeechInput }: VoiceAssistantProps) {
   const [question, setQuestion] = useState(() => initialQuestion(initialDraft, 'en-IN'));
-  const spokenQuestion = useRef(initialQuestion(initialDraft, 'en-IN'));
+  const spokenQuestion = useRef(initialQuestion(initialDraft, 'hi-IN'));
   const [input, setInput] = useState('');
   const [heard, setHeard] = useState('');
   const [status, setStatus] = useState<'paused' | 'listening' | 'thinking' | 'speaking'>('paused');
   const [supported, setSupported] = useState(false);
   const [error, setError] = useState('');
-  const [language, setLanguage] = useState<'en-IN' | 'hi-IN'>('en-IN');
+  const [language, setLanguage] = useState<'en-IN' | 'hi-IN'>('hi-IN');
   const [speechNotice, setSpeechNotice] = useState('');
   const [reviewSpeech, setReviewSpeech] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
@@ -91,6 +91,22 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
     if (!mounted.current || !active.current) return;
     setStatus('speaking'); setSpeechNotice('');
     const generation = audioGeneration.current;
+    // Native speech starts immediately on mobile and can use the installed Hindi
+    // voice. OpenAI audio remains a compatibility fallback for browsers without it.
+    if (typeof window.speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined') {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = latest.current.language;
+      const voice = selectSpeechVoice(window.speechSynthesis.getVoices(), latest.current.language);
+      if (voice) utterance.voice = voice;
+      utterance.rate = 1.03;
+      utterance.onend = () => {
+        if (!mounted.current || !active.current || generation !== audioGeneration.current) return;
+        if (listenAfter && speechInput.available() && !document.hidden) listen(); else { active.current = false; setStatus('paused'); }
+      };
+      utterance.onerror = () => { if (mounted.current && generation === audioGeneration.current) { active.current = false; setStatus('paused'); setSpeechNotice('Device voice could not play. Use Read question or type your answer.'); } };
+      window.speechSynthesis.speak(utterance);
+      return;
+    }
     const abort = new AbortController(); speechRequest.current = abort;
     try {
       const { data } = await supabase.auth.getSession();
