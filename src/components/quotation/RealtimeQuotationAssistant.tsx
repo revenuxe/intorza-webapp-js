@@ -31,7 +31,7 @@ function emptyQuotationDraft(draft: VoiceDraft): VoiceDraft {
 }
 export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onChange, onClose }: VoiceAssistantProps) {
   const [language, setLanguage] = useState<RealtimeVoiceLanguage>(() => { try { const saved = localStorage.getItem('quotation-voice-language'); return saved === 'en-IN' || saved === 'hi-IN-native' || saved === 'hi-IN' ? saved : 'hi-IN'; } catch { return 'hi-IN'; } });
-  const noisy = false;
+  const noisy = true;
   const [status, setStatus] = useState('Ready');
   const [connected, setConnected] = useState(false);
   const [question, setQuestion] = useState(initialQuestion(initialDraft, 'en-IN'));
@@ -63,6 +63,8 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   const applying = useRef(false);
   const languageFailures = useRef(0);
   const hasUserAnswer = useRef(false);
+  const listeningArmed = useRef(false);
+  const [listenReady, setListenReady] = useState(false);
   const rejectedLanguageProposal = useRef<unknown>(null);
   const responseActive = useRef(false);
   const responsePending = useRef(false);
@@ -108,10 +110,10 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
     currentDraft.current = draft;
     const next = nextGuidedState(draft);
     conversationContext.current = { question: initialQuestion(draft, 'en-IN'), heard: '' };
-    hasUserAnswer.current = false; undo.current = []; seen.current.clear();
+    hasUserAnswer.current = false; listeningArmed.current = false; setListenReady(false); undo.current = []; seen.current.clear();
     setHeard(''); setError(''); setFieldState(next); setFieldValue(guidedDefault(next, draft));
     setQuestion(initialQuestion(draft, 'en-IN')); setSpokenQuestion(openingSpeech(draft, language));
-    queueMicrotask(() => { if (mounted.current) void startCurrent.current(); });
+    queueMicrotask(() => { if (mounted.current) void start(); });
   }
   function finish() { hold(); }
   function emit(value: unknown) { if (channel.current?.readyState === 'open') channel.current.send(JSON.stringify(value)); }
@@ -121,6 +123,11 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
     emit({ type: 'response.create', response: { tool_choice: 'none', instructions: `Read this question exactly, without adding or editing quotation details. Use ${languageName(language)}: ${spokenCurrent.current}` } });
     armIdle();
   }
+  function armListening() {
+    if (!connected || responseActive.current || applying.current || audioBlockedRef.current) return;
+    listeningArmed.current = true; microphone.current?.getTracks().forEach(track => { track.enabled = true; });
+    setListenReady(true); setStatus('Listening'); setError(''); armIdle();
+  }
   async function enableVoice() {
     const player = audio.current; if (!player) return;
     const version = generation.current;
@@ -129,7 +136,6 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       await player.play();
       if (version !== generation.current) return;
       audioBlockedRef.current = false; setAudioBlocked(false); setError('');
-      microphone.current?.getTracks().forEach(track => { track.enabled = true; });
       repeatQuestion();
     } catch { if (version === generation.current) setError('Audio is still blocked. Check site sound permissions, then tap Enable voice.'); }
   }
@@ -245,6 +251,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
       if (version !== generation.current) { stream.getTracks().forEach(track => track.stop()); return; }
       microphone.current = stream;
+      stream.getTracks().forEach(track => { track.enabled = false; });
       setStatus('Connecting');
       const before = latest.current.getCurrentDraft();
       const expected = JSON.stringify(before);
@@ -280,9 +287,9 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       events.onmessage = event => {
         if (version !== generation.current) return;
         let value; try { value = JSON.parse(event.data); } catch { return; }
-        if (value.type === 'input_audio_buffer.speech_started' && !finishing.current) { setStatus('Listening'); setHeard(''); armIdle(); }
-        if (value.type === 'input_audio_buffer.speech_stopped' && !finishing.current) setStatus('Thinking');
-        if (value.type === 'input_audio_buffer.committed' && !finishing.current) { hasUserAnswer.current = true; respond(); }
+        if (value.type === 'input_audio_buffer.speech_started' && listeningArmed.current && !finishing.current) { setStatus('Listening'); setHeard(''); armIdle(); }
+        if (value.type === 'input_audio_buffer.speech_stopped' && listeningArmed.current && !finishing.current) setStatus('Thinking');
+        if (value.type === 'input_audio_buffer.committed' && listeningArmed.current && !finishing.current) { listeningArmed.current = false; setListenReady(false); microphone.current?.getTracks().forEach(track => { track.enabled = false; }); hasUserAnswer.current = true; respond(); }
         if (value.type === 'response.created') responseActive.current = true;
         if (value.type === 'output_audio_buffer.started') { if (!audioBlockedRef.current) setStatus('Speaking'); armIdle(); }
         if (value.type === 'output_audio_buffer.stopped' || value.type === 'output_audio_buffer.cleared') { if (finishing.current) finish(); else if (!audioBlockedRef.current) setStatus('Listening'); }
@@ -310,23 +317,8 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       await peer.setRemoteDescription({ type: 'answer', sdp });
     } catch (failure) { if (version === generation.current) fail(failure instanceof Error && failure.name === 'NotAllowedError' ? 'Allow microphone access in your browser, then tap Start conversation.' : failure instanceof Error ? failure.message : 'Could not start live voice.'); }
   }
-  const startCurrent = useRef(start); startCurrent.current = start;
-  useEffect(() => {
-    // One automatic start per mount, including React Strict Mode's effect replay.
-    const timer = setTimeout(() => { if (mounted.current) void startCurrent.current(); }, 0);
-    return () => clearTimeout(timer);
-  }, []);
   const running = connected || status === 'Connecting' || status === 'Allow microphone';
   const focusedPrompt = guidedPrompts[fieldState.step];
-  useEffect(() => {
-    const target = document.getElementById(fieldState.step);
-    if (!target) return;
-    const group = target.closest('div.space-y-2');
-    target.classList.add('relative', 'z-50', 'ring-4', 'ring-orange-300', 'ring-offset-2', 'shadow-lg');
-    group?.classList.add('relative', 'z-50', 'rounded-xl', 'bg-background', 'p-3', 'shadow-2xl');
-    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    return () => { target.classList.remove('relative', 'z-50', 'ring-4', 'ring-orange-300', 'ring-offset-2', 'shadow-lg'); group?.classList.remove('relative', 'z-50', 'rounded-xl', 'bg-background', 'p-3', 'shadow-2xl'); };
-  }, [fieldState.step]);
   function enterField(value: string) {
     if (!connected || responseActive.current || applying.current) return;
     hasUserAnswer.current = true;
@@ -345,7 +337,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       respond(); setStatus('Thinking'); setError('');
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update the field.'); }
   }
-  return <><div aria-hidden="true" className={connected && fieldState.step !== 'review' ? 'pointer-events-none fixed inset-0 z-40 bg-slate-950/25 backdrop-blur-[1px]' : 'hidden'} /><section className="relative z-50 mx-auto max-w-2xl overflow-hidden rounded-2xl border border-orange-200 bg-background p-3 shadow-sm dark:border-orange-900" aria-label="Quotation voice assistant">
+  return <section className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-orange-200 bg-background p-3 shadow-sm dark:border-orange-900" aria-label="Quotation voice assistant">
     <div className="flex items-center gap-2">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white ${connected ? 'ring-2 ring-orange-200 dark:ring-orange-900' : ''}`}><Mic className="h-4 w-4" /></div>
       <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Quotation assistant</h2><span className="text-xs text-muted-foreground" role="status">{holding ? 'On hold · microphone off' : status === 'Listening' ? 'Listening' : status}</span></div>
@@ -359,11 +351,12 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
     <div className="mt-2 flex items-center gap-1">
       <Button type="button" size="sm" variant="ghost" aria-label="Clear quotation and restart AI" title="Clear quotation and restart AI" disabled={status === 'Connecting' || status === 'Allow microphone'} onClick={restartConversation}><RotateCcw className="h-4 w-4" /></Button>
       {running && <Button type="button" size="sm" variant="outline" onClick={hold}>Hold</Button>}
+      {connected && !audioBlocked && !finishing.current && <Button type="button" size="sm" onClick={armListening} disabled={listenReady || status !== 'Listening'}>Listen</Button>}
       {audioBlocked && <Button type="button" size="sm" onClick={() => void enableVoice()}><Volume2 className="h-4 w-4" />Enable voice</Button>}
       {connected && !audioBlocked && !finishing.current && <Button type="button" size="sm" variant="ghost" aria-label="Read question" onClick={repeatQuestion} disabled={status !== 'Listening'}><Volume2 className="h-4 w-4" /></Button>}
-      {(!running) && <Button size="sm" variant="outline" onClick={() => void start()}>{holding ? 'Resume' : 'Reconnect'}</Button>}
+      {(!running) && <Button size="sm" variant="outline" onClick={() => void start()}>{holding ? 'Resume' : 'Start assistant'}</Button>}
       <select aria-label="Spoken language" disabled={status === 'Connecting' || status === 'Allow microphone'} value={language} onChange={event => { const value = event.target.value as RealtimeVoiceLanguage; if (running) hold(); setLanguage(value); setSpokenQuestion(openingSpeech(currentDraft.current, value)); setQuestion(initialQuestion(currentDraft.current, 'en-IN')); try { localStorage.setItem('quotation-voice-language', value); } catch { /* Optional preference. */ } }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hinglish</option><option value="hi-IN-native">हिन्दी / Hindi</option></select>
     </div>
     {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
-  </section></>;
+  </section>;
 }

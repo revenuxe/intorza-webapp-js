@@ -15,6 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => jest.restoreAllMocks());
 async function start() {
+  fireEvent.click(screen.getByRole('button', { name: 'Start assistant' }));
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2)); act(() => events.onopen?.());
 }
 function event(value: unknown) { act(() => events.onmessage?.({ data: JSON.stringify(value) })); }
@@ -61,15 +62,16 @@ describe('Realtime quotation lifecycle', () => {
     event({ type: 'response.done', response: { status: 'completed', output: [] } });
     fireEvent.click(screen.getByRole('button', { name: 'Enable voice' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Enable voice' })).toBeNull());
-    expect(play).toHaveBeenCalledTimes(2); expect(track.enabled).toBe(true);
+    expect(play).toHaveBeenCalledTimes(2); expect(track.enabled).toBe(false);
     expect(fetch).toHaveBeenCalledTimes(2); expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
     expect(events.send.mock.calls.map(([value]) => JSON.parse(value))).toContainEqual(expect.objectContaining({ type: 'response.create', response: expect.objectContaining({ tool_choice: 'none' }) }));
   });
   it('offers a retry when microphone permission is denied without exposing provider options', async () => {
     (navigator.mediaDevices.getUserMedia as jest.Mock).mockRejectedValueOnce(Object.assign(new Error('Denied'), { name: 'NotAllowedError' }));
     render(<RealtimeQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start assistant' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Allow microphone access'); expect(fetch).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start assistant' })).toBeInTheDocument();
     expect(screen.queryByText('Options')).toBeNull(); expect(screen.queryByText(/OpenAI/)).toBeNull();
   });
   it('updates fields locally without another request and deduplicates calls', async () => {
@@ -123,7 +125,7 @@ describe('Realtime quotation lifecycle', () => {
   });
   it('waits for audio commit before requesting the next answer', async () => {
     render(<RealtimeQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} />);
-    await start(); event({ type: 'response.done', response: { status: 'completed', output: [] } }); events.send.mockClear();
+    await start(); event({ type: 'response.done', response: { status: 'completed', output: [] } }); fireEvent.click(screen.getByRole('button', { name: 'Listen' })); events.send.mockClear();
     event({ type: 'input_audio_buffer.speech_stopped' }); expect(events.send).not.toHaveBeenCalled();
     event({ type: 'input_audio_buffer.committed' }); expect(events.send.mock.calls.map(([value]) => JSON.parse(value))).toContainEqual({ type: 'response.create' });
   });
