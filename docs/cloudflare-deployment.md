@@ -31,12 +31,19 @@ Use a Linux build environment or WSL if a native Windows adapter build fails.
 
 ## Public build variables
 
+If the build says both Supabase variables are missing, open Workers & Pages →
+intorza-webapp-js → Settings → Build → Variables and secrets. These are separate
+from runtime Settings → Variables and Secrets. Add the exact variable names
+below, then retry the build. An ignored local `.env` is not uploaded to Git.
+The prebuild check reports configuration problems before starting OpenNext.
+
 There is no checked-in URL/key fallback. Set both Supabase values in
 Cloudflare Workers Builds before building; a missing pair fails the build:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `NEXT_PUBLIC_SITE_URL` — the final HTTPS application origin
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — public site key of the production widget
 
 These values are embedded in browser assets at build time. Runtime secrets
 cannot replace missing public build variables. Supabase service-role and
