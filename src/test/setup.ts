@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom";
 
+if (typeof window !== 'undefined') {
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: (query: string) => ({
@@ -28,4 +29,5 @@ if (typeof (globalThis as any).requestAnimationFrame !== "function") {
 if (!("createObjectURL" in URL)) {
   (URL as any).createObjectURL = () => "blob:mock";
   (URL as any).revokeObjectURL = () => {};
+}
 }

@@ -107,7 +107,7 @@ test('the PWA caches only the public fallback and serves it offline', async ({ p
     }
   });
   const cached = await page.evaluate(async () => {
-    const cache = await caches.open('intorza-offline-v1');
+    const cache = await caches.open('intorza-offline-v2');
     return (await cache.keys()).map(request => new URL(request.url).pathname);
   });
   expect(cached).toEqual(['/offline.html']);

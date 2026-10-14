@@ -6,6 +6,14 @@ the static files. Uploads, database access, authentication, and payment Edge
 Functions remain in Supabase. The app has no separate storage or API backend
 on another hosting provider.
 
+The entry point `cloudflare-worker.mjs` wraps the generated OpenNext Worker.
+It forces HTML/RSC and failed chunk responses to no-store at the response
+boundary, while successful hashed assets retain immutable caching. Do not
+change Wrangler's entry point back to `.open-next/worker.js`, which bypasses
+this deployment cache protection. Disable any dashboard Cache Everything rule
+that overrides response headers for app pages. A pre-hydration handler recovers
+once from old chunk URLs, then offers a reload button instead of looping.
+
 ## Build and preview
 
 Use Node.js 22.12 or newer. Copy `.env.example` to an ignored `.env.local`

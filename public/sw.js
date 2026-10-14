@@ -1,5 +1,5 @@
 /* Cache the public offline screen only. Never cache account data or RSC responses. */
-const CACHE = 'intorza-offline-v1';
+const CACHE = 'intorza-offline-v2';
 const OFFLINE = '/offline.html';
 
 self.addEventListener('install', event => {
@@ -20,7 +20,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || event.request.mode !== 'navigate') return;
   if (new URL(event.request.url).origin !== self.location.origin) return;
-  event.respondWith(fetch(event.request).catch(async () => {
+  event.respondWith(fetch(event.request, { cache: 'no-store' }).catch(async () => {
     const offline = await caches.match(OFFLINE);
     // Asset hosts may redirect .html URLs to their canonical path. A cached
     // redirected Response is invalid for an offline navigation with redirect
