@@ -306,11 +306,13 @@ const CreateQuotation = () => {
       if (error) throw error;
       if (data) {
         // Get templates from My Library (default first, else latest saved)
-        const [libraryStages, libraryTerms, bankTemplate] = await Promise.all([
+        const [libraryStages, libraryTerms, bankTemplate, warrantyTemplate] = await Promise.all([
           getLibraryPaymentStages(user.id),
           getLibraryTerms(user.id, 'quotation'),
           getLibraryBankTemplate(user.id),
+          supabase.from('warranty_templates').select('warranty_years').eq('user_id', user.id).eq('is_default', true).maybeSingle(),
         ]);
+        if ((warrantyTemplate.data as any)?.warranty_years) setWarranty(normalizeWarrantyInput(String((warrantyTemplate.data as any).warranty_years)));
 
         setProfile({
           company_name: data.company_name || "",

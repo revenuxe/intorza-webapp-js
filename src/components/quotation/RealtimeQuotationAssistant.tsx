@@ -49,6 +49,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   const conversationContext = useRef({ question: initialQuestion(initialDraft, 'en-IN'), heard: '' });
   const fieldStateCurrent = useRef(fieldState); fieldStateCurrent.current = fieldState;
   const latest = useRef({ getCurrentDraft, onChange }); latest.current = { getCurrentDraft, onChange };
+  const conversationId = useRef(crypto.randomUUID());
   const pc = useRef<RTCPeerConnection | null>(null);
   const channel = useRef<RTCDataChannel | null>(null);
   const microphone = useRef<MediaStream | null>(null);
@@ -214,6 +215,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         }
         emit({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: call.call_id,
           output: JSON.stringify({ success: true, draft: next, review: body.review, nextFocus: nextField.step, reply: body.reply, instruction: 'Speak the provided reply briefly, then continue directly to nextFocus. Do not request confirmation for an ordinary field value. Only clarify ambiguity or ask for the final quotation review.' }) } });
+        void supabase.auth.getSession().then(({ data }) => data.session && fetch('/api/quotation-ai/audit', { method: 'POST', headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: conversationId.current, language, transcript: body.transcript, reply: body.displayReply, focus: nextField.step, changed: body.changed, outcome: {} }) })).catch(() => undefined);
       }
       if (version === generation.current) { applying.current = false; respond(true); armIdle(); }
     } catch (failure) {

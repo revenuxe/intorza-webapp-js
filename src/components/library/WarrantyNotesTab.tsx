@@ -15,6 +15,7 @@ interface WarrantyTemplate {
   template_name: string;
   content: string;
   is_default: boolean;
+  warranty_years: number | null;
   created_at: string;
 }
 
@@ -29,6 +30,7 @@ export const WarrantyNotesTab = () => {
   const [formData, setFormData] = useState({
     template_name: "",
     content: "",
+    warranty_years: "",
   });
 
   useEffect(() => {
@@ -59,12 +61,14 @@ export const WarrantyNotesTab = () => {
         await libraryApi.warranty.update(editingTemplate.id, {
           template_name: formData.template_name,
           content: formData.content,
+          warranty_years: formData.warranty_years ? Number(formData.warranty_years) : null,
         });
         toast({ title: "Template updated" });
       } else {
         await libraryApi.warranty.create({
           template_name: formData.template_name,
           content: formData.content,
+          warranty_years: formData.warranty_years ? Number(formData.warranty_years) : null,
           is_default: templates.length === 0,
         });
         toast({ title: "Template created" });
@@ -115,6 +119,7 @@ export const WarrantyNotesTab = () => {
     setFormData({
       template_name: template.template_name,
       content: template.content,
+      warranty_years: template.warranty_years == null ? "" : String(template.warranty_years),
     });
     setDialogOpen(true);
   };
@@ -123,6 +128,7 @@ export const WarrantyNotesTab = () => {
     setFormData({
       template_name: "",
       content: "",
+      warranty_years: "",
     });
   };
 
@@ -184,7 +190,7 @@ export const WarrantyNotesTab = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-2">{template.content || "No content"}</p>
+                <p className="text-sm text-muted-foreground">{template.warranty_years ? `${template.warranty_years} year warranty` : 'Warranty years not set'}</p><p className="mt-1 text-sm text-muted-foreground line-clamp-2">{template.content || "No content"}</p>
               </CardContent>
             </Card>
           ))}
@@ -204,6 +210,10 @@ export const WarrantyNotesTab = () => {
                 onChange={(e) => setFormData({ ...formData, template_name: e.target.value })}
                 placeholder="e.g., 10 Year Warranty"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Warranty years</Label>
+              <Input type="number" min="0.01" max="100" step="0.5" value={formData.warranty_years} onChange={(e) => setFormData({ ...formData, warranty_years: e.target.value })} placeholder="e.g., 10" />
             </div>
             <div className="space-y-2">
               <Label>Content</Label>

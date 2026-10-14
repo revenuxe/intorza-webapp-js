@@ -85,7 +85,7 @@ describe('Realtime quotation lifecycle', () => {
     render(<RealtimeQuotationAssistant initialDraft={current} getCurrentDraft={() => current} onChange={onChange} onClose={jest.fn()} />);
     await start(); event(tool()); expect(current.project.clientName).toBe('Rahul');
     fireEvent.click(screen.getByRole('button', { name: 'Clear quotation and restart AI' }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(5));
     expect(current.project.clientName).toBe(''); expect(current.sections).toEqual([{ id: 'room', title: '', items: [] }]); expect(trackStop).toHaveBeenCalled();
   });
   it('requests microphone permission automatically and has no separate explanation buttons', async () => {
@@ -135,8 +135,8 @@ describe('Realtime quotation lifecycle', () => {
     expect(trackStop).toHaveBeenCalled(); expect(close).toHaveBeenCalled(); expect(fetch).toHaveBeenCalledTimes(2);
     expect(screen.getByText('On hold · microphone off')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
-    const session = JSON.parse((fetch as jest.Mock).mock.calls[2][1].body); expect(session.draft.project.clientName).toBe('Rahul');
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(5));
+    const sessionCall = (fetch as jest.Mock).mock.calls.filter(([url]: [string]) => url === '/api/quotation-ai/realtime').at(-1); const session = JSON.parse(sessionCall[1].body); expect(session.draft.project.clientName).toBe('Rahul');
     view.unmount(); expect(trackStop).toHaveBeenCalled();
   });
 });
