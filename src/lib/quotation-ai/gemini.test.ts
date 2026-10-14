@@ -3,6 +3,12 @@ jest.mock('server-only', () => ({}), { virtual: true });
 import { GeminiQuotationProvider } from './gemini';
 
 describe('Gemini provider adapter', () => {
+  it('uses the requested mainstream fallback after an unsupported primary model', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce(new Response('{}', { status: 404 })).mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify({ reply: 'What size?', clarification: null, operations: [] }) }] } }] })));
+    await new GeminiQuotationProvider('secret', 'gemini-3.8-flash').propose(input);
+    expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain('gemini-3.6-flash:generateContent');
+    expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body).systemInstruction.parts[0].text).toContain('English/Latin letters');
+  });
   const input = { draft: {} as never, message: 'Wardrobe', history: [], language: 'en-IN' };
   const originalFetch = global.fetch;
   afterEach(() => { global.fetch = originalFetch; });

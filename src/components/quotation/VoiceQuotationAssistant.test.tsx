@@ -59,7 +59,7 @@ describe('compact live voice assistant', () => {
     const previousSynthesis = window.speechSynthesis;
     const previousUtterance = window.SpeechSynthesisUtterance;
     const utterances: { onend?: () => void; onerror?: () => void }[] = [];
-    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { cancel: jest.fn(), speak: jest.fn(utterance => utterances.push(utterance)) } });
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { cancel: jest.fn(), getVoices: () => [{ lang: 'en-IN' }], speak: jest.fn(utterance => utterances.push(utterance)) } });
     window.SpeechSynthesisUtterance = class { lang = ''; constructor(public text: string) {} } as unknown as typeof SpeechSynthesisUtterance;
     const create = jest.fn();
     const view = render(<VoiceQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} speechInput={{ available: () => true, create }} />);

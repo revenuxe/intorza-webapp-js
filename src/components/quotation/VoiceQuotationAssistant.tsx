@@ -75,7 +75,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function speak(text: string, listenAfter = true) {
+  async function speak(text: string, listenAfter = true) {
     stopAudio();
     if (!mounted.current || !active.current) return;
     if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') {
@@ -86,7 +86,16 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
     const utterance = new SpeechSynthesisUtterance(text);
     const generation = audioGeneration.current;
     utterance.lang = latest.current.language;
-    const voices = window.speechSynthesis.getVoices?.() || [];
+    let voices = window.speechSynthesis.getVoices?.() || [];
+    if (!voices.length) {
+      await new Promise<void>(resolve => {
+        const finish = () => { clearTimeout(timer); window.speechSynthesis.removeEventListener?.('voiceschanged', finish); resolve(); };
+        const timer = setTimeout(finish, 1000);
+        window.speechSynthesis.addEventListener?.('voiceschanged', finish, { once: true });
+      });
+      if (!mounted.current || !active.current || generation !== audioGeneration.current) return;
+      voices = window.speechSynthesis.getVoices?.() || [];
+    }
     const voice = selectSpeechVoice(voices, latest.current.language);
     if (voice) { utterance.voice = voice; setSpeechNotice(''); }
     else if (latest.current.language === 'hi-IN' && voices.length) {
