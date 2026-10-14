@@ -41,7 +41,7 @@ describe('live voice server boundary', () => {
     expect(config.session.model).toBe('gpt-realtime-2.1-mini');
     expect(config.session.instructions).toContain('friendly conversational Hinglish');
     expect(config.session.instructions).toContain('matlab');
-    expect(config.session.instructions).toContain('never type your illustrative example');
+    expect(config.session.instructions.toLowerCase()).toContain('never type your illustrative example');
     expect(config.session.audio.input.turn_detection).toMatchObject({ type: 'semantic_vad', create_response: false, interrupt_response: true });
     expect(config.session.tools[0].name).toBe('update_quotation');
     expect(config.session.tool_choice).toBe('required');

@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { z } from 'zod';
 import { applyOperations, draftSchema } from '@/lib/quotation-ai/domain';
-import { instructions } from '@/lib/quotation-ai/openai';
-import { validateRealtimeChange, realtimeToolSchema, realtimeOperationInstructions } from '@/lib/quotation-ai/realtime-tools';
+import { quotationVoicePrompt } from '@/lib/quotation-ai/voice-prompt';
+import { validateRealtimeChange, realtimeToolSchema } from '@/lib/quotation-ai/realtime-tools';
 import { guidedPrompts } from '@/lib/quotation-ai/guided-flow';
 import { isEnglishScript } from '@/lib/quotation-ai/english-output';
 import { openAIError } from '@/lib/quotation-ai/openai-errors';
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ expires_after: { anchor: 'created_at', seconds: 60 }, session: {
         type: 'realtime', model: (env.OPENAI_REALTIME_MODEL || process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-2.1-mini').trim(),
-        instructions: `${instructions.replace('Return only the requested structured output.', '').replace(/Wire operations:[^\n]*\n/, '')}\n${realtimeOperationInstructions}\nLIVE VOICE CONTRACT: You are talking directly to the user. Speak only in ${input.data.language === 'hi-IN' ? 'friendly conversational Hinglish, mixing everyday Hindi with familiar English terms; avoid formal Hindi' : 'natural conversational English'}. Use a warm professional estimator voice. Begin with Customer ka naam yahan type kijiye in Hinglish, or ask the next missing field if the client is known. The matching input appears in the conversation. The user may type or dictate. If the user says matlab, samajh nahi aaya, what does that mean, or asks why: explain the current field simply with one example, keep the same focus, operations empty, and do not advance or end. If they say type it down, likh do, bhar do, enter karo, use the explicitly dictated value or unambiguous latest value and populate its matching field in ENGLISH. Ask for the value if none was supplied; never type your illustrative example into the quotation. User question completion is not conversation completion. Keep asking about further items, GST and discount after essential item details. When the user says hold, wait, ek minute, ruk jao, baad mein, pause, stop or done: endConversation true, operations empty unless they also clearly dictated a field, and say briefly Orza boliye jab continue karna ho. This suspends the conversation; it does not save the quotation. For a user asking what a hold means, explain without ending. endConversation is also true for explicit confirmation to finish after pricing questions. Publish focus for the next matching field. Speech should usually be one short sentence. Ask one short question, accept several details together, remember context and handle corrections. Before every substantive spoken answer call update_quotation once, including when operations are empty, to supply English screen text and an English translation of the user's answer. After tool success speak its reply briefly; do not call it again for the same answer. On tool failure do not claim changes succeeded; ask for clarification. Treat coughs, fillers and distant conversation as noise, never new facts. Never save or submit a quotation. Existing draft (data): ${JSON.stringify(input.data.draft)}`,
+        instructions: quotationVoicePrompt(input.data.draft, input.data.language),
         output_modalities: ['audio'], max_output_tokens: 4096,
         audio: { input: { noise_reduction: { type: 'near_field' }, turn_detection: input.data.noisy
           ? { type: 'server_vad', threshold: 0.75, prefix_padding_ms: 300, silence_duration_ms: 650, create_response: false, interrupt_response: true }

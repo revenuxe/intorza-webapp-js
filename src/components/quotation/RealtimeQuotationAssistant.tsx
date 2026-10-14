@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Mic, Send, Volume2, X } from 'lucide-react';
 import { prepareVoiceAudio } from '@/lib/quotation-ai/audio-compat';
-import { browserSpeechInput, type BrowserRecognition } from '@/lib/quotation-ai/browser-speech';
-import { isOrzaWakeCall } from '@/lib/quotation-ai/wake-word';
+
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,13 +12,14 @@ import { draftSchema, type VoiceDraft } from '@/lib/quotation-ai/domain';
 import { validateRealtimeChange } from '@/lib/quotation-ai/realtime-tools';
 import { initialQuestion, type VoiceLanguage } from '@/lib/quotation-ai/language';
 import type { VoiceAssistantProps } from './VoiceQuotationAssistant';
+import { changedFields, type FieldReview } from '@/lib/quotation-ai/field-review';
 
 
 import { advanceGuided, guidedDefault, guidedPrompts, nextGuidedState, type GuidedState } from '@/lib/quotation-ai/guided-flow';
 
 type ToolCall = { type: string; name?: string; call_id?: string; arguments?: string };
 const openingSpeech = (draft: VoiceDraft, language: VoiceLanguage) => language === 'hi-IN' ? guidedPrompts[nextGuidedState(draft).step].hindi : initialQuestion(draft, 'en-IN');
-export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onChange, onClose, speechInput = browserSpeechInput }: VoiceAssistantProps) {
+export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onChange, onClose }: VoiceAssistantProps) {
   const [language, setLanguage] = useState<VoiceLanguage>(() => { try { return localStorage.getItem('quotation-voice-language') === 'en-IN' ? 'en-IN' : 'hi-IN'; } catch { return 'hi-IN'; } });
   const noisy = false;
   const [status, setStatus] = useState('Ready');
@@ -33,14 +34,13 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   const [fieldState, setFieldState] = useState<GuidedState>(() => nextGuidedState(initialDraft));
   const [fieldValue, setFieldValue] = useState(() => guidedDefault(nextGuidedState(initialDraft), initialDraft));
   const [holding, setHolding] = useState(false);
-  const [wakeAvailable, setWakeAvailable] = useState(false);
+  const [reviewFields, setReviewFields] = useState<FieldReview[]>([]);
+  const pendingNext = useRef<GuidedState | null>(null);
+  const [messages, setMessages] = useState<{ user: string; assistant: string }[]>([]);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const audioBlockedRef = useRef(false);
   const replayRequested = useRef(false);
   const spokenCurrent = useRef(spokenQuestion); spokenCurrent.current = spokenQuestion;
-  const wakeRecognition = useRef<BrowserRecognition | null>(null);
-  const wakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdingRef = useRef(false);
   const conversationContext = useRef({ question: initialQuestion(initialDraft, 'en-IN'), heard: '' });
   const fieldStateCurrent = useRef(fieldState); fieldStateCurrent.current = fieldState;
   const latest = useRef({ getCurrentDraft, onChange }); latest.current = { getCurrentDraft, onChange };
@@ -66,11 +66,8 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
 
   function stop() {
     generation.current++;
-    holdingRef.current = false;
+
     audioBlockedRef.current = false; replayRequested.current = false;
-    if (wakeTimer.current) clearTimeout(wakeTimer.current);
-    const wake = wakeRecognition.current; wakeRecognition.current = null;
-    if (wake) { wake.onresult = null; wake.onerror = null; wake.onend = null; wake.abort(); }
     request.current?.abort(); request.current = null;
     if (idle.current) clearTimeout(idle.current);
     if (sessionTimer.current) clearTimeout(sessionTimer.current);
@@ -88,32 +85,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
     if (mounted.current) { setConnected(false); setStatus('Ready'); setHolding(false); setAudioBlocked(false); }
   }
   function fail(message: string) { stop(); if (mounted.current) setError(message); }
-  function hold() {
-    stop(); if (!mounted.current || document.hidden) return;
-    holdingRef.current = true; setHolding(true); setStatus('On hold'); setError('');
-    const version = generation.current;
-    function listenForOrza() {
-      if (!mounted.current || !holdingRef.current || version !== generation.current || document.hidden) return;
-      if (!speechInput.available()) { setWakeAvailable(false); return; }
-      try {
-        const wake = speechInput.create('hi-IN'); wakeRecognition.current = wake;
-        wake.onresult = event => {
-          if (wakeRecognition.current !== wake) return;
-          for (let index = event.resultIndex; index < event.results.length; index++) {
-            if (event.results[index].isFinal && isOrzaWakeCall(event.results[index][0].transcript)) { stop(); void startCurrent.current(); return; }
-          }
-        };
-        wake.onend = () => { if (wakeRecognition.current !== wake) return; wakeRecognition.current = null; if (holdingRef.current) wakeTimer.current = setTimeout(listenForOrza, 500); };
-        wake.onerror = event => {
-          if (wakeRecognition.current !== wake) return;
-          if (event.error === 'no-speech' || event.error === 'aborted') return;
-          wakeRecognition.current = null; wake.onend = null; wake.abort(); setWakeAvailable(false);
-        };
-        wake.start(); setWakeAvailable(true);
-      } catch { setWakeAvailable(false); }
-    }
-    listenForOrza();
-  }
+  function hold() { stop(); if (mounted.current) { setHolding(true); setStatus('On hold'); setError(''); } }
   function finish() { hold(); }
   function emit(value: unknown) { if (channel.current?.readyState === 'open') channel.current.send(JSON.stringify(value)); }
   function repeatQuestion() {
@@ -142,7 +114,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   }
   function armIdle() {
     if (idle.current) clearTimeout(idle.current);
-    idle.current = setTimeout(hold, 30000);
+    idle.current = setTimeout(hold, pendingNext.current ? 120000 : 60000);
   }
   useEffect(() => {
     mounted.current = true;
@@ -194,16 +166,29 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         const previousItem = next.sections.flatMap(section => section.items).find(item => item.id === fieldStateCurrent.current.itemId);
         if (previousItem && !nextField.itemId) { nextField.itemId = previousItem.id; nextField.sectionId = next.sections.find(section => section.items.some(item => item.id === previousItem.id))?.id; }
         if (!nextField.itemId) { const section = next.sections.filter(section => section.items.length).at(-1); if (section) { nextField.sectionId = section.id; nextField.itemId = section.items.at(-1)!.id; } }
-        setFieldState(nextField); setFieldValue(guidedDefault(nextField, next));
-        setQuestion(body.displayReply); setSpokenQuestion(body.reply); setHeard(body.transcript);
-        conversationContext.current = { question: body.displayReply, heard: body.transcript };
+        const changes = changedFields(before, next);
+        let display = body.displayReply; let spoken = body.reply;
+        if (changes.length && !body.complete) {
+          pendingNext.current = nextField; setReviewFields(changes);
+          // Keep the previous field visible for correction until confirmation.
+          setFieldValue(guidedDefault(fieldStateCurrent.current, next));
+          const first = changes[0];
+          display = `Check ${first.label.toLowerCase()}: ${first.value}. Is this correct?`;
+          spoken = language === 'hi-IN' ? `${first.value} fill kar diya. Ek baar check kar lijiye. Sahi hai toh next bol dijiye.` : `I entered ${first.value}. Please check it, then say next if it is correct.`;
+        } else if (!pendingNext.current || body.confirmed) {
+          pendingNext.current = null; setReviewFields([]);
+          setFieldState(nextField); setFieldValue(guidedDefault(nextField, next));
+        }
+        setQuestion(display); setSpokenQuestion(spoken); setHeard(body.transcript);
+        setMessages(previous => [...previous.slice(-3), { user: body.transcript, assistant: display }]);
+        conversationContext.current = { question: display, heard: body.transcript };
         if (body.complete) {
           finishing.current = true; responsePending.current = false;
           microphone.current?.getTracks().forEach(track => track.stop());
           completionTimer.current = setTimeout(finish, 15000);
         }
         emit({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: call.call_id,
-          output: JSON.stringify({ success: true, draft: next, review: body.review, reply: body.reply, instruction: 'Speak this reply briefly in the selected language. Do not call the tool again until a new user answer.' }) } });
+          output: JSON.stringify({ success: true, draft: next, review: body.review, pendingReview: changes.length ? changes : pendingNext.current ? 'Awaiting confirmation' : null, nextFocus: nextField.step, reply: spoken, instruction: 'Speak the provided reply briefly. If pendingReview is set, wait for confirmation or correction; do not ask the next field yet. Do not call the tool again until a new user answer.' }) } });
       }
       if (version === generation.current) { applying.current = false; respond(true); armIdle(); }
     } catch (failure) {
@@ -224,7 +209,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       setStatus('Connecting');
       const before = latest.current.getCurrentDraft();
       const expected = JSON.stringify(before);
-      if (expected !== snapshot.current) { currentDraft.current = before; snapshot.current = expected; undo.current = []; setUndoCount(0); }
+      if (expected !== snapshot.current) { currentDraft.current = before; snapshot.current = expected; undo.current = []; setUndoCount(0); pendingNext.current = null; setReviewFields([]); const next = nextGuidedState(before); setFieldState(next); setFieldValue(guidedDefault(next, before)); }
       const secret = await api({ action: 'session', language, noisy, draft: currentDraft.current }, abort.signal);
       if (version !== generation.current) return;
       const peer = new RTCPeerConnection(); pc.current = peer;
@@ -248,13 +233,13 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         if (connectionTimer.current) clearTimeout(connectionTimer.current);
         setConnected(true); setStatus('Listening'); armIdle();
         sessionTimer.current = setTimeout(hold, 300000);
-        emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ instruction: 'Start or resume the quotation interview from the current draft. If resuming, briefly acknowledge Orza and repeat the pending question; do not repeat completed fields. Publish the English question through update_quotation with no edits unless text needs translation.', previousQuestion: conversationContext.current.question, previousAnswer: conversationContext.current.heard }) }] } });
+        emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ instruction: 'Start or resume the quotation interview from the current draft. If resuming, briefly acknowledge the user and repeat the pending question; do not repeat completed fields. Publish the English question through update_quotation with no edits unless text needs translation.', previousQuestion: conversationContext.current.question, previousAnswer: conversationContext.current.heard, pendingReview: pendingNext.current ? reviewFields : [], pendingFocus: fieldStateCurrent.current.step }) }] } });
         respond();
       };
       events.onmessage = event => {
         if (version !== generation.current) return;
         let value; try { value = JSON.parse(event.data); } catch { return; }
-        if (value.type === 'input_audio_buffer.speech_started' && !finishing.current) { setStatus('Listening'); armIdle(); }
+        if (value.type === 'input_audio_buffer.speech_started' && !finishing.current) { setStatus('Listening'); setHeard(''); armIdle(); }
         if (value.type === 'input_audio_buffer.speech_stopped' && !finishing.current) setStatus('Thinking');
         if (value.type === 'input_audio_buffer.committed' && !finishing.current) respond();
         if (value.type === 'response.created') responseActive.current = true;
@@ -292,6 +277,14 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   }, []);
   const running = connected || status === 'Connecting' || status === 'Allow microphone';
   const focusedPrompt = guidedPrompts[fieldState.step];
+  function confirmField() {
+    if (!pendingNext.current || responseActive.current || applying.current || !connected) return;
+    if (JSON.stringify(latest.current.getCurrentDraft()) !== snapshot.current) { setError('The main form changed. Hold and resume to use your edits.'); return; }
+    const next = pendingNext.current; pendingNext.current = null; setReviewFields([]);
+    setFieldState(next); setFieldValue(guidedDefault(next, currentDraft.current));
+    emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ confirmed: true, instruction: 'The user checked the populated fields and clicked Next. Continue to the next missing field without repeating or duplicating confirmed edits.', nextFocus: next.step, draft: currentDraft.current }) }] } });
+    respond(); setStatus('Thinking'); armIdle();
+  }
   function enterField(value: string) {
     if (!connected || responseActive.current || applying.current) return;
     try {
@@ -304,30 +297,32 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         snapshot.current = after; currentDraft.current = result.draft;
         undo.current = [...undo.current.slice(-9), { draft: before, after }]; setUndoCount(undo.current.length); setUpdates(count => count + 1);
       }
-      setFieldState(result.state); setFieldValue(guidedDefault(result.state, result.draft));
-      emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ typedField: fieldState.step, entered: value, currentDraft: result.draft, nextFocus: result.state.step, instruction: 'This typed answer is already applied to the unsaved form. Continue naturally from this draft. Do not duplicate this edit or item. Ask the next missing question and publish its focus.' }) }] } });
+      const changes = changedFields(before, result.draft);
+      if (changes.length) { pendingNext.current = result.state; setReviewFields(changes); }
+      else { pendingNext.current = null; setReviewFields([]); setFieldState(result.state); setFieldValue(guidedDefault(result.state, result.draft)); }
+      emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ typedField: fieldState.step, entered: value, currentDraft: result.draft, pendingReview: changes, nextFocus: result.state.step, instruction: changes.length ? 'This typed answer is already applied. Read back the entered value briefly and ask the user to check it. Keep the current field focus. Do not duplicate edits or advance until yes/next/correct confirmation.' : 'Continue from this choice and ask the next field.' }) }] } });
       respond(); setStatus('Thinking'); setError('');
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update the field.'); }
   }
-  return <section className="rounded-2xl border border-orange-200 bg-orange-50/60 p-4 dark:border-orange-900 dark:bg-orange-950/20" aria-label="Quotation voice assistant">
+  return <section className="overflow-hidden rounded-2xl border border-orange-200 bg-background p-4 shadow-sm dark:border-orange-900" aria-label="Quotation voice assistant">
     <div className="flex items-start gap-3">
       <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white ${connected ? 'ring-4 ring-orange-200 dark:ring-orange-900' : ''}`}><Mic className="h-5 w-5" /></div>
-      <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Quotation voice assistant <span className="ml-1 text-xs font-normal text-muted-foreground" role="status">{status}</span></h2>
-        <p className="mt-1 text-sm" aria-live="polite">{question}</p>
-        {heard && <p className="mt-1 text-xs text-muted-foreground">You: {heard}</p>}
-        {updates > 0 && <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">Quotation fields updated below.</p>}
+      <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Quotation assistant</h2><span className="text-xs text-muted-foreground" role="status">{holding ? 'On hold · microphone off' : status === 'Listening' ? 'Your turn · microphone on' : status}</span>
+        {updates > 0 && <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">Fields updated below</p>}
       </div>
       <Button variant="ghost" size="icon" aria-label="Close voice assistant" className="h-8 w-8" onClick={() => { stop(); onClose(); }}><X className="h-4 w-4" /></Button>
     </div>
+    <div aria-label="Current conversation" className="mt-3 space-y-2 rounded-xl bg-muted/40 p-3"><p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Assistant</p><p className="text-sm leading-relaxed" aria-live="polite">{question}</p>{heard && <div className="mt-2 border-t pt-2"><p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Your answer</p><p className="mt-1 text-sm">{heard}</p></div>}</div>
+    {reviewFields.length > 0 && <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50/60 p-3 dark:border-orange-900 dark:bg-orange-950/20"><p className="text-sm font-semibold">Check what I entered</p><dl className="mt-2 space-y-1">{reviewFields.map((entry, index) => <div key={`${entry.label}:${index}`} className="flex flex-wrap justify-between gap-x-4 text-sm"><dt className="text-muted-foreground">{entry.label}</dt><dd className="font-medium">{entry.value}</dd></div>)}</dl><Button type="button" size="sm" className="mt-3" disabled={status !== 'Listening' || !connected} onClick={confirmField}>Looks right · Next</Button><p className="mt-2 text-xs text-muted-foreground">Or say “sahi hai” to continue. Tell me if anything needs correcting.</p></div>}
     {connected && !finishing.current && fieldState.step !== 'review' && <div className="mt-3 rounded-xl border bg-background p-3"><label htmlFor="conversation-field" className="mb-2 block text-sm font-medium">{focusedPrompt.label}</label>
       {focusedPrompt.choices ? <div className="flex flex-wrap gap-2">{focusedPrompt.choices.map(choice => <Button key={choice.value} type="button" size="sm" variant="outline" disabled={status !== 'Listening'} onClick={() => enterField(choice.value)}>{choice.label}</Button>)}</div>
-        : <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (fieldState.step === 'sectionChoice') { emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `Use section ${fieldValue}` }] } }); respond(); setStatus('Thinking'); } else enterField(fieldValue); }}><Input id="conversation-field" value={fieldValue} maxLength={focusedPrompt.numeric ? 20 : 1000} inputMode={focusedPrompt.numeric ? 'decimal' : 'text'} onChange={event => setFieldValue(event.target.value)} placeholder={focusedPrompt.numeric ? 'Enter a number' : 'Type in English, or tell me aloud'} /><Button type="submit" size="sm" disabled={status !== 'Listening' || !fieldValue.trim()}>Continue</Button></form>}
+        : <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (fieldState.step === 'sectionChoice') { emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `Use section ${fieldValue}` }] } }); respond(); setStatus('Thinking'); } else enterField(fieldValue); }}><Input id="conversation-field" value={fieldValue} maxLength={focusedPrompt.numeric ? 20 : 1000} inputMode={focusedPrompt.numeric ? 'decimal' : 'text'} onChange={event => setFieldValue(event.target.value)} placeholder={focusedPrompt.numeric ? 'Enter a number' : 'Type in English, or tell me aloud'} /><Button type="submit" size="sm" disabled={status !== 'Listening' || !fieldValue.trim()}>{reviewFields.length ? 'Update' : 'Continue'}</Button></form>}
     </div>}
     <div className="mt-3 flex flex-wrap items-center gap-2">
+      {running && <Button type="button" size="sm" variant="outline" onClick={hold}>Hold</Button>}
       {audioBlocked && <Button type="button" size="sm" onClick={() => void enableVoice()}><Volume2 className="h-4 w-4" />Enable voice</Button>}
       {connected && !audioBlocked && !finishing.current && <Button type="button" size="sm" variant="ghost" onClick={repeatQuestion} disabled={status !== 'Listening'}><Volume2 className="h-4 w-4" />Read question</Button>}
-      {holding && <span role="status" className="text-xs text-muted-foreground">{wakeAvailable ? 'On hold · say “Orza” to resume · microphone listening' : 'On hold · voice wake unavailable here'}</span>}
-      {((holding && !wakeAvailable) || (!running && !holding)) && <Button size="sm" variant="outline" onClick={() => void start()}>{holding ? 'Resume' : 'Reconnect'}</Button>}
+      {(!running) && <Button size="sm" variant="outline" onClick={() => void start()}>{holding ? 'Resume' : 'Reconnect'}</Button>}
       <select aria-label="Spoken language" disabled={running} value={language} onChange={event => { const value = event.target.value as VoiceLanguage; setLanguage(value); setSpokenQuestion(openingSpeech(currentDraft.current, value)); setQuestion(initialQuestion(currentDraft.current, 'en-IN')); try { localStorage.setItem('quotation-voice-language', value); } catch { /* Optional. */ } }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hinglish</option></select>
     </div>
     <details className="mt-2"><summary className="cursor-pointer text-xs text-muted-foreground">Type a question or correction</summary>
@@ -337,6 +332,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       respond(); setInput(''); setStatus('Thinking'); armIdle();
     }}><Input aria-label="Your answer or correction" placeholder="Or type an answer or correction..." maxLength={3000} value={input} onChange={event => setInput(event.target.value)} disabled={!connected} className="h-9 bg-background text-sm" /><Button size="sm" type="submit" aria-label="Send answer" disabled={!connected || !input.trim() || status !== 'Listening'}><Send className="h-4 w-4" /></Button></form>
     </details>
+    {messages.length > 1 && <details className="mt-3 border-t pt-2"><summary className="cursor-pointer text-xs text-muted-foreground">Earlier conversation</summary><ol className="mt-2 max-h-40 space-y-3 overflow-y-auto text-xs">{messages.slice(0, -1).map((message, index) => <li key={index}><p className="text-muted-foreground">You: {message.user}</p><p className="mt-1">Assistant: {message.assistant}</p></li>)}</ol></details>}
     {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
   </section>;
 }

@@ -12,14 +12,15 @@ export const realtimeToolSchema = {
     transcript: { type: 'string', description: 'English translation of the latest user answer.' },
     clarification: { type: ['string', 'null'], description: 'Spoken clarification if facts are ambiguous; no edits in this case.' },
     operationsJson: { type: 'string', description: 'JSON array of domain operations. Use only supplied fields; [] for no changes. Never invent numeric values.' },
-    endConversation: { type: 'boolean', description: 'True when the user asks to hold, wait, pause, stop or finish. The app suspends the paid session until the Orza wake call.' },
+    endConversation: { type: 'boolean', description: 'True when the user asks to hold, wait, pause, stop or finish. The app suspends the session until Resume is tapped.' },
+    confirmed: { type: 'boolean', description: 'True only if the user confirms the previously populated values are correct, for example yes, sahi hai, correct, next or continue. False for explanations, corrections or new facts.' },
     focus: { type: 'string', enum: Object.keys(guidedPrompts), description: 'The field or choice that your next question asks about. Keep the same focus while explaining.' },
   },
-  required: ['reply', 'displayReply', 'transcript', 'clarification', 'operationsJson', 'endConversation', 'focus'],
+  required: ['reply', 'displayReply', 'transcript', 'clarification', 'operationsJson', 'endConversation', 'focus', 'confirmed'],
 };
-const wire = z.object({ reply: z.string(), displayReply: z.string(), transcript: z.string(), clarification: z.string().nullable(), operationsJson: z.string().max(65536), endConversation: z.boolean().optional().default(false), focus: z.string().refine(value => Object.hasOwn(guidedPrompts, value)).optional() }).strict();
+const wire = z.object({ reply: z.string(), displayReply: z.string(), transcript: z.string(), clarification: z.string().nullable(), operationsJson: z.string().max(65536), endConversation: z.boolean().optional().default(false), confirmed: z.boolean().optional().default(false), focus: z.string().refine(value => Object.hasOwn(guidedPrompts, value)).optional() }).strict();
 export function parseRealtimeProposal(value: unknown) {
-  const { operationsJson, endConversation: _end, focus: _focus, ...text } = wire.parse(value);
+  const { operationsJson, endConversation: _end, focus: _focus, confirmed: _confirmed, ...text } = wire.parse(value);
   const proposal = proposalSchema.parse({ ...text, operations: JSON.parse(operationsJson) });
   assertEnglishProposal(proposal);
   return proposal;
@@ -33,7 +34,7 @@ export function validateRealtimeChange(before: VoiceDraft, value: unknown) {
   if (operations.length && hasNonEnglishDraft(draft)) throw new Error('Quotation text must be English. No fields changed.');
   const review = reviewDraft(draft);
   const meta = wire.parse(value);
-  return { draft, review, focus: meta.focus as keyof typeof guidedPrompts | undefined, complete: meta.endConversation, changed: operations.length > 0, displayReply: proposal.displayReply!, transcript: proposal.transcript!, reply: proposal.clarification || proposal.reply };
+  return { draft, review, focus: meta.focus as keyof typeof guidedPrompts | undefined, complete: meta.endConversation, confirmed: meta.confirmed, changed: operations.length > 0, displayReply: proposal.displayReply!, transcript: proposal.transcript!, reply: proposal.clarification || proposal.reply };
 }
 export const realtimeOperationInstructions = `Tool operationsJson is a JSON array using these exact shapes:
 {"type":"update_project","fields":{"clientName":"Rahul"}}; project fields: projectTitle,clientName,clientAddress,placeOfProject,projectType.
