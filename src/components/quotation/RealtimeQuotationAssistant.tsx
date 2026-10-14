@@ -12,7 +12,6 @@ import { draftSchema, type VoiceDraft } from '@/lib/quotation-ai/domain';
 import { isFaithfulLanguageRepair, validateRealtimeChange } from '@/lib/quotation-ai/realtime-tools';
 import { initialQuestion, type VoiceLanguage } from '@/lib/quotation-ai/language';
 import type { VoiceAssistantProps } from './VoiceQuotationAssistant';
-import { changedFields, type FieldReview } from '@/lib/quotation-ai/field-review';
 import { ProviderError } from '@/lib/quotation-ai/provider';
 
 
@@ -43,8 +42,6 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   const [fieldState, setFieldState] = useState<GuidedState>(() => nextGuidedState(initialDraft));
   const [fieldValue, setFieldValue] = useState(() => guidedDefault(nextGuidedState(initialDraft), initialDraft));
   const [holding, setHolding] = useState(false);
-  const [reviewFields, setReviewFields] = useState<FieldReview[]>([]);
-  const pendingNext = useRef<GuidedState | null>(null);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const audioBlockedRef = useRef(false);
   const replayRequested = useRef(false);
@@ -109,9 +106,9 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
     snapshot.current = latest.current.onChange(draft, expected);
     currentDraft.current = draft;
     const next = nextGuidedState(draft);
-    pendingNext.current = null; conversationContext.current = { question: initialQuestion(draft, 'en-IN'), heard: '' };
+    conversationContext.current = { question: initialQuestion(draft, 'en-IN'), heard: '' };
     hasUserAnswer.current = false; undo.current = []; seen.current.clear();
-    setReviewFields([]); setHeard(''); setError(''); setFieldState(next); setFieldValue(guidedDefault(next, draft));
+    setHeard(''); setError(''); setFieldState(next); setFieldValue(guidedDefault(next, draft));
     setQuestion(initialQuestion(draft, 'en-IN')); setSpokenQuestion(openingSpeech(draft, language));
     queueMicrotask(() => { if (mounted.current) void startCurrent.current(); });
   }
@@ -144,8 +141,8 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   function armIdle() {
     if (idle.current) clearTimeout(idle.current);
     // Close promptly when the user walks away. Resume restores the local draft
-    // and pending field without paying for an open, silent Realtime session.
-    idle.current = setTimeout(hold, pendingNext.current ? 45000 : 30000);
+    // and current field without paying for an open, silent Realtime session.
+    idle.current = setTimeout(hold, 30000);
   }
   useEffect(() => {
     mounted.current = true;
@@ -204,28 +201,19 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         const previousItem = next.sections.flatMap(section => section.items).find(item => item.id === fieldStateCurrent.current.itemId);
         if (previousItem && !nextField.itemId) { nextField.itemId = previousItem.id; nextField.sectionId = next.sections.find(section => section.items.some(item => item.id === previousItem.id))?.id; }
         if (!nextField.itemId) { const section = next.sections.filter(section => section.items.length).at(-1); if (section) { nextField.sectionId = section.id; nextField.itemId = section.items.at(-1)!.id; } }
-        const changes = changedFields(before, next);
-        let display = body.displayReply; let spoken = body.reply;
-        if (changes.length && !body.complete) {
-          pendingNext.current = nextField; setReviewFields(changes);
-          // Keep the previous field visible for correction until confirmation.
-          setFieldValue(guidedDefault(fieldStateCurrent.current, next));
-          const first = changes[0];
-          display = `Check ${first.label.toLowerCase()}: ${first.value}. Is this correct?`;
-          spoken = language === 'hi-IN' ? `${first.value} fill kar diya. Ek baar check kar lijiye. Sahi hai toh next bol dijiye.` : isNativeHindi(language) ? `${first.value} भर दिया है। एक बार देख लीजिए। सही है तो आगे बोलिए।` : `I entered ${first.value}. Please check it, then say next if it is correct.`;
-        } else if (!pendingNext.current || body.confirmed) {
-          pendingNext.current = null; setReviewFields([]);
-          setFieldState(nextField); setFieldValue(guidedDefault(nextField, next));
-        }
-        setQuestion(display); setSpokenQuestion(spoken); setHeard(body.transcript);
-        conversationContext.current = { question: display, heard: body.transcript };
+        // Move forward immediately after an explicit value. Corrections remain
+        // possible through speech or the visible field; confirmations are saved
+        // for the final quotation review only.
+        setFieldState(nextField); setFieldValue(guidedDefault(nextField, next));
+        setQuestion(body.displayReply); setSpokenQuestion(body.reply); setHeard(body.transcript);
+        conversationContext.current = { question: body.displayReply, heard: body.transcript };
         if (body.complete) {
           finishing.current = true; responsePending.current = false;
           microphone.current?.getTracks().forEach(track => track.stop());
           completionTimer.current = setTimeout(finish, 15000);
         }
         emit({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: call.call_id,
-          output: JSON.stringify({ success: true, draft: next, review: body.review, pendingReview: changes.length ? changes : pendingNext.current ? 'Awaiting confirmation' : null, nextFocus: nextField.step, reply: spoken, instruction: 'Speak the provided reply briefly. If pendingReview is set, wait for confirmation or correction; do not ask the next field yet. Do not call the tool again until a new user answer.' }) } });
+          output: JSON.stringify({ success: true, draft: next, review: body.review, nextFocus: nextField.step, reply: body.reply, instruction: 'Speak the provided reply briefly, then continue directly to nextFocus. Do not request confirmation for an ordinary field value. Only clarify ambiguity or ask for the final quotation review.' }) } });
       }
       if (version === generation.current) { applying.current = false; respond(true); armIdle(); }
     } catch (failure) {
@@ -258,7 +246,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       setStatus('Connecting');
       const before = latest.current.getCurrentDraft();
       const expected = JSON.stringify(before);
-      if (expected !== snapshot.current) { currentDraft.current = before; snapshot.current = expected; undo.current = []; setUndoCount(0); pendingNext.current = null; setReviewFields([]); const next = nextGuidedState(before); setFieldState(next); setFieldValue(guidedDefault(next, before)); }
+      if (expected !== snapshot.current) { currentDraft.current = before; snapshot.current = expected; undo.current = []; setUndoCount(0); const next = nextGuidedState(before); setFieldState(next); setFieldValue(guidedDefault(next, before)); }
       const secret = await api({ action: 'session', language, noisy, draft: currentDraft.current }, abort.signal);
       if (version !== generation.current) return;
       const peer = new RTCPeerConnection(); pc.current = peer;
@@ -284,7 +272,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         // A focused quotation conversation should be short. The saved draft and
         // field state make a fresh session cheaper than retaining a long history.
         sessionTimer.current = setTimeout(hold, 120000);
-        emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ instruction: 'Start or resume the quotation interview from the current draft. If resuming, briefly acknowledge the user and repeat the pending question; do not repeat completed fields. Publish the English question through update_quotation with no edits unless text needs translation.', previousQuestion: conversationContext.current.question, previousAnswer: conversationContext.current.heard, pendingReview: pendingNext.current ? reviewFields : [], pendingFocus: fieldStateCurrent.current.step }) }] } });
+        emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ instruction: 'Start or resume the quotation interview from the current draft. If resuming, briefly acknowledge the user and repeat the current question; do not repeat completed fields. Publish the English question through update_quotation with no edits unless text needs translation.', previousQuestion: conversationContext.current.question, previousAnswer: conversationContext.current.heard, pendingFocus: fieldStateCurrent.current.step }) }] } });
         respond();
       };
       events.onmessage = event => {
@@ -328,15 +316,6 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   }, []);
   const running = connected || status === 'Connecting' || status === 'Allow microphone';
   const focusedPrompt = guidedPrompts[fieldState.step];
-  function confirmField() {
-    if (!pendingNext.current || responseActive.current || applying.current || !connected) return;
-    if (JSON.stringify(latest.current.getCurrentDraft()) !== snapshot.current) { setError('The main form changed. Hold and resume to use your edits.'); return; }
-    const next = pendingNext.current; pendingNext.current = null; setReviewFields([]);
-    hasUserAnswer.current = true;
-    setFieldState(next); setFieldValue(guidedDefault(next, currentDraft.current));
-    emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ confirmed: true, instruction: 'The user checked the populated fields and clicked Next. Continue to the next missing field without repeating or duplicating confirmed edits.', nextFocus: next.step, draft: currentDraft.current }) }] } });
-    respond(); setStatus('Thinking'); armIdle();
-  }
   function enterField(value: string) {
     if (!connected || responseActive.current || applying.current) return;
     hasUserAnswer.current = true;
@@ -350,10 +329,8 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         snapshot.current = after; currentDraft.current = result.draft;
         undo.current = [...undo.current.slice(-9), { draft: before, after }]; setUndoCount(undo.current.length);
       }
-      const changes = changedFields(before, result.draft);
-      if (changes.length) { pendingNext.current = result.state; setReviewFields(changes); }
-      else { pendingNext.current = null; setReviewFields([]); setFieldState(result.state); setFieldValue(guidedDefault(result.state, result.draft)); }
-      emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ typedField: fieldState.step, entered: value, currentDraft: result.draft, pendingReview: changes, nextFocus: result.state.step, instruction: changes.length ? 'This typed answer is already applied. Read back the entered value briefly and ask the user to check it. Keep the current field focus. Do not duplicate edits or advance until yes/next/correct confirmation.' : 'Continue from this choice and ask the next field.' }) }] } });
+      setFieldState(result.state); setFieldValue(guidedDefault(result.state, result.draft));
+      emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ typedField: fieldState.step, entered: value, currentDraft: result.draft, nextFocus: result.state.step, instruction: 'This typed answer is already applied. Briefly acknowledge it and immediately ask the next field. Do not ask for confirmation.' }) }] } });
       respond(); setStatus('Thinking'); setError('');
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update the field.'); }
   }
@@ -364,7 +341,6 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       <Button variant="ghost" size="icon" aria-label="Close voice assistant" className="h-8 w-8" onClick={() => { stop(); onClose(); }}><X className="h-4 w-4" /></Button>
     </div>
     <div aria-label="Current conversation" className="mt-3 rounded-xl bg-orange-50/70 px-3 py-2.5 dark:bg-orange-950/20"><p className="text-sm leading-relaxed" aria-live="polite">{question}</p>{heard && <p className="mt-1 truncate text-xs text-muted-foreground">You: {heard}</p>}</div>
-    {reviewFields.length > 0 && <div aria-label="Field review" className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-orange-200 bg-orange-50/60 px-3 py-2 dark:border-orange-900 dark:bg-orange-950/20"><p className="min-w-0 flex-1 truncate text-sm"><span className="font-medium">Check:</span> {reviewFields.map(entry => `${entry.label}: ${entry.value}`).join(' · ')}</p><Button type="button" size="sm" disabled={status !== 'Listening' || !connected} onClick={confirmField}>Next</Button></div>}
     {connected && !finishing.current && fieldState.step !== 'review' && <div className="mt-2"><label htmlFor="conversation-field" className="sr-only">{focusedPrompt.label}</label>
       {focusedPrompt.choices ? <div className="flex flex-wrap gap-2">{focusedPrompt.choices.map(choice => <Button key={choice.value} type="button" size="sm" variant="outline" disabled={status !== 'Listening'} onClick={() => enterField(choice.value)}>{choice.label}</Button>)}</div>
         : <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (fieldState.step === 'sectionChoice') { emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `Use section ${fieldValue}` }] } }); respond(); setStatus('Thinking'); } else enterField(fieldValue); }}><Input id="conversation-field" value={fieldValue} maxLength={focusedPrompt.numeric ? 20 : 1000} inputMode={focusedPrompt.numeric ? 'decimal' : 'text'} onChange={event => setFieldValue(event.target.value)} placeholder={focusedPrompt.numeric ? `Enter ${focusedPrompt.label.toLowerCase()}` : `Type ${focusedPrompt.label.toLowerCase()} or say it`} /><Button type="submit" size="sm" aria-label="Continue" disabled={status !== 'Listening' || !fieldValue.trim()}><Send className="h-4 w-4" /></Button></form>}

@@ -100,10 +100,7 @@ describe('Realtime quotation lifecycle', () => {
     render(<RealtimeQuotationAssistant initialDraft={current} getCurrentDraft={() => current} onChange={onChange} onClose={jest.fn()} />);
     await start(); event({ type: 'response.done', response: { status: 'completed', output: [] } });
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Aslam' } }); fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(current.project.clientName).toBe('Aslam'); expect(fetch).toHaveBeenCalledTimes(2); expect(screen.getByLabelText('Customer name')).toHaveValue('Aslam');
-    expect(screen.getByLabelText('Field review')).toBeInTheDocument();
-    event({ type: 'response.done', response: { status: 'completed', output: [] } }); event({ type: 'output_audio_buffer.stopped' });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(current.project.clientName).toBe('Aslam'); expect(fetch).toHaveBeenCalledTimes(2);
     expect(screen.getByLabelText('Quotation title')).toBeInTheDocument(); expect(screen.queryByLabelText('Field review')).toBeNull();
   });
   it('preserves manual edits before a voice update', async () => {
@@ -112,12 +109,10 @@ describe('Realtime quotation lifecycle', () => {
     await start(); current = { ...current, project: { ...current.project, clientName: 'Manual' } }; event(tool());
     expect(onChange).not.toHaveBeenCalled(); expect(screen.getByRole('alert')).toHaveTextContent('edited manually'); expect(trackStop).toHaveBeenCalled();
   });
-  it('keeps a spoken value under review until the user confirms by voice', async () => {
+  it('advances directly after a spoken value without a confirmation gate', async () => {
     let current = fixture();
     render(<RealtimeQuotationAssistant initialDraft={current} getCurrentDraft={() => current} onChange={draft => { current = draft; return JSON.stringify(draft); }} onClose={jest.fn()} />);
     await start(); event(tool());
-    expect(screen.getByLabelText('Customer name')).toHaveValue('Rahul'); expect(screen.getByLabelText('Field review')).toBeInTheDocument();
-    event({ type: 'response.done', response: { status: 'completed', output: [{ type: 'function_call', name: 'update_quotation', call_id: 'confirm', arguments: JSON.stringify({ reply: 'Quotation ka title kya rakhein?', displayReply: 'What is the quotation title?', transcript: 'Yes, the name is correct.', clarification: null, confirmed: true, endConversation: false, focus: 'projectTitle', operationsJson: '[]' }) }] } });
     expect(screen.queryByLabelText('Field review')).toBeNull(); expect(screen.getByLabelText('Quotation title')).toBeInTheDocument(); expect(current.project.clientName).toBe('Rahul');
   });
   it('ends capture immediately on finish and closes after final playback', async () => {
