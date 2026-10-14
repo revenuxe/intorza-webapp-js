@@ -37,13 +37,14 @@ describe('Realtime quotation lifecycle', () => {
     const retry = tool(); retry.response.output[0].call_id = 'repair'; event(retry);
     expect(onChange).toHaveBeenCalledTimes(1); expect(current.project.clientName).toBe('Rahul'); expect(screen.queryByRole('alert')).toBeNull();
   });
-  it('stops after one failed repair without a loop or any field mutation', async () => {
+  it('keeps listening after a failed repair without mutating fields', async () => {
     const onChange = jest.fn();
     render(<RealtimeQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={onChange} onClose={jest.fn()} />);
     await start();
     const bad = tool(); const args = JSON.parse(bad.response.output[0].arguments); args.displayReply = 'ग्राहक का नाम'; bad.response.output[0].arguments = JSON.stringify(args);
     event(bad); bad.response.output[0].call_id = 'repair'; event(bad);
-    expect(onChange).not.toHaveBeenCalled(); expect(screen.getByRole('alert')).toHaveTextContent('Could not translate'); expect(close).toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalled(); expect(screen.queryByRole('alert')).toBeNull(); expect(close).not.toHaveBeenCalled();
+    expect(screen.getByText('I could not understand that answer. Please say it again.')).toBeInTheDocument();
   });
   it('opens just one microphone session under Strict Mode', async () => {
     render(<StrictMode><RealtimeQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} /></StrictMode>);

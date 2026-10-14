@@ -225,6 +225,25 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
           emit({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: failedCallId,
             output: JSON.stringify({ success: false, code: 'AI_LANGUAGE_INVALID', changed: false, instruction: `No fields changed. Retry the same rejected tool call ONCE. Translate displayReply and transcript into English sentences in Latin letters. Translate quotation text into English, Roman proper names only. Keep reply strictly in ${languageName(language)}. Preserve every numeric value, ID and user intent; do not add operations or facts. If there was no user answer, use empty transcript with no operations.` }) } });
           respond(); armIdle();
+        } else if (failure instanceof ProviderError && (failure.code === 'AI_LANGUAGE_INVALID' || failure.code === 'AI_TOOL_INVALID')) {
+          // A malformed/unclear model turn must never end a live conversation.
+          // Keep the quotation untouched and ask for the same answer again.
+          const retrySpeech = language === 'hi-IN'
+            ? 'Mujhe jawab samajh nahi aaya. Ek baar phir bol dijiye.'
+            : isNativeHindi(language)
+              ? 'मुझे जवाब समझ नहीं आया। कृपया फिर से बताइए।'
+              : 'I did not catch that. Please say it again.';
+          const retryDisplay = 'I could not understand that answer. Please say it again.';
+          languageFailures.current = 0;
+          rejectedLanguageProposal.current = null;
+          applying.current = false;
+          responsePending.current = false;
+          spokenCurrent.current = retrySpeech;
+          conversationContext.current = { question: retryDisplay, heard: '' };
+          setQuestion(retryDisplay); setSpokenQuestion(retrySpeech); setHeard(''); setError(''); setStatus('Listening');
+          if (failedCallId) emit({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: failedCallId,
+            output: JSON.stringify({ success: false, code: failure.code, changed: false, instruction: `No fields changed. The answer was unclear or could not be safely translated. Ask this exact question in ${languageName(language)} and wait for new user speech: ${retrySpeech}. Do not call update_quotation until the user provides a new answer.` }) } });
+          repeatQuestion(); armIdle();
         } else {
           fail(failure instanceof ProviderError && failure.code === 'AI_LANGUAGE_INVALID' ? 'Could not translate that answer into English. Your fields are unchanged. Tap Reconnect and try again.' : failure instanceof Error ? failure.message : 'Quotation update failed.');
         }
