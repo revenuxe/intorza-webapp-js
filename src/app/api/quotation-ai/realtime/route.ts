@@ -78,7 +78,12 @@ export async function POST(request: Request) {
       body: JSON.stringify({ expires_after: { anchor: 'created_at', seconds: 60 }, session: {
         type: 'realtime', model: (env.OPENAI_REALTIME_MODEL || process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-2.1-mini').trim(),
         instructions: quotationVoicePrompt(input.data.draft, input.data.language),
-        output_modalities: ['audio'], max_output_tokens: 4096,
+        // Quotation turns are deliberately short. Keeping the response ceiling low
+        // protects against an accidental long spoken reply and its audio tokens.
+        output_modalities: ['audio'], max_output_tokens: 512,
+        // The browser owns the verified draft and pending field. Older dialogue is
+        // not needed after a few turns, so keep the Realtime context bounded.
+        truncation: { type: 'retention_ratio', retention_ratio: 0.7, token_limits: { post_instructions: 1200 } },
         audio: { input: { noise_reduction: { type: 'near_field' }, turn_detection: input.data.noisy
           ? { type: 'server_vad', threshold: 0.75, prefix_padding_ms: 300, silence_duration_ms: 650, create_response: false, interrupt_response: true }
           : { type: 'semantic_vad', eagerness: 'high', create_response: false, interrupt_response: true } }, output: { voice: 'marin' } },

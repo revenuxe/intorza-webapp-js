@@ -120,7 +120,9 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   }
   function armIdle() {
     if (idle.current) clearTimeout(idle.current);
-    idle.current = setTimeout(hold, pendingNext.current ? 120000 : 60000);
+    // Close promptly when the user walks away. Resume restores the local draft
+    // and pending field without paying for an open, silent Realtime session.
+    idle.current = setTimeout(hold, pendingNext.current ? 45000 : 30000);
   }
   useEffect(() => {
     mounted.current = true;
@@ -256,7 +258,9 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         if (version !== generation.current) return;
         if (connectionTimer.current) clearTimeout(connectionTimer.current);
         setConnected(true); setStatus('Listening'); armIdle();
-        sessionTimer.current = setTimeout(hold, 300000);
+        // A focused quotation conversation should be short. The saved draft and
+        // field state make a fresh session cheaper than retaining a long history.
+        sessionTimer.current = setTimeout(hold, 120000);
         emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ instruction: 'Start or resume the quotation interview from the current draft. If resuming, briefly acknowledge the user and repeat the pending question; do not repeat completed fields. Publish the English question through update_quotation with no edits unless text needs translation.', previousQuestion: conversationContext.current.question, previousAnswer: conversationContext.current.heard, pendingReview: pendingNext.current ? reviewFields : [], pendingFocus: fieldStateCurrent.current.step }) }] } });
         respond();
       };
