@@ -85,7 +85,7 @@ export async function POST(request: Request) {
         // not needed after a few turns, so keep the Realtime context bounded.
         truncation: { type: 'retention_ratio', retention_ratio: 0.7, token_limits: { post_instructions: 1200 } },
         audio: { input: { noise_reduction: { type: 'near_field' }, turn_detection: input.data.noisy
-          ? { type: 'server_vad', threshold: 0.75, prefix_padding_ms: 300, silence_duration_ms: 650, create_response: false, interrupt_response: true }
+          ? { type: 'server_vad', threshold: 0.82, prefix_padding_ms: 200, silence_duration_ms: 800, create_response: false, interrupt_response: true }
           : { type: 'semantic_vad', eagerness: 'high', create_response: false, interrupt_response: true } }, output: { voice: 'marin' } },
         tools: [{ type: 'function', name: 'update_quotation', description: 'Validate quotation edits and publish English question/transcript. Call before speaking; use no operations for clarification.', parameters: realtimeToolSchema }], tool_choice: 'required',
       } }),

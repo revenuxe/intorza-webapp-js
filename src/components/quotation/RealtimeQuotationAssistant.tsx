@@ -233,8 +233,34 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
           emit({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: failedCallId,
             output: JSON.stringify({ success: false, code: 'AI_LANGUAGE_INVALID', changed: false, instruction: `No fields changed. Retry the same rejected tool call ONCE. Translate displayReply and transcript into English sentences in Latin letters. Translate quotation text into English, Roman proper names only. Keep reply strictly in ${languageName(language)}. Preserve every numeric value, ID and user intent; do not add operations or facts. If there was no user answer, use empty transcript with no operations.` }) } });
           respond(); armIdle();
+        } else if (failure instanceof ProviderError && failure.code === 'AI_LANGUAGE_INVALID') {
+          // A model formatting mistake must not end the customer's flow. The
+          // form was not changed, so retain the connection and use the visible
+          // field for a safe new answer instead of retrying indefinitely.
+          languageFailures.current = 0;
+          rejectedLanguageProposal.current = null;
+          applying.current = false;
+          responsePending.current = false;
+          listeningArmed.current = false;
+          microphone.current?.getTracks().forEach(track => { track.enabled = false; });
+          setListenReady(false);
+          const retryQuestion = 'I could not read that safely. Please type the answer again, or tap Listen and repeat it.';
+          const retrySpeech = language === 'hi-IN'
+            ? 'Mujhe jawab samajh nahi aaya. Kripya dobara boliye ya field mein type kijiye.'
+            : isNativeHindi(language)
+              ? 'मुझे जवाब समझ नहीं आया। कृपया दोबारा बोलिए या फील्ड में टाइप कीजिए।'
+              : 'I did not catch that. Please type the answer again, or tap Listen and repeat it.';
+          conversationContext.current = { question: retryQuestion, heard: '' };
+          setQuestion(retryQuestion);
+          setSpokenQuestion(retrySpeech);
+          setHeard('');
+          setError('');
+          setStatus('Listening');
+          if (failedCallId) emit({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: failedCallId,
+            output: JSON.stringify({ success: false, code: 'AI_LANGUAGE_INVALID', changed: false, instruction: 'Do not retry this answer. Wait for the customer to type or speak a new answer.' }) } });
+          armIdle();
         } else {
-          fail(failure instanceof ProviderError && failure.code === 'AI_LANGUAGE_INVALID' ? 'Could not translate that answer into English. Your fields are unchanged. Tap Reconnect and try again.' : failure instanceof Error ? failure.message : 'Quotation update failed.');
+          fail(failure instanceof Error ? failure.message : 'Quotation update failed.');
         }
       }
     } finally { if (version === generation.current) applying.current = false; }
@@ -337,26 +363,26 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       respond(); setStatus('Thinking'); setError('');
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update the field.'); }
   }
-  return <section className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-orange-200 bg-background p-3 shadow-sm dark:border-orange-900" aria-label="Quotation voice assistant">
+  return <section className="mx-auto w-full min-w-0 max-w-2xl overflow-hidden rounded-2xl border border-orange-200 bg-background p-3 shadow-sm dark:border-orange-900 sm:p-4" aria-label="Quotation voice assistant">
     <div className="flex items-center gap-2">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white ${connected ? 'ring-2 ring-orange-200 dark:ring-orange-900' : ''}`}><Mic className="h-4 w-4" /></div>
       <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Quotation assistant</h2><span className="text-xs text-muted-foreground" role="status">{holding ? 'On hold · microphone off' : status === 'Listening' ? 'Listening' : status}</span></div>
       <Button variant="ghost" size="icon" aria-label="Close voice assistant" className="h-8 w-8" onClick={() => { stop(); onClose(); }}><X className="h-4 w-4" /></Button>
     </div>
-    <div aria-label="Current conversation" className="mt-2 max-h-24 overflow-hidden rounded-xl bg-orange-50/70 px-3 py-2 dark:bg-orange-950/20"><p className="line-clamp-2 text-sm leading-5" aria-live="polite">{question}</p>{heard && <p className="mt-1 truncate text-xs text-muted-foreground">You: {heard}</p>}</div>
+    <div aria-label="Current conversation" className="mt-2 min-w-0 max-h-28 overflow-hidden rounded-xl bg-orange-50/70 px-3 py-2 dark:bg-orange-950/20"><p className="line-clamp-2 break-words text-sm leading-5" aria-live="polite">{question}</p>{heard && <p className="mt-1 truncate text-xs text-muted-foreground">You: {heard}</p>}</div>
     {connected && !finishing.current && fieldState.step !== 'review' && <div className="mt-2"><label htmlFor="conversation-field" className="sr-only">{focusedPrompt.label}</label>
-      {focusedPrompt.choices ? <div className="flex flex-wrap gap-2">{focusedPrompt.choices.map(choice => <Button key={choice.value} type="button" size="sm" variant="outline" disabled={status !== 'Listening'} onClick={() => enterField(choice.value)}>{choice.label}</Button>)}</div>
-        : <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (fieldState.step === 'sectionChoice') { emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `Use section ${fieldValue}` }] } }); respond(); setStatus('Thinking'); } else enterField(fieldValue); }}><Input id="conversation-field" value={fieldValue} maxLength={focusedPrompt.numeric ? 20 : 1000} inputMode={focusedPrompt.numeric ? 'decimal' : 'text'} onChange={event => setFieldValue(event.target.value)} placeholder={`Type ${focusedPrompt.label.toLowerCase()}`} /><Button type="submit" size="sm" aria-label="Continue" disabled={status !== 'Listening' || !fieldValue.trim()}><Send className="h-4 w-4" /></Button></form>}
+      {focusedPrompt.choices ? <div className="flex flex-wrap gap-2">{focusedPrompt.choices.map(choice => <Button key={choice.value} type="button" size="sm" variant="outline" className="max-w-full whitespace-normal text-left" disabled={status !== 'Listening'} onClick={() => enterField(choice.value)}>{choice.label}</Button>)}</div>
+        : <form className="flex min-w-0 gap-2" onSubmit={event => { event.preventDefault(); if (fieldState.step === 'sectionChoice') { emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `Use section ${fieldValue}` }] } }); respond(); setStatus('Thinking'); } else enterField(fieldValue); }}><Input id="conversation-field" className="min-w-0 flex-1" value={fieldValue} maxLength={focusedPrompt.numeric ? 20 : 1000} inputMode={focusedPrompt.numeric ? 'decimal' : 'text'} onChange={event => setFieldValue(event.target.value)} placeholder={`Type ${focusedPrompt.label.toLowerCase()}`} /><Button type="submit" size="sm" aria-label="Continue" disabled={status !== 'Listening' || !fieldValue.trim()}><Send className="h-4 w-4" /></Button></form>}
     </div>}
-    <div className="mt-2 flex items-center gap-1">
+    <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
       <Button type="button" size="sm" variant="ghost" aria-label="Clear quotation and restart AI" title="Clear quotation and restart AI" disabled={status === 'Connecting' || status === 'Allow microphone'} onClick={restartConversation}><RotateCcw className="h-4 w-4" /></Button>
       {running && <Button type="button" size="sm" variant="outline" onClick={hold}>Hold</Button>}
       {connected && !audioBlocked && !finishing.current && <Button type="button" size="sm" onClick={armListening} disabled={listenReady || status !== 'Listening'}>Listen</Button>}
       {audioBlocked && <Button type="button" size="sm" onClick={() => void enableVoice()}><Volume2 className="h-4 w-4" />Enable voice</Button>}
       {connected && !audioBlocked && !finishing.current && <Button type="button" size="sm" variant="ghost" aria-label="Read question" onClick={repeatQuestion} disabled={status !== 'Listening'}><Volume2 className="h-4 w-4" /></Button>}
       {(!running) && <Button size="sm" variant="outline" onClick={() => void start()}>{holding ? 'Resume' : 'Start assistant'}</Button>}
-      <select aria-label="Spoken language" disabled={status === 'Connecting' || status === 'Allow microphone'} value={language} onChange={event => { const value = event.target.value as RealtimeVoiceLanguage; if (running) hold(); setLanguage(value); setSpokenQuestion(openingSpeech(currentDraft.current, value)); setQuestion(initialQuestion(currentDraft.current, 'en-IN')); try { localStorage.setItem('quotation-voice-language', value); } catch { /* Optional preference. */ } }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hinglish</option><option value="hi-IN-native">हिन्दी / Hindi</option></select>
+      <select aria-label="Spoken language" disabled={status === 'Connecting' || status === 'Allow microphone'} value={language} onChange={event => { const value = event.target.value as RealtimeVoiceLanguage; if (running) hold(); setLanguage(value); setSpokenQuestion(openingSpeech(currentDraft.current, value)); setQuestion(initialQuestion(currentDraft.current, 'en-IN')); try { localStorage.setItem('quotation-voice-language', value); } catch { /* Optional preference. */ } }} className="w-full rounded-md border bg-background px-2 py-1.5 text-xs sm:ml-auto sm:w-auto"><option value="en-IN">English</option><option value="hi-IN">Hinglish</option><option value="hi-IN-native">हिन्दी / Hindi</option></select>
     </div>
-    {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+    {error && <p role="alert" className="mt-2 break-words text-sm text-destructive">{error}</p>}
   </section>;
 }
