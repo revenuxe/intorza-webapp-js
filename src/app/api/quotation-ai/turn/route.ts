@@ -1,0 +1,84 @@
+import { createClient } from '@supabase/supabase-js';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+import { z } from 'zod';
+import { applyOperations, draftSchema, reviewDraft } from '@/lib/quotation-ai/domain';
+import { createQuotationProvider } from '@/lib/quotation-ai/provider-factory';
+import { ProviderError } from '@/lib/quotation-ai/provider';
+
+export const dynamic = 'force-dynamic';
+const requestSchema = z.object({
+  draft: draftSchema, message: z.string().trim().min(1).max(3000),
+  language: z.enum(['en-IN', 'hi-IN']),
+  history: z.array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().max(1500) }).strict()).max(8),
+}).strict();
+type RateLimiter = { limit(input: { key: string }): Promise<{ success: boolean }> };
+type AIEnvironment = { GEMINI_API_KEY?: string; QUOTATION_AI_PROVIDER?: string; GEMINI_MODEL?: string; QUOTATION_AI_LIMITER?: RateLimiter };
+const localUsage = new Map<string, { count: number; expires: number }>();
+async function allowed(userId: string, env: AIEnvironment) {
+  if (env.QUOTATION_AI_LIMITER) return (await env.QUOTATION_AI_LIMITER.limit({ key: `quotation-ai:${userId}` })).success;
+  // Production must have the distributed binding; local limits are development-only.
+  if (process.env.NODE_ENV === 'production') throw new ProviderError('AI rate limiting is not configured on the server.', 503);
+  const now = Date.now();
+  for (const [key, value] of localUsage) if (value.expires <= now) localUsage.delete(key);
+  const usage = localUsage.get(userId) ?? { count: 0, expires: now + 60000 };
+  usage.count++;
+  localUsage.set(userId, usage);
+  return usage.count <= 10;
+}
+async function readBody(request: Request) {
+  if (!request.headers.get('content-type')?.includes('application/json')) throw new ProviderError('Send a JSON request.', 415);
+  const reader = request.body?.getReader();
+  if (!reader) throw new ProviderError('Missing request body.', 400);
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 65536) { await reader.cancel(); throw new ProviderError('Quotation request is too large.', 413); }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    throw new ProviderError('Invalid request body.', 400);
+  } finally { reader.releaseLock(); }
+}
+function json(value: unknown, status = 200) {
+  return Response.json(value, { status, headers: { 'Cache-Control': 'private, no-store', ...(status === 429 ? { 'Retry-After': '60' } : {}) } });
+}
+
+export async function POST(request: Request) {
+  try {
+    const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
+    if (!token) return json({ error: 'Sign in to create a quotation with AI.' }, 401);
+    const auth = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { data, error } = await auth.auth.getUser(token);
+    if (error || !data.user) return json({ error: 'Your session expired. Please sign in again.' }, 401);
+    let env: AIEnvironment = {};
+    try { env = (await getCloudflareContext({ async: true })).env as unknown as AIEnvironment; } catch { /* Next.js local development has no Worker bindings. */ }
+    if (!await allowed(data.user.id, env)) return json({ error: 'Please wait a minute before sending another message.' }, 429);
+    const input = requestSchema.safeParse(await readBody(request));
+    if (!input.success) return json({ error: 'The quotation request is invalid or exceeds the draft limits.' }, 400);
+    // Validate uniqueness and the overall item limit before calling a paid service.
+    try { applyOperations(input.data.draft, []); }
+    catch { return json({ error: 'The quotation draft has duplicate identifiers or exceeds its item limits.' }, 400); }
+    const providerName = env.QUOTATION_AI_PROVIDER || process.env.QUOTATION_AI_PROVIDER || 'gemini';
+    const key = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    const provider = createQuotationProvider({ provider: providerName, apiKey: key, model: env.GEMINI_MODEL || process.env.GEMINI_MODEL || 'gemini-3.8-flash' });
+    const proposal = await provider.propose({ draft: input.data.draft, message: input.data.message, history: input.data.history.map(turn => ({ role: turn.role, text: turn.text })), language: input.data.language }, request.signal);
+    // A clarification never mutates state, even if the model also suggests edits.
+    const operations = proposal.clarification ? [] : proposal.operations;
+    let draft;
+    try { draft = applyOperations(input.data.draft, operations); }
+    catch { throw new ProviderError('The proposed change could not be validated. Please clarify the item or measurement.'); }
+    return json({ draft, reply: proposal.clarification || proposal.reply, review: reviewDraft(draft), changed: operations.length > 0 });
+  } catch (error) {
+    if (error instanceof ProviderError) return json({ error: error.message }, error.status);
+    return json({ error: 'Could not process this turn. Your quotation has not changed.' }, 500);
+  }
+}

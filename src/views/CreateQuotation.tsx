@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon } from "lucide-react";
+import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon, Mic, ArrowRight } from "lucide-react";
 import { getCountryByCode } from "@/lib/countryConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,8 @@ import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
 import { GalleryImagePicker } from "@/components/quotation/GalleryImagePicker";
 import { GalleryImage } from "@/hooks/useGallery";
 import { getLibraryTerms, getLibraryPaymentStages, getLibraryBankTemplate } from "@/lib/libraryDefaults";
+import { VoiceQuotationAssistant } from "@/components/quotation/VoiceQuotationAssistant";
+import { fromQuotation, toQuotation, lineAmount, quotationTotals, reviewDraft, type VoiceDraft } from "@/lib/quotation-ai/domain";
 interface LineItem {
   id: string;
   side: string;
@@ -54,6 +56,8 @@ const CreateQuotation = () => {
     toast, feedback, clearFeedback
   } = useInlineFeedback();
   const [isSaving, setIsSaving] = useState(false);
+  const [voiceDraft, setVoiceDraft] = useState<VoiceDraft | null>(null);
+  const lastVoiceDraft = useRef<VoiceDraft | null>(null);
   const [isLoadingQuotation, setIsLoadingQuotation] = useState(false);
   const {
     requireAuth,
@@ -269,7 +273,9 @@ const CreateQuotation = () => {
           }
 
           // Execute the pending action with the fresh profile data
-          if (continueAction === 'saveDraft') {
+          if (continueAction === 'createWithAI') {
+            setVoiceDraft(getVoiceDraft());
+          } else if (continueAction === 'saveDraft') {
             await handleSaveQuotation('draft');
           } else if (continueAction === 'downloadPdf') {
             const savedId = await handleSaveQuotation('pending');
@@ -496,12 +502,12 @@ const CreateQuotation = () => {
           };
           // Auto-calculate sftArea when dimensions change
           if (field === 'widthFt' || field === 'heightFt') {
-            updatedItem.sftArea = updatedItem.widthFt * updatedItem.heightFt;
-            updatedItem.amount = updatedItem.sftArea * updatedItem.ratePerSft;
+            updatedItem.sftArea = Math.round(updatedItem.widthFt * updatedItem.heightFt * 10000) / 10000;
+            updatedItem.amount = lineAmount(updatedItem.sftArea, updatedItem.ratePerSft);
           }
           // Auto-calculate amount when rate or sftArea changes
           if (field === 'ratePerSft' || field === 'sftArea') {
-            updatedItem.amount = updatedItem.sftArea * updatedItem.ratePerSft;
+            updatedItem.amount = lineAmount(updatedItem.sftArea, updatedItem.ratePerSft);
           }
           return updatedItem;
         }
@@ -509,7 +515,6 @@ const CreateQuotation = () => {
       })
     } : section));
   };
-  const subtotal = sections.reduce((sum, section) => sum + section.items.reduce((itemSum, item) => itemSum + item.amount, 0), 0);
 
   // Only applied pricing affects the bill
   const effGstEnabled = appliedPricing.gstEnabled;
@@ -536,10 +541,11 @@ const CreateQuotation = () => {
     toast({ title: "Pricing applied", description: "Totals have been updated." });
   };
 
-  const socialMediaDiscountAmount = effSocialEnabled ? subtotal * (effSocialRate / 100) : 0;
-  const discountAmount = effSocialEnabled ? socialMediaDiscountAmount : subtotal * effDiscountPercentage / 100;
-  const gstAmount = effGstEnabled ? (subtotal - discountAmount) * parseFloat(effGstRate) / 100 : 0;
-  const grandTotal = subtotal - discountAmount + gstAmount;
+  const { subtotal, discount: discountAmount, tax: gstAmount, total: grandTotal } = quotationTotals(
+    sections.flatMap(section => section.items.map(item => item.amount)),
+    { gstEnabled: effGstEnabled, gstRate: Number(effGstRate) || 0, discountPercentage: effDiscountPercentage, enableSocialMediaDiscount: effSocialEnabled, socialMediaDiscountRate: effSocialRate },
+  );
+  const socialMediaDiscountAmount = effSocialEnabled ? discountAmount : 0;
   const getFormData = () => ({
     appliedPricing,
     sections,
@@ -558,6 +564,10 @@ const CreateQuotation = () => {
     enableSocialMediaDiscount,
     socialMediaDiscountRate
   });
+  const getVoiceDraft = () => fromQuotation(
+    { projectTitle, clientName, clientAddress, placeOfProject, projectType }, sections,
+    { gstEnabled, gstRate: Number(gstRate) || 0, discountPercentage, enableSocialMediaDiscount, socialMediaDiscountRate },
+  );
   const handleSaveQuotation = async (status: string, showShare: boolean = false): Promise<string | null> => {
     if (quotationSaveInProgress.current) return null;
     quotationSaveInProgress.current = true;
@@ -571,6 +581,18 @@ const CreateQuotation = () => {
           variant: "destructive"
         });
         return null;
+      }
+      if (status !== 'draft' && lastVoiceDraft.current) {
+        const current = getVoiceDraft();
+        const explicitFreeIds = new Set(lastVoiceDraft.current.sections.flatMap(section => section.items.filter(item => item.ratePerSft === 0).map(item => item.id)));
+        for (const item of current.sections.flatMap(section => section.items)) {
+          if (item.ratePerSft == null && explicitFreeIds.has(item.id)) item.ratePerSft = 0;
+        }
+        const missing = reviewDraft(current).missing;
+        if (missing.length) {
+          toast({ title: 'Quotation needs a few more details', description: `Complete ${missing.slice(0, 3).join(', ')} before finalizing. You can still save a draft.`, variant: 'destructive' });
+          return null;
+        }
       }
       const {
         data: {
@@ -1016,16 +1038,52 @@ const CreateQuotation = () => {
       )}
       <div className="flex flex-col gap-6">
         {/* Header Actions */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Create Quotation</h1>
             <p className="text-sm text-muted-foreground mt-1">Fill in the details to create a new quotation</p>
           </div>
-          <div className="flex gap-2 w-full sm:w-auto">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:shrink-0">
             <QuotationTemplates onSelectTemplate={(newSections) => setSections(newSections)} currentSections={sections} onSetQuotationTitle={(title) => setProjectTitle(title)} countryCode={profile.country_code} />
             <CustomizeFieldsDrawer type="quotation" settings={customizeSettings} onSettingsChange={s => setCustomizeSettings(s as QuotationSettings)} />
+            <Button
+              type="button"
+              size="sm"
+              className="w-full gap-2 bg-orange-600 text-white shadow-sm hover:bg-orange-700 sm:w-auto"
+              onClick={() => requireAuth(async () => {
+                try { setVoiceDraft(getVoiceDraft()); }
+                catch { toast({ title: "Could not open AI draft", description: "Check your pricing values. AI drafts support up to 12 sections and 60 items.", variant: "destructive" }); }
+              }, 'createWithAI', getFormData())}
+            >
+              <Mic className="h-4 w-4" aria-hidden="true" />
+              Create with AI
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </div>
         </div>
+
+        {voiceDraft && <VoiceQuotationAssistant
+          initialDraft={voiceDraft}
+          getCurrentDraft={getVoiceDraft}
+          onClose={() => setVoiceDraft(null)}
+          onChange={(draft, base) => {
+            if (JSON.stringify(getVoiceDraft()) !== base) throw new Error('The quotation was edited while processing your answer. Please try again.');
+            const nextSections = toQuotation(draft, true);
+            lastVoiceDraft.current = draft;
+            setSections(nextSections);
+            setProjectTitle(draft.project.projectTitle);
+            setClientName(draft.project.clientName);
+            setClientAddress(draft.project.clientAddress);
+            setPlaceOfProject(draft.project.placeOfProject);
+            setProjectType(draft.project.projectType);
+            setGstEnabled(draft.pricing.gstEnabled);
+            setGstRate(String(draft.pricing.gstRate));
+            setDiscountPercentage(draft.pricing.discountPercentage);
+            setEnableSocialMediaDiscount(draft.pricing.enableSocialMediaDiscount);
+            setSocialMediaDiscountRate(draft.pricing.socialMediaDiscountRate);
+            return JSON.stringify(fromQuotation(draft.project, nextSections, draft.pricing));
+          }}
+        />}
 
         {/* Project Details */}
         <Card>
