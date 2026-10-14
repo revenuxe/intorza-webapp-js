@@ -11,7 +11,7 @@ export class MetaQuotationProvider implements QuotationAIProvider {
     try {
       const response = await fetch(`${this.baseUrl.replace(/\/$/, '')}/chat/completions`, {
         method: 'POST', signal: deadline, headers: { Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: this.model, reasoning_effort: 'none', max_tokens: 700,
+        body: JSON.stringify({ model: this.model, reasoning_effort: 'none', max_tokens: 420,
           messages: [{ role: 'developer', content: instructions }, { role: 'user', content: JSON.stringify(input) }],
           response_format: { type: 'json_schema', json_schema: { name: 'quotation_turn', strict: true, schema: openAIResponseSchema } },
         }),

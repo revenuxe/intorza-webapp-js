@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const upstream = new FormData();
     upstream.set('request', new Blob([JSON.stringify({ model: (env.META_STT_MODEL || process.env.META_STT_MODEL || 'muse-voice-transcribe-1.0').trim(), audioEncoding: 'WAV', mode: 'PUSH_TO_TALK', languageBias: ['English', 'Hindi'], keywords: ['quotation', 'square feet', 'square foot', 'GST', 'discount', 'rate', 'section'] })], { type: 'application/json' }));
     upstream.set('audio', audio, 'turn.wav');
-    const response = await fetch(`${(env.META_BASE_URL || process.env.META_BASE_URL || 'https://api.meta.ai/v1').replace(/\/$/, '')}/asr/transcribe`, { method: 'POST', signal: AbortSignal.any([request.signal, AbortSignal.timeout(20000)]), headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' }, body: upstream });
+    const response = await fetch(`${(env.META_BASE_URL || process.env.META_BASE_URL || 'https://api.meta.ai/v1').replace(/\/$/, '')}/asr/transcribe`, { method: 'POST', signal: AbortSignal.any([request.signal, AbortSignal.timeout(12000)]), headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' }, body: upstream });
     if (!response.ok) return json('Meta could not transcribe that recording. Please try again.', response.status === 429 ? 429 : 502);
     const body = await response.json();
     if (typeof body.transcript !== 'string' || !body.transcript.trim()) return json('No speech was detected. Please speak again.', 422);
