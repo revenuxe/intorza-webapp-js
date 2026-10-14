@@ -12,6 +12,7 @@ import type { ConversationTurn } from '@/lib/quotation-ai/provider';
 import { initialQuestion, romanLetters, selectSpeechVoice, type VoiceLanguage } from '@/lib/quotation-ai/language';
 import { classifySpeechTurn } from '@/lib/quotation-ai/turn-policy';
 import { hasNonEnglishDraft } from '@/lib/quotation-ai/english-output';
+import { recordMetaVoiceTurn } from '@/lib/quotation-ai/meta-wav-recorder';
 
 export type VoiceAssistantProps = {
   initialDraft: VoiceDraft;
@@ -245,6 +246,18 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
       if (!abort.signal.aborted && mounted.current) { setError(failure instanceof Error ? failure.message : 'Could not connect. Please try again.'); active.current = false; setStatus('paused'); }
     } finally { inFlight.current = false; }
   }
+  async function recordWithMeta() {
+    if (inFlight.current || status !== 'paused') return;
+    setError(''); setStatus('listening');
+    try {
+      const audio = await recordMetaVoiceTurn();
+      const { data } = await supabase.auth.getSession(); if (!data.session) throw new Error('Sign in to use Meta voice.');
+      const form = new FormData(); form.set('audio', audio, 'quotation-turn.wav');
+      const response = await fetch('/api/quotation-ai/transcribe', { method: 'POST', headers: { Authorization: `Bearer ${data.session.access_token}` }, body: form });
+      const body = await response.json(); if (!response.ok || typeof body.transcript !== 'string') throw new Error(body.error || 'Meta could not transcribe that answer.');
+      setHeard(romanLetters(body.transcript)); setInput(romanLetters(body.transcript)); await send(body.transcript);
+    } catch (failure) { setStatus('paused'); setError(failure instanceof Error ? failure.message : 'Meta voice could not start.'); }
+  }
   function undoLast() {
     const entry = undo.current[undo.current.length - 1];
     if (!entry) return;
@@ -273,6 +286,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
     </div>
     {needsEnglish && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span>Existing quotation text needs English translation.</span><Button size="sm" variant="outline" disabled={status !== 'paused'} onClick={() => { active.current = false; void send('Translate all existing quotation section titles, product names, descriptions, project details and client names into English or Roman proper-name spellings. Preserve IDs, measurements, prices and pricing.'); }}>Convert existing text to English</Button></div>}
     <div className="mt-3 flex flex-wrap items-center gap-2">
+      <Button type="button" size="sm" disabled={working || status !== 'paused'} onClick={() => void recordWithMeta()}><Mic className="h-4 w-4" />Meta voice</Button>
       <Button type="button" size="sm" variant="outline" disabled={!supported || working} onClick={() => { if (status !== 'paused') pause(); else { active.current = true; listen(); } }}>{status === 'paused' ? <Mic className="h-4 w-4" /> : <Pause className="h-4 w-4" />}{status === 'paused' ? t('Speak', 'à¤¬à¥‹à¤²à¤¿à¤') : t('Pause', 'à¤°à¥‹à¤•à¥‡à¤‚')}</Button>
       <QuestionPlayback text={spokenQuestion.current} language={language} disabled={working || status !== 'paused'} onStart={pause} />
       <Button type="button" size="sm" variant="ghost" disabled={!undoCount || status !== 'paused'} onClick={undoLast}><Undo2 className="h-4 w-4" />{t('Undo', 'à¤ªà¤¿à¤›à¤²à¤¾ à¤¬à¤¦à¤²à¤¾à¤µ à¤¹à¤Ÿà¤¾à¤à¤')}</Button>
