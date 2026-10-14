@@ -1,5 +1,7 @@
 # Security rollout status — 14 October 2026
 
+Cleanup update: after the user confirmed provider configuration, local webhook/Turnstile secret staging files and one-time provisioning scripts were removed. Earlier staging-file instructions below are historical; use the providers' secret settings or a password manager. Backend environment lookups remain necessary. The signed probe now accepts its secret only from the process environment.
+
 This supersedes the earlier audit statements that the prepared fixes were undeployed.
 
 ## Deployed and verified

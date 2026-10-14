@@ -1,5 +1,7 @@
 # Post-dashboard security reassessment
 
+Secret cleanup update: exact comparisons found zero staged webhook/Turnstile secret matches in tracked files, local Git history or browser assets. Local staging copies and one-time provisioning scripts were removed; deployed provider secrets were not changed. The previously conversation-disclosed webhook value still requires coordinated provider rotation; deleting a file does not rotate it.
+
 ## Verified current state
 
 The Cloudflare build, TypeScript and 89 unit tests pass. OpenNext reports native Windows and bundled dependency warnings; those are not evidence of an authorization bypass. This check rebuilt locally, without republishing the unchanged app.
