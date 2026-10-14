@@ -31,6 +31,43 @@ export const guidedPrompts: Record<GuidedStep, Prompt> = {
   review: { label: 'Review quotation', english: 'Your quotation details are ready. Review the fields, apply pricing, and check terms before saving.', hindi: 'कोटेशन की जानकारी तैयार है। नीचे जानकारी और शर्तें जाँचिए, प्राइसिंग लागू कीजिए, फिर सेव कीजिए।' },
 };
 const projectSteps = ['clientName', 'projectTitle', 'clientAddress', 'placeOfProject', 'projectType'] as const;
+const hinglish: Record<GuidedStep, string> = {
+  clientName: 'Customer ka naam yahan type kijiye.',
+  projectTitle: 'Quotation ka title kya rakhein?',
+  clientAddress: 'Customer ka address add karna hai? Nahi toh skip kar dijiye.',
+  placeOfProject: 'Project kis location par hai?',
+  projectType: 'Project type bata dijiye, jaise residential ya office.',
+  sectionChoice: 'Kis room ya section mein kaam add karna hai?',
+  sectionName: 'Section ka naam likhiye, jaise Bedroom ya Kitchen.',
+  productName: 'Kaunsa item add karein? Jaise Wardrobe ya TV unit.',
+  productDetails: 'Material ya finish bata dijiye. Baad mein bhi add kar sakte hain.',
+  side: 'Item ki position add karni hai? Nahi toh skip kar dijiye.',
+  measurementMode: 'Width aur height dalenge, ya direct square feet area?',
+  widthFt: 'Width kitni feet hai? Six feet six inches ke liye six point five daliye.',
+  heightFt: 'Height kitni feet hai?',
+  sftArea: 'Is item ka area kitne square feet hai?',
+  ratePerSft: 'Per square foot rate kitna hai?',
+  addItem: 'Isi section mein aur item add karein?',
+  addSection: 'Kisi aur room ya section ka kaam add karna hai?',
+  gstEnabled: 'GST add karna hai?',
+  gstRate: 'GST kitne percent rakhein?',
+  discountMode: 'Discount dena hai? Normal ya social media discount choose kar lijiye.',
+  discountPercentage: 'Kitne percent discount dein?',
+  socialMediaDiscountRate: 'Social media discount kitne percent rakhein?',
+  review: 'Details ready hain. Ek baar quotation check kar lijiye, phir save kar sakte hain.',
+};
+// Hindi selection uses familiar Hindi/English wording, not formal Hindi.
+for (const step of Object.keys(hinglish) as GuidedStep[]) guidedPrompts[step].hindi = hinglish[step];
+export function nextGuidedState(draft: VoiceDraft): GuidedState {
+  if (!draft.project.clientName.trim()) return { step: 'clientName' };
+  if (!draft.project.projectTitle.trim()) return { step: 'projectTitle' };
+  return repairMissingItem(draft) || { step: draft.sections.some(section => section.items.length) ? 'addSection' : 'sectionChoice' };
+}
+export function quickGuidedState(state: GuidedState): GuidedState {
+  if (state.step === 'clientAddress' || state.step === 'placeOfProject' || state.step === 'projectType') return { step: 'sectionChoice' };
+  if (state.step === 'side') return { ...state, step: 'measurementMode' };
+  return state;
+}
 export function guidedDefault(state: GuidedState, draft: VoiceDraft): string {
   const english = (value: string) => isEnglishScript(value) ? value : '';
   if (projectSteps.some(step => step === state.step)) return english(draft.project[state.step as typeof projectSteps[number]]);

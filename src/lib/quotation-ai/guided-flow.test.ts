@@ -1,8 +1,15 @@
 /** @jest-environment node */
-import { advanceGuided, type GuidedState } from './guided-flow';
+import { advanceGuided, nextGuidedState, quickGuidedState, type GuidedState } from './guided-flow';
 import { reviewDraft, type VoiceDraft } from './domain';
 function fixture(): VoiceDraft { return { version: 1, revision: 0, project: { projectTitle: '', clientName: '', clientAddress: '', placeOfProject: '', projectType: '' }, pricing: { gstEnabled: false, gstRate: 18, discountPercentage: 0, enableSocialMediaDiscount: false, socialMediaDiscountRate: 6 }, sections: [{ id: 'room', title: '', items: [] }] }; }
 describe('guided quotation workflow', () => {
+  it('shortens optional steps and resumes from the missing billable detail after AI entry', () => {
+    expect(quickGuidedState({ step: 'clientAddress' })).toEqual({ step: 'sectionChoice' });
+    expect(quickGuidedState({ step: 'side', sectionId: 'room', itemId: 'item' })).toEqual({ step: 'measurementMode', sectionId: 'room', itemId: 'item' });
+    const draft = fixture(); draft.project.clientName = 'Aslam'; draft.project.projectTitle = 'Home';
+    draft.sections[0].items.push({ id: 'item', productName: 'Wardrobe', productDetails: '', side: '', measurementMode: 'dimensions', widthFt: 6, heightFt: 8, sftArea: null, ratePerSft: null });
+    expect(nextGuidedState(draft)).toEqual({ step: 'ratePerSft', sectionId: 'room', itemId: 'item' });
+  });
   it('completes multiple items with dimensions, direct area, tax and discount', () => {
     let state: GuidedState = { step: 'clientName' }; let draft = fixture(); let sequence = 0;
     const answers = ['Rahul', 'Home interiors', '', 'Delhi', 'Residential', 'new', 'Bedroom', 'Wardrobe', 'White laminate', '', 'dimensions', '6.5', '8', '100', 'yes', 'Wall panel', '', '', 'direct_area', '12.5', '80', 'no', 'no', 'yes', '18', 'standard', '10'];

@@ -4,6 +4,7 @@ import { Volume2, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import type { VoiceLanguage } from '@/lib/quotation-ai/language';
+import { prepareVoiceAudio, timedVoiceRequest } from '@/lib/quotation-ai/audio-compat';
 
 export function QuestionPlayback({ text, language, onStart, disabled = false, autoPlay = false }: { text: string; language: VoiceLanguage; onStart: () => void; disabled?: boolean; autoPlay?: boolean }) {
   const [state, setState] = useState<'idle' | 'loading' | 'playing' | 'blocked'>('idle');
@@ -15,7 +16,7 @@ export function QuestionPlayback({ text, language, onStart, disabled = false, au
   const version = useRef(0);
   function release() {
     version.current++; abort.current?.abort();
-    if (audio.current) { audio.current.onended = null; audio.current.onerror = null; audio.current.pause(); audio.current.removeAttribute('src'); audio.current = null; }
+    if (audio.current) { audio.current.onended = null; audio.current.onerror = null; audio.current.pause(); audio.current.removeAttribute('src'); }
     if (url.current) { URL.revokeObjectURL(url.current); url.current = null; }
   }
   useEffect(() => { release(); setState('idle'); setError(''); return release; }, [text, language, disabled, autoPlay]);
@@ -36,8 +37,11 @@ export function QuestionPlayback({ text, language, onStart, disabled = false, au
     if (!force && state === 'blocked' && audio.current) { setError(''); void play(audio.current, version.current); return; }
     if (!force && (state === 'loading' || state === 'playing')) { release(); setState('idle'); return; }
     onStart(); release(); setError(''); setState('loading');
+    // Reuse the element unlocked by Play question across subsequent prompts.
+    const player = audio.current || new Audio(); audio.current = player; prepareVoiceAudio(player);
     const expected = version.current;
     const controller = new AbortController(); abort.current = controller;
+    const deadline = timedVoiceRequest(controller.signal, 25000);
     try {
       const key = `${language}:${text}`;
       let blob = cache.current.get(key);
@@ -45,7 +49,7 @@ export function QuestionPlayback({ text, language, onStart, disabled = false, au
         const { data } = await supabase.auth.getSession();
         if (!data.session) throw new Error('Sign in to hear the question.');
         if (expected !== version.current || controller.signal.aborted) return;
-        const response = await fetch('/api/quotation-ai/speech', { method: 'POST', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(25000)]), headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify({ text, language }) });
+        const response = await fetch('/api/quotation-ai/speech', { method: 'POST', signal: deadline.signal, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify({ text, language }) });
         if (!response.ok) { const body = await response.json(); throw new Error(body.upstreamStatus === 429 ? 'Voice limit reached. Try later or use device voice.' : 'Question audio could not load. Try again.'); }
         blob = await response.blob();
         if (!blob.size) throw new Error('The speech service returned empty audio.');
@@ -54,11 +58,12 @@ export function QuestionPlayback({ text, language, onStart, disabled = false, au
       }
       if (expected !== version.current || controller.signal.aborted) return;
       url.current = URL.createObjectURL(blob);
-      const player = new Audio(url.current); audio.current = player;
+      player.src = url.current;
       player.onended = () => { if (expected === version.current) { release(); setState('idle'); } };
       player.onerror = () => { if (expected === version.current) { release(); setState('idle'); setError('Question audio could not play. Try again.'); } };
       await play(player, expected);
-    } catch (failure) { if (expected === version.current && !controller.signal.aborted) { release(); setState('idle'); setError(failure instanceof Error ? failure.message : 'Question audio could not load.'); } }
+    } catch (failure) { if (expected === version.current && !controller.signal.aborted) { release(); setState('idle'); setError(deadline.signal.aborted ? 'Audio took too long to load. Tap Read question to retry.' : failure instanceof Error ? failure.message : 'Question audio could not load.'); } }
+    finally { deadline.dispose(); }
   }
   const readCurrent = useRef(read); readCurrent.current = read;
   useEffect(() => { if (autoPlay && !disabled) void readCurrent.current(true); }, [text, language, autoPlay, disabled]);

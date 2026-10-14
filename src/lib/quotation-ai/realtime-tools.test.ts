@@ -1,0 +1,16 @@
+/** @jest-environment node */
+import { validateRealtimeChange } from './realtime-tools';
+import type { VoiceDraft } from './domain';
+const draft: VoiceDraft = { version: 1, revision: 0, project: { projectTitle: 'Home', clientName: 'Aslam', clientAddress: '', placeOfProject: '', projectType: '' }, pricing: { gstEnabled: false, gstRate: 18, discountPercentage: 0, enableSocialMediaDiscount: false, socialMediaDiscountRate: 6 }, sections: [{ id: 'bedroom', title: 'Bedroom', items: [{ id: 'wardrobe', productName: 'Wardrobe', productDetails: '', side: '', measurementMode: 'dimensions', widthFt: 6, heightFt: 8, sftArea: null, ratePerSft: 1200 }] }] };
+it('keeps a completed item conversation open for tax, discounts and more items', () => {
+  const result = validateRealtimeChange(draft, { reply: 'GST add karna hai?', displayReply: 'Should we add GST?', transcript: 'The wardrobe details are complete.', clarification: null, operationsJson: '[]', endConversation: false, focus: 'gstEnabled' });
+  expect(result.complete).toBe(false); expect(result.focus).toBe('gstEnabled'); expect(result.review.missing).toEqual([]);
+});
+it('explains matlab without changing fields or advancing focus', () => {
+  const result = validateRealtimeChange(draft, { reply: 'Rate matlab ek square foot ka price. Apna rate bata dijiye.', displayReply: 'Rate means the price for one square foot. Enter your rate.', transcript: 'What does rate mean?', clarification: 'Rate matlab ek square foot ka price. Apna rate bata dijiye.', operationsJson: JSON.stringify([{ type: 'update_item', itemId: 'wardrobe', fields: { ratePerSft: 999 } }]), endConversation: false, focus: 'ratePerSft' });
+  expect(result.changed).toBe(false); expect(result.draft.sections[0].items[0].ratePerSft).toBe(1200); expect(result.focus).toBe('ratePerSft');
+});
+it('fills English product text and honors an explicit conversation end', () => {
+  const result = validateRealtimeChange(draft, { reply: 'White laminate add kar diya.', displayReply: 'White laminate added.', transcript: 'Please enter white laminate and finish.', clarification: null, operationsJson: JSON.stringify([{ type: 'update_item', itemId: 'wardrobe', fields: { productDetails: 'White laminate' } }]), endConversation: true, focus: 'review' });
+  expect(result.draft.sections[0].items[0].productDetails).toBe('White laminate'); expect(result.complete).toBe(true);
+});

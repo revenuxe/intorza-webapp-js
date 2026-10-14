@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { applyOperations, proposalSchema, reviewDraft, type VoiceDraft } from './domain';
 import { assertEnglishProposal, hasNonEnglishDraft } from './english-output';
+import { guidedPrompts } from './guided-flow';
 
 // A compact wire format avoids generating dozens of unused null fields per edit.
 export const realtimeToolSchema = {
@@ -11,13 +12,14 @@ export const realtimeToolSchema = {
     transcript: { type: 'string', description: 'English translation of the latest user answer.' },
     clarification: { type: ['string', 'null'], description: 'Spoken clarification if facts are ambiguous; no edits in this case.' },
     operationsJson: { type: 'string', description: 'JSON array of domain operations. Use only supplied fields; [] for no changes. Never invent numeric values.' },
-    endConversation: { type: 'boolean', description: 'True only when the user explicitly asks to stop, finish or end the conversation.' },
+    endConversation: { type: 'boolean', description: 'True when the user asks to hold, wait, pause, stop or finish. The app suspends the paid session until the Orza wake call.' },
+    focus: { type: 'string', enum: Object.keys(guidedPrompts), description: 'The field or choice that your next question asks about. Keep the same focus while explaining.' },
   },
-  required: ['reply', 'displayReply', 'transcript', 'clarification', 'operationsJson', 'endConversation'],
+  required: ['reply', 'displayReply', 'transcript', 'clarification', 'operationsJson', 'endConversation', 'focus'],
 };
-const wire = z.object({ reply: z.string(), displayReply: z.string(), transcript: z.string(), clarification: z.string().nullable(), operationsJson: z.string().max(65536), endConversation: z.boolean().optional().default(false) }).strict();
+const wire = z.object({ reply: z.string(), displayReply: z.string(), transcript: z.string(), clarification: z.string().nullable(), operationsJson: z.string().max(65536), endConversation: z.boolean().optional().default(false), focus: z.string().refine(value => Object.hasOwn(guidedPrompts, value)).optional() }).strict();
 export function parseRealtimeProposal(value: unknown) {
-  const { operationsJson, endConversation: _end, ...text } = wire.parse(value);
+  const { operationsJson, endConversation: _end, focus: _focus, ...text } = wire.parse(value);
   const proposal = proposalSchema.parse({ ...text, operations: JSON.parse(operationsJson) });
   assertEnglishProposal(proposal);
   return proposal;
@@ -30,7 +32,8 @@ export function validateRealtimeChange(before: VoiceDraft, value: unknown) {
   const draft = applyOperations(before, operations);
   if (operations.length && hasNonEnglishDraft(draft)) throw new Error('Quotation text must be English. No fields changed.');
   const review = reviewDraft(draft);
-  return { draft, review, complete: wire.parse(value).endConversation || review.missing.length === 0, changed: operations.length > 0, displayReply: proposal.displayReply!, transcript: proposal.transcript!, reply: proposal.clarification || proposal.reply };
+  const meta = wire.parse(value);
+  return { draft, review, focus: meta.focus as keyof typeof guidedPrompts | undefined, complete: meta.endConversation, changed: operations.length > 0, displayReply: proposal.displayReply!, transcript: proposal.transcript!, reply: proposal.clarification || proposal.reply };
 }
 export const realtimeOperationInstructions = `Tool operationsJson is a JSON array using these exact shapes:
 {"type":"update_project","fields":{"clientName":"Rahul"}}; project fields: projectTitle,clientName,clientAddress,placeOfProject,projectType.

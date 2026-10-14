@@ -13,14 +13,14 @@ it('shows one field, fills the form immediately and supports Back with no paid r
   expect(current.project.clientName).toBe('Rahul'); expect(screen.getByLabelText('Quotation title')).toHaveFocus(); expect(screen.queryByLabelText('Customer name')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Back' })); expect(current.project.clientName).toBe(''); expect(screen.getByLabelText('Customer name')).toBeInTheDocument(); expect(fetch).not.toHaveBeenCalled();
 });
-it('speaks Hindi while the question and input stay English', () => {
+it('speaks Hinglish while the question and input stay English', () => {
   const speak = jest.fn(); const cancel = jest.fn();
   Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: { speak, cancel, resume: jest.fn(), getVoices: () => [{ lang: 'hi-IN' }], speaking: false } });
   Object.defineProperty(window, 'SpeechSynthesisUtterance', { configurable: true, value: class { constructor(public text: string) {} } });
   const view = render(<GuidedQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} onLive={jest.fn()} />);
   fireEvent.click(screen.getByRole('checkbox', { name: 'OpenAI voice (paid, AI-generated)' }));
   fireEvent.change(screen.getByLabelText('Spoken language'), { target: { value: 'hi-IN' } }); fireEvent.click(screen.getByRole('button', { name: 'Start guide' }));
-  expect(speak.mock.calls[0][0].text).toContain('ग्राहक'); expect(screen.getByLabelText('Customer name')).toBeInTheDocument();
+  expect(speak.mock.calls[0][0].text).toBe('Customer ka naam yahan type kijiye.'); expect(screen.getByLabelText('Customer name')).toBeInTheDocument();
   expect(screen.getByText('Please type the customer name here.')).toBeInTheDocument(); view.unmount(); expect(cancel).toHaveBeenCalled();
 });
 it('preserves manual edits and reports a conflict', () => {

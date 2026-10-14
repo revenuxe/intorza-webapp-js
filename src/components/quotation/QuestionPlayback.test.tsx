@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QuestionPlayback } from './QuestionPlayback';
 jest.mock('@/integrations/supabase/client', () => ({ supabase: { auth: { getSession: jest.fn().mockResolvedValue({ data: { session: { access_token: 'token' } } }) } } }));
-const player = { play: jest.fn(), pause: jest.fn(), removeAttribute: jest.fn(), onended: null as null | (() => void), onerror: null };
+const player = { play: jest.fn(), pause: jest.fn(), removeAttribute: jest.fn(), setAttribute: jest.fn(), onended: null as null | (() => void), onerror: null };
 beforeEach(() => { jest.clearAllMocks(); player.play.mockResolvedValue(undefined); Object.defineProperty(window, 'Audio', { configurable: true, value: jest.fn(() => player) }); global.fetch = jest.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(['mp3']) }); });
 it('provides a user-gesture replay if mobile autoplay is blocked, without paying again', async () => {
   player.play.mockRejectedValueOnce(Object.assign(new Error('Blocked'), { name: 'NotAllowedError' }));

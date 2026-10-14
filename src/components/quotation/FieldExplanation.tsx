@@ -6,6 +6,7 @@ import { browserSpeechInput, type BrowserRecognition } from '@/lib/quotation-ai/
 import type { VoiceLanguage } from '@/lib/quotation-ai/language';
 import { QuestionPlayback } from './QuestionPlayback';
 import { isEnglishScript } from '@/lib/quotation-ai/english-output';
+import { timedVoiceRequest } from '@/lib/quotation-ai/audio-compat';
 
 export function FieldExplanation({ step, language, onStart, onFinish }: { step: string; language: VoiceLanguage; onStart: () => void; onFinish: () => void }) {
   const [result, setResult] = useState<{ display: string; speech: string } | null>(null);
@@ -27,18 +28,20 @@ export function FieldExplanation({ step, language, onStart, onFinish }: { step: 
   async function explain(question = "I didn't understand. Explain what I should enter here.") {
     stop(); onStart(); setError(''); setResult(null); setStatus('Explaining…');
     const expected = version.current; const controller = new AbortController(); abort.current = controller;
+    const deadline = timedVoiceRequest(controller.signal, 18000);
     try {
       const key = `${language}:${step}:${question}`; let answer = cache.current.get(key);
       if (!answer) {
         const { data } = await supabase.auth.getSession(); if (!data.session) throw new Error('Sign in to use AI help.');
         if (expected !== version.current || controller.signal.aborted) return;
-        const response = await fetch('/api/quotation-ai/realtime', { method: 'POST', signal: AbortSignal.any([controller.signal, AbortSignal.timeout(18000)]), headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'explain', step, language, question }) });
+        const response = await fetch('/api/quotation-ai/realtime', { method: 'POST', signal: deadline.signal, headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'explain', step, language, question }) });
         const body = await response.json(); if (!response.ok) throw new Error(body.upstreamStatus === 429 ? 'AI help is unavailable. Check API billing or try later.' : 'Could not explain this field. Try again.');
         if (typeof body.display !== 'string' || !body.display.trim() || !isEnglishScript(body.display) || typeof body.speech !== 'string' || !body.speech.trim()) throw new Error('Could not explain this field. Try again.');
         answer = body; cache.current.set(key, body); if (cache.current.size > 20) cache.current.delete(cache.current.keys().next().value!);
       }
       if (expected === version.current) { setResult(answer!); setStatus(''); }
     } catch (failure) { if (expected === version.current) { setStatus(''); setError(failure instanceof Error ? failure.message : 'AI help is unavailable.'); onFinish(); } }
+    finally { deadline.dispose(); }
   }
   function ask() {
     stop(); onStart(); setError(''); setResult(null);

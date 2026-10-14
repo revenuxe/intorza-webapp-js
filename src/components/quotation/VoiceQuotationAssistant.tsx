@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from 'react';
 import { Loader2, Mic, Pause, Send, Undo2, X } from 'lucide-react';
@@ -261,7 +261,7 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
         const nextLanguage = event.target.value as VoiceLanguage;
         setLanguage(nextLanguage); spokenQuestion.current = initialQuestion(latest.current.getCurrentDraft(), nextLanguage); setQuestion(initialQuestion(latest.current.getCurrentDraft(), 'en-IN')); history.current = []; setSpeechNotice('');
         try { localStorage.setItem('quotation-voice-language', nextLanguage); } catch { /* Optional preference. */ }
-      }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hindi</option></select>
+      }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hinglish</option></select>
     </div>
     <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={reviewSpeech} disabled={status !== 'paused'} onChange={event => setReviewSpeech(event.target.checked)} />{t('Noisy surroundings: review each spoken answer before sending', 'à¤¶à¥‹à¤° à¤µà¤¾à¤²à¥€ à¤œà¤—à¤¹: à¤¹à¤° à¤¬à¥‹à¤²à¥‡ à¤¹à¥à¤ à¤œà¤µà¤¾à¤¬ à¤•à¥‹ à¤­à¥‡à¤œà¤¨à¥‡ à¤¸à¥‡ à¤ªà¤¹à¤²à¥‡ à¤œà¤¾à¤à¤šà¥‡à¤‚')}</label>
     <form className="mt-2 flex gap-2" onSubmit={event => { event.preventDefault(); active.current = false; stopAudio(); void send(input); }}>
@@ -271,6 +271,6 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
     {error && <p role="alert" className="mt-2 text-sm text-destructive">{romanLetters(error)}</p>}
     {speechNotice && <p role="status" className="mt-2 text-xs text-muted-foreground">{romanLetters(speechNotice)}</p>}
     {!supported && <p className="mt-2 text-xs text-muted-foreground">{t('Voice recognition is unavailable in this browser. You can type your answers.', 'à¤‡à¤¸ à¤¬à¥à¤°à¤¾à¤‰à¤œà¤¼à¤° à¤®à¥‡à¤‚ à¤µà¥‰à¤‡à¤¸ à¤ªà¤¹à¤šà¤¾à¤¨ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤ à¤…à¤ªà¤¨à¤¾ à¤œà¤µà¤¾à¤¬ à¤²à¤¿à¤– à¤¸à¤•à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤')}</p>}
-    <details className="mt-2 text-xs text-muted-foreground"><summary>Voice details</summary><p>AI-generated OpenAI voice.</p></details>
+
   </section>;
 }

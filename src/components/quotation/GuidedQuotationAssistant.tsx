@@ -3,12 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Mic, Volume2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { advanceGuided, guidedDefault, guidedPrompts, type GuidedState } from '@/lib/quotation-ai/guided-flow';
+import { advanceGuided, guidedDefault, guidedPrompts, nextGuidedState, quickGuidedState, type GuidedState } from '@/lib/quotation-ai/guided-flow';
 import { reviewDraft, type VoiceDraft } from '@/lib/quotation-ai/domain';
 import { romanLetters, selectSpeechVoice, type VoiceLanguage } from '@/lib/quotation-ai/language';
 import type { VoiceAssistantProps } from './VoiceQuotationAssistant';
 import { QuestionPlayback } from './QuestionPlayback';
 import { FieldExplanation } from './FieldExplanation';
+import { DescribeQuotation } from './DescribeQuotation';
 
 export function GuidedQuotationAssistant({ initialDraft, getCurrentDraft, onChange, onClose, onLive }: VoiceAssistantProps & { onLive: () => void }) {
   const [state, setState] = useState<GuidedState>({ step: 'clientName' });
@@ -18,6 +19,8 @@ export function GuidedQuotationAssistant({ initialDraft, getCurrentDraft, onChan
   const [speaking, setSpeaking] = useState(false);
   const [paidVoice, setPaidVoice] = useState(true);
   const [helpActive, setHelpActive] = useState(false);
+  const [describe, setDescribe] = useState(false);
+  const [detailed, setDetailed] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [historyCount, setHistoryCount] = useState(0);
@@ -65,6 +68,7 @@ export function GuidedQuotationAssistant({ initialDraft, getCurrentDraft, onChan
       if (JSON.stringify(latest.current.getCurrentDraft()) !== snapshot.current) throw new Error('You changed the main form. Pause and restart the guide to use those changes.');
       const before = current.current;
       const result = advanceGuided(state, before, value);
+      if (!detailed) result.state = quickGuidedState(result.state);
       setHelpActive(false);
       if (result.changed) snapshot.current = latest.current.onChange(result.draft, snapshot.current);
       previous.current = [...previous.current.slice(-49), { state, draft: before }]; setHistoryCount(previous.current.length);
@@ -83,16 +87,26 @@ export function GuidedQuotationAssistant({ initialDraft, getCurrentDraft, onChan
   }
   const prompt = guidedPrompts[state.step];
   const choices = state.step === 'sectionChoice' ? [...current.current.sections.filter(section => section.title.trim()).map(section => ({ value: section.id, label: romanLetters(section.title) })), { value: 'new', label: 'Create a new section' }] : prompt.choices;
+  const suggestions = state.step === 'sectionName' ? ['Bedroom', 'Kitchen', 'Living Room'] : state.step === 'productName' ? ['Wardrobe', 'TV Unit', 'Kitchen Cabinet'] : state.step === 'gstRate' ? ['5', '12', '18'] : state.step === 'discountPercentage' || state.step === 'socialMediaDiscountRate' ? ['5', '10', '15'] : [];
   const currentSection = current.current.sections.find(section => section.id === state.sectionId);
   const currentItem = currentSection?.items.find(item => item.id === state.itemId);
   const review = reviewDraft(current.current);
   return <section aria-label="Guided quotation assistant" className="rounded-2xl border border-orange-200 bg-orange-50/60 p-4 dark:border-orange-900 dark:bg-orange-950/20">
-    <div className="flex items-start gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white"><Mic className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Guided quotation <span role="status" className="ml-1 text-xs font-normal text-muted-foreground">{state.step === 'review' ? 'Ready to review' : speaking ? 'Speaking' : started ? 'Waiting for your input' : 'Ready'}</span></h2><p className="mt-1 text-sm" aria-live="polite">{prompt.english}</p></div><Button size="icon" variant="ghost" aria-label="Close quotation guide" onClick={() => { stopSpeech(); onClose(); }}><X className="h-4 w-4" /></Button></div>
-    <div className="mt-3 flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" onClick={() => { if (started) { stopSpeech(); setStarted(false); } else begin(); }}>{started ? 'Pause guide' : 'Start guide'}</Button>
-      {paidVoice ? <QuestionPlayback text={language === 'hi-IN' ? prompt.hindi : prompt.english} language={language} onStart={stopSpeech} autoPlay={started && !helpActive} disabled={helpActive} /> : <Button size="sm" variant="ghost" disabled={helpActive} onClick={() => read(state)}><Volume2 className="h-4 w-4" />Read question</Button>}
-      <select aria-label="Spoken language" value={language} onChange={event => { const value = event.target.value as VoiceLanguage; stopSpeech(); setLanguage(value); try { localStorage.setItem('quotation-voice-language', value); } catch { /* Optional. */ } if (started) read(state, value); }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hindi</option></select>
+    <div className="flex items-start gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white"><Mic className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Quotation assistant <span role="status" className="ml-1 text-xs font-normal text-muted-foreground">{state.step === 'review' ? 'Ready to review' : speaking ? 'Speaking' : started ? 'Your turn' : 'Ready'}</span></h2><p className="mt-1 text-sm" aria-live="polite">{describe ? 'Tell me what you already know. I will help fill the rest.' : prompt.english}</p></div><Button size="icon" variant="ghost" aria-label="Close quotation guide" onClick={() => { stopSpeech(); onClose(); }}><X className="h-4 w-4" /></Button></div>
+    {!describe && <Button size="sm" variant="outline" className="mt-3" onClick={() => { stopSpeech(); setStarted(false); setDescribe(true); }}>Tell AI several details</Button>}
+    {describe && <DescribeQuotation draft={current.current} language={language} onClose={() => setDescribe(false)} onAccept={(next, expected) => {
+      if (JSON.stringify(latest.current.getCurrentDraft()) !== snapshot.current || JSON.stringify(current.current) !== expected) throw new Error('The form changed. Reopen AI entry to use the latest details.');
+      const before = current.current;
+      snapshot.current = latest.current.onChange(next, snapshot.current);
+      previous.current = [...previous.current.slice(-49), { state, draft: before }]; setHistoryCount(previous.current.length);
+      current.current = next; const nextState = nextGuidedState(next); setState(nextState); setAnswer(guidedDefault(nextState, next)); setHelpActive(false); setDescribe(false); setStarted(true); read(nextState);
+    }} />}
+    <div className="mt-3 flex flex-wrap items-center gap-2">{!describe && <Button size="sm" variant="outline" onClick={() => { if (started) { stopSpeech(); setStarted(false); } else begin(); }}>{started ? 'Pause guide' : 'Start guide'}</Button>}
+      {paidVoice ? <QuestionPlayback text={language === 'hi-IN' ? prompt.hindi : prompt.english} language={language} onStart={stopSpeech} autoPlay={started && !helpActive && !describe} disabled={helpActive || describe} /> : <Button size="sm" variant="ghost" disabled={helpActive || describe} onClick={() => read(state)}><Volume2 className="h-4 w-4" />Read question</Button>}
+      <select aria-label="Spoken language" value={language} onChange={event => { const value = event.target.value as VoiceLanguage; stopSpeech(); setLanguage(value); try { localStorage.setItem('quotation-voice-language', value); } catch { /* Optional. */ } if (started) read(state, value); }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hinglish</option></select>
     </div>
-    {started && state.step !== 'review' && <div className="mt-3 rounded-xl border bg-background p-3"><label htmlFor="guided-quotation-field" className="mb-2 block text-sm font-medium">{prompt.label}</label>
+    {started && !describe && state.step !== 'review' && <div className="mt-3 rounded-xl border bg-background p-3"><label htmlFor="guided-quotation-field" className="mb-2 block text-sm font-medium">{prompt.label}</label>
+      {suggestions.length > 0 && <div className="mb-2 flex flex-wrap gap-2">{suggestions.map(value => <Button type="button" key={value} size="sm" variant="outline" onClick={() => submit(value)}>{value}{prompt.numeric ? '%' : ''}</Button>)}</div>}
       {currentSection && <p className="mb-2 text-xs text-muted-foreground">Section: {romanLetters(currentSection.title) || 'Untitled'}{currentItem ? ` · Item: ${romanLetters(currentItem.productName) || 'Untitled'}` : ''}</p>}
       {choices ? <div className="flex flex-wrap gap-2" role="group" aria-label={prompt.label}>{choices.map(choice => <Button key={choice.value} size="sm" variant="outline" onClick={() => submit(choice.value)}>{choice.label}</Button>)}</div>
         : <form onSubmit={event => { event.preventDefault(); submit(answer); }} className="flex flex-wrap gap-2"><Input ref={field} id="guided-quotation-field" type="text" inputMode={prompt.numeric ? 'decimal' : 'text'} value={answer} maxLength={prompt.numeric ? 20 : state.step === 'side' ? 20 : 1000} onChange={event => setAnswer(event.target.value)} placeholder={prompt.numeric ? 'Enter a number' : 'Type in English letters'} className="min-w-0 flex-1" /><Button type="submit" size="sm">Next</Button>{prompt.optional && <Button type="button" size="sm" variant="ghost" onClick={() => submit('')}>Skip</Button>}</form>}
@@ -101,6 +115,6 @@ export function GuidedQuotationAssistant({ initialDraft, getCurrentDraft, onChan
     </div>}
     {state.step === 'review' && <div className="mt-3 rounded-xl border bg-background p-3 text-sm"><p>{current.current.project.clientName} · {current.current.sections.filter(section => section.items.length).length} sections · {current.current.sections.reduce((sum, section) => sum + section.items.length, 0)} items</p><p className="mt-1 font-medium">Projected total: {review.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="mt-1 text-xs text-muted-foreground">Check the fields below, apply pricing, and review terms and payment details before saving.</p><Button size="sm" variant="ghost" onClick={back}>Back</Button><Button size="sm" variant="outline" onClick={() => { stopSpeech(); onClose(); }}>Review quotation below</Button></div>}
     {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}{notice && <p role="status" className="mt-2 text-xs text-muted-foreground">{notice}</p>}
-    <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Voice options</summary><label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={paidVoice} onChange={event => { stopSpeech(); setPaidVoice(event.target.checked); setNotice(''); }} />OpenAI voice (paid, AI-generated)</label><button type="button" className="mt-2 underline underline-offset-2" onClick={() => { stopSpeech(); onLive(); }}>Switch to live AI conversation</button></details>
+    <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer">Options</summary><label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={paidVoice} onChange={event => { stopSpeech(); setPaidVoice(event.target.checked); setNotice(''); }} />OpenAI voice (paid, AI-generated)</label><label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={detailed} onChange={event => setDetailed(event.target.checked)} />Include address, project type and item position</label><button type="button" className="mt-2 underline underline-offset-2" onClick={() => { stopSpeech(); onLive(); }}>Switch to live AI conversation</button></details>
   </section>;
 }
