@@ -71,7 +71,7 @@ describe('Realtime quotation lifecycle', () => {
     render(<RealtimeQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Allow microphone access'); expect(fetch).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
-    expect(screen.queryByText('Options')).toBeNull(); expect(screen.queryByText(/OpenAI/)).toBeNull();
+    expect(screen.queryByText('Options')).toBeNull(); expect(screen.getByLabelText('AI model: OpenAI')).toBeInTheDocument();
   });
   it('updates fields locally without another request and deduplicates calls', async () => {
     let current = fixture(); const onChange = jest.fn((draft: VoiceDraft) => { current = draft; return JSON.stringify(draft); });

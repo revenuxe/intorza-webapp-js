@@ -43,6 +43,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   const [fieldValue, setFieldValue] = useState(() => guidedDefault(nextGuidedState(initialDraft), initialDraft));
   const [holding, setHolding] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [modelProvider, setModelProvider] = useState('OpenAI');
   const audioBlockedRef = useRef(false);
   const replayRequested = useRef(false);
   const spokenCurrent = useRef(spokenQuestion); spokenCurrent.current = spokenQuestion;
@@ -268,6 +269,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       if (expected !== snapshot.current) { currentDraft.current = before; snapshot.current = expected; undo.current = []; setUndoCount(0); const next = nextGuidedState(before); setFieldState(next); setFieldValue(guidedDefault(next, before)); }
       const secret = await api({ action: 'session', language, noisy, draft: currentDraft.current }, abort.signal);
       if (version !== generation.current) return;
+      if (secret.provider === 'Meta' || secret.provider === 'OpenAI') setModelProvider(secret.provider);
       const peer = new RTCPeerConnection(); pc.current = peer;
       const player = new Audio(); player.autoplay = true; prepareVoiceAudio(player); audio.current = player;
       const requireAudioTap = () => {
@@ -356,7 +358,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   return <section className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-orange-200 bg-background p-3 shadow-sm dark:border-orange-900" aria-label="Quotation voice assistant">
     <div className="flex items-center gap-2">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white ${connected ? 'ring-2 ring-orange-200 dark:ring-orange-900' : ''}`}><Mic className="h-4 w-4" /></div>
-      <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Quotation assistant</h2><span className="text-xs text-muted-foreground" role="status">{holding ? 'On hold · microphone off' : status === 'Listening' ? 'Listening' : status}</span></div>
+      <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Quotation assistant</h2><div className="flex items-center gap-1.5"><span className="text-xs text-muted-foreground" role="status">{holding ? 'On hold · microphone off' : status === 'Listening' ? 'Listening' : status}</span><span aria-label={`AI model: ${modelProvider}`} className="text-[11px] text-muted-foreground">· {modelProvider}</span></div></div>
       <Button variant="ghost" size="icon" aria-label="Close voice assistant" className="h-8 w-8" onClick={() => { stop(); onClose(); }}><X className="h-4 w-4" /></Button>
     </div>
     <div aria-label="Current conversation" className="mt-3 rounded-xl bg-orange-50/70 px-3 py-2.5 dark:bg-orange-950/20"><p className="text-sm leading-relaxed" aria-live="polite">{question}</p>{heard && <p className="mt-1 truncate text-xs text-muted-foreground">You: {heard}</p>}</div>

@@ -94,7 +94,7 @@ export async function POST(request: Request) {
     const secret = await response.json();
     if (typeof secret.value !== 'string') throw new Error('Invalid realtime secret');
     // Only short-lived credentials go to the browser. Never return the runtime API key.
-    return json({ value: secret.value, expiresAt: secret.expires_at });
+    return json({ value: secret.value, expiresAt: secret.expires_at, provider: 'OpenAI' });
   } catch (error) {
     if (error instanceof ProviderError) {
       const response = json({ error: error.message, code: error.code, requestId, providerCode: error.providerCode, upstreamStatus: error.upstreamStatus, providerRequestId: error.providerRequestId, retryAfterSeconds: error.retryAfterSeconds }, error.status);
