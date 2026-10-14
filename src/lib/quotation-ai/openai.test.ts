@@ -33,7 +33,7 @@ describe('OpenAI quotation provider', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
   it('disables the Gemini factory and requires a runtime OpenAI key', () => {
-    expect(() => createQuotationProvider({ provider: 'gemini', apiKey: 'key', model: 'gemini-test' })).toThrow('Gemini is disabled');
+    expect(() => createQuotationProvider({ provider: 'gemini', apiKey: 'key', model: 'gemini-test' })).toThrow('Unsupported quotation AI provider');
     expect(() => createQuotationProvider({ provider: 'openai', model: 'gpt-5.4-mini' })).toThrow('OPENAI_API_KEY');
   });
 });

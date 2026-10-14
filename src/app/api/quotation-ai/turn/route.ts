@@ -13,7 +13,7 @@ const requestSchema = z.object({
   history: z.array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().max(1500) }).strict()).max(8),
 }).strict();
 type RateLimiter = { limit(input: { key: string }): Promise<{ success: boolean }> };
-type AIEnvironment = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; QUOTATION_AI_LIMITER?: RateLimiter };
+type AIEnvironment = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; MODEL_API_KEY?: string; META_BASE_URL?: string; META_CHAT_MODEL?: string; META_STT_MODEL?: string; QUOTATION_AI_LIMITER?: RateLimiter };
 const localUsage = new Map<string, { count: number; expires: number }>();
 async function allowed(userId: string, env: AIEnvironment) {
   if (env.QUOTATION_AI_LIMITER) return (await env.QUOTATION_AI_LIMITER.limit({ key: `quotation-ai:${userId}` })).success;
@@ -70,8 +70,11 @@ export async function POST(request: Request) {
     // Validate uniqueness and the overall item limit before calling a paid service.
     try { applyOperations(input.data.draft, []); }
     catch { return json({ error: 'The quotation draft has duplicate identifiers or exceeds its item limits.' }, 400); }
-    const key = (env.OPENAI_API_KEY || process.env.OPENAI_API_KEY)?.trim();
-    const provider = createQuotationProvider({ provider: 'openai', apiKey: key, model: (env.OPENAI_MODEL || process.env.OPENAI_MODEL || 'gpt-5.4-mini').trim() });
+    const openAIKey = (env.OPENAI_API_KEY || process.env.OPENAI_API_KEY)?.trim();
+    const metaKey = (env.MODEL_API_KEY || process.env.MODEL_API_KEY)?.trim();
+    const provider = metaKey
+      ? createQuotationProvider({ provider: 'meta', apiKey: metaKey, baseUrl: (env.META_BASE_URL || process.env.META_BASE_URL || 'https://api.meta.ai/v1').trim(), model: (env.META_CHAT_MODEL || process.env.META_CHAT_MODEL || 'muse-spark-1.3').trim(), fallback: { apiKey: openAIKey, model: (env.OPENAI_MODEL || process.env.OPENAI_MODEL || 'gpt-5.4-mini').trim() } })
+      : createQuotationProvider({ provider: 'openai', apiKey: openAIKey, model: (env.OPENAI_MODEL || process.env.OPENAI_MODEL || 'gpt-5.4-mini').trim() });
     const providerStarted = performance.now();
     const proposal = await provider.propose({ draft: input.data.draft, message: input.data.message, history: input.data.history.map(turn => ({ role: turn.role, text: turn.text })), language: input.data.language }, request.signal);
     const providerDuration = performance.now() - providerStarted;
