@@ -316,6 +316,15 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   }, []);
   const running = connected || status === 'Connecting' || status === 'Allow microphone';
   const focusedPrompt = guidedPrompts[fieldState.step];
+  useEffect(() => {
+    const target = document.getElementById(fieldState.step);
+    if (!target) return;
+    const group = target.closest('div.space-y-2');
+    target.classList.add('relative', 'z-50', 'ring-4', 'ring-orange-300', 'ring-offset-2', 'shadow-lg');
+    group?.classList.add('relative', 'z-50', 'rounded-xl', 'bg-background', 'p-3', 'shadow-2xl');
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return () => { target.classList.remove('relative', 'z-50', 'ring-4', 'ring-orange-300', 'ring-offset-2', 'shadow-lg'); group?.classList.remove('relative', 'z-50', 'rounded-xl', 'bg-background', 'p-3', 'shadow-2xl'); };
+  }, [fieldState.step]);
   function enterField(value: string) {
     if (!connected || responseActive.current || applying.current) return;
     hasUserAnswer.current = true;
@@ -334,16 +343,16 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       respond(); setStatus('Thinking'); setError('');
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update the field.'); }
   }
-  return <section className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-orange-200 bg-background p-3 shadow-sm dark:border-orange-900" aria-label="Quotation voice assistant">
+  return <><div aria-hidden="true" className={connected && fieldState.step !== 'review' ? 'pointer-events-none fixed inset-0 z-40 bg-slate-950/25 backdrop-blur-[1px]' : 'hidden'} /><section className="relative z-50 mx-auto max-w-2xl overflow-hidden rounded-2xl border border-orange-200 bg-background p-3 shadow-sm dark:border-orange-900" aria-label="Quotation voice assistant">
     <div className="flex items-center gap-2">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white ${connected ? 'ring-2 ring-orange-200 dark:ring-orange-900' : ''}`}><Mic className="h-4 w-4" /></div>
       <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Quotation assistant</h2><span className="text-xs text-muted-foreground" role="status">{holding ? 'On hold · microphone off' : status === 'Listening' ? 'Listening' : status}</span></div>
       <Button variant="ghost" size="icon" aria-label="Close voice assistant" className="h-8 w-8" onClick={() => { stop(); onClose(); }}><X className="h-4 w-4" /></Button>
     </div>
-    <div aria-label="Current conversation" className="mt-3 rounded-xl bg-orange-50/70 px-3 py-2.5 dark:bg-orange-950/20"><p className="text-sm leading-relaxed" aria-live="polite">{question}</p>{heard && <p className="mt-1 truncate text-xs text-muted-foreground">You: {heard}</p>}</div>
+    <div aria-label="Current conversation" className="mt-2 max-h-24 overflow-hidden rounded-xl bg-orange-50/70 px-3 py-2 dark:bg-orange-950/20"><p className="line-clamp-2 text-sm leading-5" aria-live="polite">{question}</p>{heard && <p className="mt-1 truncate text-xs text-muted-foreground">You: {heard}</p>}</div>
     {connected && !finishing.current && fieldState.step !== 'review' && <div className="mt-2"><label htmlFor="conversation-field" className="sr-only">{focusedPrompt.label}</label>
       {focusedPrompt.choices ? <div className="flex flex-wrap gap-2">{focusedPrompt.choices.map(choice => <Button key={choice.value} type="button" size="sm" variant="outline" disabled={status !== 'Listening'} onClick={() => enterField(choice.value)}>{choice.label}</Button>)}</div>
-        : <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (fieldState.step === 'sectionChoice') { emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `Use section ${fieldValue}` }] } }); respond(); setStatus('Thinking'); } else enterField(fieldValue); }}><Input id="conversation-field" value={fieldValue} maxLength={focusedPrompt.numeric ? 20 : 1000} inputMode={focusedPrompt.numeric ? 'decimal' : 'text'} onChange={event => setFieldValue(event.target.value)} placeholder={focusedPrompt.numeric ? `Enter ${focusedPrompt.label.toLowerCase()}` : `Type ${focusedPrompt.label.toLowerCase()} or say it`} /><Button type="submit" size="sm" aria-label="Continue" disabled={status !== 'Listening' || !fieldValue.trim()}><Send className="h-4 w-4" /></Button></form>}
+        : <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (fieldState.step === 'sectionChoice') { emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `Use section ${fieldValue}` }] } }); respond(); setStatus('Thinking'); } else enterField(fieldValue); }}><Input id="conversation-field" value={fieldValue} maxLength={focusedPrompt.numeric ? 20 : 1000} inputMode={focusedPrompt.numeric ? 'decimal' : 'text'} onChange={event => setFieldValue(event.target.value)} placeholder={`Type ${focusedPrompt.label.toLowerCase()}`} /><Button type="submit" size="sm" aria-label="Continue" disabled={status !== 'Listening' || !fieldValue.trim()}><Send className="h-4 w-4" /></Button></form>}
     </div>}
     <div className="mt-2 flex items-center gap-1">
       <Button type="button" size="sm" variant="ghost" aria-label="Clear quotation and restart AI" title="Clear quotation and restart AI" disabled={status === 'Connecting' || status === 'Allow microphone'} onClick={restartConversation}><RotateCcw className="h-4 w-4" /></Button>
@@ -354,5 +363,5 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       <select aria-label="Spoken language" disabled={status === 'Connecting' || status === 'Allow microphone'} value={language} onChange={event => { const value = event.target.value as RealtimeVoiceLanguage; if (running) hold(); setLanguage(value); setSpokenQuestion(openingSpeech(currentDraft.current, value)); setQuestion(initialQuestion(currentDraft.current, 'en-IN')); try { localStorage.setItem('quotation-voice-language', value); } catch { /* Optional preference. */ } }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hinglish</option><option value="hi-IN-native">हिन्दी / Hindi</option></select>
     </div>
     {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
-  </section>;
+  </section></>;
 }
