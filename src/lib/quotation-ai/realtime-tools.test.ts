@@ -1,7 +1,21 @@
 /** @jest-environment node */
-import { validateRealtimeChange } from './realtime-tools';
+import { isFaithfulLanguageRepair, validateRealtimeChange } from './realtime-tools';
 import type { VoiceDraft } from './domain';
 const draft: VoiceDraft = { version: 1, revision: 0, project: { projectTitle: 'Home', clientName: 'Aslam', clientAddress: '', placeOfProject: '', projectType: '' }, pricing: { gstEnabled: false, gstRate: 18, discountPercentage: 0, enableSocialMediaDiscount: false, socialMediaDiscountRate: 6 }, sections: [{ id: 'bedroom', title: 'Bedroom', items: [{ id: 'wardrobe', productName: 'Wardrobe', productDetails: '', side: '', measurementMode: 'dimensions', widthFt: 6, heightFt: 8, sftArea: null, ratePerSft: 1200 }] }] };
+it('allows language repair without changing numeric facts, IDs or already-English text', () => {
+  const original = { reply: 'Check kar lijiye', displayReply: 'नाम जाँचिए', transcript: 'मेरा नाम असलम है', clarification: null, operationsJson: JSON.stringify([{ type: 'update_item', itemId: 'wardrobe', fields: { productDetails: 'सफेद लैमिनेट', ratePerSft: 1200 } }]), focus: 'ratePerSft' };
+  const repaired = { ...original, displayReply: 'Please check the details.', transcript: 'My name is Aslam.', operationsJson: JSON.stringify([{ type: 'update_item', itemId: 'wardrobe', fields: { productDetails: 'White laminate', ratePerSft: 1200 } }]) };
+  expect(isFaithfulLanguageRepair(original, repaired)).toBe(true);
+  expect(isFaithfulLanguageRepair(original, { ...repaired, operationsJson: repaired.operationsJson.replace('1200', '1500') })).toBe(false);
+  expect(isFaithfulLanguageRepair(original, { ...repaired, operationsJson: repaired.operationsJson.replace('wardrobe', 'another-item') })).toBe(false);
+  expect(isFaithfulLanguageRepair(repaired, { ...repaired, operationsJson: repaired.operationsJson.replace('White laminate', 'Black laminate') })).toBe(false);
+});
+it('permits an empty opening transcript only in explicit startup context without edits', () => {
+  const opening = { reply: 'GST add karna hai?', displayReply: 'Should we add GST?', transcript: '', clarification: null, operationsJson: '[]', endConversation: false, focus: 'gstEnabled' };
+  expect(validateRealtimeChange(draft, opening, { allowEmptyTranscript: true }).changed).toBe(false);
+  expect(() => validateRealtimeChange(draft, opening)).toThrow('English transcript');
+  expect(() => validateRealtimeChange(draft, { ...opening, operationsJson: JSON.stringify([{ type: 'update_project', fields: { clientName: 'Changed' } }]) }, { allowEmptyTranscript: true })).toThrow('English transcript');
+});
 it('keeps a completed item conversation open for tax, discounts and more items', () => {
   const result = validateRealtimeChange(draft, { reply: 'GST add karna hai?', displayReply: 'Should we add GST?', transcript: 'The wardrobe details are complete.', clarification: null, operationsJson: '[]', endConversation: false, focus: 'gstEnabled' });
   expect(result.complete).toBe(false); expect(result.focus).toBe('gstEnabled'); expect(result.review.missing).toEqual([]);

@@ -20,6 +20,31 @@ async function start() {
 function event(value: unknown) { act(() => events.onmessage?.({ data: JSON.stringify(value) })); }
 function tool(endConversation = false) { return { type: 'response.done', response: { status: 'completed', output: [{ type: 'function_call', name: 'update_quotation', call_id: 'call1', arguments: JSON.stringify({ reply: 'What is the quotation title?', displayReply: 'What is the quotation title?', transcript: 'For Rahul', clarification: null, endConversation, operationsJson: JSON.stringify([{ type: 'update_project', fields: { clientName: 'Rahul' } }]) }) }] } }; }
 describe('Realtime quotation lifecycle', () => {
+  it('accepts an empty opening transcript without a false language error', async () => {
+    const onChange = jest.fn();
+    render(<RealtimeQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={onChange} onClose={jest.fn()} />);
+    await start();
+    event({ type: 'response.done', response: { status: 'completed', output: [{ type: 'function_call', name: 'update_quotation', call_id: 'opening', arguments: JSON.stringify({ reply: 'Customer ka naam kya hai?', displayReply: 'What is the customer name?', transcript: '', clarification: null, operationsJson: '[]', focus: 'clientName' }) }] } });
+    expect(onChange).not.toHaveBeenCalled(); expect(screen.queryByRole('alert')).toBeNull(); expect(close).not.toHaveBeenCalled();
+  });
+  it('repairs non-English output once while preserving the form until validation succeeds', async () => {
+    let current = fixture(); const onChange = jest.fn((next: VoiceDraft) => { current = next; return JSON.stringify(next); });
+    render(<RealtimeQuotationAssistant initialDraft={current} getCurrentDraft={() => current} onChange={onChange} onClose={jest.fn()} />);
+    await start();
+    const bad = tool(); const args = JSON.parse(bad.response.output[0].arguments); args.transcript = 'मेरा नाम राहुल है'; bad.response.output[0].arguments = JSON.stringify(args);
+    event(bad); expect(onChange).not.toHaveBeenCalled(); expect(close).not.toHaveBeenCalled();
+    expect(screen.getByText('Translating answer')).toBeInTheDocument();
+    const retry = tool(); retry.response.output[0].call_id = 'repair'; event(retry);
+    expect(onChange).toHaveBeenCalledTimes(1); expect(current.project.clientName).toBe('Rahul'); expect(screen.queryByRole('alert')).toBeNull();
+  });
+  it('stops after one failed repair without a loop or any field mutation', async () => {
+    const onChange = jest.fn();
+    render(<RealtimeQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={onChange} onClose={jest.fn()} />);
+    await start();
+    const bad = tool(); const args = JSON.parse(bad.response.output[0].arguments); args.displayReply = 'ग्राहक का नाम'; bad.response.output[0].arguments = JSON.stringify(args);
+    event(bad); bad.response.output[0].call_id = 'repair'; event(bad);
+    expect(onChange).not.toHaveBeenCalled(); expect(screen.getByRole('alert')).toHaveTextContent('Could not translate'); expect(close).toHaveBeenCalled();
+  });
   it('opens just one microphone session under Strict Mode', async () => {
     render(<StrictMode><RealtimeQuotationAssistant initialDraft={fixture()} getCurrentDraft={fixture} onChange={jest.fn()} onClose={jest.fn()} /></StrictMode>);
     await start(); expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);

@@ -1,5 +1,9 @@
 # Quotation voice assistant
 
+## English output recovery
+
+An empty transcript is allowed only for an opening Realtime question before any real user answer and with no operations. Text extraction and real spoken/typed answers retain strict English transcript validation. If a live tool returns AI_LANGUAGE_INVALID, no form fields are applied; the client returns a failed tool result and requests exactly one translated regeneration in the same session. A repair must preserve operation count/order, IDs, fields, numbers, booleans, focus, confirmation/end state and already-English quotation values. Only non-Latin quotation strings can change to English; screen reply/transcript can be translated. A second language failure or a repair that changes facts stops cleanly without applying the rejected update. This does not attempt to classify arbitrary Latin-script Hinglish as semantically English; that remains a model translation responsibility.
+
 ## Current field review and testing controls
 
 Numeric editing fix: the shared Input keeps numeric editing text separate from parent calculation values, so empty fields and partial decimals (.5, 1.) do not snap to zero or round to step increments. Native type=number is rendered as decimal-keyboard text input with decimal syntax/finite-number checks and custom min/max validity. Explicit numeric zero remains visible even when an existing parent uses value || ''. A zero placeholder is suppressed so a cleared input looks fully empty. Calculation state may still normalize an empty optional amount to zero; external loaded/AI values replace the buffer when their numeric value changes. Regression tests cover deletion, blur, partial decimals, limits, zero and external updates.

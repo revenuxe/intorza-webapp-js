@@ -9,10 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { draftSchema, type VoiceDraft } from '@/lib/quotation-ai/domain';
-import { validateRealtimeChange } from '@/lib/quotation-ai/realtime-tools';
+import { isFaithfulLanguageRepair, validateRealtimeChange } from '@/lib/quotation-ai/realtime-tools';
 import { initialQuestion, type VoiceLanguage } from '@/lib/quotation-ai/language';
 import type { VoiceAssistantProps } from './VoiceQuotationAssistant';
 import { changedFields, type FieldReview } from '@/lib/quotation-ai/field-review';
+import { ProviderError } from '@/lib/quotation-ai/provider';
 
 
 import { advanceGuided, guidedDefault, guidedPrompts, nextGuidedState, type GuidedState } from '@/lib/quotation-ai/guided-flow';
@@ -55,6 +56,9 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   const snapshot = useRef(JSON.stringify(initialDraft));
   const seen = useRef(new Set<string>());
   const applying = useRef(false);
+  const languageFailures = useRef(0);
+  const hasUserAnswer = useRef(false);
+  const rejectedLanguageProposal = useRef<unknown>(null);
   const responseActive = useRef(false);
   const responsePending = useRef(false);
   const undo = useRef<{ draft: VoiceDraft; after: string }[]>([]);
@@ -81,6 +85,8 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
     microphone.current?.getTracks().forEach(track => track.stop()); microphone.current = null;
     if (audio.current) { audio.current.pause(); audio.current.srcObject = null; audio.current = null; }
     applying.current = false;
+    languageFailures.current = 0;
+    rejectedLanguageProposal.current = null;
     responseActive.current = false; responsePending.current = false;
     if (mounted.current) { setConnected(false); setStatus('Ready'); setHolding(false); setAudioBlocked(false); }
   }
@@ -138,10 +144,13 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   async function applyCalls(calls: ToolCall[], version: number, signal: AbortSignal) {
     if (applying.current) { fail('A new answer arrived while fields were updating. Please restart from the current quotation.'); return; }
     applying.current = true;
+    let failedCallId: string | undefined;
+    let rejectedProposal: unknown;
     try {
       for (const call of calls) {
         if (!call.call_id || seen.current.has(call.call_id)) continue;
         seen.current.add(call.call_id);
+        failedCallId = call.call_id;
         if (seen.current.size > 100) throw new Error('Conversation limit reached. Start a fresh conversation.');
         if (call.name !== 'update_quotation' || !call.arguments || call.arguments.length > 65536) throw new Error('Invalid voice tool request.');
         const expected = snapshot.current;
@@ -150,7 +159,11 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         setStatus('Updating fields');
         // Unsaved form edits use the same pure validator as the server, without
         // another network/authentication hop for every spoken answer.
-        const body = validateRealtimeChange(before, JSON.parse(call.arguments));
+        rejectedProposal = JSON.parse(call.arguments);
+        if (rejectedLanguageProposal.current && !isFaithfulLanguageRepair(rejectedLanguageProposal.current, rejectedProposal)) throw new Error('The translation retry changed quotation details. No fields changed. Please reconnect and repeat the answer.');
+        const body = validateRealtimeChange(before, rejectedProposal, { allowEmptyTranscript: !hasUserAnswer.current });
+        languageFailures.current = 0;
+        rejectedLanguageProposal.current = null;
         if (version !== generation.current || signal.aborted) return;
         if (JSON.stringify(latest.current.getCurrentDraft()) !== expected) throw new Error('Your manual edits are safe. Restart voice to continue from them.');
         const next = draftSchema.parse(body.draft);
@@ -192,11 +205,23 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       }
       if (version === generation.current) { applying.current = false; respond(true); armIdle(); }
     } catch (failure) {
-      if (!signal.aborted && version === generation.current) fail(failure instanceof Error ? failure.message : 'Quotation update failed.');
+      if (!signal.aborted && version === generation.current) {
+        if (failure instanceof ProviderError && failure.code === 'AI_LANGUAGE_INVALID' && failedCallId && languageFailures.current < 1) {
+          languageFailures.current++;
+          rejectedLanguageProposal.current = rejectedProposal;
+          applying.current = false; responsePending.current = false; setStatus('Translating answer');
+          emit({ type: 'conversation.item.create', item: { type: 'function_call_output', call_id: failedCallId,
+            output: JSON.stringify({ success: false, code: 'AI_LANGUAGE_INVALID', changed: false, instruction: 'No fields changed. Retry the same rejected tool call ONCE. Translate displayReply and transcript into English sentences in Latin letters. Translate quotation text into English, Roman proper names only. Keep reply Hinglish if selected. Preserve every numeric value, ID and user intent; do not add operations or facts. If there was no user answer, use empty transcript with no operations.' }) } });
+          respond(); armIdle();
+        } else {
+          fail(failure instanceof ProviderError && failure.code === 'AI_LANGUAGE_INVALID' ? 'Could not translate that answer into English. Your fields are unchanged. Tap Reconnect and try again.' : failure instanceof Error ? failure.message : 'Quotation update failed.');
+        }
+      }
     } finally { if (version === generation.current) applying.current = false; }
   }
   async function start() {
     stop(); setError(''); setStatus('Connecting');
+    hasUserAnswer.current = false;
     const version = generation.current;
     const abort = new AbortController(); request.current = abort;
     connectionTimer.current = setTimeout(() => { if (version === generation.current) fail('Live voice connection timed out. Please try again.'); }, 20000);
@@ -241,7 +266,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         let value; try { value = JSON.parse(event.data); } catch { return; }
         if (value.type === 'input_audio_buffer.speech_started' && !finishing.current) { setStatus('Listening'); setHeard(''); armIdle(); }
         if (value.type === 'input_audio_buffer.speech_stopped' && !finishing.current) setStatus('Thinking');
-        if (value.type === 'input_audio_buffer.committed' && !finishing.current) respond();
+        if (value.type === 'input_audio_buffer.committed' && !finishing.current) { hasUserAnswer.current = true; respond(); }
         if (value.type === 'response.created') responseActive.current = true;
         if (value.type === 'output_audio_buffer.started') { if (!audioBlockedRef.current) setStatus('Speaking'); armIdle(); }
         if (value.type === 'output_audio_buffer.stopped' || value.type === 'output_audio_buffer.cleared') { if (finishing.current) finish(); else if (!audioBlockedRef.current) setStatus('Listening'); }
@@ -281,12 +306,14 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
     if (!pendingNext.current || responseActive.current || applying.current || !connected) return;
     if (JSON.stringify(latest.current.getCurrentDraft()) !== snapshot.current) { setError('The main form changed. Hold and resume to use your edits.'); return; }
     const next = pendingNext.current; pendingNext.current = null; setReviewFields([]);
+    hasUserAnswer.current = true;
     setFieldState(next); setFieldValue(guidedDefault(next, currentDraft.current));
     emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ confirmed: true, instruction: 'The user checked the populated fields and clicked Next. Continue to the next missing field without repeating or duplicating confirmed edits.', nextFocus: next.step, draft: currentDraft.current }) }] } });
     respond(); setStatus('Thinking'); armIdle();
   }
   function enterField(value: string) {
     if (!connected || responseActive.current || applying.current) return;
+    hasUserAnswer.current = true;
     try {
       const expected = snapshot.current;
       if (JSON.stringify(latest.current.getCurrentDraft()) !== expected) throw new Error('The main form changed. Pause and restart to use those edits.');
@@ -328,6 +355,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
     <details className="mt-2"><summary className="cursor-pointer text-xs text-muted-foreground">Type a question or correction</summary>
     <form className="mt-2 flex gap-2" onSubmit={event => {
       event.preventDefault(); if (!connected || !input.trim() || applying.current || status !== 'Listening') return;
+      hasUserAnswer.current = true;
       emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: input.trim() }] } });
       respond(); setInput(''); setStatus('Thinking'); armIdle();
     }}><Input aria-label="Your answer or correction" placeholder="Or type an answer or correction..." maxLength={3000} value={input} onChange={event => setInput(event.target.value)} disabled={!connected} className="h-9 bg-background text-sm" /><Button size="sm" type="submit" aria-label="Send answer" disabled={!connected || !input.trim() || status !== 'Listening'}><Send className="h-4 w-4" /></Button></form>

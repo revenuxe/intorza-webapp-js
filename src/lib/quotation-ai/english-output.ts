@@ -3,8 +3,9 @@ import { ProviderError } from './provider';
 
 const nonLatinLetter = /(?=\p{L})\P{Script=Latin}/u;
 export function isEnglishScript(text: string) { return !nonLatinLetter.test(text); }
-export function assertEnglishProposal(proposal: Proposal) {
-  if (!proposal.displayReply || !isEnglishScript(proposal.displayReply) || !proposal.transcript || !isEnglishScript(proposal.transcript)) {
+export function assertEnglishProposal(proposal: Proposal, options: { allowEmptyTranscript?: boolean } = {}) {
+  const validTranscript = typeof proposal.transcript === 'string' && (proposal.transcript.trim().length > 0 || options.allowEmptyTranscript === true) && isEnglishScript(proposal.transcript);
+  if (!proposal.displayReply?.trim() || !isEnglishScript(proposal.displayReply) || !validTranscript) {
     throw new ProviderError('AI output did not meet the English transcript requirement. No fields were changed; please try again.', 502, 'AI_LANGUAGE_INVALID');
   }
   for (const operation of proposal.operations) {
