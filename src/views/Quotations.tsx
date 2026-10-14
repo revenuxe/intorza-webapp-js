@@ -6,7 +6,7 @@ import { useNavigate } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { useInlineFeedback } from "@/hooks/useInlineFeedback";
 import { useLocalization } from "@/hooks/useLocalization";
 import { quotationsApi } from "@/lib/api";
 import { ListSkeleton } from "@/components/ui/skeleton";
@@ -43,7 +43,7 @@ const getStatusColor = (status: string) => {
 
 const Quotations = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toast, feedback } = useInlineFeedback();
   const { formatCurrency, formatDate } = useLocalization();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,6 +162,7 @@ const Quotations = () => {
 
   return (
     <div className="container max-w-6xl mx-auto p-4 md:p-6 lg:p-8">
+      {feedback}
       <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>

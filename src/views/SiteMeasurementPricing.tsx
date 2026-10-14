@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, FileText } from "lucide-react";
-import { toast } from "sonner";
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
 
 interface Room {
   id: string;
@@ -34,6 +34,7 @@ interface Project {
 }
 
 export default function SiteMeasurementPricing() {
+  const { toast, feedback } = useInlineFeedback();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -204,11 +205,10 @@ export default function SiteMeasurementPricing() {
         })
         .eq('id', id);
 
-      toast.success('Quotation created successfully');
       navigate(`/?id=${quotation.id}`);
     } catch (error) {
       console.error(error);
-      toast.error('Failed to generate quotation');
+      toast({ title: 'Could not create quotation', description: 'Please try again.', variant: 'destructive' });
     } finally {
       setGenerating(false);
     }
@@ -233,6 +233,7 @@ export default function SiteMeasurementPricing() {
 
   return (
     <div className="p-4 md:p-6 pb-32 md:pb-6">
+      {feedback}
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button 

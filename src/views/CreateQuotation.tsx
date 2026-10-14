@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
+import { useInlineFeedback } from "@/hooks/useInlineFeedback";
 import { supabase } from "@/integrations/supabase/client";
 import { quotationsApi } from "@/lib/api";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
@@ -51,8 +51,10 @@ interface PaymentStage {
 }
 const CreateQuotation = () => {
   const {
-    toast
-  } = useToast();
+    toast, feedback, clearFeedback
+  } = useInlineFeedback();
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingQuotation, setIsLoadingQuotation] = useState(false);
   const {
     requireAuth,
     clearPendingAction,
@@ -341,6 +343,8 @@ const CreateQuotation = () => {
     }
   };
   const loadQuotation = async (id: string) => {
+    setIsLoadingQuotation(true);
+    clearFeedback();
     try {
       // Load quotation data
       const {
@@ -422,17 +426,15 @@ const CreateQuotation = () => {
         }
       }
       setItemImages(restoredImages);
-      toast({
-        title: "Quotation loaded",
-        description: "Existing quotation data has been loaded for editing"
-      });
     } catch (error) {
       console.error('Error loading quotation:', error);
       toast({
         title: "Load failed",
-        description: "Failed to load quotation data",
+        description: "Failed to load quotation data. Refresh to retry before editing.",
         variant: "destructive"
       });
+    } finally {
+      setIsLoadingQuotation(false);
     }
   };
   const addSection = () => {
@@ -559,6 +561,8 @@ const CreateQuotation = () => {
   const handleSaveQuotation = async (status: string, showShare: boolean = false): Promise<string | null> => {
     if (quotationSaveInProgress.current) return null;
     quotationSaveInProgress.current = true;
+    setIsSaving(true);
+    clearFeedback();
     try {
       if (!clientName || !projectTitle) {
         toast({
@@ -770,6 +774,7 @@ const CreateQuotation = () => {
       return null;
     } finally {
       quotationSaveInProgress.current = false;
+      setIsSaving(false);
     }
   };
   
@@ -992,6 +997,13 @@ const CreateQuotation = () => {
     profile,
   ]);
   return <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8 relative">
+      {feedback}
+      {(isSaving || isLoadingQuotation) && <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" role="status" aria-live="polite">
+        <div className="flex items-center gap-3 rounded-lg border bg-card px-5 py-4 shadow-sm">
+          <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
+          <span>{isLoadingQuotation ? 'Loading quotation…' : 'Saving quotation…'}</span>
+        </div>
+      </div>}
       {/* Download Loader Overlay */}
       {isDownloading && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">

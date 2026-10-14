@@ -6,7 +6,7 @@ import { ArrowLeft, Download, FileText, Edit, Check, X, FileUp } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { useInlineFeedback } from "@/hooks/useInlineFeedback";
 import { useLocalization } from "@/hooks/useLocalization";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -63,7 +63,7 @@ const getStatusColor = (status: string) => {
 const QuotationDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { toast, feedback } = useInlineFeedback();
   const { checkProFeature } = useSubscription();
   const { formatCurrency, formatDateShort, settings } = useLocalization();
   const [quotation, setQuotation] = useState<Quotation | null>(null);
@@ -346,6 +346,7 @@ const QuotationDetail = () => {
   if (!quotation) {
     return (
       <div className="container max-w-4xl mx-auto p-4 md:p-6 lg:p-8">
+        {feedback}
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-muted-foreground mb-4" />
@@ -362,6 +363,7 @@ const QuotationDetail = () => {
 
   return (
     <div className="container max-w-4xl mx-auto p-4 md:p-6 lg:p-8">
+      {feedback}
       <div className="flex flex-col gap-6">
         {/* Header */}
         <div className="flex items-center justify-between">
