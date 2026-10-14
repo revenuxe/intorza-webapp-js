@@ -188,6 +188,7 @@ const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: numb
     } else if (imageUrl.startsWith('blob:')) {
       img.src = imageUrl;
     } else {
+      // For remote URLs, try with timestamp to avoid cache issues
       img.src = imageUrl;
     }
   });

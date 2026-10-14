@@ -44,4 +44,16 @@ describe('PDF currency formatting', () => {
     expect(doc.getFont().fontStyle).toBe('bold');
     expect(NOTO_SANS_CURRENCY_BOLD_FONT_BASE64).not.toBe(NOTO_SANS_CURRENCY_FONT_BASE64);
   });
+
+  it('includes Latin currency-code glyphs in the bold PDF font', async () => {
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+    registerPDFCurrencyFont(doc);
+    doc.setFont(DEFAULT_NUMERIC_FONT, 'bold');
+    const glyphs = doc.getFont().metadata.cmap.unicode.codeMap;
+
+    for (let codePoint = 65; codePoint <= 90; codePoint++) {
+      expect(glyphs[String(codePoint)]).toBeGreaterThan(0);
+    }
+  });
 });
