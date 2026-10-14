@@ -9,10 +9,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { draftSchema, reviewDraft, type VoiceDraft } from '@/lib/quotation-ai/domain';
 import { browserSpeechInput, type BrowserRecognition, type SpeechInputProvider } from '@/lib/quotation-ai/browser-speech';
 import type { ConversationTurn } from '@/lib/quotation-ai/provider';
-import { initialQuestion, romanLetters, selectSpeechVoice, type VoiceLanguage } from '@/lib/quotation-ai/language';
+import { initialQuestion, romanLetters, type VoiceLanguage } from '@/lib/quotation-ai/language';
 import { classifySpeechTurn } from '@/lib/quotation-ai/turn-policy';
 import { hasNonEnglishDraft } from '@/lib/quotation-ai/english-output';
-import { recordMetaVoiceTurn } from '@/lib/quotation-ai/meta-wav-recorder';
 
 export type VoiceAssistantProps = {
   initialDraft: VoiceDraft;
@@ -23,19 +22,18 @@ export type VoiceAssistantProps = {
 };
 export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChange, onClose, speechInput = browserSpeechInput }: VoiceAssistantProps) {
   const [question, setQuestion] = useState(() => initialQuestion(initialDraft, 'en-IN'));
-  const spokenQuestion = useRef(initialQuestion(initialDraft, 'hi-IN'));
+  const spokenQuestion = useRef(initialQuestion(initialDraft, 'en-IN'));
   const [input, setInput] = useState('');
   const [heard, setHeard] = useState('');
   const [status, setStatus] = useState<'paused' | 'listening' | 'thinking' | 'speaking'>('paused');
   const [supported, setSupported] = useState(false);
   const [error, setError] = useState('');
-  const [language, setLanguage] = useState<'en-IN' | 'hi-IN'>('hi-IN');
+  const [language, setLanguage] = useState<'en-IN' | 'hi-IN'>('en-IN');
   const [speechNotice, setSpeechNotice] = useState('');
   const [reviewSpeech, setReviewSpeech] = useState(false);
   const [undoCount, setUndoCount] = useState(0);
   const [updated, setUpdated] = useState(false);
   const [needsEnglish, setNeedsEnglish] = useState(() => hasNonEnglishDraft(initialDraft));
-  const [modelProvider, setModelProvider] = useState<'Meta' | 'OpenAI'>('Meta');
   const playback = useRef<HTMLAudioElement | null>(null);
   const speechUrl = useRef<string | null>(null);
   const speechRequest = useRef<AbortController | null>(null);
@@ -92,22 +90,6 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
     if (!mounted.current || !active.current) return;
     setStatus('speaking'); setSpeechNotice('');
     const generation = audioGeneration.current;
-    // Native speech starts immediately on mobile and can use the installed Hindi
-    // voice. OpenAI audio remains a compatibility fallback for browsers without it.
-    if (typeof window.speechSynthesis !== 'undefined' && typeof SpeechSynthesisUtterance !== 'undefined') {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = latest.current.language;
-      const voice = selectSpeechVoice(window.speechSynthesis.getVoices(), latest.current.language);
-      if (voice) utterance.voice = voice;
-      utterance.rate = 1.03;
-      utterance.onend = () => {
-        if (!mounted.current || !active.current || generation !== audioGeneration.current) return;
-        if (listenAfter && speechInput.available() && !document.hidden) listen(); else { active.current = false; setStatus('paused'); }
-      };
-      utterance.onerror = () => { if (mounted.current && generation === audioGeneration.current) { active.current = false; setStatus('paused'); setSpeechNotice('Device voice could not play. Use Read question or type your answer.'); } };
-      window.speechSynthesis.speak(utterance);
-      return;
-    }
     const abort = new AbortController(); speechRequest.current = abort;
     try {
       const { data } = await supabase.auth.getSession();
@@ -225,7 +207,6 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
       const body = await response.json();
       if (!response.ok) throw new Error(`${body.error || 'Could not process your answer.'}${body.retryAfterSeconds ? ` Retry after ${body.retryAfterSeconds} seconds.` : ''}${body.providerCode ? ` Provider reason: ${body.providerCode}.` : ''}${body.code ? ` [${body.code}]` : ''}${body.requestId ? ` Reference: ${body.requestId}` : ''}`);
       const next = draftSchema.parse(body.draft);
-      if (body.provider === 'Meta' || body.provider === 'OpenAI') setModelProvider(body.provider);
       if (abort.signal.aborted || !mounted.current) return;
       if (typeof body.reply !== 'string') throw new Error('Invalid assistant response.');
       if (JSON.stringify(latest.current.getCurrentDraft()) !== expected) throw new Error('You edited the form while I was thinking. Your edits are safe; send your answer again to continue from them.');
@@ -246,18 +227,6 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
       if (!abort.signal.aborted && mounted.current) { setError(failure instanceof Error ? failure.message : 'Could not connect. Please try again.'); active.current = false; setStatus('paused'); }
     } finally { inFlight.current = false; }
   }
-  async function recordWithMeta() {
-    if (inFlight.current || status !== 'paused') return;
-    setError(''); setStatus('listening');
-    try {
-      const audio = await recordMetaVoiceTurn();
-      const { data } = await supabase.auth.getSession(); if (!data.session) throw new Error('Sign in to use Meta voice.');
-      const form = new FormData(); form.set('audio', audio, 'quotation-turn.wav');
-      const response = await fetch('/api/quotation-ai/transcribe', { method: 'POST', headers: { Authorization: `Bearer ${data.session.access_token}` }, body: form });
-      const body = await response.json(); if (!response.ok || typeof body.transcript !== 'string') throw new Error(body.error || 'Meta could not transcribe that answer.');
-      setHeard(romanLetters(body.transcript)); setInput(romanLetters(body.transcript)); await send(body.transcript);
-    } catch (failure) { setStatus('paused'); setError(failure instanceof Error ? failure.message : 'Meta voice could not start.'); }
-  }
   function undoLast() {
     const entry = undo.current[undo.current.length - 1];
     if (!entry) return;
@@ -277,7 +246,6 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
         {working ? <Loader2 className="h-5 w-5 animate-spin" /> : status === 'paused' ? <Mic className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
       </button>
       <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><h2 className="text-sm font-semibold">{t('Quotation voice assistant', 'à¤•à¥‹à¤Ÿà¥‡à¤¶à¤¨ à¤µà¥‰à¤‡à¤¸ à¤¸à¤¹à¤¾à¤¯à¤•')}</h2><span role="status" className="text-xs text-muted-foreground">{status === 'thinking' ? t('Updating fields...', 'à¤œà¤¾à¤¨à¤•à¤¾à¤°à¥€ à¤­à¤° à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...') : status === 'listening' ? t('Listening...', 'à¤¸à¥à¤¨ à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...') : status === 'speaking' ? t('Speaking...', 'à¤¬à¥‹à¤² à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...') : t('Ready', 'à¤¤à¥ˆà¤¯à¤¾à¤°')}</span></div>
-        <p aria-label={`AI model: ${modelProvider}`} className="mt-0.5 text-[11px] text-muted-foreground">{modelProvider === 'Meta' ? 'Meta Spark' : 'OpenAI fallback'}</p>
         <p aria-live="polite" className="mt-1 text-sm">{question}</p>
         {heard && <p className="mt-1 truncate text-xs text-muted-foreground" title={heard}>You: {heard}</p>}
         {updated && <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">{t('Quotation fields updated below. You can edit them anytime.', 'à¤¨à¥€à¤šà¥‡ à¤•à¥‹à¤Ÿà¥‡à¤¶à¤¨ à¤•à¥€ à¤œà¤¾à¤¨à¤•à¤¾à¤°à¥€ à¤­à¤° à¤¦à¥€ à¤—à¤ˆ à¤¹à¥ˆà¥¤ à¤†à¤ª à¤‡à¤¸à¥‡ à¤¬à¤¦à¤² à¤­à¥€ à¤¸à¤•à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤')}</p>}
@@ -286,7 +254,6 @@ export function VoiceQuotationAssistant({ initialDraft, getCurrentDraft, onChang
     </div>
     {needsEnglish && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span>Existing quotation text needs English translation.</span><Button size="sm" variant="outline" disabled={status !== 'paused'} onClick={() => { active.current = false; void send('Translate all existing quotation section titles, product names, descriptions, project details and client names into English or Roman proper-name spellings. Preserve IDs, measurements, prices and pricing.'); }}>Convert existing text to English</Button></div>}
     <div className="mt-3 flex flex-wrap items-center gap-2">
-      <Button type="button" size="sm" disabled={working || status !== 'paused'} onClick={() => void recordWithMeta()}><Mic className="h-4 w-4" />Meta voice</Button>
       <Button type="button" size="sm" variant="outline" disabled={!supported || working} onClick={() => { if (status !== 'paused') pause(); else { active.current = true; listen(); } }}>{status === 'paused' ? <Mic className="h-4 w-4" /> : <Pause className="h-4 w-4" />}{status === 'paused' ? t('Speak', 'à¤¬à¥‹à¤²à¤¿à¤') : t('Pause', 'à¤°à¥‹à¤•à¥‡à¤‚')}</Button>
       <QuestionPlayback text={spokenQuestion.current} language={language} disabled={working || status !== 'paused'} onStart={pause} />
       <Button type="button" size="sm" variant="ghost" disabled={!undoCount || status !== 'paused'} onClick={undoLast}><Undo2 className="h-4 w-4" />{t('Undo', 'à¤ªà¤¿à¤›à¤²à¤¾ à¤¬à¤¦à¤²à¤¾à¤µ à¤¹à¤Ÿà¤¾à¤à¤')}</Button>

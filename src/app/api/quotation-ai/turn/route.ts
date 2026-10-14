@@ -13,7 +13,7 @@ const requestSchema = z.object({
   history: z.array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().max(1500) }).strict()).max(8),
 }).strict();
 type RateLimiter = { limit(input: { key: string }): Promise<{ success: boolean }> };
-type AIEnvironment = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; MODEL_API_KEY?: string; META_BASE_URL?: string; META_CHAT_MODEL?: string; META_STT_MODEL?: string; QUOTATION_AI_LIMITER?: RateLimiter };
+type AIEnvironment = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; QUOTATION_AI_LIMITER?: RateLimiter };
 const localUsage = new Map<string, { count: number; expires: number }>();
 async function allowed(userId: string, env: AIEnvironment) {
   if (env.QUOTATION_AI_LIMITER) return (await env.QUOTATION_AI_LIMITER.limit({ key: `quotation-ai:${userId}` })).success;
@@ -70,11 +70,8 @@ export async function POST(request: Request) {
     // Validate uniqueness and the overall item limit before calling a paid service.
     try { applyOperations(input.data.draft, []); }
     catch { return json({ error: 'The quotation draft has duplicate identifiers or exceeds its item limits.' }, 400); }
-    const openAIKey = (env.OPENAI_API_KEY || process.env.OPENAI_API_KEY)?.trim();
-    const metaKey = (env.MODEL_API_KEY || process.env.MODEL_API_KEY)?.trim();
-    const provider = metaKey
-      ? createQuotationProvider({ provider: 'meta', apiKey: metaKey, baseUrl: (env.META_BASE_URL || process.env.META_BASE_URL || 'https://api.meta.ai/v1').trim(), model: (env.META_CHAT_MODEL || process.env.META_CHAT_MODEL || 'muse-spark-1.3').trim(), fallback: { apiKey: openAIKey, model: (env.OPENAI_MODEL || process.env.OPENAI_MODEL || 'gpt-5.4-mini').trim() } })
-      : createQuotationProvider({ provider: 'openai', apiKey: openAIKey, model: (env.OPENAI_MODEL || process.env.OPENAI_MODEL || 'gpt-5.4-mini').trim() });
+    const key = (env.OPENAI_API_KEY || process.env.OPENAI_API_KEY)?.trim();
+    const provider = createQuotationProvider({ provider: 'openai', apiKey: key, model: (env.OPENAI_MODEL || process.env.OPENAI_MODEL || 'gpt-5.4-mini').trim() });
     const providerStarted = performance.now();
     const proposal = await provider.propose({ draft: input.data.draft, message: input.data.message, history: input.data.history.map(turn => ({ role: turn.role, text: turn.text })), language: input.data.language }, request.signal);
     const providerDuration = performance.now() - providerStarted;
@@ -84,8 +81,7 @@ export async function POST(request: Request) {
     try { draft = applyOperations(input.data.draft, operations); }
     catch { throw new ProviderError('The proposed change could not be validated. Please clarify the item or measurement.', 502, 'QUOTATION_CHANGE_INVALID'); }
     if (operations.length && hasNonEnglishDraft(draft)) throw new ProviderError('Some quotation text still needs English translation. No fields changed; use Convert existing text to English and try again.', 502, 'AI_LANGUAGE_INVALID');
-    const providerName = (proposal as typeof proposal & { provider?: 'Meta' | 'OpenAI' }).provider || (metaKey ? 'Meta' : 'OpenAI');
-    return json({ draft, reply: proposal.clarification || proposal.reply, displayReply: proposal.displayReply, transcript: proposal.transcript, review: reviewDraft(draft), changed: operations.length > 0, provider: providerName }, 200, `provider;dur=${providerDuration.toFixed(1)}, total;dur=${(performance.now() - started).toFixed(1)}`);
+    return json({ draft, reply: proposal.clarification || proposal.reply, displayReply: proposal.displayReply, transcript: proposal.transcript, review: reviewDraft(draft), changed: operations.length > 0 }, 200, `provider;dur=${providerDuration.toFixed(1)}, total;dur=${(performance.now() - started).toFixed(1)}`);
   } catch (error) {
     if (error instanceof ProviderError) {
       console.warn('quotation_ai_failure', { requestId, code: error.code, upstreamStatus: error.upstreamStatus, ...(error.providerCode ? { providerCode: error.providerCode } : {}), ...(error.providerRequestId ? { providerRequestId: error.providerRequestId } : {}) });

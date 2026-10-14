@@ -34,7 +34,7 @@ describe('live voice server boundary', () => {
   });
   it('returns only ephemeral credentials and configures Hindi, interruption and English tools', async () => {
     const response = await POST(request({ action: 'session', language: 'hi-IN', noisy: false, draft }));
-    expect(await response.json()).toEqual({ value: 'short-lived-secret', expiresAt: 123, provider: 'OpenAI' });
+    expect(await response.json()).toEqual({ value: 'short-lived-secret', expiresAt: 123 });
     expect(response.headers.get('Cache-Control')).toContain('no-store');
     const config = JSON.parse((fetch as jest.Mock).mock.calls[0][1].body);
     expect(config.expires_after.seconds).toBe(60);
