@@ -94,6 +94,7 @@ export function LiveQuotationAssistant(props: VoiceAssistantProps) {
           const labels: Record<string, string> = { clientName: 'Client', projectTitle: 'Quotation', clientAddress: 'Address', productName: 'Product', productDetails: 'Details', side: 'Side', widthFt: 'Width (ft)', heightFt: 'Height (ft)', sftArea: 'Area (sq ft)', ratePerSft: 'Rate / sq ft', gstEnabled: 'Tax enabled', gstRate: 'Tax %', discountPercentage: 'Discount %', enableSocialMediaDiscount: 'Social discount enabled', socialMediaDiscountRate: 'Social discount %', measurementMode: 'Measurement method', placeOfProject: 'Location', projectType: 'Project type' };
           setPendingSummary(operations.map(op => {
             if (op.type === 'add_section') return `New section: ${op.title}`;
+            if (op.type === 'update_section') return `Section title: ${op.title}`;
             const item = 'itemId' in op ? current.current.sections.flatMap(section => section.items).find(item => item.id === op.itemId) : null;
             if (op.type === 'remove_item') return `Remove: ${item?.productName || 'item'}`;
             return `${item?.productName ? item.productName + ': ' : ''}${Object.entries(op.fields).map(([key, value]) => `${labels[key] || key}: ${value == null ? 'not provided' : String(value)}`).join(', ')}`;

@@ -26,6 +26,7 @@ export type VoiceDraft = z.infer<typeof draftSchema>;
 export const operationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('update_project'), fields: projectFields.partial() }).strict(),
   z.object({ type: z.literal('add_section'), title: text }).strict(),
+  z.object({ type: z.literal('update_section'), sectionId: id, title: text }).strict(),
   z.object({ type: z.literal('add_item'), sectionId: id, fields: itemFields }).strict(),
   z.object({ type: z.literal('update_item'), itemId: id, fields: itemFields.partial() }).strict(),
   z.object({ type: z.literal('remove_item'), itemId: id }).strict(),
@@ -35,6 +36,8 @@ export const proposalSchema = z.object({
   reply: z.string().min(1).max(1500),
   operations: z.array(operationSchema).max(30),
   clarification: z.string().max(1000).nullable(),
+  displayReply: z.string().max(1500).optional(),
+  transcript: z.string().max(3000).optional(),
 }).strict();
 export type Proposal = z.infer<typeof proposalSchema>;
 export type Operation = Proposal['operations'][number];
@@ -87,6 +90,11 @@ export function applyOperations(draft: VoiceDraft, operations: Operation[], make
     if (op.type === 'update_project') Object.assign(next.project, op.fields);
     if (op.type === 'propose_pricing') Object.assign(next.pricing, op.fields);
     if (op.type === 'add_section') next.sections.push({ id: makeId(), title: op.title, items: [] });
+    if (op.type === 'update_section') {
+      const section = next.sections.find(section => section.id === op.sectionId);
+      if (!section) throw new Error('That section no longer exists.');
+      section.title = op.title;
+    }
     if (op.type === 'add_item') {
       const section = next.sections.find(s => s.id === op.sectionId);
       if (!section) throw new Error('That section no longer exists. Please try again.');

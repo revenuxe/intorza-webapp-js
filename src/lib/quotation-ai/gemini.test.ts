@@ -3,11 +3,16 @@ jest.mock('server-only', () => ({}), { virtual: true });
 import { GeminiQuotationProvider } from './gemini';
 
 describe('Gemini provider adapter', () => {
-  it('uses the requested mainstream fallback after an unsupported primary model', async () => {
-    global.fetch = jest.fn().mockResolvedValueOnce(new Response('{}', { status: 404 })).mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify({ reply: 'What size?', clarification: null, operations: [] }) }] } }] })));
-    await new GeminiQuotationProvider('secret', 'gemini-3.8-flash').propose(input);
-    expect((global.fetch as jest.Mock).mock.calls[1][0]).toContain('gemini-3.6-flash:generateContent');
-    expect(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body).systemInstruction.parts[0].text).toContain('English/Latin letters');
+  it('reports billing errors without retrying or changing models', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('{}', { status: 402 }));
+    await expect(new GeminiQuotationProvider('secret', 'gemini-3.8-flash').propose(input)).rejects.toMatchObject({ code: 'GEMINI_PAYMENT_REQUIRED', status: 402 });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+  it('keeps Flash-Lite selected instead of falling back to a different model', async () => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('{}', { status: 404 }));
+    await expect(new GeminiQuotationProvider('secret', 'gemini-3.5-flash-lite').propose(input)).rejects.toThrow('gemini-3.5-flash-lite');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect((global.fetch as jest.Mock).mock.calls[0][0]).toContain('gemini-3.5-flash-lite:generateContent');
   });
   const input = { draft: {} as never, message: 'Wardrobe', history: [], language: 'en-IN' };
   const originalFetch = global.fetch;

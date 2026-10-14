@@ -1,5 +1,20 @@
 import { reviewDraft, type VoiceDraft } from './domain';
 export type VoiceLanguage = 'en-IN' | 'hi-IN';
+// Display-only transliteration. Send original speech to the model for semantic translation.
+export function romanLetters(value: string): string {
+  const consonants: Record<string, string> = { 'क':'k','ख':'kh','ग':'g','घ':'gh','ङ':'n','च':'ch','छ':'chh','ज':'j','झ':'jh','ञ':'n','ट':'t','ठ':'th','ड':'d','ढ':'dh','ण':'n','त':'t','थ':'th','द':'d','ध':'dh','न':'n','प':'p','फ':'ph','ब':'b','भ':'bh','म':'m','य':'y','र':'r','ल':'l','व':'v','श':'sh','ष':'sh','स':'s','ह':'h','ळ':'l' };
+  const vowels: Record<string, string> = { 'अ':'a','आ':'aa','इ':'i','ई':'ee','उ':'u','ऊ':'oo','ए':'e','ऐ':'ai','ओ':'o','औ':'au','ऋ':'ri','ा':'aa','ि':'i','ी':'ee','ु':'u','ू':'oo','े':'e','ै':'ai','ो':'o','ौ':'au','ृ':'ri','ं':'n','ँ':'n','ः':'h','्':'','़':'','।':'.' };
+  const chars = [...normalizeSpokenDigits(value)]; let result = '';
+  for (let i = 0; i < chars.length; i++) {
+    const char = chars[i];
+    if (consonants[char]) {
+      result += consonants[char];
+      const next = chars[i + 1];
+      if (next && consonants[next]) result += 'a';
+    } else result += vowels[char] ?? char;
+  }
+  return result.replace(/[\u0900-\u097f]/g, '').replace(/\s+/g, ' ').trim();
+}
 export function normalizeSpokenDigits(text: string) {
   return text.replace(/[०-९]/g, digit => String(digit.charCodeAt(0) - 0x0966));
 }

@@ -2,6 +2,38 @@
 
 Implemented foundation, 2026-10-14. This document supersedes provider/transport choices in `voice-quotation-plan.md`.
 
+## Current OpenAI integration (2026-10-15)
+
+This section supersedes all Gemini configuration below. The active provider is OpenAI, with `gpt-5.4-mini` as the configurable text default and `gpt-4o-mini-tts` for spoken playback. Gemini is disabled in the factory; `/api/quotation-ai/live` returns 410 and cannot issue Google tokens. Old Gemini source modules remain for historical reference/tests but are not used by the mounted quotation flow.
+
+Cloudflare runtime configuration:
+
+```dotenv
+OPENAI_API_KEY=your-server-only-secret
+OPENAI_MODEL=gpt-5.4-mini
+OPENAI_TTS_MODEL=gpt-4o-mini-tts
+```
+
+The key is never public or returned to the browser. Existing `GEMINI_*` and `QUOTATION_AI_PROVIDER=gemini` overrides are ignored by the active endpoint. OpenAI usage requires API-project access/credit; it is not supplied by an unrelated subscription or a Gemini free tier. No credentials have been provisioned by this implementation.
+
+The server calls the Responses API with strict JSON schema and `store:false`, a 30-second deadline, bounded output and at most one transient-5xx retry. Structured wire patches contain nullable unused fields; the adapter converts them into the existing domain command schema without wiping unspecified values. Authentication, per-user limits, batch validation, fixed-point calculations, optimistic form conflict checks, undo, incomplete draft handling and explicit saving remain intact. Unknown or noncompliant output is rejected before a form update. The operation schema includes `update_section` to translate existing section names without replacing their identities or items.
+
+Language contract: `reply` and `clarification` are the spoken text in the selected Hindi/English language. `displayReply` is English. `transcript` is an English semantic translation of the latest user answer, with proper names in Roman letters. All operation text and section titles must use Latin letters; product/room words are translated to English rather than merely transliterated. Non-Latin output is rejected, never silently applied. Existing Hindi draft content triggers a visible Convert existing text to English action; the model must preserve numeric fields and IDs while changing text. If any Hindi quotation content survives an accepted turn, the whole change is rejected. Name spelling still requires user review; Latin-script enforcement cannot prove semantic translation accuracy.
+
+Browser speech recognition still captures input. Before a model translation arrives, the visible interim/failed-turn transcript uses approximate Roman transliteration; the original recognized text is sent for extraction. Successful turns display the English translation. The interface stays English even when speech language is Hindi. Recognition errors still need user review.
+
+`/api/quotation-ai/speech` authenticates, rate limits and bounds speech requests, calls OpenAI speech generation with the requested language and returns non-cacheable MP3. This removes reliance on an installed Hindi device voice. Playback finishes before microphone recognition restarts, and pause/hide/close aborts loading, releases audio URLs and ignores stale playback. A failed speech request leaves the English question visible and the assistant paused. The UI discloses AI-generated speech. No speech transcript/audio is logged by these endpoints.
+
+Text and speech share the per-user request limiter; continuous use may hit that quota sooner than text-only use. No Realtime protocol or model training is claimed. Live latency, pronunciation and account access must still be verified after adding the runtime key and deploying.
+
+Official sources: https://developers.openai.com/api/docs/guides/structured-outputs ; https://developers.openai.com/api/docs/models/gpt-5.4-mini ; https://developers.openai.com/api/docs/guides/text-to-speech
+
+Current model update (2026-10-15): the mounted browser/text assistant defaults to `gemini-3.5-flash-lite`. Set Cloudflare runtime `GEMINI_MODEL=gemini-3.5-flash-lite` or remove an older runtime override. `.env.example` reflects this default. Automatic fallback to other models has been removed to preserve the user's model/cost preference; transient 5xx errors can retry the same model once. Google lists free-tier input/output for this model, subject to project tier and limits. Paid-tier projects have applicable charges, and changing a model does not automatically repair a depleted-credit HTTP 402 or change the Google project's billing tier. Source: https://ai.google.dev/gemini-api/docs/pricing . Earlier model/Live sections below are historical.
+
+Update 2026-10-15: the quotation form currently uses the browser/text assistant with gemini-3.8-flash and gemini-3.6-flash fallback, following unsupported Live-model reports. The Live implementation below remains available in source but is not the mounted default. Spoken replies use the selected Hindi/English language; interface and displayed conversation use English/Latin letters. Gemini returns separate displayReply and transcript translations alongside its spoken reply. Recognized text uses display-only Roman transliteration before a model translation is available; original recognition is preserved for extraction. A final script guard transliterates noncompliant Hindi operation strings, including section titles. Transliteration is approximate, so proper-name spelling should be reviewed.
+
+Google HTTP 402 is now reported as GEMINI_PAYMENT_REQUIRED with an actionable API-project billing message. It is not retried or model-fallbacked. The previously generic GEMINI_UPSTREAM_FAILED/402 response was a misleading classification, not evidence of a model outage. API billing must be resolved externally in the key's Google AI Studio project.
+
 ## Native Live voice (current default)
 
 The form now mounts `QuotationVoiceAssistant`, which offers native Live voice by default and retains the earlier browser/text assistant as an explicit fallback. The conversational model is configurable separately using server-only `GEMINI_LIVE_MODEL`; the default is `gemini-3.8-live`, Google's documented current conversational Live model. The older label "Gemini 3 Flash Live" does not imply a verified API identifier of `gemini-3-flash-live`. `gemini-3.1-flash-live-preview` can be selected explicitly if the account supports it. No silent model fallback occurs.

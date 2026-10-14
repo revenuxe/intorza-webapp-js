@@ -1,6 +1,11 @@
-import { initialQuestion, normalizeSpokenDigits, selectSpeechVoice } from './language';
+import { initialQuestion, normalizeSpokenDigits, selectSpeechVoice, romanLetters } from './language';
 import type { VoiceDraft } from './domain';
 describe('Hindi voice support', () => {
+  it('keeps display transcripts and section labels in Roman letters without changing English', () => {
+    expect(romanLetters('Bedroom')).toBe('Bedroom');
+    expect(romanLetters('राहुल ६ फीट')).not.toMatch(/[\u0900-\u097f]/);
+    expect(romanLetters('राहुल ६ फीट')).toContain('6');
+  });
   it('normalizes Devanagari digits without changing names or amounts', () => {
     expect(normalizeSpokenDigits('राहुल: ६.५ फीट, १२०० रुपये, १८%')).toBe('राहुल: 6.5 फीट, 1200 रुपये, 18%');
   });

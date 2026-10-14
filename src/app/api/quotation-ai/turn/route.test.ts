@@ -22,13 +22,19 @@ function request(body: unknown = input(), authenticated = true) {
 beforeEach(() => {
   jest.clearAllMocks();
   (createClient as jest.Mock).mockReturnValue({ auth: { getUser } });
-  (getCloudflareContext as jest.Mock).mockResolvedValue({ env: { GEMINI_API_KEY: 'test-key', QUOTATION_AI_LIMITER: { limit } } });
+  (getCloudflareContext as jest.Mock).mockResolvedValue({ env: { OPENAI_API_KEY: 'test-key', QUOTATION_AI_LIMITER: { limit } } });
   (createQuotationProvider as jest.Mock).mockReturnValue({ propose });
   getUser.mockResolvedValue({ data: { user: { id: 'owner' } }, error: null });
   limit.mockResolvedValue({ success: true });
   propose.mockResolvedValue({ reply: 'What is the quotation title?', clarification: null, operations: [{ type: 'update_project', fields: { clientName: 'Rahul' } }] });
 });
 describe('authenticated quotation AI boundary', () => {
+  it('selects OpenAI and prevents existing Hindi sections from surviving an accepted update', async () => {
+    const payload = input(); payload.draft.sections[0].title = 'बेडरूम';
+    const response = await POST(request(payload));
+    expect(response.status).toBe(502); expect((await response.json()).code).toBe('AI_LANGUAGE_INVALID');
+    expect(createQuotationProvider).toHaveBeenCalledWith({ provider: 'openai', apiKey: 'test-key', model: 'gpt-5.4-mini' });
+  });
   it('returns a traceable safe upstream error without logging credentials or quotation text', async () => {
     const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
     try {
