@@ -19,9 +19,12 @@ import { ProviderError } from '@/lib/quotation-ai/provider';
 import { advanceGuided, guidedDefault, guidedPrompts, nextGuidedState, type GuidedState } from '@/lib/quotation-ai/guided-flow';
 
 type ToolCall = { type: string; name?: string; call_id?: string; arguments?: string };
-const openingSpeech = (draft: VoiceDraft, language: VoiceLanguage) => language === 'hi-IN' ? guidedPrompts[nextGuidedState(draft).step].hindi : initialQuestion(draft, 'en-IN');
+type RealtimeVoiceLanguage = VoiceLanguage | 'hi-IN-native';
+const isNativeHindi = (language: RealtimeVoiceLanguage) => language === 'hi-IN-native';
+const openingSpeech = (draft: VoiceDraft, language: RealtimeVoiceLanguage) => language === 'hi-IN' ? guidedPrompts[nextGuidedState(draft).step].hindi : initialQuestion(draft, isNativeHindi(language) ? 'hi-IN' : language);
+const languageName = (language: RealtimeVoiceLanguage) => language === 'hi-IN' ? 'Hinglish' : isNativeHindi(language) ? 'Hindi' : 'English';
 export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onChange, onClose }: VoiceAssistantProps) {
-  const [language, setLanguage] = useState<VoiceLanguage>(() => { try { return localStorage.getItem('quotation-voice-language') === 'en-IN' ? 'en-IN' : 'hi-IN'; } catch { return 'hi-IN'; } });
+  const [language, setLanguage] = useState<RealtimeVoiceLanguage>(() => { try { const saved = localStorage.getItem('quotation-voice-language'); return saved === 'en-IN' || saved === 'hi-IN-native' || saved === 'hi-IN' ? saved : 'hi-IN'; } catch { return 'hi-IN'; } });
   const noisy = false;
   const [status, setStatus] = useState('Ready');
   const [connected, setConnected] = useState(false);
@@ -29,15 +32,12 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   const [spokenQuestion, setSpokenQuestion] = useState(() => openingSpeech(initialDraft, language));
   const [heard, setHeard] = useState('');
   const [error, setError] = useState('');
-  const [input, setInput] = useState('');
-  const [updates, setUpdates] = useState(0);
   const [, setUndoCount] = useState(0);
   const [fieldState, setFieldState] = useState<GuidedState>(() => nextGuidedState(initialDraft));
   const [fieldValue, setFieldValue] = useState(() => guidedDefault(nextGuidedState(initialDraft), initialDraft));
   const [holding, setHolding] = useState(false);
   const [reviewFields, setReviewFields] = useState<FieldReview[]>([]);
   const pendingNext = useRef<GuidedState | null>(null);
-  const [messages, setMessages] = useState<{ user: string; assistant: string }[]>([]);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const audioBlockedRef = useRef(false);
   const replayRequested = useRef(false);
@@ -97,7 +97,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
   function repeatQuestion() {
     if (audioBlockedRef.current || !channel.current || applying.current || responseActive.current) { replayRequested.current = true; return; }
     replayRequested.current = false; responseActive.current = true; setStatus('Thinking');
-    emit({ type: 'response.create', response: { tool_choice: 'none', instructions: `Read this question exactly, without adding or editing quotation details. Use ${language === 'hi-IN' ? 'conversational Hinglish' : 'English'}: ${spokenCurrent.current}` } });
+    emit({ type: 'response.create', response: { tool_choice: 'none', instructions: `Read this question exactly, without adding or editing quotation details. Use ${languageName(language)}: ${spokenCurrent.current}` } });
     armIdle();
   }
   async function enableVoice() {
@@ -127,7 +127,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
     const hide = () => { if (document.hidden) stop(); };
     document.addEventListener('visibilitychange', hide);
     const { data } = supabase.auth.onAuthStateChange(event => { if (event === 'SIGNED_OUT') stop(); });
-    try { const saved = localStorage.getItem('quotation-voice-language'); if (saved === 'hi-IN') { setLanguage(saved); setSpokenQuestion(openingSpeech(currentDraft.current, saved)); } } catch { /* Optional preference. */ }
+    try { const saved = localStorage.getItem('quotation-voice-language'); if (saved === 'hi-IN' || saved === 'hi-IN-native' || saved === 'en-IN') { setLanguage(saved); setSpokenQuestion(openingSpeech(currentDraft.current, saved)); } } catch { /* Optional preference. */ }
     return () => { mounted.current = false; stop(); data.subscription.unsubscribe(); document.removeEventListener('visibilitychange', hide); };
     // The connection is owned by this mounted component and reads callbacks from refs.
   }, []);
@@ -170,7 +170,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
         if (body.changed) {
           const after = latest.current.onChange(next, expected);
           undo.current = [...undo.current.slice(-9), { draft: before, after }];
-          snapshot.current = after; setUndoCount(undo.current.length); setUpdates(count => count + 1);
+          snapshot.current = after; setUndoCount(undo.current.length);
         }
         currentDraft.current = next;
         const inferred = nextGuidedState(next);
@@ -187,13 +187,12 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
           setFieldValue(guidedDefault(fieldStateCurrent.current, next));
           const first = changes[0];
           display = `Check ${first.label.toLowerCase()}: ${first.value}. Is this correct?`;
-          spoken = language === 'hi-IN' ? `${first.value} fill kar diya. Ek baar check kar lijiye. Sahi hai toh next bol dijiye.` : `I entered ${first.value}. Please check it, then say next if it is correct.`;
+          spoken = language === 'hi-IN' ? `${first.value} fill kar diya. Ek baar check kar lijiye. Sahi hai toh next bol dijiye.` : isNativeHindi(language) ? `${first.value} भर दिया है। एक बार देख लीजिए। सही है तो आगे बोलिए।` : `I entered ${first.value}. Please check it, then say next if it is correct.`;
         } else if (!pendingNext.current || body.confirmed) {
           pendingNext.current = null; setReviewFields([]);
           setFieldState(nextField); setFieldValue(guidedDefault(nextField, next));
         }
         setQuestion(display); setSpokenQuestion(spoken); setHeard(body.transcript);
-        setMessages(previous => [...previous.slice(-3), { user: body.transcript, assistant: display }]);
         conversationContext.current = { question: display, heard: body.transcript };
         if (body.complete) {
           finishing.current = true; responsePending.current = false;
@@ -322,7 +321,7 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       if (result.changed) {
         const after = latest.current.onChange(result.draft, expected);
         snapshot.current = after; currentDraft.current = result.draft;
-        undo.current = [...undo.current.slice(-9), { draft: before, after }]; setUndoCount(undo.current.length); setUpdates(count => count + 1);
+        undo.current = [...undo.current.slice(-9), { draft: before, after }]; setUndoCount(undo.current.length);
       }
       const changes = changedFields(before, result.draft);
       if (changes.length) { pendingNext.current = result.state; setReviewFields(changes); }
@@ -331,36 +330,25 @@ export function RealtimeQuotationAssistant({ initialDraft, getCurrentDraft, onCh
       respond(); setStatus('Thinking'); setError('');
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update the field.'); }
   }
-  return <section className="overflow-hidden rounded-2xl border border-orange-200 bg-background p-4 shadow-sm dark:border-orange-900" aria-label="Quotation voice assistant">
-    <div className="flex items-start gap-3">
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white ${connected ? 'ring-4 ring-orange-200 dark:ring-orange-900' : ''}`}><Mic className="h-5 w-5" /></div>
-      <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Quotation assistant</h2><span className="text-xs text-muted-foreground" role="status">{holding ? 'On hold · microphone off' : status === 'Listening' ? 'Your turn · microphone on' : status}</span>
-        {updates > 0 && <p className="mt-1 text-xs font-medium text-orange-700 dark:text-orange-300">Fields updated below</p>}
-      </div>
+  return <section className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-orange-200 bg-background p-3 shadow-sm dark:border-orange-900" aria-label="Quotation voice assistant">
+    <div className="flex items-center gap-2">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white ${connected ? 'ring-2 ring-orange-200 dark:ring-orange-900' : ''}`}><Mic className="h-4 w-4" /></div>
+      <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">Quotation assistant</h2><span className="text-xs text-muted-foreground" role="status">{holding ? 'On hold · microphone off' : status === 'Listening' ? 'Listening' : status}</span></div>
       <Button variant="ghost" size="icon" aria-label="Close voice assistant" className="h-8 w-8" onClick={() => { stop(); onClose(); }}><X className="h-4 w-4" /></Button>
     </div>
-    <div aria-label="Current conversation" className="mt-3 space-y-2 rounded-xl bg-muted/40 p-3"><p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Assistant</p><p className="text-sm leading-relaxed" aria-live="polite">{question}</p>{heard && <div className="mt-2 border-t pt-2"><p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Your answer</p><p className="mt-1 text-sm">{heard}</p></div>}</div>
-    {reviewFields.length > 0 && <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50/60 p-3 dark:border-orange-900 dark:bg-orange-950/20"><p className="text-sm font-semibold">Check what I entered</p><dl className="mt-2 space-y-1">{reviewFields.map((entry, index) => <div key={`${entry.label}:${index}`} className="flex flex-wrap justify-between gap-x-4 text-sm"><dt className="text-muted-foreground">{entry.label}</dt><dd className="font-medium">{entry.value}</dd></div>)}</dl><Button type="button" size="sm" className="mt-3" disabled={status !== 'Listening' || !connected} onClick={confirmField}>Looks right · Next</Button><p className="mt-2 text-xs text-muted-foreground">Or say “sahi hai” to continue. Tell me if anything needs correcting.</p></div>}
-    {connected && !finishing.current && fieldState.step !== 'review' && <div className="mt-3 rounded-xl border bg-background p-3"><label htmlFor="conversation-field" className="mb-2 block text-sm font-medium">{focusedPrompt.label}</label>
+    <div aria-label="Current conversation" className="mt-3 rounded-xl bg-orange-50/70 px-3 py-2.5 dark:bg-orange-950/20"><p className="text-sm leading-relaxed" aria-live="polite">{question}</p>{heard && <p className="mt-1 truncate text-xs text-muted-foreground">You: {heard}</p>}</div>
+    {reviewFields.length > 0 && <div aria-label="Field review" className="mt-2 flex flex-wrap items-center gap-2 rounded-xl border border-orange-200 bg-orange-50/60 px-3 py-2 dark:border-orange-900 dark:bg-orange-950/20"><p className="min-w-0 flex-1 truncate text-sm"><span className="font-medium">Check:</span> {reviewFields.map(entry => `${entry.label}: ${entry.value}`).join(' · ')}</p><Button type="button" size="sm" disabled={status !== 'Listening' || !connected} onClick={confirmField}>Next</Button></div>}
+    {connected && !finishing.current && fieldState.step !== 'review' && <div className="mt-2"><label htmlFor="conversation-field" className="sr-only">{focusedPrompt.label}</label>
       {focusedPrompt.choices ? <div className="flex flex-wrap gap-2">{focusedPrompt.choices.map(choice => <Button key={choice.value} type="button" size="sm" variant="outline" disabled={status !== 'Listening'} onClick={() => enterField(choice.value)}>{choice.label}</Button>)}</div>
-        : <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (fieldState.step === 'sectionChoice') { emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `Use section ${fieldValue}` }] } }); respond(); setStatus('Thinking'); } else enterField(fieldValue); }}><Input id="conversation-field" value={fieldValue} maxLength={focusedPrompt.numeric ? 20 : 1000} inputMode={focusedPrompt.numeric ? 'decimal' : 'text'} onChange={event => setFieldValue(event.target.value)} placeholder={focusedPrompt.numeric ? 'Enter a number' : 'Type in English, or tell me aloud'} /><Button type="submit" size="sm" disabled={status !== 'Listening' || !fieldValue.trim()}>{reviewFields.length ? 'Update' : 'Continue'}</Button></form>}
+        : <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (fieldState.step === 'sectionChoice') { emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: `Use section ${fieldValue}` }] } }); respond(); setStatus('Thinking'); } else enterField(fieldValue); }}><Input id="conversation-field" value={fieldValue} maxLength={focusedPrompt.numeric ? 20 : 1000} inputMode={focusedPrompt.numeric ? 'decimal' : 'text'} onChange={event => setFieldValue(event.target.value)} placeholder={focusedPrompt.numeric ? `Enter ${focusedPrompt.label.toLowerCase()}` : `Type ${focusedPrompt.label.toLowerCase()} or say it`} /><Button type="submit" size="sm" aria-label="Continue" disabled={status !== 'Listening' || !fieldValue.trim()}><Send className="h-4 w-4" /></Button></form>}
     </div>}
-    <div className="mt-3 flex flex-wrap items-center gap-2">
+    <div className="mt-2 flex items-center gap-1">
       {running && <Button type="button" size="sm" variant="outline" onClick={hold}>Hold</Button>}
       {audioBlocked && <Button type="button" size="sm" onClick={() => void enableVoice()}><Volume2 className="h-4 w-4" />Enable voice</Button>}
-      {connected && !audioBlocked && !finishing.current && <Button type="button" size="sm" variant="ghost" onClick={repeatQuestion} disabled={status !== 'Listening'}><Volume2 className="h-4 w-4" />Read question</Button>}
+      {connected && !audioBlocked && !finishing.current && <Button type="button" size="sm" variant="ghost" aria-label="Read question" onClick={repeatQuestion} disabled={status !== 'Listening'}><Volume2 className="h-4 w-4" /></Button>}
       {(!running) && <Button size="sm" variant="outline" onClick={() => void start()}>{holding ? 'Resume' : 'Reconnect'}</Button>}
-      <select aria-label="Spoken language" disabled={running} value={language} onChange={event => { const value = event.target.value as VoiceLanguage; setLanguage(value); setSpokenQuestion(openingSpeech(currentDraft.current, value)); setQuestion(initialQuestion(currentDraft.current, 'en-IN')); try { localStorage.setItem('quotation-voice-language', value); } catch { /* Optional. */ } }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hinglish</option></select>
+      <select aria-label="Spoken language" disabled={status === 'Connecting' || status === 'Allow microphone'} value={language} onChange={event => { const value = event.target.value as RealtimeVoiceLanguage; if (running) hold(); setLanguage(value); setSpokenQuestion(openingSpeech(currentDraft.current, value)); setQuestion(initialQuestion(currentDraft.current, 'en-IN')); try { localStorage.setItem('quotation-voice-language', value); } catch { /* Optional preference. */ } }} className="ml-auto rounded-md border bg-background px-2 py-1.5 text-xs"><option value="en-IN">English</option><option value="hi-IN">Hinglish</option><option value="hi-IN-native">हिन्दी / Hindi</option></select>
     </div>
-    <details className="mt-2"><summary className="cursor-pointer text-xs text-muted-foreground">Type a question or correction</summary>
-    <form className="mt-2 flex gap-2" onSubmit={event => {
-      event.preventDefault(); if (!connected || !input.trim() || applying.current || status !== 'Listening') return;
-      hasUserAnswer.current = true;
-      emit({ type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: input.trim() }] } });
-      respond(); setInput(''); setStatus('Thinking'); armIdle();
-    }}><Input aria-label="Your answer or correction" placeholder="Or type an answer or correction..." maxLength={3000} value={input} onChange={event => setInput(event.target.value)} disabled={!connected} className="h-9 bg-background text-sm" /><Button size="sm" type="submit" aria-label="Send answer" disabled={!connected || !input.trim() || status !== 'Listening'}><Send className="h-4 w-4" /></Button></form>
-    </details>
-    {messages.length > 1 && <details className="mt-3 border-t pt-2"><summary className="cursor-pointer text-xs text-muted-foreground">Earlier conversation</summary><ol className="mt-2 max-h-40 space-y-3 overflow-y-auto text-xs">{messages.slice(0, -1).map((message, index) => <li key={index}><p className="text-muted-foreground">You: {message.user}</p><p className="mt-1">Assistant: {message.assistant}</p></li>)}</ol></details>}
     {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
   </section>;
 }

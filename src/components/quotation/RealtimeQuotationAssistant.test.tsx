@@ -76,7 +76,7 @@ describe('Realtime quotation lifecycle', () => {
     let current = fixture(); const onChange = jest.fn((draft: VoiceDraft) => { current = draft; return JSON.stringify(draft); });
     render(<RealtimeQuotationAssistant initialDraft={current} getCurrentDraft={() => current} onChange={onChange} onClose={jest.fn()} />);
     await start(); event(tool()); expect(onChange).toHaveBeenCalledTimes(1); expect(fetch).toHaveBeenCalledTimes(2);
-    expect(screen.getByText('For Rahul')).toBeInTheDocument();
+    expect(screen.getByLabelText('Current conversation')).toHaveTextContent('For Rahul');
     event(tool()); expect(onChange).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Close voice assistant' })); expect(trackStop).toHaveBeenCalled(); expect(close).toHaveBeenCalled();
   });
@@ -93,10 +93,10 @@ describe('Realtime quotation lifecycle', () => {
     await start(); event({ type: 'response.done', response: { status: 'completed', output: [] } });
     fireEvent.change(screen.getByLabelText('Customer name'), { target: { value: 'Aslam' } }); fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
     expect(current.project.clientName).toBe('Aslam'); expect(fetch).toHaveBeenCalledTimes(2); expect(screen.getByLabelText('Customer name')).toHaveValue('Aslam');
-    expect(screen.getByText('Check what I entered')).toBeInTheDocument();
+    expect(screen.getByLabelText('Field review')).toBeInTheDocument();
     event({ type: 'response.done', response: { status: 'completed', output: [] } }); event({ type: 'output_audio_buffer.stopped' });
-    fireEvent.click(screen.getByRole('button', { name: 'Looks right · Next' }));
-    expect(screen.getByLabelText('Quotation title')).toBeInTheDocument(); expect(screen.queryByText('Check what I entered')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByLabelText('Quotation title')).toBeInTheDocument(); expect(screen.queryByLabelText('Field review')).toBeNull();
   });
   it('preserves manual edits before a voice update', async () => {
     let current = fixture(); const onChange = jest.fn();
@@ -108,9 +108,9 @@ describe('Realtime quotation lifecycle', () => {
     let current = fixture();
     render(<RealtimeQuotationAssistant initialDraft={current} getCurrentDraft={() => current} onChange={draft => { current = draft; return JSON.stringify(draft); }} onClose={jest.fn()} />);
     await start(); event(tool());
-    expect(screen.getByLabelText('Customer name')).toHaveValue('Rahul'); expect(screen.getByText('Check what I entered')).toBeInTheDocument();
+    expect(screen.getByLabelText('Customer name')).toHaveValue('Rahul'); expect(screen.getByLabelText('Field review')).toBeInTheDocument();
     event({ type: 'response.done', response: { status: 'completed', output: [{ type: 'function_call', name: 'update_quotation', call_id: 'confirm', arguments: JSON.stringify({ reply: 'Quotation ka title kya rakhein?', displayReply: 'What is the quotation title?', transcript: 'Yes, the name is correct.', clarification: null, confirmed: true, endConversation: false, focus: 'projectTitle', operationsJson: '[]' }) }] } });
-    expect(screen.queryByText('Check what I entered')).toBeNull(); expect(screen.getByLabelText('Quotation title')).toBeInTheDocument(); expect(current.project.clientName).toBe('Rahul');
+    expect(screen.queryByLabelText('Field review')).toBeNull(); expect(screen.getByLabelText('Quotation title')).toBeInTheDocument(); expect(current.project.clientName).toBe('Rahul');
   });
   it('ends capture immediately on finish and closes after final playback', async () => {
     let current = fixture();
