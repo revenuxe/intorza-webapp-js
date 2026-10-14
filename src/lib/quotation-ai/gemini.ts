@@ -46,11 +46,18 @@ export class GeminiQuotationProvider implements QuotationAIProvider {
         body: JSON.stringify({ systemInstruction: { parts: [{ text: instructions }] },
           contents: [{ role: 'user', parts: [{ text: JSON.stringify(input) }] }],
           generationConfig: { temperature: 0.1, maxOutputTokens: 4096,
-            responseFormat: { text: { mimeType: 'application/json', schema: geminiResponseSchema } } },
+            responseMimeType: 'application/json', responseJsonSchema: geminiResponseSchema },
         }),
       });
     } catch { throw new ProviderError('The AI request timed out or could not connect. Your draft is unchanged.'); }
-    if (!response.ok) throw new ProviderError(response.status === 429 ? 'AI usage limit reached. Please wait before trying again.' : 'Gemini is unavailable. Check the server API key and model configuration.', response.status === 429 ? 429 : 502);
+    if (!response.ok) {
+      const message = response.status === 429 ? 'AI usage limit reached. Please wait before trying again.'
+        : response.status === 404 ? `Gemini model ${this.model} is unavailable for this API key. Check GEMINI_MODEL in Cloudflare runtime settings.`
+        : response.status === 401 || response.status === 403 ? 'Gemini rejected the API key or its permissions. Check the Cloudflare runtime GEMINI_API_KEY and Google AI project access.'
+        : response.status === 400 ? 'Gemini rejected the request configuration. Check that GEMINI_MODEL supports structured JSON output and that your API key is valid.'
+        : 'Gemini is temporarily unavailable. Your quotation is unchanged; please try again.';
+      throw new ProviderError(message, response.status === 429 ? 429 : 502);
+    }
     const body = await response.json();
     const candidate = body.candidates?.[0];
     if (candidate?.finishReason !== 'STOP') throw new ProviderError('The AI could not complete this turn. Try a shorter description.');

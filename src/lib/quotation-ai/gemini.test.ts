@@ -12,7 +12,9 @@ describe('Gemini provider adapter', () => {
     expect(result.reply).toBe('What size?');
     const [url, config] = (global.fetch as jest.Mock).mock.calls[0];
     expect(url).not.toContain('secret'); expect(config.headers['x-goog-api-key']).toBe('secret');
-    expect(JSON.parse(config.body).generationConfig.responseFormat.text.mimeType).toBe('application/json');
+    expect(JSON.parse(config.body).generationConfig.responseMimeType).toBe('application/json');
+    expect(JSON.parse(config.body).generationConfig.responseJsonSchema).toBeDefined();
+    expect(JSON.parse(config.body).generationConfig.responseFormat).toBeUndefined();
   });
   it('rejects truncated output and unsupported operations', async () => {
     global.fetch = jest.fn().mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ finishReason: 'MAX_TOKENS' }] })))
@@ -25,5 +27,9 @@ describe('Gemini provider adapter', () => {
     global.fetch = jest.fn().mockResolvedValue(new Response('sensitive upstream details', { status: 429 }));
     await expect(new GeminiQuotationProvider('secret', 'gemini-3.8-flash').propose(input)).rejects.toThrow('usage limit');
     expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+  it.each([[404, 'gemini-2.0-flash is unavailable'], [403, 'permissions'], [400, 'request configuration']])('reports upstream %s without leaking its response body', async (status, expected) => {
+    global.fetch = jest.fn().mockResolvedValue(new Response('private provider details', { status: status as number }));
+    await expect(new GeminiQuotationProvider('secret', 'gemini-2.0-flash').propose(input)).rejects.toThrow(expected as string);
   });
 });
