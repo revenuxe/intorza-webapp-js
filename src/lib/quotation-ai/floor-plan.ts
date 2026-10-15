@@ -26,6 +26,7 @@ export const briefSchema = z.object({
   clientName: z.string().trim().max(150), location: label, address: z.string().max(1000),
   roomWork: z.array(roomWorkSchema).max(40).optional(),
   automatic: z.boolean().optional(),
+  requestNotes: z.string().trim().max(600).optional(),
   measurementInputUnit: z.enum(['sqft','feet','sqm','metres']).optional(),
   design: z.object({ coordinatedLook: z.boolean().nullable(), retainExisting: z.boolean().nullable(), notes: z.string().trim().max(600) }).strict().optional(),
 }).strict();
