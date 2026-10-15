@@ -30,7 +30,7 @@ type Props = {
 type Step = 'upload' | 'analysis' | 'scope' | 'work' | 'design' | 'finish' | 'budget' | 'details' | 'review' | 'estimate';
 const emptyAnalysis: PlanAnalysis = { propertyType: 'Residential interior', floors: null, units: 'Not supplied', scale: 'Not supplied', rooms: [], warnings: ['No floor plan supplied. Work measurements require confirmation.'] };
 // Presentation values requested for this design. No wallet or credit deduction is implemented.
-const creditDisplay = { coins: 60, upload: 15, details: 10 } as const;
+const creditDisplay = { upload: 15, details: 10 } as const;
 const scopes = [{ value: 'complete', title: 'Full Interior', detail: 'All rooms in your plan' }, { value: 'kitchen', title: 'Kitchen', detail: 'Only kitchens detected in your plan' }, { value: 'bedrooms', title: 'Bedrooms', detail: 'Bedroom interiors in your plan' }, { value: 'kitchen-wardrobes', title: 'Kitchen & wardrobes', detail: 'Kitchen cabinetry and bedroom storage' }, { value: 'living-bedrooms', title: 'Living room & bedrooms', detail: 'Focus on everyday spaces' }, { value: 'selected', title: 'Choose specific rooms', detail: 'Include only the spaces you need' }] as const;
 const titles: Record<Step, string> = { upload: 'Upload your floor plan', analysis: 'Your property analysis', scope: 'What would you like to design?', work: 'Confirm the work in each room', design: 'Set your design direction', finish: 'Choose your finish level', budget: 'Do you have a target budget?', details: 'Who is this project for?', review: 'Ready to build your estimate', estimate: 'Your quotation is ready to review' };
 function FilePreview({ file }: { file: File }) {
@@ -52,6 +52,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const [brief, setBrief] = useState<ProjectBrief>({ scope: 'complete', roomNames: [], finish: 'Standard', budget: null, clientName: '', location: '', address: '' });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [autoSaved, setAutoSaved] = useState(false);
   const [workRoomIndex, setWorkRoomIndex] = useState(0);
   const [wholePlan, setWholePlan] = useState<boolean | null>(null);
@@ -81,6 +82,12 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
       return { name: `${labels[kind]}${['bedroom', 'bathroom'].includes(kind) ? ` ${count[kind]}` : ''}`, kind, floor: '1', widthFt: null, lengthFt: null, source: 'unknown', confidence: 'medium', file: 'Home type selected', page: index + 1, notes: '' };
     }) };
   };
+  const refreshWalletBalance = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase.from('coin_wallets').select('balance').eq('user_id', user.id).maybeSingle();
+    setWalletBalance(data?.balance ?? 0);
+  };
   useEffect(() => {
     if (!mode) return;
     const frame = requestAnimationFrame(() => {
@@ -100,6 +107,12 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     } else errorBanner.current?.focus({ preventScroll: true });
   }, [error, invalidWorkKey, validationAttempt]);
   useEffect(() => () => abort.current?.(), []);
+  useEffect(() => {
+    void refreshWalletBalance();
+    const update = () => void refreshWalletBalance();
+    window.addEventListener('intorza:wallet-changed', update);
+    return () => window.removeEventListener('intorza:wallet-changed', update);
+  }, []);
   useEffect(() => { if (mode === 'details') setStep(current => current === 'upload' ? 'analysis' : current); }, [mode]);
   const start = (next: BuilderMode) => {
     setChooserOpen(false);
@@ -140,7 +153,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         xhr.onload = () => { try { const body = JSON.parse(xhr.responseText); if (xhr.status < 200 || xhr.status >= 300) throw new Error(body.error || 'Analysis failed.'); resolve(body); } catch (failure) { reject(failure); } };
         xhr.send(form);
       });
-      setAnalysis(result.analysis); setProjectId(result.projectId); setBrief(value => ({ ...value, roomNames: result.analysis.rooms.map(room => room.name) })); setStep('scope');
+      setAnalysis(result.analysis); setProjectId(result.projectId); setBrief(value => ({ ...value, roomNames: result.analysis.rooms.map(room => room.name) })); setStep('scope'); void refreshWalletBalance();
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not analyse the plan.'); }
     finally { pending.current = false; setBusy(''); abort.current = null; }
   }
@@ -162,7 +175,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
       if (!response.ok) throw new Error(body.error || 'Could not generate an estimate.');
       if (body.measurementSystem === 'imperial') onMeasurementSystemChange?.();
       if (body.measurementChanged) setMeasurementChanged(true);
-      setEstimate(body.estimate); setProjectId(body.projectId); setRegenerateRooms([]); setStep('estimate');
+      setEstimate(body.estimate); setProjectId(body.projectId); setRegenerateRooms([]); setStep('estimate'); void refreshWalletBalance();
       // A completed estimate must survive a refresh or an accidental close. Store it in
       // the regular quotation editor immediately; the plan project itself is already
       // saved by the API and is linked when the draft save completes.
@@ -225,12 +238,12 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const groups = ['upload', 'analysis'].includes(step) ? 0 : ['scope', 'work', 'design', 'finish', 'budget'].includes(step) ? 1 : step === 'details' ? 2 : 3;
   return <>
     <div className="col-span-2 min-w-0 sm:col-span-1 sm:min-w-[220px]">
-      <Button type="button" aria-label="Built with AI" className="h-12 w-full gap-2 rounded-xl px-3 shadow-sm sm:px-4" onClick={() => setChooserOpen(true)}><BuilderMark className="h-4 w-4 shrink-0" /><span className="text-sm leading-5">Built with AI</span><span className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[11px] font-semibold leading-4 text-amber-900 shadow-sm"><GoldCoin className="h-3.5 w-3.5" />{creditDisplay.coins} coins</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Button>
+      <Button type="button" aria-label="Built with AI" className="h-12 w-full gap-2 rounded-xl px-3 shadow-sm sm:px-4" onClick={() => { void refreshWalletBalance(); setChooserOpen(true); }}><BuilderMark className="h-4 w-4 shrink-0" /><span className="text-sm leading-5">Built with AI</span><span className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[11px] font-semibold leading-4 text-amber-900 shadow-sm"><GoldCoin className="h-3.5 w-3.5" />{walletBalance ?? '—'} coins</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Button>
     </div>
     <Dialog open={chooserOpen} onOpenChange={setChooserOpen}>
       <DialogContent className="max-h-[90dvh] min-w-0 max-w-xl gap-5 overflow-y-auto rounded-3xl p-4 sm:p-6">
         <DialogHeader className="pr-5 text-left">
-          <div className="mb-3 flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-xs font-medium text-primary"><BuilderMark className="h-4 w-4" />INTORZA STUDIO</span><span className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900"><GoldCoin />{creditDisplay.coins} coins</span></div>
+          <div className="mb-3 flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-xs font-medium text-primary"><BuilderMark className="h-4 w-4" />INTORZA STUDIO</span><span className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900"><GoldCoin />{walletBalance ?? '—'} coins</span></div>
           <DialogTitle className="text-xl leading-7">Create your quotation</DialogTitle>
           <DialogDescription className="text-sm leading-6">Upload a plan or start with your project details.</DialogDescription>
         </DialogHeader>
