@@ -23,3 +23,11 @@ it('validates model output before returning it', async () => {
   (global.fetch as jest.Mock).mockResolvedValue(complete(proposal));
   await expect(new OpenAIFloorPlanProvider('secret', 'configured-model').generate({}, new AbortController().signal)).rejects.toThrow();
 });
+it('instructs quotation extraction to keep fixed packages out of sqft pricing', async () => {
+  const extraction = { location: 'Bengaluru', currency: 'INR', priceDate: '2026-10-01', projectType: 'Apartment', limitations: [], items: [{ section: 'Kitchen', productName: 'Accessories', material: '', specification: '', unit: 'lump_sum', quantity: 1, rate: 20000, tax: 'unknown', installationIncluded: false, page: 1, notes: '' }] };
+  (global.fetch as jest.Mock).mockResolvedValue(complete(extraction));
+  await new OpenAIFloorPlanProvider('secret', 'configured-model').extractTrainingPDF(new TextEncoder().encode('%PDF-1.7\n%%EOF'), new AbortController().signal);
+  const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+  expect(body.instructions).toContain('Billing classification is mandatory');
+  expect(body.instructions).toContain('unit=lump_sum');
+});

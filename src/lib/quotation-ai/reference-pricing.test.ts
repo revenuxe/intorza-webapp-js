@@ -35,10 +35,15 @@ it('excludes high-rate accessory-like items that are lump-sum totals mislabelled
   // Normal sqft rates for genuine cabinetry products remain available
   expect(referencePriceEvidence([row({ product_name: 'kitchen base cabinets', recent_rate: 1400, recent_low: 1200, recent_high: 1600 })], 'INR', 'Bengaluru', true)).toHaveLength(1);
 });
+it.each(['Lights', 'Granite', 'Profile shutters with glass'])('does not use fixed packages as area rates: %s', product_name => {
+  expect(referencePriceEvidence([row({ product_name, recent_rate: 22000, recent_low: 22000, recent_high: 22000 })], 'INR', 'Bengaluru', true)).toEqual([]);
+});
 it('maps kitchen cabinet library names to the builder canonical names', () => {
   const prices = referencePriceEvidence([row({ product_name: 'base unit' })], 'INR', 'Bengaluru');
   expect(matchingReferenceRate(prices, 'Kitchen base cabinets', 'laminate. 18mm plywood')?.rate).toBe(1400);
   expect(matchingReferenceRate(prices, 'kitchen base unit', 'laminate. 18mm plywood')?.rate).toBe(1400);
+  const shaped = referencePriceEvidence([row({ product_name: 'base unit (u-shaped)' })], 'INR', 'Bengaluru');
+  expect(matchingReferenceRate(shaped, 'Kitchen base cabinets', 'laminate. 18mm plywood')?.rate).toBe(1400);
   expect(matchingReferenceRate(prices, 'upper cabinet', 'laminate. 18mm plywood')).toBeUndefined();
 });
 it('provides an explained close match based on product details without changing its observed price', () => {

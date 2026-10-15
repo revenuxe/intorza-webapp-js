@@ -69,6 +69,16 @@ export function defaultRoomWork(room: Room, scope: ProjectBrief['scope']): RoomW
   })) };
 }
 
+function automaticRoomWork(room: Room, scope: ProjectBrief['scope']) {
+  const answer = defaultRoomWork(room, scope);
+  // Lofts recur with bedroom and kitchen storage in the reviewed quotations.
+  // Include them in the fast path, while retaining full editability.
+  if (['bedroom', 'kitchen'].includes(room.kind) && !answer.items.some(item => item.key === 'loft')) {
+    answer.items.push({ key: 'loft', widthFt: null, heightFt: null, areaSqft: null, details: '' });
+  }
+  return answer;
+}
+
 /** Every confirmed work field survives sparse AI output, including unpriced work. */
 export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, rooms: Room[], brief: ProjectBrief) {
   if (!brief.roomWork?.length) {
@@ -76,7 +86,7 @@ export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, roo
     // Automatic mode: keep the AI's room-specific proposal and supplement any
     // omitted essential work, without forcing the user through a checklist.
     const baseline = ensureRoomWorkCoverage({ sections: [], assumptions: [] }, rooms,
-      { ...brief, roomWork: rooms.map(room => defaultRoomWork(room, brief.scope)) });
+      { ...brief, roomWork: rooms.map(room => automaticRoomWork(room, brief.scope)) });
     return { ...raw, sections: rooms.map(room => {
       const options = roomWorkOptions(room, brief.scope);
       const proposed = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items).map(item => ({ ...item,

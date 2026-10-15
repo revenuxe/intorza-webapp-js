@@ -70,11 +70,11 @@ describe('floor plan quotation boundary', () => {
   });
   it('creates bounded work-face allowances for fast upload and replaces an implausible model wardrobe area', () => {
     const automatic = { ...brief, automatic: true };
-    expect(automaticWorkFaceAllowance(plan.rooms[0], 'Wardrobe')).toMatchObject({ area: 84 });
+    expect(automaticWorkFaceAllowance(plan.rooms[0], 'Wardrobe')).toMatchObject({ area: 56 });
     const raw = proposal();
     Object.assign(raw.sections[0].items[0], { quantity: 300, measurementStatus: 'estimated' });
     const result = buildEstimate(raw, plan, automatic, [rate], fixture());
-    expect(result.draft.sections[0].items[0]).toMatchObject({ sftArea: 84, ratePerSft: 1200 });
+    expect(result.draft.sections[0].items[0]).toMatchObject({ sftArea: 56, ratePerSft: 1200 });
     expect(result.evidence[0]).toMatchObject({ quantityStatus: 'estimated' });
     expect(result.evidence[0].reason).toContain('AI-estimated wardrobe work face');
   });

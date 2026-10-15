@@ -79,9 +79,10 @@ it('automatically covers every detected room without requiring user work answers
   const plan = planFixture();
   const brief = { ...briefFixture(), automatic: true };
   const result = ensureRoomWorkCoverage(generatedSchema.parse(proposalFixture()), plan.rooms, brief);
-  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe','False ceiling','Wall painting']);
+  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe','False ceiling','Wall painting','Loft storage']);
   expect(result.sections[0].items[0].quantity).toBe(56);
   expect(result.sections[0].items[2].quantity).toBeNull();
+  expect(result.sections[0].items[3].quantity).toBeNull();
 });
 it('completes unknown work using direct sqft and transfers no feet dimensions to the quotation', () => {
   const proposal = proposalFixture(); proposal.sections[0].items[0].measurementStatus = 'unknown';

@@ -24,6 +24,13 @@ export function referenceProduct(value: string) {
     'pantry unit': 'kitchen tall unit', 'pantry cabinet': 'kitchen tall unit',
     'study unit': 'study storage', 'loft': 'loft storage',
   };
+  if (/^base unit\b/.test(name)) return 'kitchen base cabinets';
+  if (/^wall unit\b/.test(name)) return 'kitchen wall cabinets';
+  if (/^tall unit\b/.test(name)) return 'kitchen tall unit';
+  if (/^loft\b/.test(name)) return 'loft storage';
+  if (/^study unit\b/.test(name)) return 'study storage';
+  if (/^vanity unit\b/.test(name)) return 'vanity cabinet';
+  if (/^shoe rack\b/.test(name)) return 'shoe storage';
   return aliases[name] ?? name;
 }
 export const referenceCity = (value: string) => normalizeReferenceText(value).replace(/\bbangalore\b/g, 'bengaluru').replace(/\bbombay\b/g, 'mumbai').replace(/\bmadras\b/g, 'chennai');
@@ -36,7 +43,7 @@ export function referencePriceEvidence(rows: ReferencePrice[], currency: string,
     // Never multiply a hardware/package total by a cabinet's work area.
     // Match names starting with OR containing these keywords (e.g. "kitchen accessories", "cabinet hardware").
     const productLabel = row.product_name.trim();
-    if (/(?:^|\b)(accessories|hardware|appliances?|package|fittings|fitting|bundle)(?:\s|$)/i.test(productLabel)) return [];
+    if (/(?:^|\b)(accessories|hardware|appliances?|package|fittings|fitting|bundle|lights?|lighting|demolition|granite|pantry|logo|profile shutters?)(?:\s|$)/i.test(productLabel)) return [];
     // Rates above 5000/sqft from reference PDFs are almost certainly lump-sum
     // package totals (₹20k-₹35k) that the extractor mis-labelled as sqft.
     if (Number(row.recent_rate) > 5000 && /(?:accessory|hardware|fitting|internal|basket|hinge|channel|shutter)/i.test(productLabel)) return [];

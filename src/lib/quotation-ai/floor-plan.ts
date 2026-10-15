@@ -125,10 +125,11 @@ export function automaticWorkFaceAllowance(room: PlanAnalysis['rooms'][number], 
     area: Math.round(length * height * 10000) / 10000,
     reason: `AI-estimated ${label}: ${length} ft × ${height} ft from the room's longest ${wall} ft wall. Editable; verify on site.`,
   });
-  if (product === 'wardrobe') return coverage(Math.min(wall, 14), 7, 'wardrobe work face');
+  if (product === 'wardrobe') return coverage(Math.max(6, Math.min(wall * 0.7, 8)), 7, 'wardrobe work face');
   if (product === 'tv unit') return coverage(Math.min(wall, 6), 7, 'TV-unit work face');
-  if (product === 'kitchen base cabinets') return coverage(Math.min(wall, 12), 2.5, 'base-cabinet work face');
-  if (product === 'kitchen wall cabinets') return coverage(Math.min(wall, 12), 1.5, 'wall-cabinet work face');
+  const kitchenRun = Math.min(room.widthFt + room.lengthFt, 24);
+  if (product === 'kitchen base cabinets') return coverage(kitchenRun, 2.5, 'base-cabinet work face');
+  if (product === 'kitchen wall cabinets') return coverage(kitchenRun, 1.5, 'wall-cabinet work face');
   if (product === 'kitchen tall unit') return coverage(Math.min(wall, 8), 7, 'tall-unit work face');
   if (product === 'bed back panelling') return coverage(Math.min(wall, 8), 4, 'bed-back panelling');
   if (product === 'study storage' || product === 'bookshelf') return coverage(Math.min(wall, 8), 7, 'storage work face');
@@ -136,7 +137,7 @@ export function automaticWorkFaceAllowance(room: PlanAnalysis['rooms'][number], 
   if (product === 'kitchen backsplash') return coverage(Math.min(wall, 12), 2, 'backsplash coverage');
   if (product === 'wall panelling') return coverage(Math.min(wall, 10), 4, 'wall-panelling coverage');
   if (product === 'shoe storage') return coverage(Math.min(wall, 5), 4, 'shoe-storage work face');
-  if (product === 'loft storage') return coverage(Math.min(wall, 10), 2, 'loft work face');
+  if (product === 'loft storage') return coverage(Math.min(wall, 12), 2.5, 'loft work face');
   return null;
 }
 
