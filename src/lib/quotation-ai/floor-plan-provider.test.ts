@@ -14,6 +14,17 @@ it('uses the configured vision model with PDF inputs and clears inferred dimensi
   expect(body.input[0].content[1]).toMatchObject({ type: 'input_file', filename: 'plan.pdf' });
   expect(options.headers.Authorization).toBe('Bearer secret-key');
 });
+it('normalizes harmless room-output mistakes into a reviewable analysis', async () => {
+  (global.fetch as jest.Mock).mockResolvedValue(complete({ propertyType: '', floors: 0, units: '', scale: '', rooms: [
+    { name: '', kind: 'bedroom', floor: '', widthFt: 12, lengthFt: 10, source: 'inferred', confidence: 'high', file: 'wrong.pdf', page: 0, notes: 'x'.repeat(700) },
+    { name: '', kind: 'bedroom', floor: '', widthFt: 12, lengthFt: 10, source: 'inferred', confidence: 'high', file: 'wrong.pdf', page: 0, notes: '' },
+  ], warnings: [] }));
+  const result = await new OpenAIFloorPlanProvider('secret-key', 'configured-model').analyse([{ name: 'plan.pdf', mime: 'application/pdf', bytes: new Uint8Array() }], new AbortController().signal);
+  expect(result).toMatchObject({ propertyType: 'Residential interior', floors: null, rooms: [
+    { name: 'Bedroom 1', widthFt: null, lengthFt: null, file: 'plan.pdf', page: 1 },
+    { name: 'Bedroom 2', widthFt: null, lengthFt: null, file: 'plan.pdf', page: 1 },
+  ] });
+});
 it('rejects incomplete structured results instead of returning a partial proposal', async () => {
   (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ status: 'incomplete' }) });
   await expect(new OpenAIFloorPlanProvider('secret', 'configured-model').generate({}, new AbortController().signal)).rejects.toThrow('incomplete');
