@@ -69,7 +69,7 @@ export function defaultRoomWork(room: Room, scope: ProjectBrief['scope']): RoomW
   })) };
 }
 
-function automaticRoomWork(room: Room, scope: ProjectBrief['scope']) {
+function automaticRoomWork(room: Room, scope: ProjectBrief['scope'], extras: string[] = []) {
   const answer = defaultRoomWork(room, scope);
   // Fast upload follows the recurring, priced core in the reviewed quotations.
   // Optional finishes and trade work are never assumed merely because a room
@@ -79,7 +79,8 @@ function automaticRoomWork(room: Room, scope: ProjectBrief['scope']) {
     dining: ['crockery_unit'], study: ['study_storage'], bathroom: ['vanity'], utility: ['utility_storage'],
     balcony: [], other: [],
   };
-  const selected = new Set(core[room.kind]);
+  const available = new Set(roomWorkOptions(room, scope).map(item => item.key));
+  const selected = new Set([...core[room.kind], ...extras.filter(key => available.has(key))]);
   const items = answer.items.filter(item => selected.has(item.key));
   for (const key of selected) if (!items.some(item => item.key === key)) items.push({ key, widthFt: null, heightFt: null, areaSqft: null, details: '' });
   return { ...answer, items };
@@ -92,7 +93,7 @@ export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, roo
     // Automatic mode: keep the AI's room-specific proposal and supplement any
     // omitted essential work, without forcing the user through a checklist.
     const baseline = ensureRoomWorkCoverage({ sections: [], assumptions: [] }, rooms,
-      { ...brief, roomWork: rooms.map(room => automaticRoomWork(room, brief.scope)) });
+      { ...brief, roomWork: rooms.map(room => automaticRoomWork(room, brief.scope, brief.quoteExtras)) });
     return { ...raw, sections: rooms.map(room => {
       const options = roomWorkOptions(room, brief.scope);
       const proposed = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items).map(item => ({ ...item,

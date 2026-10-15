@@ -1,17 +1,9 @@
 ﻿'use client';
-import { useRef, useState } from 'react';
-import { BedDouble, Check, ChevronDown, CookingPot, Grid2X2, House, Layers3, MapPin, Mic, ScanLine, Sparkles, Square } from 'lucide-react';
+import { BedDouble, Check, ChevronDown, CookingPot, Grid2X2, House, Layers3, MapPin, ScanLine, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { scopedRooms, type PlanAnalysis, type ProjectBrief } from '@/lib/quotation-ai/floor-plan';
-import { supabase } from '@/integrations/supabase/client';
 
 export function QuickPlanScope({ analysis, brief, onChange }: { analysis: PlanAnalysis; brief: ProjectBrief; onChange: (brief: ProjectBrief) => void }) {
-  const [voiceState, setVoiceState] = useState<'idle' | 'recording' | 'transcribing'>('idle');
-  const [voiceError, setVoiceError] = useState('');
-  const recorder = useRef<MediaRecorder | null>(null);
-  const chunks = useRef<Blob[]>([]);
-  const stream = useRef<MediaStream | null>(null);
   const names = analysis.rooms.map(room => room.name);
   const included = scopedRooms(analysis, brief);
   const choices = [
@@ -22,33 +14,6 @@ export function QuickPlanScope({ analysis, brief, onChange }: { analysis: PlanAn
     { value: 'living-bedrooms', name: 'Living + bedrooms', detail: 'TV feature and bedroom storage.', icon: BedDouble },
     { value: 'selected', name: 'Select rooms', detail: 'Focus on the spaces you choose.', icon: Grid2X2 },
   ] as const;
-  const stopVoice = () => recorder.current?.state === 'recording' && recorder.current.stop();
-  const startVoice = async () => {
-    setVoiceError('');
-    try {
-      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('Voice recording is not supported in this browser.');
-      stream.current = await navigator.mediaDevices.getUserMedia({ audio: true }); chunks.current = [];
-      const next = new MediaRecorder(stream.current, MediaRecorder.isTypeSupported('audio/webm') ? { mimeType: 'audio/webm' } : undefined);
-      recorder.current = next;
-      next.ondataavailable = event => { if (event.data.size) chunks.current.push(event.data); };
-      next.onstop = async () => {
-        stream.current?.getTracks().forEach(track => track.stop()); stream.current = null; recorder.current = null;
-        const audio = new Blob(chunks.current, { type: next.mimeType || 'audio/webm' });
-        if (audio.size < 100) { setVoiceState('idle'); setVoiceError('No audio was captured. Please try again.'); return; }
-        setVoiceState('transcribing');
-        try {
-          const { data } = await supabase.auth.getSession();
-          const form = new FormData(); form.set('audio', new File([audio], 'project-note.webm', { type: audio.type }));
-          const response = await fetch('/api/quotation-ai/transcribe', { method: 'POST', headers: data.session?.access_token ? { Authorization: `Bearer ${data.session.access_token}` } : {}, body: form });
-          const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Could not transcribe the voice note.');
-          const combined = [brief.requestNotes, result.text].filter(Boolean).join(brief.requestNotes ? ' ' : '').slice(0, 600);
-          onChange({ ...brief, requestNotes: combined });
-        } catch (error) { setVoiceError(error instanceof Error ? error.message : 'Could not transcribe the voice note.'); }
-        finally { setVoiceState('idle'); }
-      };
-      next.start(); setVoiceState('recording');
-    } catch (error) { stream.current?.getTracks().forEach(track => track.stop()); stream.current = null; setVoiceError(error instanceof Error ? error.message : 'Could not start voice recording.'); }
-  };
   return <div className="space-y-6">
     <section className="relative overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.08] via-card to-card p-4 sm:p-5">
       <div className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-primary/5" />
@@ -71,7 +36,6 @@ export function QuickPlanScope({ analysis, brief, onChange }: { analysis: PlanAn
         </button>;
       })}</div>
     </fieldset>
-    <fieldset className="rounded-2xl border bg-card p-3.5"><legend className="px-1 text-sm font-semibold">Tell us what matters</legend><p className="mt-1 text-xs leading-5 text-muted-foreground">Describe any must-have rooms, storage, furniture, finish, or items to exclude. This guides the AI quotation.</p><div className="mt-3 flex gap-2"><Textarea aria-label="Project requirements" value={brief.requestNotes ?? ''} maxLength={600} rows={3} placeholder="Example: Include kitchen and both wardrobes. No false ceiling. Add a TV unit and study storage." onChange={event => onChange({ ...brief, requestNotes: event.target.value })} /><button type="button" aria-label={voiceState === 'recording' ? 'Stop recording' : 'Record project requirements'} disabled={voiceState === 'transcribing'} onClick={voiceState === 'recording' ? stopVoice : startVoice} className={`flex w-12 shrink-0 items-center justify-center rounded-xl border transition-colors ${voiceState === 'recording' ? 'animate-pulse border-destructive bg-destructive text-destructive-foreground' : 'border-primary/20 bg-primary/5 text-primary hover:bg-primary/10'} disabled:opacity-50`}>{voiceState === 'recording' ? <Square className="h-4 w-4 fill-current" /> : <Mic className="h-5 w-5" />}</button></div><div className="mt-2 flex justify-between gap-3 text-[11px] text-muted-foreground"><span>{voiceState === 'recording' ? 'Recording… tap again to transcribe.' : voiceState === 'transcribing' ? 'Transcribing your note…' : 'Tap the microphone to speak instead of typing.'}</span><span>{(brief.requestNotes ?? '').length}/600</span></div>{voiceError && <p role="alert" className="mt-2 text-xs text-destructive">{voiceError}</p>}</fieldset>
     <fieldset className="rounded-xl border bg-card p-3.5"><legend className="px-1 text-sm font-semibold">Which units would you like to enter?</legend><div className="mt-1 grid grid-cols-2 gap-2">{([{ value: 'sqft', label: 'Sqft', detail: 'Direct area' }, { value: 'feet', label: 'Feet', detail: 'Width × height' }, { value: 'sqm', label: 'Square metres', detail: 'Direct area' }, { value: 'metres', label: 'Metres', detail: 'Width × height' }] as const).map(unit => <label key={unit.value} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-2.5 text-xs ${brief.measurementInputUnit === unit.value ? 'border-primary bg-primary/5' : ''}`}><input type="radio" name="measurement-input-unit" checked={brief.measurementInputUnit === unit.value} onChange={() => onChange({ ...brief, measurementInputUnit: unit.value })} /><span><span className="block font-medium">{unit.label}</span><span className="text-[10px] text-muted-foreground">{unit.detail}</span></span></label>)}</div><p className="mt-2 text-[11px] leading-5 text-muted-foreground">Drawing units are read from the plan. Your selection controls manual measurements; all work areas and prices are calculated in sqft. Feet/metres need two dimensions, not a single length.</p></fieldset>
     {brief.scope === 'selected' && <fieldset className="space-y-2"><legend className="mb-2 text-xs font-medium">Rooms to include</legend><div className="grid max-h-52 grid-cols-1 gap-2 overflow-y-auto overscroll-contain sm:grid-cols-2">{analysis.rooms.map(room => <label key={room.name} className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border p-2.5 text-xs ${brief.roomNames.includes(room.name) ? 'border-primary/30 bg-primary/5' : ''}`}><input type="checkbox" className="accent-primary" checked={brief.roomNames.includes(room.name)} onChange={event => onChange({ ...brief, roomNames: event.target.checked ? [...brief.roomNames, room.name] : brief.roomNames.filter(name => name !== room.name) })} /><span className="truncate" title={room.name}>{room.name}</span></label>)}</div></fieldset>}
     <div className="rounded-xl border bg-card">
