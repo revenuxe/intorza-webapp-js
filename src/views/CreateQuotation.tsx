@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import dynamic from 'next/dynamic';
-import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon, Mic, ArrowRight } from "lucide-react";
+import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon } from "lucide-react";
 import { getCountryByCode } from "@/lib/countryConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,8 +28,9 @@ import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
 import { GalleryImagePicker } from "@/components/quotation/GalleryImagePicker";
 import { GalleryImage } from "@/hooks/useGallery";
 import { getLibraryTerms, getLibraryPaymentStages, getLibraryBankTemplate } from "@/lib/libraryDefaults";
-const VoiceQuotationAssistant = dynamic(() => import('@/components/quotation/RealtimeQuotationAssistant').then(module => module.RealtimeQuotationAssistant), { ssr: false });
-import { fromQuotation, toQuotation, lineAmount, quotationTotals, reviewDraft, type VoiceDraft } from "@/lib/quotation-ai/domain";
+const FloorPlanQuotationBuilder = dynamic(() => import('@/components/quotation/FloorPlanQuotationBuilder').then(module => module.FloorPlanQuotationBuilder), { ssr: false });
+import type { BuilderMode } from '@/components/quotation/FloorPlanQuotationBuilder';
+import { fromQuotation, toQuotation, lineAmount, quotationTotals, reviewDraft, draftSchema, type VoiceDraft } from "@/lib/quotation-ai/domain";
 interface LineItem {
   id: string;
   side: string;
@@ -57,8 +58,10 @@ const CreateQuotation = () => {
     toast, feedback, clearFeedback
   } = useInlineFeedback();
   const [isSaving, setIsSaving] = useState(false);
-  const [voiceDraft, setVoiceDraft] = useState<VoiceDraft | null>(null);
-  const lastVoiceDraft = useRef<VoiceDraft | null>(null);
+  const [builderMode, setBuilderMode] = useState<BuilderMode | null>(null);
+  const lastAIDraft = useRef<VoiceDraft | null>(null);
+  const planProjectId = useRef<string | null>(null);
+  const [saveGeneratedDraft, setSaveGeneratedDraft] = useState(false);
   const [isLoadingQuotation, setIsLoadingQuotation] = useState(false);
   const {
     requireAuth,
@@ -275,7 +278,7 @@ const CreateQuotation = () => {
 
           // Execute the pending action with the fresh profile data
           if (continueAction === 'createWithAI') {
-            setVoiceDraft(getVoiceDraft());
+            setBuilderMode('details');
           } else if (continueAction === 'saveDraft') {
             await handleSaveQuotation('draft');
           } else if (continueAction === 'downloadPdf') {
@@ -353,6 +356,8 @@ const CreateQuotation = () => {
   };
   const loadQuotation = async (id: string) => {
     setIsLoadingQuotation(true);
+    lastAIDraft.current = null;
+    planProjectId.current = null;
     clearFeedback();
     try {
       // Load quotation data
@@ -435,6 +440,12 @@ const CreateQuotation = () => {
         }
       }
       setItemImages(restoredImages);
+      const { data: planProject } = await supabase.from('quotation_plan_projects').select('id,estimate').eq('quotation_id', id).order('updated_at', { ascending: false }).limit(1).maybeSingle();
+      if (planProject) {
+        planProjectId.current = planProject.id;
+        const restored = draftSchema.safeParse((planProject.estimate as { draft?: unknown } | null)?.draft);
+        if (restored.success) lastAIDraft.current = restored.data;
+      }
     } catch (error) {
       console.error('Error loading quotation:', error);
       toast({
@@ -567,7 +578,7 @@ const CreateQuotation = () => {
     enableSocialMediaDiscount,
     socialMediaDiscountRate
   });
-  const getVoiceDraft = () => fromQuotation(
+  const getAIDraft = () => fromQuotation(
     { projectTitle, clientName, clientAddress, placeOfProject, projectType }, sections,
     { gstEnabled, gstRate: Number(gstRate) || 0, discountPercentage, enableSocialMediaDiscount, socialMediaDiscountRate },
   );
@@ -585,9 +596,9 @@ const CreateQuotation = () => {
         });
         return null;
       }
-      if (status !== 'draft' && lastVoiceDraft.current) {
-        const current = getVoiceDraft();
-        const explicitFreeIds = new Set(lastVoiceDraft.current.sections.flatMap(section => section.items.filter(item => item.ratePerSft === 0).map(item => item.id)));
+      if (status !== 'draft' && lastAIDraft.current) {
+        const current = getAIDraft();
+        const explicitFreeIds = new Set(lastAIDraft.current.sections.flatMap(section => section.items.filter(item => item.ratePerSft === 0).map(item => item.id)));
         for (const item of current.sections.flatMap(section => section.items)) {
           if (item.ratePerSft == null && explicitFreeIds.has(item.id)) item.ratePerSft = 0;
         }
@@ -675,6 +686,11 @@ const CreateQuotation = () => {
       }
 
 
+      if (savedQuotationId && planProjectId.current) {
+        const linked = await supabase.from('quotation_plan_projects').update({ quotation_id: savedQuotationId }).eq('id', planProjectId.current).eq('user_id', user.id);
+        if (linked.error) toast({ title: 'Quotation saved', description: 'The plan reference could not be linked. Your estimate analysis is still in your account.' });
+      }
+
       // Silently save last used preferences and track item usage
       saveLastUsedPreferences({
         warranty,
@@ -760,6 +776,8 @@ const CreateQuotation = () => {
         }
         
         setClientName("");
+        lastAIDraft.current = null;
+        planProjectId.current = null;
         savedQuotationIdRef.current = null;
         setClientAddress("");
         setDateOfProposal("");
@@ -1021,7 +1039,14 @@ const CreateQuotation = () => {
     paymentStages,
     profile,
   ]);
-  return <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8 relative">
+  useEffect(() => {
+    if (!saveGeneratedDraft) return;
+    setSaveGeneratedDraft(false);
+    void handleSaveQuotation('draft');
+    // Runs after the generated sections and project details have rendered.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveGeneratedDraft]);
+  return <div className="container min-w-0 max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8 relative">
       {feedback}
       {(isSaving || isLoadingQuotation) && <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" role="status" aria-live="polite">
         <div className="flex items-center gap-3 rounded-lg border bg-card px-5 py-4 shadow-sm">
@@ -1049,30 +1074,25 @@ const CreateQuotation = () => {
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:shrink-0">
             <QuotationTemplates onSelectTemplate={(newSections) => setSections(newSections)} currentSections={sections} onSetQuotationTitle={(title) => setProjectTitle(title)} countryCode={profile.country_code} />
             <CustomizeFieldsDrawer type="quotation" settings={customizeSettings} onSettingsChange={s => setCustomizeSettings(s as QuotationSettings)} />
-            <Button
-              type="button"
-              size="sm"
-              className="w-full gap-2 bg-orange-600 text-white shadow-sm hover:bg-orange-700 sm:w-auto"
-              onClick={() => requireAuth(async () => {
-                try { setVoiceDraft(getVoiceDraft()); }
-                catch { toast({ title: "Could not open AI draft", description: "Check your pricing values. AI drafts support up to 12 sections and 60 items.", variant: "destructive" }); }
-              }, 'createWithAI', getFormData())}
-            >
-              <Mic className="h-4 w-4" aria-hidden="true" />
-              Create with AI
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </Button>
           </div>
         </div>
 
-        {voiceDraft && <VoiceQuotationAssistant
-          initialDraft={voiceDraft}
-          getCurrentDraft={getVoiceDraft}
-          onClose={() => setVoiceDraft(null)}
-          onChange={(draft, base) => {
-            if (JSON.stringify(getVoiceDraft()) !== base) throw new Error('The quotation was edited while processing your answer. Please try again.');
-            const nextSections = toQuotation(draft, true);
-            lastVoiceDraft.current = draft;
+        <FloorPlanQuotationBuilder
+          mode={builderMode}
+          onStart={mode => requireAuth(async () => {
+            try { getAIDraft(); setBuilderMode(mode); }
+            catch { toast({ title: 'Check your quotation', description: 'AI estimates support up to 12 sections and 60 items.', variant: 'destructive' }); }
+          }, 'createWithAI', getFormData())}
+          getCurrentDraft={getAIDraft}
+          clients={clients}
+          onClose={() => setBuilderMode(null)}
+          onApply={(draft, base, projectId, saveDraft) => {
+            const existing = getAIDraft();
+            if (JSON.stringify(existing) !== base) throw new Error('Your quotation changed while the estimate was being prepared. Go Back and regenerate to preserve your edits.');
+            const combined = { ...draft, sections: [...existing.sections.filter(section => section.items.length || section.title.trim()), ...draft.sections] };
+            const nextSections = toQuotation(combined, true);
+            lastAIDraft.current = combined;
+            planProjectId.current = projectId;
             setSections(nextSections);
             setProjectTitle(draft.project.projectTitle);
             setClientName(draft.project.clientName);
@@ -1084,9 +1104,12 @@ const CreateQuotation = () => {
             setDiscountPercentage(draft.pricing.discountPercentage);
             setEnableSocialMediaDiscount(draft.pricing.enableSocialMediaDiscount);
             setSocialMediaDiscountRate(draft.pricing.socialMediaDiscountRate);
-            return JSON.stringify(fromQuotation(draft.project, nextSections, draft.pricing));
+            if (saveDraft) setSaveGeneratedDraft(true);
+            toast({ title: 'Estimate added to your quotation', description: 'Review the measurements and rates, then save as a draft.' });
           }}
-        />}
+        />
+
+        {lastAIDraft.current && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100" role="status">AI-generated estimate — review required. Check all work measurements and rates before saving or sending. Missing values contribute zero to the displayed total.</div>}
 
         {/* Project Details */}
         <Card>

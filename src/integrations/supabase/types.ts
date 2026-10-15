@@ -14,6 +14,18 @@ export type Database = {
   }
   public: {
     Tables: {
+      quotation_plan_projects: {
+        Row: { id: string; user_id: string; quotation_id: string | null; files: Json; analysis: Json; brief: Json | null; estimate: Json | null; created_at: string; updated_at: string }
+        Insert: { id?: string; user_id: string; quotation_id?: string | null; files?: Json; analysis: Json; brief?: Json | null; estimate?: Json | null; created_at?: string; updated_at?: string }
+        Update: { quotation_id?: string | null; files?: Json; analysis?: Json; brief?: Json | null; estimate?: Json | null; updated_at?: string }
+        Relationships: []
+      }
+      quotation_approved_rates: {
+        Row: { id: string; user_id: string; product_name: string; specification: string; rate: number; unit: string; currency: string; location: string; source_url: string | null; inclusions: string; verified_at: string; active: boolean }
+        Insert: { id?: string; user_id: string; product_name: string; specification?: string; rate: number; unit: string; currency?: string; location?: string; source_url?: string | null; inclusions?: string; verified_at?: string; active?: boolean }
+        Update: { product_name?: string; specification?: string; rate?: number; unit?: string; currency?: string; location?: string; source_url?: string | null; inclusions?: string; verified_at?: string; active?: boolean }
+        Relationships: []
+      }
       attendance: {
         Row: {
           clock_in: string

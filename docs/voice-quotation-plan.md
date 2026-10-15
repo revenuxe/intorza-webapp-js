@@ -1,4 +1,6 @@
-# Conversational voice quotation architecture
+# Historical conversational voice quotation architecture
+
+Archived 2026-10-15. Voice has been replaced by the [floor plan quotation builder](./floor-plan-quotation-builder.md). The audio roadmap below is historical.
 
 Date: 2026-10-14. Status: historical architecture and future roadmap. The implemented Gemini Flash + browser speech recognition design is documented in [quotation-ai-implementation.md](./quotation-ai-implementation.md); it supersedes the provider/transport recommendations below. Database snapshot and persistence proposals below remain future work.
 

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLocalization } from "@/hooks/useLocalization";
+import { ApprovedRatesPanel } from './ApprovedRatesPanel';
 
 const CATEGORIES = [
   "General",
@@ -298,6 +299,8 @@ export const ItemsPricingTab = () => {
           )}
         </CardContent>
       </Card>
+
+      <ApprovedRatesPanel currency={settings.currencyCode} />
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent>

@@ -1,4 +1,7 @@
-# Quotation voice assistant
+# Historical quotation voice assistant
+
+Archived 2026-10-15: the voice workflow and audio endpoints have been removed.
+See [the current floor plan builder](./floor-plan-quotation-builder.md) for implementation and deployment requirements.
 
 ## English output recovery
 
