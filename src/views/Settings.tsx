@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { profileApi } from "@/lib/api";
 import { BillingSection } from "@/components/BillingSection";
+import { CoinWallet } from '@/components/CoinWallet';
 import { BrandColorExtractor } from "@/components/BrandColorExtractor";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
@@ -246,6 +247,11 @@ const Settings = () => {
         </div>
 
         <BillingSection />
+
+        <Card>
+          <CardHeader><CardTitle>AI coin wallet</CardTitle></CardHeader>
+          <CardContent><CoinWallet /></CardContent>
+        </Card>
 
         {/* Country/Region Settings */}
         <Card>

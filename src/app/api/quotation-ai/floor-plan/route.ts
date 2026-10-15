@@ -33,6 +33,7 @@ export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
   let cleanup: (() => Promise<unknown>) | undefined;
   let uploadRequest = false;
+  let coinCharge: { type: 'floor_plan' | 'ai_builder'; amount: number } | null = null;
   try {
     const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
     if (!token) return json({ error: 'Sign in to build a quotation.' }, 401);
@@ -62,6 +63,9 @@ export async function POST(request: Request) {
       }));
       if (new Set(files.map(file => file.name)).size !== files.length) return json({ error: 'Give each uploaded drawing a different file name.' }, 400);
       if (files.reduce((sum, file) => sum + file.bytes.length, 0) > MAX_PLAN_BYTES) return json({ error: 'Keep the total upload under 10 MB.' }, 413);
+      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: 15, p_type: 'floor_plan', p_reference: requestId, p_note: 'Floor plan analysis' });
+      if (charged.error) return json({ error: /Insufficient coins/i.test(charged.error.message) ? 'No coins left for Floor Plan Analysis. Top up your wallet to continue.' : charged.error.message, code: 'COINS_REQUIRED', requestId }, 402);
+      coinCharge = { type: 'floor_plan', amount: 15 };
       const projectId = crypto.randomUUID();
       const paths: string[] = [];
       cleanup = () => db.storage.from('quotation-floor-plans').remove(paths);
@@ -75,6 +79,7 @@ export async function POST(request: Request) {
       const saved = await db.from('quotation_plan_projects').insert({ id: projectId, user_id: user.id, files: paths.map((path, index) => ({ path, name: files[index].name, mime: files[index].mime })), analysis });
       if (saved.error) throw new Error('Could not save the plan analysis. Check the database migration.');
       cleanup = undefined;
+      coinCharge = null;
       return json({ projectId, analysis });
     }
     if (!contentType.startsWith('application/json')) return json({ error: 'Use JSON or a floor plan upload.' }, 415);
@@ -103,6 +108,11 @@ export async function POST(request: Request) {
     }
     if (regenerateRooms && (!previousEstimate || regenerateRooms.some(name => !scopedRooms(analysis, brief).some(room => room.name === name)))) return json({ error: 'Select rooms from the current estimate to regenerate.' }, 400);
     if (action === 'retry_pricing' && (!previousEstimate || regenerateRooms)) return json({ error: 'Open an existing estimate to retry its pricing.' }, 400);
+    if (!projectId && action === 'generate' && brief.automatic) {
+      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: 10, p_type: 'ai_builder', p_reference: requestId, p_note: 'AI quotation builder' });
+      if (charged.error) return json({ error: /Insufficient coins/i.test(charged.error.message) ? 'No coins left for AI Quotation Builder. Top up your wallet to continue.' : charged.error.message, code: 'COINS_REQUIRED', requestId }, 402);
+      coinCharge = { type: 'ai_builder', amount: 10 };
+    }
     // RLS and an explicit owner filter both apply. Pattern rates are historical, never approved.
     const [approved, history, profile] = await Promise.all([
       db.from('quotation_approved_rates').select('*').eq('user_id', user.id).eq('active', true).limit(100),
@@ -264,9 +274,18 @@ export async function POST(request: Request) {
       ? await db.from('quotation_plan_projects').update({ analysis, brief, estimate, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', user.id)
       : await db.from('quotation_plan_projects').insert({ id, user_id: user.id, analysis, brief, estimate });
     if (saved.error) throw new Error('Could not store the estimate. Your quotation has not changed.');
+    coinCharge = null;
     return json({ projectId: id, estimate, measurementSystem: 'imperial', measurementChanged });
   } catch (error) {
     if (cleanup) await cleanup().catch(() => undefined);
+    if (coinCharge) {
+      // The debit and this recovery are both owner-scoped and idempotent by request ID.
+      const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
+      if (token) {
+        const refundDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
+        try { await refundDb.rpc('refund_failed_ai_charge', { p_reference: requestId, p_note: `${coinCharge.type} request failed; coins restored.` }); } catch { /* Preserve the original request failure if recovery is unavailable. */ }
+      }
+    }
     if (error instanceof InputError) return json({ error: error.message, requestId }, error.status);
     if (error instanceof ProviderError) return json({ error: error.message, code: error.code, requestId }, error.status);
     if (error instanceof SyntaxError || error instanceof z.ZodError) return json({ error: uploadRequest ? 'The floor plan response could not be validated. Review the detected rooms and try again.' : 'The quotation response could not be validated. Your floor plan is unchanged; please try again.', requestId }, 422);

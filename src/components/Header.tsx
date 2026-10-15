@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Navigation } from "./Navigation";
+import { CoinWallet } from './CoinWallet';
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import logo from "@/assets/intorza-logo.webp";
@@ -75,6 +76,7 @@ export const Header = () => {
 
         {/* Mobile auth section */}
         <div className="lg:hidden flex items-center gap-1.5">
+          {isAuthenticated && <CoinWallet />}
           {/* Pro badge for Pro users */}
           {isAuthenticated && isPro && (
             <Tooltip>

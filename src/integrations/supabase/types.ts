@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      coin_wallets: {
+        Row: { user_id: string; balance: number; lifetime_earned: number; lifetime_spent: number; created_at: string; updated_at: string }
+        Insert: { user_id: string; balance?: number; lifetime_earned?: number; lifetime_spent?: number; created_at?: string; updated_at?: string }
+        Update: { balance?: number; lifetime_earned?: number; lifetime_spent?: number; updated_at?: string }
+        Relationships: []
+      }
+      coin_ledger: {
+        Row: { id: string; user_id: string; tx_type: Database['public']['Enums']['coin_tx_type']; amount: number; balance_after: number; reference_id: string | null; note: string | null; created_at: string }
+        Insert: { id?: string; user_id: string; tx_type: Database['public']['Enums']['coin_tx_type']; amount: number; balance_after: number; reference_id?: string | null; note?: string | null; created_at?: string }
+        Update: never
+        Relationships: []
+      }
+      coin_payments: {
+        Row: { id: string; user_id: string; razorpay_order_id: string; razorpay_payment_id: string | null; coins: number; amount_paise: number; currency: string; status: string; created_at: string; verified_at: string | null }
+        Insert: { id?: string; user_id: string; razorpay_order_id: string; razorpay_payment_id?: string | null; coins: number; amount_paise: number; currency?: string; status?: string; created_at?: string; verified_at?: string | null }
+        Update: { razorpay_payment_id?: string | null; status?: string; verified_at?: string | null }
+        Relationships: []
+      }
       quotation_plan_projects: {
         Row: { id: string; user_id: string; quotation_id: string | null; files: Json; analysis: Json; brief: Json | null; estimate: Json | null; created_at: string; updated_at: string }
         Insert: { id?: string; user_id: string; quotation_id?: string | null; files?: Json; analysis: Json; brief?: Json | null; estimate?: Json | null; created_at?: string; updated_at?: string }
@@ -1647,6 +1665,10 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_pro_user: { Args: { _user_id: string }; Returns: boolean }
+      debit_coins: { Args: { p_user: string; p_amount: number; p_type: Database['public']['Enums']['coin_tx_type']; p_reference?: string | null; p_note?: string | null }; Returns: number }
+      refund_failed_ai_charge: { Args: { p_reference: string; p_note?: string | null }; Returns: number }
+      admin_adjust_coins: { Args: { p_admin: string; p_user: string; p_amount: number; p_note?: string | null }; Returns: number }
+      admin_coin_overview: { Args: never; Returns: Json }
       respond_to_quotation: {
         Args: { p_action: string; p_id: string }
         Returns: Json
@@ -1654,6 +1676,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      coin_tx_type: "welcome" | "purchase" | "admin_credit" | "admin_debit" | "floor_plan" | "ai_builder" | "refund"
       team_member_status: "active" | "inactive" | "on_leave"
       work_type:
         | "carpenter"

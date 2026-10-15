@@ -17,6 +17,7 @@ import {
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { TechStackDialog } from "@/components/TechStackDialog";
 import { AITrainingPanel } from '@/components/admin/AITrainingPanel';
+import { CoinWalletAdminPanel } from '@/components/admin/CoinWalletAdminPanel';
 
 interface User {
   id: string;
@@ -764,7 +765,7 @@ const AdminDashboard = () => {
             </TabsList>
           </div>
 
-          <TabsContent value="ai" className="space-y-4"><AITrainingPanel /></TabsContent>
+          <TabsContent value="ai" className="space-y-4"><CoinWalletAdminPanel /><AITrainingPanel /></TabsContent>
           <TabsContent value="users" className="space-y-4">
             <Card>
               <CardHeader className="p-3 sm:p-6">

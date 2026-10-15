@@ -20,8 +20,18 @@ serve(async req=>{
     if (!['payment.captured','payment.failed','refund.created','refund.processed','subscription.cancelled'].includes(event)) return reply({received:true,processed:false});
     const supabase=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     if (event==='payment.captured') {
-      const {payment,userId}=await getCapturedPayment(payload.payload?.payment?.entity?.id);
-      const {error}=await supabase.rpc('activate_verified_razorpay_payment',{p_user:userId,p_payment:payment.id,p_order:payment.order_id,p_amount:payment.amount,p_currency:payment.currency});
+      const paymentId=payload.payload?.payment?.entity?.id;
+      const payment=await fetchRazorpay<{id:string;order_id:string;status:string;captured:boolean;amount:number;currency:string;amount_refunded?:number}>(`payments/${encodeURIComponent(paymentId)}`);
+      const order=await fetchRazorpay<{id:string;status:string;amount:number;currency:string;notes?:Record<string,string>}>(`orders/${encodeURIComponent(payment.order_id)}`);
+      if (order.notes?.type==='coin_topup') {
+        const userId=order.notes.user_id, coins=Number(order.notes.coins);
+        if (!userId || !Number.isInteger(coins) || coins<10 || order.status!=='paid' || order.currency!=='INR' || payment.currency!=='INR' || payment.status!=='captured' || !payment.captured || (payment.amount_refunded||0)>0 || payment.amount!==order.amount || order.amount!==coins*100) throw new Error('Coin top-up facts are invalid');
+        const {error}=await supabase.rpc('verify_coin_purchase',{p_user:userId,p_order_id:order.id,p_payment_id:payment.id,p_coins:coins,p_amount_paise:order.amount,p_currency:'INR'});
+        if (error) throw new Error('Coin wallet transaction failed');
+        return reply({received:true,processed:true});
+      }
+      const captured=await getCapturedPayment(payload.payload?.payment?.entity?.id);
+      const {error}=await supabase.rpc('activate_verified_razorpay_payment',{p_user:captured.userId,p_payment:captured.payment.id,p_order:captured.payment.order_id,p_amount:captured.payment.amount,p_currency:captured.payment.currency});
       if (error) throw new Error('Activation transaction failed');
       return reply({received:true,processed:true});
     }

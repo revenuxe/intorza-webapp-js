@@ -17,6 +17,7 @@ jest.mock('@/lib/quotation-ai/market-pricing', () => ({ ...jest.requireActual('@
 const research = jest.fn();
 const getUser = jest.fn(); const limit = jest.fn(); const analyse = jest.fn(); const generate = jest.fn();
 const upload = jest.fn(); const remove = jest.fn(); const from = jest.fn();
+const rpc = jest.fn();
 const eq = jest.fn(); const insert = jest.fn();
 let projectExists = true;
 let referenceRows: Record<string, unknown>[] = [];
@@ -45,7 +46,8 @@ beforeEach(() => {
   limit.mockResolvedValue({ success: true });
   (getCloudflareContext as jest.Mock).mockResolvedValue({ env: { OPENAI_API_KEY: 'secret', OPENAI_FLOOR_PLAN_MODEL: 'configured-vision-model', QUOTATION_AI_LIMITER: { limit } } });
   from.mockImplementation(database);
-  (createClient as jest.Mock).mockReturnValue({ auth: { getUser }, from, storage: { from: () => ({ upload, remove }) } });
+  rpc.mockResolvedValue({ data: 45, error: null });
+  (createClient as jest.Mock).mockReturnValue({ auth: { getUser }, from, rpc, storage: { from: () => ({ upload, remove }) } });
   (OpenAIFloorPlanProvider as jest.Mock).mockReturnValue({ analyse, generate });
   (OpenAIWebMarketPricing as jest.Mock).mockReturnValue({ research });
   research.mockResolvedValue({ rates: [], limitations: ['No comparable published rates found.'] });
