@@ -599,7 +599,9 @@ const CreateQuotation = () => {
     setIsSaving(true);
     clearFeedback();
     try {
-      if (!clientName || !projectTitle) {
+      const draftClientName = clientName.trim() || 'Client to be confirmed';
+      const draftProjectTitle = projectTitle.trim() || 'AI quotation draft';
+      if (status !== 'draft' && (!clientName.trim() || !projectTitle.trim())) {
         toast({
           title: "Missing information",
           description: "Please fill in client name and project title",
@@ -649,10 +651,10 @@ const CreateQuotation = () => {
       }));
 
       const basePayload = {
-        quotation_title: projectTitle,
-        client_name: clientName,
+        quotation_title: status === 'draft' ? draftProjectTitle : projectTitle,
+        client_name: status === 'draft' ? draftClientName : clientName,
         client_address: clientAddress,
-        project_name: projectTitle,
+        project_name: status === 'draft' ? draftProjectTitle : projectTitle,
         date_of_proposal: dateOfProposal || new Date().toISOString().split('T')[0],
         valid_till: quotationValidTill || null,
         project_deadline: projectDeadline || null,
@@ -1113,8 +1115,8 @@ const CreateQuotation = () => {
             planProjectId.current = projectId;
             setAIPriceEvidence(current => ({ ...current, ...Object.fromEntries((evidence ?? []).map(row => [row.itemId, row.price])) }));
             setSections(nextSections);
-            setProjectTitle(draft.project.projectTitle);
-            setClientName(draft.project.clientName);
+            setProjectTitle(draft.project.projectTitle.trim() || 'AI quotation draft');
+            setClientName(draft.project.clientName.trim() || 'Client to be confirmed');
             setClientAddress(draft.project.clientAddress);
             setPlaceOfProject(draft.project.placeOfProject);
             setProjectType(draft.project.projectType);
@@ -1124,7 +1126,7 @@ const CreateQuotation = () => {
             setEnableSocialMediaDiscount(draft.pricing.enableSocialMediaDiscount);
             setSocialMediaDiscountRate(draft.pricing.socialMediaDiscountRate);
             if (saveDraft) setSaveGeneratedDraft(true);
-            toast({ title: 'Estimate added to your quotation', description: 'Review the measurements and rates, then save as a draft.' });
+            toast({ title: saveDraft ? 'Saving your AI quotation' : 'Estimate added to your quotation', description: saveDraft ? 'A draft is being saved to My Quotations so you can safely return after a refresh.' : 'Review the measurements and rates, then save as a draft.' });
           }}
         />
           </div>

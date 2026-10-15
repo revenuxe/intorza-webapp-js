@@ -52,6 +52,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const [brief, setBrief] = useState<ProjectBrief>({ scope: 'complete', roomNames: [], finish: 'Standard', budget: null, clientName: '', location: '', address: '' });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const [autoSaved, setAutoSaved] = useState(false);
   const [workRoomIndex, setWorkRoomIndex] = useState(0);
   const [wholePlan, setWholePlan] = useState<boolean | null>(null);
   const [regenerateRooms, setRegenerateRooms] = useState<string[]>([]);
@@ -105,7 +106,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     let draft: VoiceDraft;
     try { draft = getCurrentDraft(); } catch { onStart(next); return; }
     setBrief({ scope: 'complete', roomNames: [], finish: 'Standard', budget: null, clientName: draft.project.clientName, location: draft.project.placeOfProject, address: draft.project.clientAddress });
-    setFiles([]); setAnalysis(emptyAnalysis); setProjectId(null); setEstimate(null); setRegenerateRooms([]); setError(''); setWholePlan(null); setMeasurementChanged(false);
+    setFiles([]); setAnalysis(emptyAnalysis); setProjectId(null); setEstimate(null); setAutoSaved(false); setRegenerateRooms([]); setError(''); setWholePlan(null); setMeasurementChanged(false);
     setStep(next === 'upload' ? 'upload' : 'analysis'); onStart(next);
   };
   function selectFiles(incoming: File[]) {
@@ -162,6 +163,13 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
       if (body.measurementSystem === 'imperial') onMeasurementSystemChange?.();
       if (body.measurementChanged) setMeasurementChanged(true);
       setEstimate(body.estimate); setProjectId(body.projectId); setRegenerateRooms([]); setStep('estimate');
+      // A completed estimate must survive a refresh or an accidental close. Store it in
+      // the regular quotation editor immediately; the plan project itself is already
+      // saved by the API and is linked when the draft save completes.
+      if (!selected && !retryPricing && !body.estimate.scopeGaps?.length) {
+        onApply(body.estimate.draft, base.current, body.projectId, true, body.estimate.evidence);
+        setAutoSaved(true);
+      }
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not generate an estimate.'); }
     finally { clearTimeout(timeout); pending.current = false; setBusy(''); abort.current = null; }
   }
@@ -294,7 +302,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
             <FloorPlanEstimateOverview estimate={estimate} />
             <details className="rounded-xl border p-3 text-xs leading-5"><summary className="cursor-pointer font-medium">Assumptions & exclusions</summary><ul className="mt-2 list-disc space-y-1 pl-4">{estimate.assumptions.map((assumption, index) => <li key={index}>{assumption}</li>)}</ul></details>
             <details className="rounded-xl border p-3 text-sm"><summary className="cursor-pointer font-medium">Refine this estimate</summary><fieldset className="mt-3 space-y-2"><legend className="mb-2 text-xs text-muted-foreground">Select rooms to regenerate. Other rooms stay in this estimate.</legend>{[...new Set(estimate.roomSections.map(row => row.roomName))].map(name => <label key={name} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={regenerateRooms.includes(name)} onChange={event => setRegenerateRooms(current => event.target.checked ? [...current, name] : current.filter(room => room !== name))} />{name}</label>)}</fieldset><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" disabled={!regenerateRooms.length || !!busy} onClick={() => void generate(regenerateRooms)}>Regenerate selected items</Button><Button type="button" size="sm" variant="ghost" disabled={!!busy} onClick={() => setStep('details')}>Edit Project Details</Button></div></details>
-            <p className="text-xs text-muted-foreground">Open the editor to adjust products, measurements and rates, then use Save as Draft. Nothing is sent automatically.</p>
+            <p className="text-xs text-muted-foreground">{autoSaved ? 'This estimate is being saved to My Quotations as a draft. Open the editor to adjust products, measurements and rates.' : 'Open the editor to adjust products, measurements and rates, then save it as a draft.'}</p>
           </>}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 border-t bg-background px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
@@ -302,8 +310,10 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
           {busy ? <Button variant="outline" type="button" onClick={() => abort.current?.()}>Cancel request</Button> : <>
             <Button variant="outline" type="button" onClick={step === 'upload' || step === 'analysis' && mode === 'details' ? onClose : back}><ArrowLeft className="mr-1 h-4 w-4" />{step === 'upload' || step === 'analysis' && mode === 'details' ? 'Cancel' : 'Back'}</Button>
             {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'scope' ? <Button type="button" className="min-w-0 flex-1" disabled={!scopedRooms(analysis, brief).length || !brief.measurementInputUnit} onClick={() => void generate()}>Generate Quotation<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'review' ? <Button type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>
+            {autoSaved ? <Button type="button" className="min-w-0 flex-1" onClick={onClose}>Open quotation</Button> : <>
               <Button type="button" variant="outline" className="min-w-0 flex-1" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, false, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not apply the estimate.'); } }}>Edit Quotation</Button>
               <Button type="button" className="w-full sm:w-auto" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, true, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not save the estimate.'); } }}>Save as Draft</Button>
+            </>}
             </> : <Button type="button" className="min-w-0 flex-1" onClick={next}>Continue<ArrowRight className="ml-1 h-4 w-4" /></Button>}
           </>}
         </div>
