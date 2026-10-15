@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Input } from '@/components/ui/input';
-import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { Check, Package, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLocalization } from '@/hooks/useLocalization';
@@ -38,6 +38,7 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
   const [inputValue, setInputValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   
   // Use props if provided, otherwise use localization settings
   const symbol = currencySymbol || settings.currencySymbol;
@@ -46,12 +47,12 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
   // Filter and prioritize products
   const filteredProducts = useMemo(() => {
     if (!inputValue) {
-      return patterns.slice(0, 8);
+      return patterns.slice(0, 40);
     }
     const term = inputValue.toLowerCase();
     return patterns
       .filter(p => p.product_name.toLowerCase().includes(term))
-      .slice(0, 8);
+      .slice(0, 40);
   }, [patterns, inputValue]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,6 +88,18 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
     }
   }, [value]);
 
+  React.useLayoutEffect(() => {
+    if (!open) return;
+    const position = () => {
+      const rect = inputRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setMenuStyle({ position: 'fixed', top: Math.min(rect.bottom + 6, window.innerHeight - 120), left: Math.max(8, rect.left), width: Math.min(Math.max(rect.width, 280), window.innerWidth - Math.max(16, rect.left + 8)), zIndex: 100 });
+    };
+    position();
+    window.addEventListener('resize', position); window.addEventListener('scroll', position, true);
+    return () => { window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true); };
+  }, [open]);
+
   return (
     <div ref={containerRef} className="relative">
       <Input
@@ -98,43 +111,11 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
         placeholder={placeholder}
         className={className}
       />
-      {open && filteredProducts.length > 0 && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-popover border rounded-md shadow-lg">
-          <Command>
-            <CommandList>
-              <CommandGroup heading="Recent & Popular Items">
-                {filteredProducts.map((pattern, index) => (
-                  <CommandItem
-                    key={`${pattern.product_name}-${index}`}
-                    value={pattern.product_name}
-                    onSelect={() => handleSelect(pattern)}
-                    className="cursor-pointer"
-                  >
-                    <Package className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{pattern.product_name}</p>
-                      {pattern.preferred_rate && pattern.preferred_rate > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          {symbol}{pattern.preferred_rate.toLocaleString(settings.locale)}/{areaUnit}
-                        </p>
-                      )}
-                    </div>
-                    {pattern.usage_count > 1 && (
-                      <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                        <TrendingUp className="h-3 w-3" />
-                        {pattern.usage_count}
-                      </span>
-                    )}
-                    {value === pattern.product_name && (
-                      <Check className="ml-1 h-4 w-4 text-primary" />
-                    )}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </div>
-      )}
+      {open && filteredProducts.length > 0 && typeof document !== 'undefined' && createPortal(<div style={menuStyle} className="rounded-xl border bg-popover p-2 shadow-xl" onMouseDown={event => event.preventDefault()}>
+        <div className="flex items-center justify-between px-2 pb-2 text-xs text-muted-foreground"><span>Existing products</span><span>{filteredProducts.length} matches</span></div>
+        <div className="max-h-72 space-y-1 overflow-y-auto overscroll-contain pr-1">{filteredProducts.map((pattern, index) => <button key={`${pattern.product_name}-${index}`} type="button" onClick={() => handleSelect(pattern)} className="flex w-full items-start gap-2 rounded-lg border border-transparent p-2.5 text-left transition-colors hover:border-primary/30 hover:bg-primary/5">
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted"><Package className="h-3.5 w-3.5 text-primary" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{pattern.product_name}</span>{pattern.product_details && <span className="mt-0.5 block line-clamp-1 text-xs text-muted-foreground">{pattern.product_details}</span>}<span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">{pattern.preferred_rate && pattern.preferred_rate > 0 && <span>{symbol}{pattern.preferred_rate.toLocaleString(settings.locale)}/{areaUnit}</span>}{pattern.usage_count > 1 && <span className="inline-flex items-center gap-0.5"><TrendingUp className="h-3 w-3" />{pattern.usage_count}</span>}</span></span>{value === pattern.product_name && <Check className="mt-1 h-4 w-4 shrink-0 text-primary" />}</button>)}</div>
+      </div>, document.body)}
     </div>
   );
 };
