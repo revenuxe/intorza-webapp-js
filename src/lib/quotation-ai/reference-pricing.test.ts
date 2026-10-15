@@ -1,4 +1,4 @@
-import { matchingReferenceRate, referencePriceEvidence, type ReferencePrice } from './reference-pricing';
+import { closeReferencePrice, matchingReferenceRate, referencePriceEvidence, type ReferencePrice } from './reference-pricing';
 const row = (patch: Partial<ReferencePrice> = {}): ReferencePrice => ({
   id: 'laminate', product_name: 'wardrobe', material: 'laminate', specification: '18mm plywood',
   location: 'bengaluru', currency: 'INR', unit: 'sqft', tax: 'excluded', installation_included: true,
@@ -23,4 +23,20 @@ it('keeps different material variants separate and never selects one by product 
   expect(prices).toHaveLength(2);
   expect(matchingReferenceRate(prices, 'Wardrobe', 'acrylic. 18mm plywood')?.id).toBe('acrylic');
   expect(matchingReferenceRate(prices, 'Wardrobe', 'unspecified')).toBeUndefined();
+});
+it('provides an explained close match based on product details without changing its observed price', () => {
+  const prices = referencePriceEvidence([row()], 'INR', 'Bengaluru');
+  const price = closeReferencePrice(prices, 'Wardrobe', '18mm plywood laminate wardrobe with shelving', 'INR', 'Bengaluru');
+  expect(price).toMatchObject({ rate: 1400, name: 'Wardrobe', confidence: 'low', match: { type: 'close', referenceName: 'wardrobe' } });
+  expect(price?.match?.assumptions.join(' ')).toContain('without a made-up markup');
+});
+it.each(['18mm MDF acrylic wardrobe', '12mm plywood laminate wardrobe', 'Quartz kitchen countertop', 'unspecified'])('rejects incompatible or unsupported close matches: %s', specification => {
+  const prices = referencePriceEvidence([row()], 'INR', 'Bengaluru');
+  expect(closeReferencePrice(prices, 'Wardrobe', specification, 'INR', 'Bengaluru')).toBeUndefined();
+});
+it('does not borrow another city or currency and refuses ambiguous material alternatives', () => {
+  const prices = referencePriceEvidence([row(), row({ id: 'acrylic', material: 'acrylic', recent_rate: 2000 })], 'INR', 'Bengaluru');
+  expect(closeReferencePrice(prices, 'Wardrobe', '18mm plywood wardrobe', 'INR', 'Bengaluru')).toBeUndefined();
+  expect(closeReferencePrice(prices, 'Wardrobe', '18mm plywood laminate', 'USD', 'Bengaluru')).toBeUndefined();
+  expect(closeReferencePrice(prices, 'Wardrobe', '18mm plywood laminate', 'INR', 'Mumbai')).toBeUndefined();
 });

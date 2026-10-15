@@ -132,39 +132,23 @@ test('floor plan builder stays within mobile/tablet/desktop widths and preserves
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: 'test-results/floor-plan-loading-mobile.png' });
   releaseUpload!();
-  await expect(dialog.getByRole('heading', { name: 'Your property analysis' })).toBeVisible();
-  await expect.poll(() => panel.evaluate(element => element.scrollTop)).toBe(0);
-  expect(paidRequests).toBe(1);
-  for (const width of [320, 390, 768, 1440]) {
-    await page.setViewportSize({ width, height: 844 });
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(null)))));
-    const bounds = await dialog.evaluate(element => ({ left: element.getBoundingClientRect().left, right: element.getBoundingClientRect().right, width: element.clientWidth, scroll: element.scrollWidth, viewport: window.innerWidth, page: document.documentElement.scrollWidth }));
-    expect(bounds.left).toBeGreaterThanOrEqual(0);
-    expect(bounds.right).toBeLessThanOrEqual(width);
-    expect(bounds.scroll).toBeLessThanOrEqual(bounds.width + 1);
-    expect(bounds.page).toBeLessThanOrEqual(bounds.viewport);
-  }
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: 'test-results/floor-plan-mobile.png', fullPage: true });
-  await panel.evaluate(element => { element.scrollTop = element.scrollHeight; });
-  await dialog.getByRole('button', { name: 'Continue' }).click();
   await expect(dialog.getByRole('heading', { name: 'What would you like to design?' })).toBeVisible();
   await expect.poll(() => panel.evaluate(element => element.scrollTop)).toBe(0);
-  await dialog.getByRole('radio', { name: 'Yes, the whole plan' }).check();
-  await dialog.getByRole('button', { name: 'Continue' }).click();
-  await expect(dialog.getByRole('heading', { name: 'Plan your Bedroom interior' })).toBeFocused();
-  await confirmRoom();
-  await dialog.getByRole('button', { name: 'Continue' }).click();
-  await expect(dialog.getByRole('heading', { name: 'Plan your Living Room interior' })).toBeFocused();
-  await expect.poll(() => panel.evaluate(element => element.scrollTop)).toBe(0);
-  await confirmRoom();
-  await expect(dialog.getByRole('group', { name: 'Include tv unit in Living Room?' }).getByRole('radio', { name: 'No', exact: true })).toBeChecked();
-  await dialog.getByRole('button', { name: 'Continue' }).click();
-  await confirmDesign();
-  await dialog.getByRole('button', { name: 'Continue' }).click();
-  await dialog.getByRole('button', { name: 'Continue' }).click();
-  await expect(dialog.getByRole('heading', { name: 'Who is this project for?' })).toBeVisible();
+  await expect(dialog.getByText('rooms detected', { exact: true })).toBeVisible();
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect.poll(() => dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    await expect(dialog.getByRole('button', { name: 'Generate Quotation', exact: true })).toBeVisible();
+  }
+  await page.screenshot({ path: 'test-results/plan-analysis-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'test-results/plan-analysis-mobile.png' });
+  await expect(dialog.getByRole('button', { name: 'Full interior', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(dialog.getByRole('group', { name: /^Include/ })).toHaveCount(0);
   expect(paidRequests).toBe(1);
+  await dialog.getByRole('button', { name: 'Generate Quotation', exact: true }).click();
+  await expect(dialog.getByRole('heading', { name: 'Your quotation is ready to review' })).toBeVisible();
+  expect(paidRequests).toBe(2);
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.locator('#projectTitle')).toHaveValue('Preserve my manual title');
   expect(await page.getByRole('button', { name: /Listen|Read question|Speak/ }).count()).toBe(0);
@@ -195,7 +179,7 @@ test('floor plan builder stays within mobile/tablet/desktop widths and preserves
   await dialog.getByRole('button', { name: 'Apply details', exact: true }).click();
   await expect(dialog.getByText(/Partial total/)).toBeVisible();
   await expect(dialog.getByText('1 sections · 3 items', { exact: true })).toBeVisible();
-  expect(paidRequests).toBe(2);
+  expect(paidRequests).toBe(3);
   await dialog.getByRole('button', { name: 'Edit Quotation', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await expect(page.locator('#projectTitle')).toHaveValue('Preserve my manual title');
@@ -209,5 +193,5 @@ test('floor plan builder stays within mobile/tablet/desktop widths and preserves
   expect(savedSections[0].items).toHaveLength(3);
   await page.reload();
   for (const name of ['Room storage','False ceiling','Wall painting']) await expect(page.locator(`input[value="${name}"]:visible`)).toHaveCount(1);
-  expect(paidRequests).toBe(2);
+  expect(paidRequests).toBe(3);
 });

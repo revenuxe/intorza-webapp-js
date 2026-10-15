@@ -22,8 +22,9 @@ export const briefSchema = z.object({
   scope: z.enum(['complete', 'kitchen', 'bedrooms', 'kitchen-wardrobes', 'living-bedrooms', 'selected']),
   roomNames: z.array(label).min(1).max(40), finish: z.enum(['Budget-friendly', 'Standard', 'Premium', 'Luxury', 'Recommend']),
   budget: z.number().finite().positive().max(1000000000).nullable(),
-  clientName: label, location: label, address: z.string().max(1000),
+  clientName: z.string().trim().max(150), location: label, address: z.string().max(1000),
   roomWork: z.array(roomWorkSchema).max(40).optional(),
+  automatic: z.boolean().optional(),
   design: z.object({ coordinatedLook: z.boolean().nullable(), retainExisting: z.boolean().nullable(), notes: z.string().trim().max(600) }).strict().optional(),
 }).strict();
 export type ProjectBrief = z.infer<typeof briefSchema>;
@@ -41,6 +42,7 @@ export type PriceEvidence = {
   currency: string; sourceUrl: string | null; inclusions: string;
   range?: { low: number; high: number };
   confidence?: 'low' | 'medium';
+  match?: { type: 'close'; referenceName: string; referenceDescription: string; score: number; assumptions: string[] };
   sources?: { name: string; url: string; publishedDate: string | null; retrievedAt: string; quote: string; specification: string; inclusions: string }[];
 };
 export type Estimate = ReturnType<typeof buildEstimate>;

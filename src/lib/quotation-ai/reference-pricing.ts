@@ -29,5 +29,48 @@ export function matchingReferenceRate(rates: PriceEvidence[], name: string, spec
   const matches = rates.filter(row => ['approved','admin_reference'].includes(row.source)
     && normalizeReferenceText(row.name) === normalizeReferenceText(name));
   return matches.find(row => normalizeReferenceText(row.description) === normalizeReferenceText(specification))
-    ?? (matches.length === 1 && matches[0].source === 'approved' ? matches[0] : undefined);
+    ?? (matches.length === 1 && matches[0].source === 'approved' && !conflicts(specification, matches[0].description) ? matches[0] : undefined);
+}
+
+const words = (value: string) => new Set(normalizeReferenceText(value)
+  .replace(/\bcabinets?\b/g, 'cabinet').replace(/\bcupboards?\b/g, 'wardrobe')
+  .replace(/\bunits?\b/g, 'unit').replace(/\bshelves\b/g, 'shelf')
+  .split(/[^a-z0-9]+/).filter(word => word.length > 2 && !['the','and','with','for','work','included','confirm','total','front','height','width','measure'].includes(word)));
+const materials = ['plywood','mdf','hdf','particle','laminate','acrylic','veneer','solid wood','aluminium','steel','granite','quartz','marble','gypsum','pop','pvc'];
+function conflicts(a: string, b: string) {
+  const left = normalizeReferenceText(a), right = normalizeReferenceText(b);
+  const groups = [materials.slice(0, 4), materials.slice(4, 8), materials.slice(8, 10), materials.slice(10, 13), materials.slice(13)];
+  if (groups.some(group => {
+    const x = group.filter(material => left.includes(material)), y = group.filter(material => right.includes(material));
+    return x.length && y.length && !x.some(material => y.includes(material));
+  })) return true;
+  const thickness = (value: string) => [...value.matchAll(/\b(\d+(?:\.\d+)?)\s*mm\b/g)].map(match => Number(match[1]));
+  const x = thickness(left), y = thickness(right);
+  if (x.length && y.length && !x.some(value => y.includes(value))) return true;
+  return [['sliding','hinged'], ['base','wall'], ['base','tall'], ['wall','tall']].some(([x,y]) =>
+    (new RegExp(`\\b${x}\\b`).test(left) && new RegExp(`\\b${y}\\b`).test(right)) ||
+    (new RegExp(`\\b${y}\\b`).test(left) && new RegExp(`\\b${x}\\b`).test(right)));
+}
+
+/** A close match borrows an observed rate unchanged; it never invents an adjustment. */
+export function closeReferencePrice(rates: PriceEvidence[], name: string, specification: string, currency: string, location: string): PriceEvidence | undefined {
+  const target = `${name} ${specification}`, nameWords = words(name), detailWords = words(specification);
+  const candidates = rates.filter(row => row.source === 'admin_reference' && !row.match && row.unit === 'sqft'
+    && row.currency === currency && normalizeReferenceText(row.location) === normalizeReferenceText(location)
+    && !conflicts(target, `${row.name} ${row.description}`)).map(row => {
+    const referenceName = words(row.name), referenceDetails = words(row.description);
+    const nameScore = [...nameWords].filter(word => referenceName.has(word)).length / Math.max(nameWords.size, referenceName.size, 1);
+    const detailScore = [...detailWords].filter(word => referenceDetails.has(word)).length / Math.max(Math.min(detailWords.size, referenceDetails.size), 1);
+    return { row, score: nameScore * 0.65 + detailScore * 0.35, nameScore, detailScore };
+  }).filter(candidate => candidate.nameScore >= 0.5 && candidate.detailScore >= 0.5 && candidate.score >= 0.7)
+    .sort((a,b) => b.score - a.score || a.row.id.localeCompare(b.row.id));
+  const best = candidates[0];
+  if (!best || candidates.some(candidate => best.score - candidate.score < 0.05
+    && (conflicts(best.row.description, candidate.row.description) || Math.max(best.row.rate, candidate.row.rate) / Math.min(best.row.rate, candidate.row.rate) > 1.3))) return;
+  const assumptions = ['Indicative close match; the requested product is not an exact specification match.',
+    `Reference: ${best.row.name} — ${best.row.description}`.slice(0, 600),
+    'Reference median reused without a made-up markup or material adjustment. Confirm dimensions, finish, hardware and inclusions before finalizing.'];
+  return { ...best.row, id: `close-${crypto.randomUUID()}`, name, description: specification,
+    confidence: 'low', match: { type: 'close', referenceName: best.row.name, referenceDescription: best.row.description, score: Math.round(best.score * 100), assumptions },
+    inclusions: `${best.row.inclusions} Indicative close specification match; supplier confirmation required.`.slice(0, 600) };
 }

@@ -113,6 +113,18 @@ it('generates large plans in small batches and includes every confirmed field de
   expect(estimate.draft.sections.flatMap((section: { items: unknown[] }) => section.items)).toHaveLength(75);
   expect(estimate.scopeGaps).toEqual([]);
 });
+it('uses a labelled detail-based close reference when exact pricing and market evidence are missing', async () => {
+  referenceRows = [{ id: 'close-reference', section: 'Bedroom', product_name: 'Wardrobe', material: 'Laminate', specification: '18mm plywood', unit: 'sqft',
+    recent_rate: 1400, recent_low: 1200, recent_high: 1600, recent_source_count: 5, source_count: 5,
+    tax: 'excluded', installation_included: true, location: 'bengaluru', currency: 'INR', price_date: new Date().toISOString().slice(0, 10) }];
+  const proposal = proposalFixture(); proposal.sections[0].items[0].description = '18mm plywood laminate wardrobe with shelving';
+  proposal.sections[0].items[0].rateId = null; generate.mockResolvedValueOnce(proposal);
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  const { estimate } = await response.json();
+  expect(estimate.evidence[0].price).toMatchObject({ rate: 1400, confidence: 'low', match: { type: 'close' } });
+  expect(estimate.draft.sections[0].items[0].productDetails).toBe(proposal.sections[0].items[0].description);
+});
 it('preserves an editable pending estimate when research fails', async () => {
   research.mockRejectedValueOnce(new Error('timeout'));
   const response = await POST(request(payload()));

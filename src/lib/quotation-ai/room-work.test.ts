@@ -74,3 +74,11 @@ it('rejects inconsistent yes/no work choices and preserves the confirmed design 
   answer.decisions.wardrobe = false;
   expect(() => ensureRoomWorkCoverage(generatedSchema.parse(proposalFixture()), plan.rooms, brief)).toThrow('yes/no');
 });
+it('automatically covers every detected room without requiring user work answers', () => {
+  const plan = planFixture();
+  const brief = { ...briefFixture(), automatic: true };
+  const result = ensureRoomWorkCoverage(generatedSchema.parse(proposalFixture()), plan.rooms, brief);
+  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe','False ceiling','Wall painting']);
+  expect(result.sections[0].items[0].quantity).toBe(56);
+  expect(result.sections[0].items[2].quantity).toBeNull();
+});

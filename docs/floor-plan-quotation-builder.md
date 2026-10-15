@@ -1,5 +1,36 @@
 # AI floor plan quotation builder
 
+## Simplified upload path
+
+Detail-based price fallback now compares product-name tokens and specification
+overlap against recent, compatible admin reference prices. Conflicting core
+materials, finishes, thicknesses and cabinet types are rejected. Ambiguous
+near-ties with materially different specifications or rates remain pending.
+An acceptable close match reuses its observed median unchanged, records the
+reference product/specification and assumptions, and displays a low-confidence
+close-match label. It is tried after exact/reference and market pricing.
+All remaining market-research products are processed in batches of 12, rather
+than silently skipping products after the first batch. Same-name products with
+different specifications have independent research/cache/evidence groups.
+Unsupported prices retain their rows with explicit per-item review reasons.
+Validation: 43 targeted pricing/API tests, TypeScript and scoped ESLint.
+
+The floor-plan upload path now goes directly from analysis to a compact scope
+screen, defaulting to Full interior. Generate Quotation skips property review,
+per-room yes/no questions, design, finish, budget and client questionnaires.
+Kitchen, Bedrooms and selected rooms remain available. City is optional and
+existing editor details are reused; missing client details can be entered in
+the editor before saving. Unknown city does not borrow another city's prices.
+The no-plan entry retains the guided questions.
+
+Automatic generation keeps AI-proposed room work and supplements missing
+essential room-specific fields. It uses the existing reviewed admin reference,
+owner-approved rate and market pricing pipeline. Missing dimensions/rates stay
+pending. The status banner and scroll/focus behavior remain in place.
+Validated with 28 targeted tests, TypeScript, scoped ESLint, production build,
+and a fresh-server browser check covering upload-to-generation without room
+questions and preservation through edit/save/reload. Deployment is pending.
+
 Implemented 2026-10-15. This replaces the quotation voice workflow. The voice UI,
 microphone capture, WebRTC/live clients and speech/realtime/live routes are removed.
 The existing text AI turn endpoint, audit data, auth, Worker and quotation editor remain.

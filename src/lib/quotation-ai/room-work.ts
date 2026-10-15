@@ -70,7 +70,20 @@ export function defaultRoomWork(room: Room, scope: ProjectBrief['scope']): RoomW
 
 /** Every confirmed work field survives sparse AI output, including unpriced work. */
 export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, rooms: Room[], brief: ProjectBrief) {
-  if (!brief.roomWork?.length) return raw; // Legacy stored estimates remain compatible.
+  if (!brief.roomWork?.length) {
+    if (!brief.automatic) return raw;
+    // Automatic mode: keep the AI's room-specific proposal and supplement any
+    // omitted essential work, without forcing the user through a checklist.
+    const baseline = ensureRoomWorkCoverage({ sections: [], assumptions: [] }, rooms,
+      { ...brief, roomWork: rooms.map(room => defaultRoomWork(room, brief.scope)) });
+    return { ...raw, sections: rooms.map(room => {
+      const proposed = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items);
+      const essentials = baseline.sections.find(section => section.roomName === room.name)!.items;
+      const items = [...proposed];
+      for (const item of essentials) if (!items.some(row => row.productName.trim().toLowerCase() === item.productName.toLowerCase())) items.push(item);
+      return { title: room.name, roomName: room.name, items };
+    }) };
+  }
   const sections = rooms.map(room => {
     const answer = brief.roomWork?.find(row => row.roomName === room.name);
     if (!answer) throw new Error(`Confirm the work required in ${room.name} before generating.`);

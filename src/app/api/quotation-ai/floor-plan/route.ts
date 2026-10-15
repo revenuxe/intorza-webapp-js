@@ -7,7 +7,7 @@ import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
 import { MarketResearchError, OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
-import { matchingReferenceRate, normalizeReferenceText, referencePriceEvidence, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
+import { closeReferencePrice, matchingReferenceRate, normalizeReferenceText, referencePriceEvidence, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
 
 export const dynamic = 'force-dynamic';
 type Env = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; OPENAI_FLOOR_PLAN_MODEL?: string; OPENAI_MARKET_MODEL?: string; QUOTATION_MARKET_RESEARCH?: string; QUOTATION_AI_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> } };
@@ -190,7 +190,7 @@ export async function POST(request: Request) {
       if (match) item.rateId = match.id;
     }
     const products = [...new Map(proposal.sections.flatMap(section => section.items).filter(item => !approvedIds.has(item.rateId) && !/Billing: (piece|lump_sum); price separately/i.test(item.description))
-      .map(item => [item.productName.trim().toLowerCase(), { name: item.productName, specification: item.description,
+      .map(item => [JSON.stringify([item.productName.trim().toLowerCase(), item.description.trim().toLowerCase()]), { name: item.productName, specification: item.description,
         ...(action === 'retry_pricing' ? { heightFt: previousEstimate.draft.sections.flatMap(section => section.items).find(row => row.productName === item.productName && row.productDetails === item.description)?.heightFt ?? undefined } : {}),
       }])).values()];
     const enabled = (env.QUOTATION_MARKET_RESEARCH || process.env.QUOTATION_MARKET_RESEARCH || 'openai') === 'openai';
@@ -201,13 +201,12 @@ export async function POST(request: Request) {
           && Number.isFinite(Date.parse(rate.verifiedAt)) && Date.now() >= Date.parse(rate.verifiedAt) && Date.now() - Date.parse(rate.verifiedAt) < 86400000
           && products.some(product => product.name === rate.name && product.specification === rate.description));
       rates.push(...cached);
-      const uncached = products.filter(product => !cached.some(rate => rate.name === product.name));
-      if (uncached.length) {
+      const uncached = products.filter(product => !cached.some(rate => rate.name === product.name && rate.description === product.specification));
+      for (let offset = 0; offset < uncached.length; offset += 12) {
         try {
           const research = await new OpenAIWebMarketPricing(key, env.OPENAI_MARKET_MODEL || process.env.OPENAI_MARKET_MODEL || model)
-            .research({ products: uncached.slice(0, 12), location: brief.location, currency, finish: brief.finish }, request.signal);
+            .research({ products: uncached.slice(offset, offset + 12), location: brief.location, currency, finish: brief.finish }, request.signal);
           rates.push(...research.rates); researchLimitations.push(...research.limitations);
-          if (uncached.length > 12) researchLimitations.push('Research was limited to 12 distinct products to control cost; remaining prices require review.');
         } catch (failure) { researchLimitations.push(failure instanceof MarketResearchError ? failure.message : 'Live market research was unavailable. Available historical rates are labelled; other prices remain pending.'); }
       }
       if (cached.length) researchLimitations.push('Some market evidence is cached from this project within the last 24 hours; retrieval dates are shown.');
@@ -216,8 +215,16 @@ export async function POST(request: Request) {
       if (approvedIds.has(item.rateId)) continue;
       const researched = rates.find(rate => rate.source === 'market_estimate' && rate.name === item.productName && rate.description === item.description);
       if (researched) item.rateId = researched.id;
+      else if (!/Billing: (piece|lump_sum); price separately/i.test(item.description)) {
+        const close = closeReferencePrice(rates, item.productName, item.description, currency, brief.location);
+        if (close) { rates.push(close); item.rateId = close.id; }
+      }
     }
     let estimate = buildEstimate(proposal, analysis, requestedBrief, rates, draft);
+    for (const section of estimate.draft.sections) for (const item of section.items) {
+      const evidence = estimate.evidence.find(row => row.itemId === item.id);
+      if (evidence && !evidence.price) evidence.reason = `${evidence.reason} Price pending: no supported exact or close specification match was found for this product in the selected city/currency. Confirm material, thickness, finish, hardware, installation and billing unit.`.slice(0, 600);
+    }
     if (previousEstimate && action !== 'retry_pricing') estimate = preserveRefinedItems(previousEstimate, estimate, requestedBrief);
     if (action === 'retry_pricing') {
       // Keep stable identities and explicit manual rates/dimensions; only retry non-manual pricing.

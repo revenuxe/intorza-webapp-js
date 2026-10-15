@@ -39,8 +39,8 @@ export function AIPriceCatalogue({ revision }: { revision: number }) {
     </form>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {busy ? <p role="status" className="text-sm">Loading prices…</p> : !error && <>
-      <div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm">
-        <thead><tr className="border-b"><th className="p-2">Product / specification</th><th className="p-2">City</th><th className="p-2">Median / unit</th><th className="p-2">Range</th><th className="p-2">Quotations</th><th className="p-2">Basis</th></tr></thead>
+      <div className="max-h-[520px] overflow-auto overscroll-contain"><table className="w-full min-w-[780px] text-left text-sm">
+        <thead className="sticky top-0 z-10 bg-card"><tr className="border-b"><th className="p-2">Product / specification</th><th className="p-2">City</th><th className="p-2">Median / unit</th><th className="p-2">Range</th><th className="p-2">Quotations</th><th className="p-2">Basis</th></tr></thead>
         <tbody>{rows.map(row => <tr key={row.id} className="border-b align-top">
           <td className="max-w-xs p-2"><strong className="capitalize">{row.product_name}</strong><p className="text-xs text-muted-foreground">{row.material} · {row.specification}</p></td>
           <td className="p-2 capitalize">{row.location}</td>

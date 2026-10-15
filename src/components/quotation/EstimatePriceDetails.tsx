@@ -1,7 +1,8 @@
 import type { PriceEvidence } from '@/lib/quotation-ai/floor-plan';
 export function EstimatePriceDetails({ price }: { price: PriceEvidence | null }) {
   if (!price) return <p className="text-xs text-amber-800 dark:text-amber-300">Price pending — no comparable rate available.</p>;
-  return <details className="mt-1 text-xs leading-5 text-muted-foreground"><summary className="cursor-pointer">{price.source === 'manual' ? 'Rate entered by you' : price.source === 'approved' ? 'Catalogue rate' : price.source === 'admin_reference' ? 'Admin-reviewed quotation reference' : price.source === 'market_estimate' ? 'Market estimate — review sources' : 'Historical rate — verify'}</summary>
+  return <details className="mt-1 text-xs leading-5 text-muted-foreground"><summary className="cursor-pointer">{price.match ? 'Close-match price estimate — review assumptions' : price.source === 'manual' ? 'Rate entered by you' : price.source === 'approved' ? 'Catalogue rate' : price.source === 'admin_reference' ? 'Admin-reviewed quotation reference' : price.source === 'market_estimate' ? 'Market estimate — review sources' : 'Historical rate — verify'}</summary>
+    {price.match && <div className="mt-2 rounded-lg bg-amber-50 p-2 text-amber-900 dark:bg-amber-950 dark:text-amber-100"><p className="font-medium">Close-match estimate · low confidence</p>{price.match.assumptions.map((note, index) => <p key={index}>{note}</p>)}</div>}
     <p className="mt-1">{price.location || 'Location unconfirmed'} · Retrieved/recorded {price.verifiedAt.slice(0, 10)}</p>
     {price.range && <p>{price.source === 'admin_reference' ? 'Comparable quotation range' : 'Published range'}: {price.currency} {price.range.low}–{price.range.high}/{price.unit} · {price.confidence} confidence</p>}
     <p>{price.inclusions}</p>

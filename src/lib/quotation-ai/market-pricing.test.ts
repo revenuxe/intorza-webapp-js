@@ -32,6 +32,12 @@ it('converts running-foot cabinetry rates only with an explicitly supplied work 
 it('deduplicates equivalent domains rather than inflating source confidence', () => {
   expect(resolve([sample(), sample()]).rates[0].confidence).toBe('low');
 });
+it('does not mix two same-name products with different specifications', () => {
+  const acrylic = { ...sample('https://other.example/acrylic'), specification: 'Acrylic wardrobe installed', low: 2000, high: 2400 };
+  const result = resolveMarketEvidence({ observations: [sample(), acrylic], limitations: [] }, [sample().sourceUrl, acrylic.sourceUrl],
+    { ...input, products: [...input.products, { name: 'Wardrobe', specification: acrylic.specification }] }, now);
+  expect(result.rates.map(rate => rate.rate)).toEqual([1200,2200]);
+});
 it('does not fabricate a fallback if search fails or the model never searches', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 429 });
   const provider = new OpenAIWebMarketPricing('secret', 'configured-model');
