@@ -36,8 +36,29 @@ test('floor plan builder stays within mobile/tablet/desktop widths and preserves
   await expect(page).toHaveURL(/\/settings$/);
   await page.goto('/');
   await page.locator('#projectTitle').fill('Preserve my manual title');
+  const actions = page.getByLabel('Quotation actions');
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    const boxes = await Promise.all(['Templates', 'Customize', 'Built with AI'].map(name => actions.getByRole('button', { name, exact: true }).boundingBox()));
+    const aiButton = actions.getByRole('button', { name: 'Built with AI', exact: true });
+    const titleBox = await aiButton.getByText('Built with AI', { exact: true }).boundingBox();
+    const coinsBox = await aiButton.getByText('60 coins', { exact: true }).boundingBox();
+    expect(Math.abs((titleBox!.y + titleBox!.height / 2) - (coinsBox!.y + coinsBox!.height / 2))).toBeLessThan(2);
+    if (width < 640) {
+      expect(Math.abs(boxes[0]!.y - boxes[1]!.y)).toBeLessThan(2);
+      expect(boxes[2]!.y).toBeGreaterThanOrEqual(boxes[0]!.y + boxes[0]!.height);
+      expect(boxes[2]!.width).toBeGreaterThan(boxes[0]!.width * 1.9);
+    } else {
+      expect(Math.max(...boxes.map(box => box!.y)) - Math.min(...boxes.map(box => box!.y))).toBeLessThan(2);
+      expect(boxes[2]!.width).toBeGreaterThanOrEqual(220);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
   await page.getByRole('button', { name: 'Built with AI' }).click();
   const chooser = page.getByRole('dialog');
+  await expect(chooser.getByText('60 coins')).toBeVisible();
+  await expect(chooser.getByText('15 credits')).toBeVisible();
+  await expect(chooser.getByText('10 credits')).toBeVisible();
   for (const width of [320, 390, 768, 1440]) {
     await page.setViewportSize({ width, height: 844 });
     const upload = await chooser.getByRole('button', { name: 'Upload Floor Plan' }).boundingBox();
@@ -51,6 +72,7 @@ test('floor plan builder stays within mobile/tablet/desktop widths and preserves
   await page.getByRole('button', { name: 'Upload Floor Plan' }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Upload your floor plan' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/ai-upload-mobile.png' });
   await dialog.getByLabel('Floor plan files').setInputFiles({ name: 'plan.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.7\n%%EOF') });
   await dialog.getByRole('button', { name: 'Analyse Floor Plan' }).click();
   await expect(dialog.getByRole('heading', { name: 'Your property analysis' })).toBeVisible();
@@ -94,6 +116,7 @@ test('floor plan builder stays within mobile/tablet/desktop widths and preserves
   await expect(dialog).not.toBeVisible();
   await expect(page.locator('#projectTitle')).toHaveValue('Preserve my manual title');
   await expect(page.getByPlaceholder('Enter or select client name')).toHaveValue('Rahul');
-  await expect(page.getByText(/AI-generated estimate — review required/)).toBeVisible();
+  await expect(page.getByText(/AI-generated estimate — rates and measurements require review/)).toBeVisible();
+  await expect(page.getByText('Provisional Total', { exact: true })).toBeVisible();
   expect(paidRequests).toBe(2);
 });

@@ -42,6 +42,14 @@ describe('floor plan quotation boundary', () => {
   it('uses detected room types for contextual scope', () => {
     expect(scopedRooms(plan, { scope: 'living-bedrooms', roomNames: brief.roomNames }).map(room => room.name)).toEqual(['Bedroom']);
   });
+  it('derives a reviewable ceiling allowance from room dimensions without using that area for wardrobes', () => {
+    const raw = proposal(); raw.sections[0].items[0].productName = 'False ceiling'; raw.sections[0].items[0].measurementStatus = 'unknown';
+    const estimate = buildEstimate(raw, plan, brief, [], fixture());
+    expect(estimate.draft.sections[0].items[0].sftArea).toBe(120);
+    expect(estimate.evidence[0].reason).toContain('12 ft × 10 ft');
+    const wardrobe = proposal(); wardrobe.sections[0].items[0].measurementStatus = 'unknown';
+    expect(buildEstimate(wardrobe, plan, brief, [], fixture()).draft.sections[0].items[0].sftArea).toBeNull();
+  });
   it('regenerates selected rooms while preserving other room edits and refreshing their rates', () => {
     const raw = proposal();
     raw.sections.push({ title: 'Kitchen', roomName: 'Kitchen', items: [{ ...raw.sections[0].items[0], productName: 'Kitchen cabinet', rateId: null }] });

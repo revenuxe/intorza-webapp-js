@@ -36,6 +36,14 @@ PDFs are rejected. The vision service also has to parse the actual document; unr
 documents fail without publishing an estimate. This is not a malware scanning service.
 No CAD upload formats are advertised.
 
+Templates and Customize share a mobile row; the AI action has its own full-width row.
+On larger screens all three actions share a row with a wider AI button. Custom SVG
+plan/document illustrations and gold coins identify the two workflows. The requested
+60-coin display and 15/10-credit labels are presentation values only: there is no wallet,
+credit ledger, balance lookup or deduction. They must be connected to server-owned
+accounting before being treated as spendable account credits. The upload screen keeps
+tips collapsed, and room details can be expanded individually.
+
 One vision request analyses the document(s), including PDF pages. Results preserve
 room type, floor label, source file/page, printed dimensions converted to feet,
 confidence and observations. Unscaled inferred dimensions are cleared. The user can
@@ -45,13 +53,52 @@ The catalogue context is capped at 60 candidates with shortened specifications; 
 rates and full provenance remain on the server. No model call is made for each form field.
 
 One structured text request proposes items. It cannot choose arbitrary prices or taxes.
-The server resolves rate references against owner-scoped approved rates, then compatible
-historical item patterns. Product names must match referenced rates. Currency/location
+The server resolves current approved rate references first, then researches missing
+rates using OpenAI Responses web search, then uses labelled recent historical rates
+where available. Product names must match referenced rates. Currency/location
 filters apply. Unknown rates/quantities stay null and totals are explicitly partial.
-Current supplier or market feeds are **not configured**, and no current-market claim
-is made. My Library → Items has an explicit approval panel; historic patterns are never
+Live research is implemented but account-specific access is not verified locally.
+My Library → Items has an explicit approval panel; historic patterns are never
 silently promoted to approved rates. Approved rates exclude GST; inclusions and verification
 date are recorded. Deactivation preserves historical evidence.
+
+### Empty-catalogue pricing
+
+`market-pricing.ts` defines a research-provider interface and an OpenAI web-search
+implementation, using the existing server-only key. Optional `OPENAI_MARKET_MODEL`
+overrides the floor-plan/text model; it must support the Responses `web_search` tool.
+`QUOTATION_MARKET_RESEARCH=openai` is the default; `disabled` stops live research.
+No separate search credential or database migration is required. The implementation
+follows https://developers.openai.com/api/docs/guides/tools-web-search .
+
+One batch researches up to 12 deduplicated product descriptions, with at most four
+search tool calls and a 45-second deadline. Research receives product specifications,
+finish, currency and city, never client name/address or the entire quotation.
+Only URLs present in completed search output can support a rate. Future,
+older-than-90-day, different-city/currency, unknown/included-tax, material-only,
+uninstalled, incompatible-unit and noncomparable rates are excluded. Square-metre
+rates normalize to sqft. Source hosts are deduplicated; a spread exceeding 3× is
+flagged rather than averaged. Otherwise the deterministic median of range midpoints
+produces an indicative rate, retaining range, publication/retrieval dates, short source
+excerpts and source links. A single usable source has low confidence. These are
+`market_estimate` records, not verified supplier quotations. No implicit markup is added.
+Undated retrieved pages can support low-confidence indicative estimates with an explicit
+unknown-publication-date warning; retrieval is never represented as price verification.
+
+Evidence is persisted in the existing owner-scoped plan estimate JSON and reused only
+within that same project for 24h with identical product specifications/currency/city;
+cache use is disclosed. New quotations request live research. Provider failures retain
+pending prices and explicit limitations. Expired approved rates are excluded from
+automatic selection after 90 days; reapprove them in My Library if still applicable.
+Historical rates older than 90 days are not used automatically.
+
+Preview/editor show pending amounts and provisional totals instead of zero for unknown
+AI amounts. Source details appear under each item and restore from the linked plan
+record after reopening. Changes to user-entered rates/quantities recalculate with the
+existing fixed-point engine; provenance is explicitly the original AI evidence, not a
+claim that edited values were externally verified. Full-room false ceiling coverage
+can use printed/user-provided room width × length as an explicitly labelled allowance.
+Cabinetry never receives floor area as a substitute for manufacturing dimensions.
 
 Existing fixed-point quotation arithmetic computes all totals. Duplicate products
 within a room and proposals outside the selected scope are rejected. All model work

@@ -60,5 +60,5 @@ it('requires an explicit review action before populating or saving a quotation',
   expect(onApply).not.toHaveBeenCalled();
   expect(screen.getByText(/Partial total/)).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Save as Draft' }));
-  expect(onApply).toHaveBeenCalledWith(estimate.draft, JSON.stringify(draftFixture()), 'project', true);
+  expect(onApply).toHaveBeenCalledWith(estimate.draft, JSON.stringify(draftFixture()), 'project', true, estimate.evidence);
 });

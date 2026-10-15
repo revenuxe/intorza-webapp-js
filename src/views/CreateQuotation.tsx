@@ -30,6 +30,8 @@ import { GalleryImage } from "@/hooks/useGallery";
 import { getLibraryTerms, getLibraryPaymentStages, getLibraryBankTemplate } from "@/lib/libraryDefaults";
 const FloorPlanQuotationBuilder = dynamic(() => import('@/components/quotation/FloorPlanQuotationBuilder').then(module => module.FloorPlanQuotationBuilder), { ssr: false });
 import type { BuilderMode } from '@/components/quotation/FloorPlanQuotationBuilder';
+import { EstimatePriceDetails } from '@/components/quotation/EstimatePriceDetails';
+import type { PriceEvidence } from '@/lib/quotation-ai/floor-plan';
 import { fromQuotation, toQuotation, lineAmount, quotationTotals, reviewDraft, draftSchema, type VoiceDraft } from "@/lib/quotation-ai/domain";
 interface LineItem {
   id: string;
@@ -62,6 +64,7 @@ const CreateQuotation = () => {
   const lastAIDraft = useRef<VoiceDraft | null>(null);
   const planProjectId = useRef<string | null>(null);
   const [saveGeneratedDraft, setSaveGeneratedDraft] = useState(false);
+  const [aiPriceEvidence, setAIPriceEvidence] = useState<Record<string, PriceEvidence | null>>({});
   const [isLoadingQuotation, setIsLoadingQuotation] = useState(false);
   const {
     requireAuth,
@@ -357,6 +360,7 @@ const CreateQuotation = () => {
   const loadQuotation = async (id: string) => {
     setIsLoadingQuotation(true);
     lastAIDraft.current = null;
+    setAIPriceEvidence({});
     planProjectId.current = null;
     clearFeedback();
     try {
@@ -445,6 +449,8 @@ const CreateQuotation = () => {
         planProjectId.current = planProject.id;
         const restored = draftSchema.safeParse((planProject.estimate as { draft?: unknown } | null)?.draft);
         if (restored.success) lastAIDraft.current = restored.data;
+        const storedEvidence = (planProject.estimate as { evidence?: { itemId: string; price: PriceEvidence | null }[] } | null)?.evidence;
+        if (Array.isArray(storedEvidence)) setAIPriceEvidence(Object.fromEntries(storedEvidence.map(row => [row.itemId, row.price])));
       }
     } catch (error) {
       console.error('Error loading quotation:', error);
@@ -560,6 +566,9 @@ const CreateQuotation = () => {
     { gstEnabled: effGstEnabled, gstRate: Number(effGstRate) || 0, discountPercentage: effDiscountPercentage, enableSocialMediaDiscount: effSocialEnabled, socialMediaDiscountRate: effSocialRate },
   );
   const socialMediaDiscountAmount = effSocialEnabled ? discountAmount : 0;
+  const isPendingAIItem = (item: LineItem) => !!lastAIDraft.current?.sections.some(section => section.items.some(row => row.id === item.id))
+    && (!(item.sftArea > 0) || (!(item.ratePerSft > 0) && !lastAIDraft.current.sections.some(section => section.items.some(row => row.id === item.id && row.ratePerSft === 0))));
+  const aiTotalPending = sections.some(section => section.items.some(isPendingAIItem));
   const getFormData = () => ({
     appliedPricing,
     sections,
@@ -777,6 +786,7 @@ const CreateQuotation = () => {
         
         setClientName("");
         lastAIDraft.current = null;
+        setAIPriceEvidence({});
         planProjectId.current = null;
         savedQuotationIdRef.current = null;
         setClientAddress("");
@@ -1071,12 +1081,9 @@ const CreateQuotation = () => {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">Create Quotation</h1>
             <p className="text-sm text-muted-foreground mt-1">Fill in the details to create a new quotation</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:shrink-0">
+          <div className="grid w-full min-w-0 grid-cols-2 items-stretch gap-2 sm:grid-cols-[auto_auto_minmax(260px,1fr)] lg:w-auto lg:shrink-0 [&>button]:h-12 [&>button]:min-w-0 [&>button]:px-3 [&>button]:text-sm" aria-label="Quotation actions">
             <QuotationTemplates onSelectTemplate={(newSections) => setSections(newSections)} currentSections={sections} onSetQuotationTitle={(title) => setProjectTitle(title)} countryCode={profile.country_code} />
             <CustomizeFieldsDrawer type="quotation" settings={customizeSettings} onSettingsChange={s => setCustomizeSettings(s as QuotationSettings)} />
-          </div>
-        </div>
-
         <FloorPlanQuotationBuilder
           mode={builderMode}
           onStart={mode => requireAuth(async () => {
@@ -1086,13 +1093,14 @@ const CreateQuotation = () => {
           getCurrentDraft={getAIDraft}
           clients={clients}
           onClose={() => setBuilderMode(null)}
-          onApply={(draft, base, projectId, saveDraft) => {
+          onApply={(draft, base, projectId, saveDraft, evidence) => {
             const existing = getAIDraft();
             if (JSON.stringify(existing) !== base) throw new Error('Your quotation changed while the estimate was being prepared. Go Back and regenerate to preserve your edits.');
             const combined = { ...draft, sections: [...existing.sections.filter(section => section.items.length || section.title.trim()), ...draft.sections] };
             const nextSections = toQuotation(combined, true);
             lastAIDraft.current = combined;
             planProjectId.current = projectId;
+            setAIPriceEvidence(current => ({ ...current, ...Object.fromEntries((evidence ?? []).map(row => [row.itemId, row.price])) }));
             setSections(nextSections);
             setProjectTitle(draft.project.projectTitle);
             setClientName(draft.project.clientName);
@@ -1108,8 +1116,10 @@ const CreateQuotation = () => {
             toast({ title: 'Estimate added to your quotation', description: 'Review the measurements and rates, then save as a draft.' });
           }}
         />
+          </div>
+        </div>
 
-        {lastAIDraft.current && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100" role="status">AI-generated estimate — review required. Check all work measurements and rates before saving or sending. Missing values contribute zero to the displayed total.</div>}
+        {lastAIDraft.current && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100" role="status">AI-generated estimate — rates and measurements require review before final confirmation. Pending items are excluded from the provisional total.</div>}
 
         {/* Project Details */}
         <Card>
@@ -1266,9 +1276,9 @@ const CreateQuotation = () => {
                           </>}
                         <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
                         <div className="h-9 flex items-center font-semibold tabular-nums">
-                          {profile.currency_symbol}{item.amount.toLocaleString(profile.locale, {
+                          {isPendingAIItem(item) ? 'Pending' : <>{profile.currency_symbol}{item.amount.toLocaleString(profile.locale, {
                       minimumFractionDigits: 2
-                    })}
+                    })}</>}
                         </div>
                       </div>
                     </div>
@@ -1330,21 +1340,22 @@ const CreateQuotation = () => {
                     <div className="space-y-1 pt-2 border-t">
                       <div className="flex justify-between">
                         <span className="text-sm font-medium">Amount:</span>
-                        <span className="font-semibold tabular-nums">{profile.currency_symbol}{item.amount.toLocaleString(profile.locale, {
+                        <span className="font-semibold tabular-nums">{isPendingAIItem(item) ? 'Pending' : <>{profile.currency_symbol}{item.amount.toLocaleString(profile.locale, {
                       minimumFractionDigits: 2
-                    })}</span>
+                    })}</>}</span>
                       </div>
                     </div>
                   </div>
+                  {Object.prototype.hasOwnProperty.call(aiPriceEvidence, item.id) && <div className="rounded-lg bg-muted/30 px-3 py-2"><EstimatePriceDetails price={aiPriceEvidence[item.id]} /><p className="mt-1 text-[11px] text-muted-foreground">Original AI price evidence. Manual rate/specification changes require your review.</p></div>}
                 </div>)}
 
               {/* Section Subtotal */}
               <div className="flex justify-between items-center pt-4 border-t border-border">
-                <span className="font-medium">Section Total</span>
+                <span className="font-medium">{section.items.some(isPendingAIItem) ? 'Provisional Section Total' : 'Section Total'}</span>
                 <span className="text-lg font-bold text-primary">
-                  {profile.currency_symbol}{section.items.reduce((sum, item) => sum + item.amount, 0).toLocaleString(profile.locale, {
+                  {section.items.some(isPendingAIItem) && section.items.every(item => item.amount === 0) ? 'Pending' : <>{profile.currency_symbol}{section.items.reduce((sum, item) => sum + item.amount, 0).toLocaleString(profile.locale, {
                 minimumFractionDigits: 2
-              })}
+              })}</>}
                 </span>
               </div>
 
@@ -1435,10 +1446,10 @@ const CreateQuotation = () => {
                 </>}
 
               {customizeSettings.showGrandTotal && <div className="flex justify-between text-lg font-bold pt-3 border-t border-border">
-                  <span>Grand Total</span>
-                  <span className="text-primary">{profile.currency_symbol}{grandTotal.toLocaleString(profile.locale, {
+                  <span>{aiTotalPending ? 'Provisional Total' : 'Grand Total'}</span>
+                  <span className="text-primary">{aiTotalPending && grandTotal === 0 ? 'Pending' : <>{profile.currency_symbol}{grandTotal.toLocaleString(profile.locale, {
                   minimumFractionDigits: 2
-                })}</span>
+                })}</>}</span>
                 </div>}
 
               {pricingDirty && <div className="mt-3 rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">

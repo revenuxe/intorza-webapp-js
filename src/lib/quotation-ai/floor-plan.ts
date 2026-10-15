@@ -34,8 +34,11 @@ export const generatedSchema = z.object({
 }).strict();
 export type PriceEvidence = {
   id: string; name: string; description: string; rate: number; unit: string;
-  source: 'approved' | 'historical'; location: string; verifiedAt: string;
+  source: 'approved' | 'historical' | 'market_estimate'; location: string; verifiedAt: string;
   currency: string; sourceUrl: string | null; inclusions: string;
+  range?: { low: number; high: number };
+  confidence?: 'low' | 'medium';
+  sources?: { name: string; url: string; publishedDate: string | null; retrievedAt: string; quote: string; specification: string; inclusions: string }[];
 };
 export type Estimate = ReturnType<typeof buildEstimate>;
 
@@ -77,11 +80,17 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
         && rate.name.trim().toLowerCase() === item.productName.trim().toLowerCase()
         && Number.isFinite(rate.rate) && rate.rate >= 0 && rate.rate <= 10000000) ?? null;
       const id = crypto.randomUUID();
+      const room = analysis.rooms.find(room => room.name === section.roomName)!;
+      // Ceiling coverage is directly related to printed/user-entered room area. Cabinetry is not.
+      const ceilingArea = /^false ceiling(?: work)?$/i.test(item.productName.trim())
+        && ['printed','user'].includes(room.source) && room.widthFt != null && room.lengthFt != null
+        ? Math.round(room.widthFt * room.lengthFt * 10000) / 10000 : null;
       // A model's interpretation is never a verified site measurement.
-      evidence.push({ itemId: id, quantityStatus: item.measurementStatus === 'measured' ? 'estimated' : item.measurementStatus, reason: item.measurementReason, price });
+      evidence.push({ itemId: id, quantityStatus: ceilingArea != null ? 'estimated' : item.measurementStatus === 'measured' ? 'estimated' : item.measurementStatus,
+        reason: ceilingArea != null ? `Full-room ceiling allowance: ${room.widthFt} ft × ${room.lengthFt} ft. Assumes complete ceiling coverage; verify cutouts and design.` : item.measurementReason, price });
       return { id, productName: price?.name ?? item.productName, productDetails: price?.description || item.description,
         side: '', measurementMode: 'direct_area' as const, widthFt: null, heightFt: null,
-        sftArea: item.measurementStatus === 'unknown' ? null : item.quantity, ratePerSft: price?.rate ?? null };
+        sftArea: ceilingArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
     }) };
   });
   const draft = draftSchema.parse({ ...base, revision: base.revision + 1,

@@ -3,11 +3,14 @@ import { POST } from './route';
 import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
+import { OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
 import { briefFixture, draftFixture, planFixture, proposalFixture } from '@/test/floor-plan-fixtures';
 
 jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }));
 jest.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: jest.fn() }));
 jest.mock('@/lib/quotation-ai/floor-plan-provider', () => ({ OpenAIFloorPlanProvider: jest.fn() }));
+jest.mock('@/lib/quotation-ai/market-pricing', () => ({ OpenAIWebMarketPricing: jest.fn() }));
+const research = jest.fn();
 const getUser = jest.fn(); const limit = jest.fn(); const analyse = jest.fn(); const generate = jest.fn();
 const upload = jest.fn(); const remove = jest.fn(); const from = jest.fn();
 const eq = jest.fn(); const insert = jest.fn();
@@ -34,8 +37,33 @@ beforeEach(() => {
   from.mockImplementation(database);
   (createClient as jest.Mock).mockReturnValue({ auth: { getUser }, from, storage: { from: () => ({ upload, remove }) } });
   (OpenAIFloorPlanProvider as jest.Mock).mockReturnValue({ analyse, generate });
+  (OpenAIWebMarketPricing as jest.Mock).mockReturnValue({ research });
+  research.mockResolvedValue({ rates: [], limitations: ['No comparable published rates found.'] });
   generate.mockResolvedValue(proposalFixture()); analyse.mockResolvedValue(planFixture());
   upload.mockResolvedValue({ error: null }); remove.mockResolvedValue({ error: null });
+});
+it('automatically prices an empty catalogue using retrieved market evidence', async () => {
+  research.mockResolvedValueOnce({ rates: [{ id: 'market-1', name: 'Wardrobe', description: 'Proposed wardrobe', rate: 1300, unit: 'sqft', currency: 'INR', location: 'Bengaluru', source: 'market_estimate', verifiedAt: '2026-10-15', sourceUrl: 'https://supplier.example/rates', inclusions: 'Installed, excluding GST' }], limitations: [] });
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.draft.sections[0].items[0].ratePerSft).toBe(1300);
+  expect(result.estimate.totals.subtotal).toBe(72800);
+  expect(result.estimate.incomplete).toBe(false);
+});
+it('preserves an editable pending estimate when research fails', async () => {
+  research.mockRejectedValueOnce(new Error('timeout'));
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.draft.sections[0].items[0].ratePerSft).toBeNull();
+  expect(result.estimate.assumptions.join()).toContain('unavailable');
+});
+it('does not search when the city is unknown', async () => {
+  const input = payload(); input.brief.location = 'Unknown';
+  const response = await POST(request(input));
+  expect(response.status).toBe(200); expect(research).not.toHaveBeenCalled();
+  expect((await response.json()).estimate.assumptions.join()).toContain('city is unknown');
 });
 it('requires a valid user before touching storage, data or provider', async () => {
   expect((await POST(request(payload(), false))).status).toBe(401);
