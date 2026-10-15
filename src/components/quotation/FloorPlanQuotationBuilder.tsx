@@ -48,6 +48,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const [step, setStep] = useState<Step>(mode === 'details' ? 'analysis' : 'upload');
   const [files, setFiles] = useState<File[]>([]);
   const [analysis, setAnalysis] = useState<PlanAnalysis>(emptyAnalysis);
+  const [homeType, setHomeType] = useState<'Studio' | '1 BHK' | '2 BHK' | '3 BHK' | '4 BHK'>('2 BHK');
   const [brief, setBrief] = useState<ProjectBrief>({ scope: 'complete', roomNames: [], finish: 'Standard', budget: null, clientName: '', location: '', address: '' });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<Estimate | null>(null);
@@ -69,6 +70,16 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const busyBanner = useRef<HTMLDivElement>(null);
   const errorBanner = useRef<HTMLParagraphElement>(null);
+  const detailPlan = (type: typeof homeType): PlanAnalysis => {
+    const bedrooms = type === 'Studio' ? 0 : Number(type[0]);
+    const kinds: PlanAnalysis['rooms'][number]['kind'][] = ['living', 'kitchen', ...Array.from({ length: bedrooms }, () => 'bedroom' as const), ...Array.from({ length: Math.max(1, bedrooms) }, () => 'bathroom' as const), ...(bedrooms >= 2 ? ['dining' as const] : [])];
+    const labels: Record<PlanAnalysis['rooms'][number]['kind'], string> = { living: 'Living room', kitchen: 'Kitchen', bedroom: 'Bedroom', bathroom: 'Bathroom', dining: 'Dining room', balcony: 'Balcony', utility: 'Utility', study: 'Study', other: 'Room' };
+    const count: Record<string, number> = {};
+    return { propertyType: `${type} residential interior`, floors: 1, units: 'Not supplied', scale: 'Not supplied', warnings: ['Room dimensions were not supplied. The AI uses conservative work-face allowances that remain editable.'], rooms: kinds.map((kind, index) => {
+      count[kind] = (count[kind] ?? 0) + 1;
+      return { name: `${labels[kind]}${['bedroom', 'bathroom'].includes(kind) ? ` ${count[kind]}` : ''}`, kind, floor: '1', widthFt: null, lengthFt: null, source: 'unknown', confidence: 'medium', file: 'Home type selected', page: index + 1, notes: '' };
+    }) };
+  };
   useEffect(() => {
     if (!mode) return;
     const frame = requestAnimationFrame(() => {
@@ -140,12 +151,12 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     abort.current = () => controller.abort();
     try {
       const draft = getCurrentDraft();
-      if (mode === 'upload' && !brief.measurementInputUnit) throw new Error('Choose Sqft, Feet, Square metres or Metres before generating.');
+      if (!brief.measurementInputUnit) throw new Error('Choose Sqft, Feet, Square metres or Metres before generating.');
       if ((selected || retryPricing) && JSON.stringify(draft) !== base.current) throw new Error('The editor changed. Go Back and generate a new estimate to preserve your edits.');
       base.current = JSON.stringify(draft);
       const response = await fetch('/api/quotation-ai/floor-plan', { method: 'POST', signal: controller.signal,
         headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: retryPricing ? 'retry_pricing' : 'generate', projectId, analysis, brief: mode === 'upload' ? { ...brief, automatic: true, location: brief.location.trim() || 'Unknown', roomWork: undefined } : brief, draft, ...(selected ? { regenerateRooms: selected } : {}) }) });
+        body: JSON.stringify({ action: retryPricing ? 'retry_pricing' : 'generate', projectId, analysis, brief: { ...brief, automatic: true, location: brief.location.trim() || 'Unknown', roomWork: undefined }, draft, ...(selected ? { regenerateRooms: selected } : {}) }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Could not generate an estimate.');
       if (body.measurementSystem === 'imperial') onMeasurementSystemChange?.();
@@ -173,6 +184,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     setInvalidWorkKey('');
     setValidationAttempt(value => value + 1);
     if (step === 'analysis') {
+      if (mode === 'details') { const selectedPlan = detailPlan(homeType); setAnalysis(selectedPlan); setBrief(value => ({ ...value, roomNames: selectedPlan.rooms.map(room => room.name), roomWork: undefined })); setStep('scope'); return; }
       if (!analysis.rooms.length || analysis.rooms.some(room => !room.name.trim()) || new Set(analysis.rooms.map(room => room.name)).size !== analysis.rooms.length) { setError('Add at least one room, with a different name for each room.'); return; }
       setBrief(value => ({ ...value, roomNames: analysis.rooms.map(room => room.name) })); setStep('scope');
     } else if (step === 'scope') {
@@ -230,7 +242,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         <DialogHeader className="shrink-0 border-b px-5 pb-4 pt-6 text-left sm:px-6">
           <p className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-primary"><BuilderMark className="h-4 w-4" />Intorza Studio</p>
           <DialogTitle ref={stepHeading} tabIndex={-1} className="pr-5 text-xl leading-7 outline-none">{step === 'work' ? `Plan your ${scopedRooms(analysis, brief)[workRoomIndex]?.name || 'room'} interior` : titles[step]}</DialogTitle>
-          <DialogDescription className="text-sm leading-6">{step === 'upload' ? 'Add your drawing. Review the rooms. Build your estimate.' : step === 'estimate' ? 'AI-generated estimate — review required. You control what is saved and shared.' : mode === 'upload' ? 'Upload your plan. Choose the scope. Get an editable quotation.' : 'A few simple steps. Every detail stays editable.'}</DialogDescription>
+          <DialogDescription className="text-sm leading-6">{step === 'upload' ? 'Add your drawing. Review the rooms. Build your estimate.' : step === 'analysis' && mode === 'details' ? 'Choose your home size, then explain exactly what the customer needs.' : step === 'estimate' ? 'AI-generated estimate — review required. You control what is saved and shared.' : 'Choose the scope, explain the requirements, and get an editable quotation.'}</DialogDescription>
           {step !== 'upload' && mode !== 'upload' && <div className="!mt-4 flex gap-1.5" aria-label={`Step ${groups + 1} of 4`}>{['Property', 'Scope', 'Client', 'Review'].map((name, index) => <div key={name} className="min-w-0 flex-1"><div className={`h-1 rounded-full ${index <= groups ? 'bg-primary' : 'bg-muted'}`} /><span className="mt-1 block text-[11px] text-muted-foreground">{name}</span></div>)}</div>}
         </DialogHeader>
         {busy && <div ref={busyBanner} tabIndex={-1} role="status" aria-live="polite" className="shrink-0 space-y-2 border-b bg-primary/5 px-5 py-3 outline-none sm:px-6"><div className="flex items-center gap-2 text-sm font-medium"><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{busy}</div>{step === 'upload' && <progress aria-label="Upload progress" value={progress} max={100} className="h-1.5 w-full accent-primary" />}</div>}
@@ -246,7 +258,10 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
             <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground"><span className="flex items-center gap-1.5"><LockKeyhole className="h-3.5 w-3.5 shrink-0" />Private & secure</span><span className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300"><GoldCoin className="h-3.5 w-3.5" />{creditDisplay.upload} credits</span></div>
             <details className="text-xs leading-5 text-muted-foreground"><summary className="cursor-pointer">What makes a good upload?</summary><p className="mt-2">Use a clear drawing with readable room labels and dimensions. Multi-page PDFs are supported. You can check and correct every room after analysis.</p></details>
           </>}
-          {step === 'analysis' && <>
+          {step === 'analysis' && mode === 'details' ? <>
+            <section className="rounded-2xl border border-primary/15 bg-primary/[0.035] p-4"><p className="text-sm font-semibold">What kind of home is this?</p><p className="mt-1 text-xs leading-5 text-muted-foreground">Choose the layout. We create the usual rooms automatically, then you choose the quotation scope.</p><div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">{(['Studio', '1 BHK', '2 BHK', '3 BHK', '4 BHK'] as const).map(type => <button key={type} type="button" aria-pressed={homeType === type} onClick={() => setHomeType(type)} className={`rounded-xl border p-3 text-left text-sm font-semibold transition-colors ${homeType === type ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'bg-card hover:border-primary/35'}`}>{type}</button>)}</div></section>
+            <p className="rounded-xl bg-muted/50 p-3 text-xs leading-5 text-muted-foreground">No room-by-room form is needed. You can describe special spaces, furniture, exclusions and finish preferences in the next step.</p>
+          </> : step === 'analysis' && <>
             <div className="grid grid-cols-2 gap-3"><label className="col-span-2 space-y-1 text-sm">Property type<Input value={analysis.propertyType} onChange={event => setAnalysis(current => ({ ...current, propertyType: event.target.value }))} maxLength={150} /></label><label className="space-y-1 text-sm">Floors<Input type="number" min="1" max="30" placeholder="Unknown" value={analysis.floors ?? ''} onChange={event => setAnalysis(current => ({ ...current, floors: event.target.value ? Math.max(1, Math.min(30, Number(event.target.value))) : null }))} /></label><div className="self-end rounded-lg bg-muted p-2 text-xs text-muted-foreground">{analysis.rooms.length} rooms<br />{analysis.units}</div></div>
             {!!analysis.warnings.length && <details className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:bg-amber-950 dark:text-amber-100"><summary className="cursor-pointer font-medium">{analysis.warnings.length} measurement note{analysis.warnings.length === 1 ? '' : 's'} to review</summary><ul className="mt-2 max-h-40 list-disc space-y-1 overflow-y-auto pl-4">{analysis.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></details>}
             {analysis.rooms.length > 0 && <p className="text-xs text-muted-foreground">Check each room. Open a room to edit its details.</p>}
@@ -260,8 +275,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
             </details>)}
             <Button variant="outline" type="button" className="w-full gap-2" disabled={analysis.rooms.length >= 40} onClick={() => setAnalysis(current => ({ ...current, rooms: [...current.rooms, { name: `Room ${current.rooms.length + 1}`, kind: 'other', floor: '1', widthFt: null, lengthFt: null, source: 'user', confidence: 'high', file: '', page: 1, notes: '' }] }))}><Plus className="h-4 w-4" />Add room</Button>
           </>}
-          {step === 'scope' && mode === 'upload' && <QuickPlanScope analysis={analysis} brief={brief} onChange={setBrief} />}
-          {step === 'scope' && mode !== 'upload' && <PlanScopeQuestions analysis={analysis} brief={brief} wholePlan={wholePlan} scopes={scopes} onWholePlan={setWholePlan} onChange={setBrief} />}
+          {step === 'scope' && <QuickPlanScope analysis={analysis} brief={brief} onChange={setBrief} />}
           {step === 'work' && scopedRooms(analysis, brief)[workRoomIndex] && <>
             <p className="text-xs font-medium text-primary">Room {workRoomIndex + 1} of {scopedRooms(analysis, brief).length} · {scopedRooms(analysis, brief)[workRoomIndex].name}</p>
             <RoomWorkQuestions room={scopedRooms(analysis, brief)[workRoomIndex]} brief={brief} onChange={answer => setBrief(current => ({ ...current, roomWork: [...(current.roomWork ?? []).filter(row => row.roomName !== answer.roomName), answer] }))} />
@@ -287,7 +301,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
           {error && <p ref={errorBanner} tabIndex={-1} role="alert" className="w-full rounded-xl bg-destructive/10 p-3 text-sm leading-6 text-destructive outline-none">{error}</p>}
           {busy ? <Button variant="outline" type="button" onClick={() => abort.current?.()}>Cancel request</Button> : <>
             <Button variant="outline" type="button" onClick={step === 'upload' || step === 'analysis' && mode === 'details' ? onClose : back}><ArrowLeft className="mr-1 h-4 w-4" />{step === 'upload' || step === 'analysis' && mode === 'details' ? 'Cancel' : 'Back'}</Button>
-            {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'scope' && mode === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!scopedRooms(analysis, brief).length || !brief.measurementInputUnit} onClick={() => void generate()}>Generate Quotation<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'review' ? <Button type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>
+            {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'scope' ? <Button type="button" className="min-w-0 flex-1" disabled={!scopedRooms(analysis, brief).length || !brief.measurementInputUnit} onClick={() => void generate()}>Generate Quotation<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'review' ? <Button type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>
               <Button type="button" variant="outline" className="min-w-0 flex-1" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, false, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not apply the estimate.'); } }}>Edit Quotation</Button>
               <Button type="button" className="w-full sm:w-auto" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, true, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not save the estimate.'); } }}>Save as Draft</Button>
             </> : <Button type="button" className="min-w-0 flex-1" onClick={next}>Continue<ArrowRight className="ml-1 h-4 w-4" /></Button>}
