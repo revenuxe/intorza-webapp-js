@@ -111,6 +111,14 @@ export function scopedRooms(analysis: PlanAnalysis, brief: Pick<ProjectBrief, 's
   ));
 }
 
+function conciseProductDetails(value: string, fallback: string) {
+  const clean = value.replace(/\s+/g, ' ').replace(/\b(?:pricing specification|provisional reference price)\b[\s\S]*/i, '').trim();
+  if (!clean) return `${fallback} as per the selected design.`;
+  const first = clean.split(/(?<=[.!?])\s+|\n/)[0].trim();
+  if (first.length <= 180) return first;
+  return `${first.slice(0, 177).replace(/\s+\S*$/, '').trim()}…`;
+}
+
 type AutomaticAllowance = { area: number; reason: string };
 /**
  * Fast-upload estimates need a useful first total. These are intentionally
@@ -179,11 +187,8 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
       // A model's interpretation is never a verified site measurement.
       evidence.push({ itemId: id, quantityStatus: work && item.quantity != null ? 'user_entered' : ceilingArea != null || autoArea != null ? 'estimated' : item.measurementStatus === 'measured' ? 'estimated' : item.measurementStatus,
         reason: ceilingArea != null ? `Full-room ceiling allowance: ${room.widthFt} ft × ${room.lengthFt} ft. Assumes complete ceiling coverage; verify cutouts and design.` : autoReason ?? item.measurementReason, price });
-      const details = [item.description,
-        price && !price.match && normalizeReferenceText(price.description) !== normalizeReferenceText(item.description) ? `Pricing specification: ${price.description}` : '',
-        price?.basisWarnings?.length ? `Provisional reference price. ${price.basisWarnings.join(' ')}` : '',
-      ].filter(Boolean).join('\n');
-      return { id, productName: price?.name ?? item.productName, productDetails: details.slice(0, 1000),
+      const productName = price?.name ?? item.productName;
+      return { id, productName, productDetails: conciseProductDetails(item.description, productName),
         side: '', measurementMode: 'direct_area' as const, widthFt: null, heightFt: null,
         sftArea: explicitDimensions ? Math.round(work.widthFt * work.heightFt * 10000) / 10000 : ceilingArea ?? autoArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
     }) };

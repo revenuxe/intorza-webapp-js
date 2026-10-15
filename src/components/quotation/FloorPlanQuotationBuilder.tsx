@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, FileText, Loader2, LockKeyhole, Plus, Trash2, UploadCloud } from 'lucide-react';
 import { BuilderArtwork, BuilderMark, GoldCoin } from './AIBuilderVisuals';
-import { EstimatePriceDetails } from './EstimatePriceDetails';
+import { FloorPlanEstimateOverview } from './FloorPlanEstimateOverview';
 import { CompleteEstimate } from './CompleteEstimate';
 import { RoomWorkQuestions } from './RoomWorkQuestions';
 import { QuickPlanScope } from './QuickPlanScope';
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ClientSelector } from './ClientSelector';
 import { supabase } from '@/integrations/supabase/client';
 import { MAX_PLAN_BYTES, MAX_PLAN_FILES, scopedRooms, type PlanAnalysis, type ProjectBrief, type Estimate } from '@/lib/quotation-ai/floor-plan';
-import { itemCalculation, type VoiceDraft } from '@/lib/quotation-ai/domain';
+import { type VoiceDraft } from '@/lib/quotation-ai/domain';
 
 export type BuilderMode = 'upload' | 'details';
 type Props = {
@@ -277,7 +277,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
             <CompleteEstimate estimate={estimate} disabled={!!busy} inputUnit={brief.measurementInputUnit} onComplete={complete} onRetry={() => void generate(undefined, true)} />
             {estimate.assumptions.some(note => /Pricing search|Live market research|no recent comparable|conflict|city is unknown/.test(note)) && <details className="min-w-0 rounded-xl border p-3 text-xs leading-5"><summary className="cursor-pointer font-medium">Why some prices are missing</summary><ul className="mt-2 list-disc space-y-1 pl-4">{estimate.assumptions.filter(note => /Pricing search|Live market research|no recent comparable|conflict|city is unknown/.test(note)).map((note, index) => <li key={index}>{note}</li>)}</ul></details>}
             <div className="rounded-xl bg-primary/5 p-4"><p className="text-xs font-medium text-primary">AI-generated estimate · rates and measurements require review</p><p className="mt-1 text-2xl font-semibold">{estimate.incomplete && estimate.totals.total === 0 ? 'Estimate pending' : estimate.totals.total.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-xs font-normal text-muted-foreground">{estimate.evidence.find(item => item.price)?.price?.currency || ''}</span></p><p className="mt-1 text-xs text-muted-foreground">{estimate.incomplete ? 'Partial total: excludes items with missing quantity or rate.' : 'Includes your existing tax and discount settings.'}</p></div>
-            {estimate.draft.sections.map(section => <div key={section.id} className="min-w-0 overflow-hidden rounded-xl border"><h3 className="border-b bg-muted/40 px-3 py-2 text-sm font-semibold">{section.title}</h3>{section.items.map(item => { const evidence = estimate.evidence.find(row => row.itemId === item.id); const amount = itemCalculation(item); return <div key={item.id} className="min-w-0 space-y-1 break-words border-b p-3 last:border-0"><p className="text-sm font-medium">{item.productName}</p><p className="text-xs leading-5 text-muted-foreground">{item.productDetails}</p><p className="text-sm">{amount.area ?? '?'} sqft × {item.ratePerSft ?? '?'} = {amount.cents == null ? 'Pending' : (Number(amount.cents) / 100).toLocaleString()}</p><p className="text-xs text-muted-foreground">{evidence?.quantityStatus === 'unknown' ? 'Requires measurement' : evidence?.quantityStatus === 'user_entered' ? 'Measurement entered by you' : `${evidence?.quantityStatus} quantity`}</p>{evidence?.reason && <p className="text-xs text-muted-foreground">{evidence.reason}</p>}<EstimatePriceDetails price={evidence?.price ?? null} /></div>; })}</div>)}
+            <FloorPlanEstimateOverview estimate={estimate} />
             <details className="rounded-xl border p-3 text-xs leading-5"><summary className="cursor-pointer font-medium">Assumptions & exclusions</summary><ul className="mt-2 list-disc space-y-1 pl-4">{estimate.assumptions.map((assumption, index) => <li key={index}>{assumption}</li>)}</ul></details>
             <details className="rounded-xl border p-3 text-sm"><summary className="cursor-pointer font-medium">Refine this estimate</summary><fieldset className="mt-3 space-y-2"><legend className="mb-2 text-xs text-muted-foreground">Select rooms to regenerate. Other rooms stay in this estimate.</legend>{[...new Set(estimate.roomSections.map(row => row.roomName))].map(name => <label key={name} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={regenerateRooms.includes(name)} onChange={event => setRegenerateRooms(current => event.target.checked ? [...current, name] : current.filter(room => room !== name))} />{name}</label>)}</fieldset><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" disabled={!regenerateRooms.length || !!busy} onClick={() => void generate(regenerateRooms)}>Regenerate selected items</Button><Button type="button" size="sm" variant="ghost" disabled={!!busy} onClick={() => setStep('details')}>Edit Project Details</Button></div></details>
             <p className="text-xs text-muted-foreground">Open the editor to adjust products, measurements and rates, then use Save as Draft. Nothing is sent automatically.</p>
