@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { buildEstimate, completeEstimate, estimateCompletionSchema, mergeRoomEstimates, detectPlanType, scopedRooms, MAX_PLAN_BYTES, type PlanAnalysis, type PriceEvidence, type ProjectBrief } from './floor-plan';
+import { automaticWorkFaceAllowance, buildEstimate, completeEstimate, estimateCompletionSchema, mergeRoomEstimates, detectPlanType, scopedRooms, MAX_PLAN_BYTES, type PlanAnalysis, type PriceEvidence, type ProjectBrief } from './floor-plan';
 import { draftFixture as fixture } from '@/test/floor-plan-fixtures';
 
 export const plan: PlanAnalysis = { propertyType: 'Apartment', floors: 1, units: 'Feet', scale: 'Unknown', warnings: [], rooms: [
@@ -67,6 +67,23 @@ describe('floor plan quotation boundary', () => {
     expect(estimate.evidence[0].reason).toContain('12 ft × 10 ft');
     const wardrobe = proposal(); wardrobe.sections[0].items[0].measurementStatus = 'unknown';
     expect(buildEstimate(wardrobe, plan, brief, [], fixture()).draft.sections[0].items[0].sftArea).toBeNull();
+  });
+  it('creates bounded work-face allowances for fast upload and replaces an implausible model wardrobe area', () => {
+    const automatic = { ...brief, automatic: true };
+    expect(automaticWorkFaceAllowance(plan.rooms[0], 'Wardrobe')).toMatchObject({ area: 84 });
+    const raw = proposal();
+    Object.assign(raw.sections[0].items[0], { quantity: 300, measurementStatus: 'estimated' });
+    const result = buildEstimate(raw, plan, automatic, [rate], fixture());
+    expect(result.draft.sections[0].items[0]).toMatchObject({ sftArea: 84, ratePerSft: 1200 });
+    expect(result.evidence[0]).toMatchObject({ quantityStatus: 'estimated' });
+    expect(result.evidence[0].reason).toContain('AI-estimated wardrobe work face');
+  });
+  it('keeps a plausible automatic model work-face estimate when it is within the room-based range', () => {
+    const automatic = { ...brief, automatic: true };
+    const raw = proposal(); Object.assign(raw.sections[0].items[0], { quantity: 56, measurementStatus: 'estimated' });
+    const result = buildEstimate(raw, plan, automatic, [rate], fixture());
+    expect(result.draft.sections[0].items[0].sftArea).toBe(56);
+    expect(result.evidence[0].reason).toContain('AI-estimated work coverage');
   });
   it('regenerates selected rooms while preserving other room edits and refreshing their rates', () => {
     const raw = proposal();

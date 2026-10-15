@@ -111,6 +111,35 @@ export function scopedRooms(analysis: PlanAnalysis, brief: Pick<ProjectBrief, 's
   ));
 }
 
+type AutomaticAllowance = { area: number; reason: string };
+/**
+ * Fast-upload estimates need a useful first total. These are intentionally
+ * conservative work-face allowances, never floor areas, and are labelled for
+ * review. A customer-entered room-work choice always takes precedence.
+ */
+export function automaticWorkFaceAllowance(room: PlanAnalysis['rooms'][number], productName: string): AutomaticAllowance | null {
+  if (!['printed', 'user'].includes(room.source) || room.widthFt == null || room.lengthFt == null) return null;
+  const wall = Math.max(room.widthFt, room.lengthFt);
+  const product = referenceProduct(productName);
+  const coverage = (length: number, height: number, label: string) => ({
+    area: Math.round(length * height * 10000) / 10000,
+    reason: `AI-estimated ${label}: ${length} ft × ${height} ft from the room's longest ${wall} ft wall. Editable; verify on site.`,
+  });
+  if (product === 'wardrobe') return coverage(Math.min(wall, 14), 7, 'wardrobe work face');
+  if (product === 'tv unit') return coverage(Math.min(wall, 6), 7, 'TV-unit work face');
+  if (product === 'kitchen base cabinets') return coverage(Math.min(wall, 12), 2.5, 'base-cabinet work face');
+  if (product === 'kitchen wall cabinets') return coverage(Math.min(wall, 12), 1.5, 'wall-cabinet work face');
+  if (product === 'kitchen tall unit') return coverage(Math.min(wall, 8), 7, 'tall-unit work face');
+  if (product === 'bed back panelling') return coverage(Math.min(wall, 8), 4, 'bed-back panelling');
+  if (product === 'study storage' || product === 'bookshelf') return coverage(Math.min(wall, 8), 7, 'storage work face');
+  if (product === 'kitchen countertop') return coverage(Math.min(wall, 12), 2, 'countertop coverage');
+  if (product === 'kitchen backsplash') return coverage(Math.min(wall, 12), 2, 'backsplash coverage');
+  if (product === 'wall panelling') return coverage(Math.min(wall, 10), 4, 'wall-panelling coverage');
+  if (product === 'shoe storage') return coverage(Math.min(wall, 5), 4, 'shoe-storage work face');
+  if (product === 'loft storage') return coverage(Math.min(wall, 10), 2, 'loft work face');
+  return null;
+}
+
 /** The model cannot set rates, taxes, totals or access another business's pricing. */
 export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: ProjectBrief, rates: PriceEvidence[], base: VoiceDraft) {
   const proposal = generatedSchema.parse(raw);
@@ -136,16 +165,26 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
       const ceilingArea = !workAnswer && /^false ceiling(?: work)?$/i.test(normalizeReferenceText(item.productName))
         && ['printed','user'].includes(room.source) && room.widthFt != null && room.lengthFt != null
         ? Math.round(room.widthFt * room.lengthFt * 10000) / 10000 : null;
+      const automaticAllowance = !workAnswer && brief.automatic ? automaticWorkFaceAllowance(room, item.productName) : null;
+      // Retain a plausible model estimate in quick-upload mode, but replace an
+      // implausible one (for example a 300 sqft wardrobe) with a bounded
+      // room-based work-face allowance.
+      const modelEstimate = item.measurementStatus === 'estimated' && item.quantity != null
+        && (!automaticAllowance || (item.quantity >= automaticAllowance.area * 0.35 && item.quantity <= automaticAllowance.area * 1.3))
+        ? item.quantity : null;
+      const autoArea = automaticAllowance && modelEstimate == null ? automaticAllowance.area : modelEstimate;
+      const autoReason = automaticAllowance && modelEstimate == null ? automaticAllowance.reason
+        : modelEstimate != null ? `AI-estimated work coverage: ${modelEstimate} sqft. Editable; verify on site.` : null;
       // A model's interpretation is never a verified site measurement.
-      evidence.push({ itemId: id, quantityStatus: work && item.quantity != null ? 'user_entered' : ceilingArea != null ? 'estimated' : item.measurementStatus === 'measured' ? 'estimated' : item.measurementStatus,
-        reason: ceilingArea != null ? `Full-room ceiling allowance: ${room.widthFt} ft × ${room.lengthFt} ft. Assumes complete ceiling coverage; verify cutouts and design.` : item.measurementReason, price });
+      evidence.push({ itemId: id, quantityStatus: work && item.quantity != null ? 'user_entered' : ceilingArea != null || autoArea != null ? 'estimated' : item.measurementStatus === 'measured' ? 'estimated' : item.measurementStatus,
+        reason: ceilingArea != null ? `Full-room ceiling allowance: ${room.widthFt} ft × ${room.lengthFt} ft. Assumes complete ceiling coverage; verify cutouts and design.` : autoReason ?? item.measurementReason, price });
       const details = [item.description,
         price && !price.match && normalizeReferenceText(price.description) !== normalizeReferenceText(item.description) ? `Pricing specification: ${price.description}` : '',
         price?.basisWarnings?.length ? `Provisional reference price. ${price.basisWarnings.join(' ')}` : '',
       ].filter(Boolean).join('\n');
       return { id, productName: price?.name ?? item.productName, productDetails: details.slice(0, 1000),
         side: '', measurementMode: 'direct_area' as const, widthFt: null, heightFt: null,
-        sftArea: explicitDimensions ? Math.round(work.widthFt * work.heightFt * 10000) / 10000 : ceilingArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
+        sftArea: explicitDimensions ? Math.round(work.widthFt * work.heightFt * 10000) / 10000 : ceilingArea ?? autoArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
     }) };
   });
   const draft = draftSchema.parse({ ...base, revision: base.revision + 1,
