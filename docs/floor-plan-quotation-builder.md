@@ -9,7 +9,8 @@ The existing text AI turn endpoint, audit data, auth, Worker and quotation edito
 1. Apply `supabase/migrations/20261015160000_floor_plan_quotation_builder.sql` using the
    existing reviewed Supabase migration process. It creates a private storage bucket,
    owner-scoped analysis/estimate records and approved selling rates. This migration
-   has **not** been applied by this implementation task.
+   was applied to the linked project on 2026-10-15 and verified with rollback-only
+   owner/cross-user tests. See [the rollout record](./floor-plan-database-rollout-2026-10-15.md).
 2. Keep `OPENAI_API_KEY` in Cloudflare runtime secrets. Set
    `OPENAI_FLOOR_PLAN_MODEL` to a vision-capable Responses model available to that
    API project, or use the existing `OPENAI_MODEL` fallback. No new model ID is hardcoded.

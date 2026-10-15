@@ -40,5 +40,7 @@ alter table public.quotation_approved_rates enable row level security;
 create policy "Owners manage approved rates" on public.quotation_approved_rates for all to authenticated
 using(user_id=auth.uid()) with check(user_id=auth.uid());
 create index quotation_approved_rates_owner on public.quotation_approved_rates(user_id) where active;
-revoke all on public.quotation_plan_projects, public.quotation_approved_rates from anon;
+-- Supabase's default ACL can grant TRUNCATE/TRIGGER/REFERENCES to browser roles.
+-- Reset inherited defaults before granting only the required data operations.
+revoke all on public.quotation_plan_projects, public.quotation_approved_rates from public, anon, authenticated;
 grant select, insert, update, delete on public.quotation_plan_projects, public.quotation_approved_rates to authenticated;
