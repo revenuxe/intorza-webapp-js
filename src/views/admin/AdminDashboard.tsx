@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { TechStackDialog } from "@/components/TechStackDialog";
+import { AITrainingPanel } from '@/components/admin/AITrainingPanel';
 
 interface User {
   id: string;
@@ -751,6 +752,7 @@ const AdminDashboard = () => {
         <Tabs defaultValue="users" className="space-y-3">
           <div className="overflow-x-auto -mx-3 px-3">
             <TabsList className="inline-flex h-auto gap-1 p-1 w-max">
+              <TabsTrigger value="ai" className="text-xs sm:text-sm px-2 sm:px-3">AI</TabsTrigger>
               <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3">Users</TabsTrigger>
               <TabsTrigger value="companies" className="text-xs sm:text-sm px-2 sm:px-3">Companies</TabsTrigger>
               <TabsTrigger value="billing" className="text-xs sm:text-sm px-2 sm:px-3">Billing</TabsTrigger>
@@ -762,6 +764,7 @@ const AdminDashboard = () => {
             </TabsList>
           </div>
 
+          <TabsContent value="ai" className="space-y-4"><AITrainingPanel /></TabsContent>
           <TabsContent value="users" className="space-y-4">
             <Card>
               <CardHeader className="p-3 sm:p-6">

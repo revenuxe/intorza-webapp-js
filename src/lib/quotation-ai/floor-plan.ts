@@ -34,7 +34,7 @@ export const generatedSchema = z.object({
 }).strict();
 export type PriceEvidence = {
   id: string; name: string; description: string; rate: number; unit: string;
-  source: 'approved' | 'historical' | 'market_estimate'; location: string; verifiedAt: string;
+  source: 'approved' | 'historical' | 'market_estimate' | 'admin_reference'; location: string; verifiedAt: string;
   currency: string; sourceUrl: string | null; inclusions: string;
   range?: { low: number; high: number };
   confidence?: 'low' | 'medium';

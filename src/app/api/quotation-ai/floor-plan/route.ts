@@ -87,10 +87,12 @@ export async function POST(request: Request) {
     }
     if (regenerateRooms && (!previousEstimate || regenerateRooms.some(name => !scopedRooms(analysis, brief).some(room => room.name === name)))) return json({ error: 'Select rooms from the current estimate to regenerate.' }, 400);
     // RLS and an explicit owner filter both apply. Pattern rates are historical, never approved.
-    const [approved, history, profile] = await Promise.all([
+    const [approved, history, profile, references] = await Promise.all([
       db.from('quotation_approved_rates').select('*').eq('user_id', user.id).eq('active', true).limit(100),
       db.from('item_usage_patterns').select('*').eq('user_id', user.id).order('last_used_at', { ascending: false }).limit(60),
       db.from('profiles').select('currency_code,country_code,measurement_system').eq('id', user.id).single(),
+      db.from('ai_training_patterns').select('id,section,product_name,material,specification,unit,rate,tax,installation_included,location,currency,price_date,source_page,notes,project_type')
+        .eq('approved', true).eq('location', brief.location).order('price_date', { ascending: false }).limit(60),
     ]);
     if (approved.error || history.error || profile.error) throw new Error('Could not load your pricing data. Check the floor plan database migration.');
     if (profile.data?.measurement_system === 'metric') return json({ error: 'This builder currently uses square-foot billing. Switch the quotation measurement setting to imperial before generating an estimate.' }, 422);
@@ -100,6 +102,20 @@ export async function POST(request: Request) {
       currency: String(row.currency), location: String(row.location).slice(0, 150), verifiedAt: String(row.verified_at), sourceUrl: row.source_url ? String(row.source_url).slice(0, 2000) : null, inclusions: String(row.inclusions).slice(0, 600),
     })).filter(rate => rate.currency === currency && rate.unit === 'sqft' && Number.isFinite(rate.rate) && rate.rate >= 0 && rate.rate <= 10000000 && (!rate.location || rate.location.toLowerCase() === brief.location.toLowerCase())
       && Date.now() >= Date.parse(rate.verifiedAt) && Date.now() - Date.parse(rate.verifiedAt) <= 90 * 86400000);
+    const patternContext: { section: string; product: string; material: string; specification: string }[] = [];
+    // Only admin-reviewed, anonymized global records are visible through this table's RLS.
+    if (!references.error) for (const row of references.data ?? []) {
+      if (row.currency !== currency) continue;
+      patternContext.push({ section: String(row.section).slice(0, 150), product: String(row.product_name).slice(0, 150), material: String(row.material).slice(0, 300), specification: String(row.specification).slice(0, 600) });
+      const date = Date.parse(row.price_date);
+      if (row.rate == null || !Number.isFinite(Number(row.rate)) || Number(row.rate) < 0 || row.tax !== 'excluded' || !row.installation_included
+        || !['sqft','sqm'].includes(row.unit) || !Number.isFinite(date) || date > Date.now() || Date.now() - date > 90 * 86400000
+        || rates.some(rate => rate.name.toLowerCase() === String(row.product_name).toLowerCase())) continue;
+      rates.push({ id: row.id, name: String(row.product_name).slice(0, 150), description: `${row.material}. ${row.specification}`.slice(0, 1000),
+        rate: Math.round(Number(row.rate) / (row.unit === 'sqm' ? 10.7639104167 : 1) * 100) / 100, unit: 'sqft', source: 'admin_reference',
+        currency, location: row.location, verifiedAt: row.price_date, sourceUrl: null,
+        inclusions: `Admin-reviewed quotation reference, page ${row.source_page}; not a live supplier quote. GST excluded, installation included. ${row.notes}`.slice(0, 600) });
+    }
     const approvedIds = new Set(rates.map(rate => rate.id));
     for (const row of history.data ?? []) {
       const rate = row.preferred_rate ?? row.default_rate;
@@ -110,8 +126,9 @@ export async function POST(request: Request) {
     const requestedBrief = regenerateRooms ? { ...brief, roomNames: regenerateRooms } : brief;
     // Bound context cost. Full evidence remains server-side; the model only needs matching specifications and IDs.
     const rateContext = rates.slice(0, 60).map(({ id, name, description, unit, source }) => ({ id, name, description: description.slice(0, 400), unit, source }));
-    const proposal = await provider.generate({ rooms: scopedRooms(analysis, requestedBrief), property: analysis.propertyType, brief: requestedBrief, rates: rateContext }, request.signal);
+    const proposal = await provider.generate({ rooms: scopedRooms(analysis, requestedBrief), property: analysis.propertyType, brief: requestedBrief, rates: rateContext, reviewedPatterns: patternContext.slice(0, 30) }, request.signal);
     const researchLimitations: string[] = [];
+    if (references.error) researchLimitations.push('The admin reference library is unavailable; business and market pricing were used where possible.');
     const products = [...new Map(proposal.sections.flatMap(section => section.items).filter(item => !approvedIds.has(item.rateId))
       .map(item => [item.productName.trim().toLowerCase(), { name: item.productName, specification: item.description }])).values()];
     const enabled = (env.QUOTATION_MARKET_RESEARCH || process.env.QUOTATION_MARKET_RESEARCH || 'openai') === 'openai';
