@@ -6,6 +6,7 @@ import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider'
 import { OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
 import { briefFixture, draftFixture, planFixture, proposalFixture } from '@/test/floor-plan-fixtures';
 import { buildEstimate, type Estimate } from '@/lib/quotation-ai/floor-plan';
+import { defaultRoomWork } from '@/lib/quotation-ai/room-work';
 
 jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }));
 jest.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: jest.fn() }));
@@ -19,9 +20,9 @@ let projectExists = true;
 let referenceRows: Record<string, unknown>[] = [];
 let storedEstimate: Estimate | null = null;
 function database(table: string) {
-  const result = { data: table === 'profiles' ? { currency_code: 'INR', country_code: 'IN' } : table === 'ai_training_patterns' ? referenceRows : [], error: null };
+  const result = { data: table === 'profiles' ? { currency_code: 'INR', country_code: 'IN' } : table === 'ai_reference_price_catalogue' ? referenceRows : [], error: null };
   const chain = { select: jest.fn().mockReturnThis(), eq: jest.fn(function (...args: unknown[]) { eq(table, ...args); return chain; }),
-    limit: jest.fn().mockResolvedValue(result), order: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue(result),
+    range: jest.fn((start: number, end: number) => Promise.resolve({ ...result, data: referenceRows.slice(start, end + 1) })), limit: jest.fn().mockResolvedValue(result), order: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue(result),
     maybeSingle: jest.fn().mockResolvedValue({ data: projectExists ? { id: 'project', estimate: storedEstimate } : null, error: null }),
     insert: jest.fn((row: unknown) => { insert(table, row); return Promise.resolve({ error: null }); }),
     update: jest.fn().mockReturnThis(), then: (resolve: (value: unknown) => void) => Promise.resolve({ error: null }).then(resolve),
@@ -64,7 +65,7 @@ it('retries only pricing while preserving quotation item IDs and quantities', as
   expect(result.estimate.draft.sections[0].items[0]).toMatchObject({ id: storedEstimate.draft.sections[0].items[0].id, sftArea: 56, ratePerSft: 1300 });
 });
 it('uses reviewed global quotation references before paid market research', async () => {
-  referenceRows = [{ id: 'admin-rate', section: 'Bedroom', product_name: 'Wardrobe', material: 'Laminate', specification: 'Reviewed specification', unit: 'sqft', rate: 1400, tax: 'excluded', installation_included: true, location: 'Bengaluru', currency: 'INR', price_date: new Date().toISOString().slice(0, 10), source_page: 2, notes: '', project_type: 'Apartment' }];
+  referenceRows = [{ id: 'admin-rate', section: 'Bedroom', product_name: 'Wardrobe', material: 'Laminate', specification: 'Reviewed specification', unit: 'sqft', recent_rate: 1400, recent_low: 1200, recent_high: 1600, recent_source_count: 5, source_count: 5, tax: 'excluded', installation_included: true, location: 'Bengaluru', currency: 'INR', price_date: new Date().toISOString().slice(0, 10), source_page: 2, notes: '', project_type: 'Apartment' }];
   const proposal = proposalFixture(); proposal.sections[0].items[0].rateId = 'admin-rate'; generate.mockResolvedValueOnce(proposal);
   const response = await POST(request(payload()));
   expect(response.status).toBe(200);
@@ -82,6 +83,35 @@ it('automatically prices an empty catalogue using retrieved market evidence', as
   expect(result.estimate.draft.sections[0].items[0].ratePerSft).toBe(1300);
   expect(result.estimate.totals.subtotal).toBe(72800);
   expect(result.estimate.incomplete).toBe(false);
+});
+it('matches prices beyond the first catalogue page and outside the model context', async () => {
+  const reference = { section: 'Bedroom', material: 'laminate', specification: 'reviewed specification', unit: 'sqft',
+    recent_rate: 1400, recent_low: 1200, recent_high: 1600, recent_source_count: 5, source_count: 5,
+    tax: 'excluded', installation_included: true, location: 'bengaluru', currency: 'INR', price_date: new Date().toISOString().slice(0, 10) };
+  referenceRows = Array.from({ length: 500 }, (_, index) => ({ ...reference, id: `unrelated-${index}`, product_name: `Other ${index}` }));
+  referenceRows.push({ ...reference, id: 'last-page', product_name: 'Wardrobe' });
+  const proposal = proposalFixture(); proposal.sections[0].items[0].description = 'laminate. reviewed specification';
+  proposal.sections[0].items[0].rateId = null; generate.mockResolvedValueOnce(proposal);
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.evidence[0].price).toMatchObject({ id: 'last-page', rate: 1400 });
+  expect(research).not.toHaveBeenCalled();
+});
+it('generates large plans in small batches and includes every confirmed field despite sparse model output', async () => {
+  const input = payload();
+  input.analysis.rooms = Array.from({ length: 25 }, (_, index) => ({ ...planFixture().rooms[0], name: `Bedroom ${index + 1}` }));
+  input.brief.roomNames = input.analysis.rooms.map(room => room.name);
+  const brief = { ...input.brief, roomWork: input.analysis.rooms.map(room => defaultRoomWork(room, 'complete')) };
+  generate.mockImplementation(async ({ rooms }) => ({ sections: [{ ...proposalFixture().sections[0], title: rooms[0].name, roomName: rooms[0].name }], assumptions: [] }));
+  const response = await POST(request({ ...input, brief }));
+  expect(response.status).toBe(200);
+  const { estimate } = await response.json();
+  expect(generate).toHaveBeenCalledTimes(7);
+  expect(generate.mock.calls.every(([context]) => context.rooms.length <= 4)).toBe(true);
+  expect(estimate.draft.sections).toHaveLength(25);
+  expect(estimate.draft.sections.flatMap((section: { items: unknown[] }) => section.items)).toHaveLength(75);
+  expect(estimate.scopeGaps).toEqual([]);
 });
 it('preserves an editable pending estimate when research fails', async () => {
   research.mockRejectedValueOnce(new Error('timeout'));
@@ -126,7 +156,7 @@ it('ignores arbitrary rates from the caller and stores tenant-scoped evidence', 
 });
 it('rejects invalid messages and oversized chunked bodies before provider work', async () => {
   expect((await POST(request({ ...payload(), brief: { ...briefFixture(), budget: -1 } }))).status).toBe(400);
-  const response = await POST(request({ padding: 'x'.repeat(140000) }));
+  const response = await POST(request({ padding: 'x'.repeat(1048577) }));
   expect(response.status).not.toBe(200); expect(generate).not.toHaveBeenCalled();
 });
 it('validates actual bytes and cleans up private uploads on analysis failure', async () => {

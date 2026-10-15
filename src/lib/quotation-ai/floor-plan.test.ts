@@ -42,6 +42,11 @@ describe('floor plan quotation boundary', () => {
   it('uses detected room types for contextual scope', () => {
     expect(scopedRooms(plan, { scope: 'living-bedrooms', roomNames: brief.roomNames }).map(room => room.name)).toEqual(['Bedroom']);
   });
+  it('reports selected rooms missing from a proposal rather than silently treating scope as complete', () => {
+    const result = buildEstimate(proposal(), plan, brief, [], fixture());
+    expect(result.scopeGaps).toEqual(['Kitchen']);
+    expect(result.draft.sections).toHaveLength(1);
+  });
   it('completes missing measurements and an explicit rate with exact server totals and stable IDs', () => {
     const raw = proposal(); raw.sections[0].items[0].measurementStatus = 'unknown';
     const previous = buildEstimate(raw, plan, brief, [], fixture());

@@ -1,3 +1,4 @@
+import { useCompanyAssetUrl } from '@/hooks/useCompanyAssetUrl';
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
   const [companyName, setCompanyName] = useState("");
   const [phone, setPhone] = useState("");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const resolvedLogoUrl = useCompanyAssetUrl(logoUrl);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -275,7 +277,7 @@ export const OnboardingDialog = ({ open, onComplete, userId }: OnboardingDialogP
             <div className="space-y-3">
               <div className="flex flex-col items-center gap-3">
                 <Avatar className="h-20 w-20 border-2 border-dashed border-muted-foreground/30 rounded-xl">
-                  <AvatarImage src={logoUrl || undefined} />
+                  <AvatarImage src={resolvedLogoUrl} />
                   <AvatarFallback className="bg-muted rounded-xl">
                     <Upload className="h-6 w-6 text-muted-foreground" />
                   </AvatarFallback>

@@ -11,7 +11,7 @@ export function CompleteEstimate({ estimate, disabled, onComplete, onRetry }: {
   onComplete: (change: { itemId: string; widthFt: number | null; heightFt: number | null; ratePerSft: number | null }) => Promise<void>;
   onRetry: () => void;
 }) {
-  const missing = estimate.draft.sections.flatMap(section => section.items).filter(item => itemCalculation(item).area == null || item.ratePerSft == null);
+  const missing = estimate.draft.sections.flatMap(section => section.items).filter(item => !/Billing: (piece|lump_sum); price separately/i.test(item.productDetails) && (itemCalculation(item).area == null || item.ratePerSft == null));
   const [activeId, setActiveId] = useState('');
   const item = missing.find(row => row.id === activeId) ?? missing[0];
   const [width, setWidth] = useState(''); const [height, setHeight] = useState(''); const [rate, setRate] = useState('');

@@ -1,11 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { z } from 'zod';
-import { analysisSchema, briefSchema, buildEstimate, completeEstimate, estimateCompletionSchema, generatedSchema, mergeRoomEstimates, detectPlanType, MAX_PLAN_BYTES, MAX_PLAN_FILES, scopedRooms, type Estimate, type PriceEvidence } from '@/lib/quotation-ai/floor-plan';
+import { analysisSchema, briefSchema, buildEstimate, completeEstimate, estimateCompletionSchema, generatedSchema, mergeRoomEstimates, preserveRefinedItems, detectPlanType, MAX_PLAN_BYTES, MAX_PLAN_FILES, scopedRooms, type Estimate, type PriceEvidence } from '@/lib/quotation-ai/floor-plan';
+import { ensureRoomWorkCoverage } from '@/lib/quotation-ai/room-work';
 import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
 import { MarketResearchError, OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
+import { matchingReferenceRate, normalizeReferenceText, referencePriceEvidence, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
 
 export const dynamic = 'force-dynamic';
 type Env = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; OPENAI_FLOOR_PLAN_MODEL?: string; OPENAI_MARKET_MODEL?: string; QUOTATION_MARKET_RESEARCH?: string; QUOTATION_AI_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> } };
@@ -74,7 +76,7 @@ export async function POST(request: Request) {
       return json({ projectId, analysis });
     }
     if (!contentType.startsWith('application/json')) return json({ error: 'Use JSON or a floor plan upload.' }, 415);
-    const body = await boundedBody(request, 131072);
+    const body = await boundedBody(request, 1048576);
     const raw = JSON.parse(await body.text());
     if (raw.action === 'complete') {
       const completion = estimateCompletionSchema.safeParse(raw);
@@ -100,16 +102,25 @@ export async function POST(request: Request) {
     if (regenerateRooms && (!previousEstimate || regenerateRooms.some(name => !scopedRooms(analysis, brief).some(room => room.name === name)))) return json({ error: 'Select rooms from the current estimate to regenerate.' }, 400);
     if (action === 'retry_pricing' && (!previousEstimate || regenerateRooms)) return json({ error: 'Open an existing estimate to retry its pricing.' }, 400);
     // RLS and an explicit owner filter both apply. Pattern rates are historical, never approved.
-    const [approved, history, profile, references] = await Promise.all([
+    const [approved, history, profile] = await Promise.all([
       db.from('quotation_approved_rates').select('*').eq('user_id', user.id).eq('active', true).limit(100),
       db.from('item_usage_patterns').select('*').eq('user_id', user.id).order('last_used_at', { ascending: false }).limit(60),
       db.from('profiles').select('currency_code,country_code,measurement_system').eq('id', user.id).single(),
-      db.from('ai_training_patterns').select('id,section,product_name,material,specification,unit,rate,tax,installation_included,location,currency,price_date,source_page,notes,project_type')
-        .eq('approved', true).eq('location', brief.location).order('price_date', { ascending: false }).limit(60),
     ]);
     if (approved.error || history.error || profile.error) throw new Error('Could not load your pricing data. Check the floor plan database migration.');
     if (profile.data?.measurement_system === 'metric') return json({ error: 'This builder currently uses square-foot billing. Switch the quotation measurement setting to imperial before generating an estimate.' }, 422);
     const currency = profile.data?.currency_code || 'INR';
+    // The view aggregates all approved PDFs before pagination; never price from
+    // an arbitrary first 60 source entries. Fetch every matching product group.
+    const references: { data: ReferencePrice[]; error: unknown } = { data: [], error: null };
+    for (let offset = 0; ; offset += 500) {
+      const page = await db.from('ai_reference_price_catalogue').select('*')
+        .eq('location', normalizeReferenceText(brief.location)).eq('currency', currency)
+        .order('id').range(offset, offset + 499);
+      if (page.error) { references.error = page.error; references.data = []; break; }
+      references.data.push(...(page.data ?? []));
+      if ((page.data?.length ?? 0) < 500) break;
+    }
     const rates: PriceEvidence[] = (approved.data ?? []).map((row: Record<string, unknown>) => ({
       id: String(row.id), name: String(row.product_name).slice(0, 150), description: String(row.specification).slice(0, 1000), rate: Number(row.rate), unit: String(row.unit), source: 'approved' as const,
       currency: String(row.currency), location: String(row.location).slice(0, 150), verifiedAt: String(row.verified_at), sourceUrl: row.source_url ? String(row.source_url).slice(0, 2000) : null, inclusions: String(row.inclusions).slice(0, 600),
@@ -120,15 +131,10 @@ export async function POST(request: Request) {
     if (!references.error) for (const row of references.data ?? []) {
       if (row.currency !== currency) continue;
       patternContext.push({ section: String(row.section).slice(0, 150), product: String(row.product_name).slice(0, 150), material: String(row.material).slice(0, 300), specification: String(row.specification).slice(0, 600) });
-      const date = Date.parse(row.price_date);
-      if (row.rate == null || !Number.isFinite(Number(row.rate)) || Number(row.rate) < 0 || row.tax !== 'excluded' || !row.installation_included
-        || !['sqft','sqm'].includes(row.unit) || !Number.isFinite(date) || date > Date.now() || Date.now() - date > 90 * 86400000
-        || rates.some(rate => rate.name.toLowerCase() === String(row.product_name).toLowerCase())) continue;
-      rates.push({ id: row.id, name: String(row.product_name).slice(0, 150), description: `${row.material}. ${row.specification}`.slice(0, 1000),
-        rate: Math.round(Number(row.rate) / (row.unit === 'sqm' ? 10.7639104167 : 1) * 100) / 100, unit: 'sqft', source: 'admin_reference',
-        currency, location: row.location, verifiedAt: row.price_date, sourceUrl: null,
-        inclusions: `Admin-reviewed quotation reference, page ${row.source_page}; not a live supplier quote. GST excluded, installation included. ${row.notes}`.slice(0, 600) });
     }
+    rates.push(...referencePriceEvidence(references.data, currency, brief.location)
+      .filter(row => !rates.some(rate => rate.source === 'approved' && normalizeReferenceText(rate.name) === normalizeReferenceText(row.name)
+        && normalizeReferenceText(rate.description) === normalizeReferenceText(row.description))));
     const approvedIds = new Set(rates.map(rate => rate.id));
     for (const row of history.data ?? []) {
       const rate = row.preferred_rate ?? row.default_rate;
@@ -137,21 +143,53 @@ export async function POST(request: Request) {
       rates.push({ id: row.id, name: row.product_name.slice(0, 150), description: (row.product_details || '').slice(0, 1000), rate, unit: 'sqft', source: 'historical', currency, location: '', verifiedAt: row.last_used_at || row.updated_at, sourceUrl: null, inclusions: 'Historical rate; specifications, location, GST and inclusions require review.' });
     }
     const requestedBrief = regenerateRooms ? { ...brief, roomNames: regenerateRooms } : brief;
+    if (action !== 'retry_pricing') ensureRoomWorkCoverage({ sections: [], assumptions: [] }, scopedRooms(analysis, requestedBrief), requestedBrief);
     // Bound context cost. Full evidence remains server-side; the model only needs matching specifications and IDs.
-    const rateContext = rates.slice(0, 60).map(({ id, name, description, unit, source }) => ({ id, name, description: description.slice(0, 400), unit, source }));
-    const proposal = action === 'retry_pricing' ? generatedSchema.parse({
+    const relevanceTerms = normalizeReferenceText([
+      brief.finish, ...scopedRooms(analysis, requestedBrief).map(room => room.kind),
+      ...draft.sections.flatMap(section => section.items.map(item => `${item.productName} ${item.productDetails}`)),
+    ].join(' ')).split(/\W+/).filter(term => term.length > 2);
+    const score = (row: PriceEvidence) => (row.source === 'approved' ? 1000 : row.source === 'admin_reference' ? 100 : 0)
+      + relevanceTerms.reduce((sum, term) => sum + (normalizeReferenceText(`${row.name} ${row.description}`).includes(term) ? 1 : 0), 0);
+    const rankedRates = [...rates].sort((a, b) => score(b) - score(a));
+    const rateContext = rankedRates.slice(0, 60).map(({ id, name, description, unit, source }) => ({ id, name, description: description.slice(0, 400), unit, source }));
+    let proposal = action === 'retry_pricing' ? generatedSchema.parse({
       sections: draftSchema.parse(previousEstimate.draft).sections.map(section => ({ title: section.title,
         roomName: previousEstimate.roomSections.find(row => row.sectionId === section.id)?.roomName,
         items: section.items.map(item => ({ productName: item.productName, description: item.productDetails,
-          rateId: rates.find(rate => rate.name === item.productName && (rate.source === 'approved' || rate.source === 'admin_reference'))?.id ?? null,
+          rateId: matchingReferenceRate(rates, item.productName, item.productDetails)?.id ?? null,
           quantity: itemCalculation(item).area, measurementStatus: itemCalculation(item).area == null ? 'unknown' : 'estimated',
           measurementReason: previousEstimate.evidence.find(row => row.itemId === item.id)?.reason || 'Previous work measurement retained.',
         })),
       })), assumptions: [],
-    }) : await provider.generate({ rooms: scopedRooms(analysis, requestedBrief), property: analysis.propertyType, brief: requestedBrief, rates: rateContext, reviewedPatterns: patternContext.slice(0, 30) }, request.signal);
+    }) : await (async () => {
+      const rooms = scopedRooms(analysis, requestedBrief);
+      const batches = Array.from({ length: Math.ceil(rooms.length / 4) }, (_, index) => rooms.slice(index * 4, index * 4 + 4));
+      const results: ReturnType<typeof generatedSchema.parse>[] = [];
+      // Small batches prevent response token limits from dropping later rooms.
+      // Two requests at a time keep latency bounded without a provider burst.
+      for (let index = 0; index < batches.length; index += 2) {
+        const group = await Promise.all(batches.slice(index, index + 2).map(batch => provider.generate({
+          rooms: batch, property: analysis.propertyType,
+          brief: { ...requestedBrief, roomNames: batch.map(room => room.name), roomWork: requestedBrief.roomWork?.filter(answer => batch.some(room => room.name === answer.roomName)) },
+          rates: rateContext, reviewedPatterns: patternContext.slice(0, 30),
+        }, request.signal)));
+        results.push(...group);
+      }
+      return generatedSchema.parse({ sections: results.flatMap(result => result.sections), assumptions: [...new Set(results.flatMap(result => result.assumptions))].slice(0, 20) });
+    })();
+    if (action !== 'retry_pricing') proposal = generatedSchema.parse(ensureRoomWorkCoverage(proposal, scopedRooms(analysis, requestedBrief), requestedBrief));
     const researchLimitations: string[] = [];
     if (references.error) researchLimitations.push('The admin reference library is unavailable; business and market pricing were used where possible.');
-    const products = [...new Map(proposal.sections.flatMap(section => section.items).filter(item => !approvedIds.has(item.rateId))
+    // Match against the complete catalogue even when an item was outside the
+    // bounded model context. Never swap material variants based on name alone.
+    for (const section of proposal.sections) for (const item of section.items) {
+      if (/Billing: (piece|lump_sum); price separately/i.test(item.description)) { item.rateId = null; continue; }
+      if (approvedIds.has(item.rateId)) continue;
+      const match = matchingReferenceRate(rates, item.productName, item.description);
+      if (match) item.rateId = match.id;
+    }
+    const products = [...new Map(proposal.sections.flatMap(section => section.items).filter(item => !approvedIds.has(item.rateId) && !/Billing: (piece|lump_sum); price separately/i.test(item.description))
       .map(item => [item.productName.trim().toLowerCase(), { name: item.productName, specification: item.description,
         ...(action === 'retry_pricing' ? { heightFt: previousEstimate.draft.sections.flatMap(section => section.items).find(row => row.productName === item.productName && row.productDetails === item.description)?.heightFt ?? undefined } : {}),
       }])).values()];
@@ -180,6 +218,7 @@ export async function POST(request: Request) {
       if (researched) item.rateId = researched.id;
     }
     let estimate = buildEstimate(proposal, analysis, requestedBrief, rates, draft);
+    if (previousEstimate && action !== 'retry_pricing') estimate = preserveRefinedItems(previousEstimate, estimate, requestedBrief);
     if (action === 'retry_pricing') {
       // Keep stable identities and explicit manual rates/dimensions; only retry non-manual pricing.
       estimate.draft.sections.forEach((section, sectionIndex) => {
@@ -198,6 +237,7 @@ export async function POST(request: Request) {
     }
     estimate.assumptions.push(...researchLimitations);
     if (regenerateRooms && previousEstimate) estimate = mergeRoomEstimates(previousEstimate, estimate, regenerateRooms, rates);
+    estimate.scopeGaps = scopedRooms(analysis, brief).map(room => room.name).filter(name => !estimate.roomSections.some(row => row.roomName === name));
     const id = projectId || crypto.randomUUID();
     const saved = projectId
       ? await db.from('quotation_plan_projects').update({ analysis, brief, estimate, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', user.id)

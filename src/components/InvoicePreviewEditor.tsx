@@ -1,3 +1,4 @@
+import { CompanyAssetImage } from "@/components/CompanyAssetImage";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, Maximize, Copy, Image as ImageIcon, X, Upload } from "lucide-react";
 import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
@@ -691,7 +692,7 @@ export const InvoicePreviewEditor = ({
                 <p className="text-xs text-muted-foreground">Shown across every invoice using this template. Falls back to your logo if not set.</p>
                 {profile?.hero_image_url ? (
                   <div className="relative">
-                    <img src={profile.hero_image_url} alt="Hero" className="w-full h-20 object-cover rounded-md border" />
+                    <CompanyAssetImage src={profile.hero_image_url} alt="Hero" className="w-full h-20 object-cover rounded-md border" />
                     <Button
                       variant="destructive"
                       size="icon"

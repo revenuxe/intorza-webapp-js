@@ -1,5 +1,6 @@
 "use client";
 
+import { appendFloorPlanEstimate } from '@/lib/quotation-ai/apply-estimate';
 import { useState, useEffect, useRef, useMemo } from "react";
 import dynamic from 'next/dynamic';
 import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon } from "lucide-react";
@@ -32,7 +33,8 @@ const FloorPlanQuotationBuilder = dynamic(() => import('@/components/quotation/F
 import type { BuilderMode } from '@/components/quotation/FloorPlanQuotationBuilder';
 import { EstimatePriceDetails } from '@/components/quotation/EstimatePriceDetails';
 import type { PriceEvidence } from '@/lib/quotation-ai/floor-plan';
-import { fromQuotation, toQuotation, lineAmount, quotationTotals, reviewDraft, draftSchema, type VoiceDraft } from "@/lib/quotation-ai/domain";
+import { reconcileSavedQuotation, remapDraftIds } from '@/lib/quotation-ai/save-reconciliation';
+import { fromQuotation, lineAmount, quotationTotals, reviewDraft, draftSchema, type VoiceDraft } from "@/lib/quotation-ai/domain";
 interface LineItem {
   id: string;
   side: string;
@@ -671,10 +673,6 @@ const CreateQuotation = () => {
       if (existingId) {
         const { data: updated } = await quotationsApi.update(existingId, basePayload);
         savedQuotationId = updated?.id || existingId;
-        toast({
-          title: "Quotation updated",
-          description: "Quotation has been updated successfully",
-        });
       } else {
         const quotationNumber = `QT-${Date.now()}`;
         const { data: created } = await quotationsApi.create({
@@ -683,22 +681,35 @@ const CreateQuotation = () => {
         });
         savedQuotationId = created?.id ?? null;
         savedQuotationIdRef.current = savedQuotationId;
-        if (savedQuotationId && !showShare) {
-          const params = new URLSearchParams(searchParams);
-          params.set('id', savedQuotationId);
-          setSearchParams(params, { replace: true });
-        }
-        toast({
-          title: "Quotation saved",
-          description: `Quotation ${quotationNumber} has been saved successfully`,
-        });
       }
 
 
-      if (savedQuotationId && planProjectId.current) {
-        const linked = await supabase.from('quotation_plan_projects').update({ quotation_id: savedQuotationId }).eq('id', planProjectId.current).eq('user_id', user.id);
-        if (linked.error) toast({ title: 'Quotation saved', description: 'The plan reference could not be linked. Your estimate analysis is still in your account.' });
+      if (!savedQuotationId) throw new Error('The quotation save did not return an ID. Your editor has been preserved.');
+      // Read back the complete nested save before navigating or replacing any local identities.
+      const { data: verifiedQuotation } = await quotationsApi.get(savedQuotationId);
+      const mapping = reconcileSavedQuotation(payloadSections, verifiedQuotation.sections);
+      const currentPlanId = planProjectId.current;
+      if (currentPlanId) {
+        const source = await supabase.from('quotation_plan_projects').select('estimate').eq('id', currentPlanId).eq('user_id', user.id).single();
+        if (source.error || !source.data?.estimate) throw new Error('Quotation saved, but its AI reference could not be loaded. Your editor is preserved; retry saving to link it.');
+        const estimate = source.data.estimate as unknown as import('@/lib/quotation-ai/floor-plan').Estimate;
+        const linked = await supabase.from('quotation_plan_projects').update({ quotation_id: savedQuotationId, updated_at: new Date().toISOString(), estimate: {
+          ...estimate, draft: remapDraftIds(estimate.draft, mapping),
+          evidence: estimate.evidence.map(row => ({ ...row, itemId: mapping.items[row.itemId] ?? row.itemId })),
+          roomSections: estimate.roomSections.map(row => ({ ...row, sectionId: mapping.sections[row.sectionId] ?? row.sectionId })),
+        } }).eq('id', currentPlanId).eq('user_id', user.id);
+        if (linked.error) throw new Error('Quotation saved, but its AI reference could not be linked. Your editor is preserved; retry saving.');
       }
+      if (lastAIDraft.current) lastAIDraft.current = remapDraftIds(lastAIDraft.current, mapping);
+      setSections(current => current.map(section => ({ ...section, id: mapping.sections[section.id] ?? section.id,
+        items: section.items.map(item => ({ ...item, id: mapping.items[item.id] ?? item.id })),
+      })));
+      setAIPriceEvidence(current => Object.fromEntries(Object.entries(current).map(([id, price]) => [mapping.items[id] ?? id, price])));
+      setItemImages(current => Object.fromEntries(Object.entries(current).map(([id, images]) => [mapping.items[id] ?? id, images])));
+      if (!existingId && !showShare) {
+        const params = new URLSearchParams(searchParams); params.set('id', savedQuotationId); setSearchParams(params, { replace: true });
+      }
+      toast({ title: existingId ? 'Quotation updated' : 'Quotation saved', description: `Verified ${payloadSections.length} sections and ${payloadSections.reduce((count, section) => count + section.items.length, 0)} items.` });
 
       // Silently save last used preferences and track item usage
       saveLastUsedPreferences({
@@ -1088,7 +1099,7 @@ const CreateQuotation = () => {
           mode={builderMode}
           onStart={mode => requireAuth(async () => {
             try { getAIDraft(); setBuilderMode(mode); }
-            catch { toast({ title: 'Check your quotation', description: 'AI estimates support up to 12 sections and 60 items.', variant: 'destructive' }); }
+            catch { toast({ title: 'Check your quotation', description: 'AI estimates support up to 80 sections and 600 items. Split larger projects into separate quotations.', variant: 'destructive' }); }
           }, 'createWithAI', getFormData())}
           getCurrentDraft={getAIDraft}
           clients={clients}
@@ -1096,8 +1107,7 @@ const CreateQuotation = () => {
           onApply={(draft, base, projectId, saveDraft, evidence) => {
             const existing = getAIDraft();
             if (JSON.stringify(existing) !== base) throw new Error('Your quotation changed while the estimate was being prepared. Go Back and regenerate to preserve your edits.');
-            const combined = { ...draft, sections: [...existing.sections.filter(section => section.items.length || section.title.trim()), ...draft.sections] };
-            const nextSections = toQuotation(combined, true);
+            const { draft: combined, sections: nextSections } = appendFloorPlanEstimate(existing, draft);
             lastAIDraft.current = combined;
             planProjectId.current = projectId;
             setAIPriceEvidence(current => ({ ...current, ...Object.fromEntries((evidence ?? []).map(row => [row.itemId, row.price])) }));

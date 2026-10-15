@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { FloorPlanQuotationBuilder } from './FloorPlanQuotationBuilder';
 import { draftFixture } from '@/test/floor-plan-fixtures';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,6 +22,15 @@ async function reachReview() {
   fireEvent.click(screen.getByRole('button', { name: 'Add room' }));
   fireEvent.change(screen.getByRole('textbox', { name: 'Room 1 name' }), { target: { value: 'Bedroom' } });
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Yes, the whole plan' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  for (const group of screen.getAllByRole('group', { name: /^Include/ })) {
+    const name = group.querySelector('legend')?.textContent || '';
+    fireEvent.click(within(group).getByRole('radio', { name: /room storage|false ceiling|wall painting/.test(name) ? 'Yes' : 'No' }));
+  }
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  fireEvent.click(within(screen.getByRole('group', { name: /coordinated cabinetry/ })).getByRole('radio', { name: 'Yes' }));
+  fireEvent.click(within(screen.getByRole('group', { name: /retain existing/ })).getByRole('radio', { name: 'No' }));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
@@ -61,4 +70,32 @@ it('requires an explicit review action before populating or saving a quotation',
   expect(screen.getByText(/Partial total/)).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Save as Draft' }));
   expect(onApply).toHaveBeenCalledWith(estimate.draft, JSON.stringify(draftFixture()), 'project', true, estimate.evidence);
+});
+it('shows room-specific work choices and sends all confirmed fields in the generation request', async () => {
+  await reachReview();
+  (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'Retry' }) });
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Quotation' }));
+  await screen.findByRole('alert');
+  const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+  expect(body.brief.roomWork[0]).toMatchObject({ roomName: 'Bedroom' });
+  expect(body.brief.roomWork[0].items).toHaveLength(3);
+  expect(body.brief.roomWork[0].items.map((item: { key: string }) => item.key)).toEqual(['storage','ceiling','painting']);
+  expect(body.brief.design).toMatchObject({ coordinatedLook: true, retainExisting: false });
+});
+it('requires scope confirmation and directs the user to the first unanswered feature', async () => {
+  render(<FloorPlanQuotationBuilder {...props()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Add room' }));
+  fireEvent.change(screen.getByRole('textbox', { name: 'Room 1 name' }), { target: { value: 'Living Room' } });
+  fireEvent.change(screen.getByLabelText('Room type'), { target: { value: 'living' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('whether the interior work covers the whole plan');
+  fireEvent.click(screen.getByRole('radio', { name: 'No, select rooms' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: /Living Room/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Plan your Living Room interior' })).toHaveFocus());
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('tv unit in Living Room');
+  expect(within(screen.getByRole('group', { name: 'Include tv unit in Living Room?' })).getByRole('radio', { name: 'Yes' })).toHaveFocus();
+  expect(global.fetch).not.toHaveBeenCalled();
 });

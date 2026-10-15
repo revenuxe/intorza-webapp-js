@@ -5,6 +5,10 @@ import { ArrowLeft, ArrowRight, Check, FileText, Loader2, LockKeyhole, Plus, Tra
 import { BuilderArtwork, BuilderMark, GoldCoin } from './AIBuilderVisuals';
 import { EstimatePriceDetails } from './EstimatePriceDetails';
 import { CompleteEstimate } from './CompleteEstimate';
+import { RoomWorkQuestions } from './RoomWorkQuestions';
+import { PlanScopeQuestions } from './PlanScopeQuestions';
+import { DesignIntentQuestions } from './DesignIntentQuestions';
+import { defaultRoomWork, roomWorkOptions } from '@/lib/quotation-ai/room-work';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,12 +25,12 @@ type Props = {
   onApply: (draft: VoiceDraft, base: string, projectId: string, saveDraft?: boolean, evidence?: Estimate['evidence']) => void;
   clients: { id: string; name: string; address: string | null }[];
 };
-type Step = 'upload' | 'analysis' | 'scope' | 'finish' | 'budget' | 'details' | 'review' | 'estimate';
+type Step = 'upload' | 'analysis' | 'scope' | 'work' | 'design' | 'finish' | 'budget' | 'details' | 'review' | 'estimate';
 const emptyAnalysis: PlanAnalysis = { propertyType: 'Residential interior', floors: null, units: 'Not supplied', scale: 'Not supplied', rooms: [], warnings: ['No floor plan supplied. Work measurements require confirmation.'] };
 // Presentation values requested for this design. No wallet or credit deduction is implemented.
 const creditDisplay = { coins: 60, upload: 15, details: 10 } as const;
-const scopes = [{ value: 'complete', title: 'Complete home', detail: 'All rooms in your plan' }, { value: 'kitchen-wardrobes', title: 'Kitchen & wardrobes', detail: 'Kitchen cabinetry and bedroom storage' }, { value: 'living-bedrooms', title: 'Living room & bedrooms', detail: 'Focus on everyday spaces' }, { value: 'selected', title: 'Choose specific rooms', detail: 'Include only the spaces you need' }] as const;
-const titles: Record<Step, string> = { upload: 'Upload your floor plan', analysis: 'Your property analysis', scope: 'What would you like to design?', finish: 'Choose your finish level', budget: 'Do you have a target budget?', details: 'Who is this project for?', review: 'Ready to build your estimate', estimate: 'Your quotation is ready to review' };
+const scopes = [{ value: 'complete', title: 'Full Interior', detail: 'All rooms in your plan' }, { value: 'kitchen', title: 'Kitchen', detail: 'Only kitchens detected in your plan' }, { value: 'bedrooms', title: 'Bedrooms', detail: 'Bedroom interiors in your plan' }, { value: 'kitchen-wardrobes', title: 'Kitchen & wardrobes', detail: 'Kitchen cabinetry and bedroom storage' }, { value: 'living-bedrooms', title: 'Living room & bedrooms', detail: 'Focus on everyday spaces' }, { value: 'selected', title: 'Choose specific rooms', detail: 'Include only the spaces you need' }] as const;
+const titles: Record<Step, string> = { upload: 'Upload your floor plan', analysis: 'Your property analysis', scope: 'What would you like to design?', work: 'Confirm the work in each room', design: 'Set your design direction', finish: 'Choose your finish level', budget: 'Do you have a target budget?', details: 'Who is this project for?', review: 'Ready to build your estimate', estimate: 'Your quotation is ready to review' };
 function FilePreview({ file }: { file: File }) {
   const [url, setUrl] = useState('');
   useEffect(() => {
@@ -45,15 +49,41 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const [brief, setBrief] = useState<ProjectBrief>({ scope: 'complete', roomNames: [], finish: 'Standard', budget: null, clientName: '', location: '', address: '' });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const [workRoomIndex, setWorkRoomIndex] = useState(0);
+  const [wholePlan, setWholePlan] = useState<boolean | null>(null);
   const [regenerateRooms, setRegenerateRooms] = useState<string[]>([]);
   const [busy, setBusy] = useState('');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
+  const [invalidWorkKey, setInvalidWorkKey] = useState('');
+  const [validationAttempt, setValidationAttempt] = useState(0);
   const [dragging, setDragging] = useState(false);
   const base = useRef('');
   const picker = useRef<HTMLInputElement>(null);
   const abort = useRef<(() => void) | null>(null);
   const pending = useRef(false);
+  const scrollPanel = useRef<HTMLDivElement>(null);
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const busyBanner = useRef<HTMLDivElement>(null);
+  const errorBanner = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (!mode) return;
+    const frame = requestAnimationFrame(() => {
+      if (scrollPanel.current) scrollPanel.current.scrollTop = 0;
+      stepHeading.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [mode, step, workRoomIndex]);
+  useEffect(() => { if (busy) busyBanner.current?.focus({ preventScroll: true }); }, [busy]);
+  useEffect(() => {
+    if (!error) return;
+    const panel = scrollPanel.current;
+    const question = invalidWorkKey ? panel?.querySelector<HTMLElement>(`[data-work-key="${invalidWorkKey}"]`) : null;
+    if (panel && question) {
+      panel.scrollTop += question.getBoundingClientRect().top - panel.getBoundingClientRect().top - 16;
+      question.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
+    } else errorBanner.current?.focus({ preventScroll: true });
+  }, [error, invalidWorkKey, validationAttempt]);
   useEffect(() => () => abort.current?.(), []);
   useEffect(() => { if (mode === 'details') setStep(current => current === 'upload' ? 'analysis' : current); }, [mode]);
   const start = (next: BuilderMode) => {
@@ -61,7 +91,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     let draft: VoiceDraft;
     try { draft = getCurrentDraft(); } catch { onStart(next); return; }
     setBrief({ scope: 'complete', roomNames: [], finish: 'Standard', budget: null, clientName: draft.project.clientName, location: draft.project.placeOfProject, address: draft.project.clientAddress });
-    setFiles([]); setAnalysis(emptyAnalysis); setProjectId(null); setEstimate(null); setRegenerateRooms([]); setError('');
+    setFiles([]); setAnalysis(emptyAnalysis); setProjectId(null); setEstimate(null); setRegenerateRooms([]); setError(''); setWholePlan(null);
     setStep(next === 'upload' ? 'upload' : 'analysis'); onStart(next);
   };
   function selectFiles(incoming: File[]) {
@@ -103,7 +133,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     if (pending.current) return;
     pending.current = true; setBusy(retryPricing ? 'Searching for comparable prices' : 'Preparing your editable estimate'); setError('');
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 150000);
+    const timeout = setTimeout(() => controller.abort(), 360000);
     abort.current = () => controller.abort();
     try {
       const draft = getCurrentDraft();
@@ -131,21 +161,42 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update these details.'); }
     finally { clearTimeout(timeout); pending.current = false; setBusy(''); abort.current = null; }
   }
-  const back = () => { setError(''); setStep(({ upload: 'upload', analysis: mode === 'upload' ? 'upload' : 'analysis', scope: 'analysis', finish: 'scope', budget: 'finish', details: 'budget', review: 'details', estimate: 'review' } as Record<Step, Step>)[step]); };
+  const back = () => { setError(''); setInvalidWorkKey(''); if (step === 'work' && workRoomIndex > 0) { setWorkRoomIndex(index => index - 1); return; } setStep(({ upload: 'upload', analysis: mode === 'upload' ? 'upload' : 'analysis', scope: 'analysis', work: 'scope', design: 'work', finish: 'design', budget: 'finish', details: 'budget', review: 'details', estimate: 'review' } as Record<Step, Step>)[step]); };
   const next = () => {
     setError('');
+    setInvalidWorkKey('');
+    setValidationAttempt(value => value + 1);
     if (step === 'analysis') {
       if (!analysis.rooms.length || analysis.rooms.some(room => !room.name.trim()) || new Set(analysis.rooms.map(room => room.name)).size !== analysis.rooms.length) { setError('Add at least one room, with a different name for each room.'); return; }
       setBrief(value => ({ ...value, roomNames: analysis.rooms.map(room => room.name) })); setStep('scope');
     } else if (step === 'scope') {
+      if (wholePlan == null) { setError('Tell us whether the interior work covers the whole plan.'); return; }
       if (!scopedRooms(analysis, brief).length) { setError('Choose at least one room that matches this scope.'); return; }
+      const rooms = scopedRooms(analysis, brief);
+      setBrief(current => ({ ...current, roomWork: rooms.map(room => {
+        const old = current.roomWork?.find(answer => answer.roomName === room.name);
+        const allowed = new Set(roomWorkOptions(room, current.scope).map(option => option.key));
+        return old ? { ...old, items: old.items.filter(item => allowed.has(item.key)) } : defaultRoomWork(room, current.scope);
+      }) }));
+      setWorkRoomIndex(0); setStep('work');
+    } else if (step === 'work') {
+      const rooms = scopedRooms(analysis, brief), room = rooms[workRoomIndex];
+      const answer = brief.roomWork?.find(row => row.roomName === room?.name);
+      const unanswered = room && roomWorkOptions(room, brief.scope).find(option => answer?.decisions?.[option.key] == null);
+      if (unanswered) { setInvalidWorkKey(unanswered.key); setError(`Choose Yes or No for ${unanswered.name.toLowerCase()} in ${room.name}.`); return; }
+      if (!answer?.items.length) { setError(`Select the work to include in ${room?.name || 'this room'}, or remove the room from your scope.`); return; }
+      if (answer.items.some(item => (item.widthFt == null) !== (item.heightFt == null))) { setError('Enter both work dimensions, or leave both pending.'); return; }
+      if (workRoomIndex + 1 < rooms.length) setWorkRoomIndex(index => index + 1);
+      else setStep('design');
+    } else if (step === 'design') {
+      if (brief.design?.coordinatedLook == null || brief.design?.retainExisting == null) { setError('Choose Yes or No for coordinated design and retaining existing items.'); return; }
       setStep('finish');
     } else if (step === 'finish') setStep('budget');
-    else if (step === 'budget') setStep('details');
+    else if (step === 'budget') setStep(brief.clientName.trim() && brief.location.trim() ? 'review' : 'details');
     else if (step === 'details') { if (!brief.clientName.trim() || !brief.location.trim()) { setError('Enter the client name and project city.'); return; } setStep('review'); }
   };
   const updateRoom = (index: number, value: Partial<PlanAnalysis['rooms'][number]>) => setAnalysis(current => ({ ...current, rooms: current.rooms.map((room, i) => i === index ? { ...room, ...value } : room) }));
-  const groups = ['upload', 'analysis'].includes(step) ? 0 : ['scope', 'finish', 'budget'].includes(step) ? 1 : step === 'details' ? 2 : 3;
+  const groups = ['upload', 'analysis'].includes(step) ? 0 : ['scope', 'work', 'design', 'finish', 'budget'].includes(step) ? 1 : step === 'details' ? 2 : 3;
   return <>
     <div className="col-span-2 min-w-0 sm:col-span-1 sm:min-w-[220px]">
       <Button type="button" aria-label="Built with AI" className="h-12 w-full gap-2 rounded-xl px-3 shadow-sm sm:px-4" onClick={() => setChooserOpen(true)}><BuilderMark className="h-4 w-4 shrink-0" /><span className="text-sm leading-5">Built with AI</span><span className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[11px] font-semibold leading-4 text-amber-900 shadow-sm"><GoldCoin className="h-3.5 w-3.5" />{creditDisplay.coins} coins</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Button>
@@ -169,14 +220,15 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
       </DialogContent>
     </Dialog>
     <Dialog open={mode !== null} onOpenChange={open => { if (!open && !busy) onClose(); }}>
-      <DialogContent className="flex max-h-[90dvh] min-w-0 max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:p-0" onInteractOutside={event => { if (busy) event.preventDefault(); }} onEscapeKeyDown={event => { if (busy) event.preventDefault(); }}>
+      <DialogContent className="flex h-[min(90dvh,900px)] max-h-[calc(100dvh-1rem)] min-w-0 max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:p-0" onInteractOutside={event => { if (busy) event.preventDefault(); }} onEscapeKeyDown={event => { if (busy) event.preventDefault(); }}>
         <DialogHeader className="shrink-0 border-b px-5 pb-4 pt-6 text-left sm:px-6">
           <p className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-primary"><BuilderMark className="h-4 w-4" />Intorza Studio</p>
-          <DialogTitle className="pr-5 text-xl leading-7">{titles[step]}</DialogTitle>
+          <DialogTitle ref={stepHeading} tabIndex={-1} className="pr-5 text-xl leading-7 outline-none">{step === 'work' ? `Plan your ${scopedRooms(analysis, brief)[workRoomIndex]?.name || 'room'} interior` : titles[step]}</DialogTitle>
           <DialogDescription className="text-sm leading-6">{step === 'upload' ? 'Add your drawing. Review the rooms. Build your estimate.' : step === 'estimate' ? 'AI-generated estimate — review required. You control what is saved and shared.' : 'A few simple steps. Every detail stays editable.'}</DialogDescription>
           {step !== 'upload' && <div className="!mt-4 flex gap-1.5" aria-label={`Step ${groups + 1} of 4`}>{['Property', 'Scope', 'Client', 'Review'].map((name, index) => <div key={name} className="min-w-0 flex-1"><div className={`h-1 rounded-full ${index <= groups ? 'bg-primary' : 'bg-muted'}`} /><span className="mt-1 block text-[11px] text-muted-foreground">{name}</span></div>)}</div>}
         </DialogHeader>
-        <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5 [overflow-wrap:anywhere] sm:px-6">
+        {busy && <div ref={busyBanner} tabIndex={-1} role="status" aria-live="polite" className="shrink-0 space-y-2 border-b bg-primary/5 px-5 py-3 outline-none sm:px-6"><div className="flex items-center gap-2 text-sm font-medium"><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{busy}</div>{step === 'upload' && <progress aria-label="Upload progress" value={progress} max={100} className="h-1.5 w-full accent-primary" />}</div>}
+        <div ref={scrollPanel} role="region" aria-label="Quotation step content" aria-busy={!!busy} inert={!!busy} className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5 [overflow-wrap:anywhere] sm:px-6">
           {step === 'upload' && <>
             <div className={`rounded-2xl border border-dashed px-4 py-6 text-center sm:py-8 ${dragging ? 'border-primary bg-primary/5' : 'border-primary/25 bg-primary/[0.025]'}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); if (!busy) selectFiles(Array.from(event.dataTransfer.files)); }}>
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border bg-background shadow-sm"><UploadCloud className="h-6 w-6 text-primary" strokeWidth={1.5} /></div><p className="text-base font-semibold">Choose your floor plan</p><p className="mb-5 mt-1 text-xs text-muted-foreground">Drag it here, or select a file below.</p>
@@ -202,15 +254,18 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
             </details>)}
             <Button variant="outline" type="button" className="w-full gap-2" disabled={analysis.rooms.length >= 40} onClick={() => setAnalysis(current => ({ ...current, rooms: [...current.rooms, { name: `Room ${current.rooms.length + 1}`, kind: 'other', floor: '1', widthFt: null, lengthFt: null, source: 'user', confidence: 'high', file: '', page: 1, notes: '' }] }))}><Plus className="h-4 w-4" />Add room</Button>
           </>}
-          {step === 'scope' && <>
-            <div className="grid gap-2 sm:grid-cols-2">{scopes.map(scope => <button type="button" key={scope.value} aria-pressed={brief.scope === scope.value} onClick={() => setBrief(current => ({ ...current, scope: scope.value }))} className={`rounded-xl border p-4 text-left ${brief.scope === scope.value ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'bg-card'}`}><span className="block text-sm font-medium">{scope.title}</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">{scope.detail}</span></button>)}</div>
-            {brief.scope === 'selected' && <fieldset className="space-y-2"><legend className="mb-2 text-sm font-medium">Choose your rooms</legend>{analysis.rooms.map(room => <label key={room.name} className="flex items-center gap-3 rounded-xl border p-3 text-sm"><input type="checkbox" checked={brief.roomNames.includes(room.name)} onChange={event => setBrief(current => ({ ...current, roomNames: event.target.checked ? [...current.roomNames, room.name] : current.roomNames.filter(name => name !== room.name) }))} />{room.name}</label>)}</fieldset>}
+          {step === 'scope' && <PlanScopeQuestions analysis={analysis} brief={brief} wholePlan={wholePlan} scopes={scopes} onWholePlan={setWholePlan} onChange={setBrief} />}
+          {step === 'work' && scopedRooms(analysis, brief)[workRoomIndex] && <>
+            <p className="text-xs font-medium text-primary">Room {workRoomIndex + 1} of {scopedRooms(analysis, brief).length} · {scopedRooms(analysis, brief)[workRoomIndex].name}</p>
+            <RoomWorkQuestions room={scopedRooms(analysis, brief)[workRoomIndex]} brief={brief} onChange={answer => setBrief(current => ({ ...current, roomWork: [...(current.roomWork ?? []).filter(row => row.roomName !== answer.roomName), answer] }))} />
           </>}
+          {step === 'design' && <DesignIntentQuestions analysis={analysis} brief={brief} onChange={setBrief} />}
           {step === 'finish' && <div className="space-y-2">{(['Budget-friendly', 'Standard', 'Premium', 'Luxury', 'Recommend'] as const).map(finish => <button key={finish} type="button" aria-pressed={brief.finish === finish} onClick={() => setBrief(current => ({ ...current, finish }))} className={`flex w-full items-center justify-between rounded-xl border p-4 text-left text-sm ${brief.finish === finish ? 'border-primary bg-primary/5' : ''}`}>{finish === 'Recommend' ? 'Recommend based on my budget' : finish}{brief.finish === finish && <Check className="h-4 w-4 text-primary" />}</button>)}</div>}
           {step === 'budget' && <><p className="text-sm text-muted-foreground">Optional. Leave this empty to start with the available product rates.</p><Label htmlFor="plan-budget">Approximate budget</Label><Input id="plan-budget" inputMode="decimal" type="number" min="1" max="1000000000" placeholder="No budget set" value={brief.budget ?? ''} onChange={event => setBrief(current => ({ ...current, budget: event.target.value ? Number(event.target.value) : null }))} /></>}
           {step === 'details' && <><div className="space-y-2"><Label>Client name</Label><ClientSelector value={brief.clientName} clients={clients} onChange={clientName => setBrief(current => ({ ...current, clientName }))} onClientSelect={client => setBrief(current => ({ ...current, address: client.address || current.address }))} /></div><div className="space-y-2"><Label htmlFor="plan-location">Project city or location</Label><Input id="plan-location" value={brief.location} maxLength={150} placeholder="e.g. Bengaluru" onChange={event => setBrief(current => ({ ...current, location: event.target.value }))} /></div><div className="space-y-2"><Label htmlFor="plan-address">Address (optional)</Label><Input id="plan-address" value={brief.address} maxLength={1000} onChange={event => setBrief(current => ({ ...current, address: event.target.value }))} /></div></>}
-          {step === 'review' && <><dl className="space-y-3 rounded-xl border p-4 text-sm">{[['Property', `${analysis.propertyType} · ${analysis.floors ?? 'Unknown'} floor(s)`], ['Rooms included', scopedRooms(analysis, brief).map(room => room.name).join(', ')], ['Finish', brief.finish], ['Client', brief.clientName], ['Location', brief.location], ['Budget', brief.budget?.toLocaleString() || 'Not set']].map(([name, value]) => <div key={name} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-3"><dt className="text-muted-foreground">{name}</dt><dd>{value}</dd></div>)}</dl><p className="rounded-xl bg-muted p-3 text-xs leading-5">We use approved selling rates first, then research comparable published prices for your city. Sources, estimates and historical rates are labelled. Unavailable prices and missing work measurements remain pending. Your existing editor content is preserved.</p></>}
+          {step === 'review' && <><dl className="space-y-3 rounded-xl border p-4 text-sm">{[['Property', `${analysis.propertyType} · ${analysis.floors ?? 'Unknown'} floor(s)`], ['Rooms included', scopedRooms(analysis, brief).map(room => room.name).join(', ')], ['Work included', (brief.roomWork ?? []).map(answer => `${answer.roomName}: ${answer.items.map(item => roomWorkOptions(analysis.rooms.find(room => room.name === answer.roomName)!, brief.scope).find(option => option.key === item.key)?.name).join(', ')}`).join('; ')], ['Design', brief.design ? `${brief.design.coordinatedLook ? 'Coordinated finishes' : 'Room-specific finishes'}; ${brief.design.retainExisting ? 'retain existing items where possible' : 'new interior work'}. ${brief.design.notes}` : 'Not set'], ['Finish', brief.finish], ['Client', brief.clientName], ['Location', brief.location], ['Budget', brief.budget?.toLocaleString() || 'Not set']].map(([name, value]) => <div key={name} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-3"><dt className="text-muted-foreground">{name}</dt><dd>{value}</dd></div>)}</dl><p className="rounded-xl bg-muted p-3 text-xs leading-5">We use approved selling rates first, then research comparable published prices for your city. Sources, estimates and historical rates are labelled. Unavailable prices and missing work measurements remain pending. Your existing editor content is preserved.</p></>}
           {step === 'estimate' && estimate && <>
+            <div className="rounded-xl border p-3 text-xs leading-5"><p className="font-medium">{estimate.draft.sections.length} sections · {estimate.draft.sections.reduce((count, section) => count + section.items.length, 0)} items</p><p className="text-muted-foreground">All listed sections and items will be added to your quotation. Existing work stays in the editor.</p>{!!estimate.scopeGaps?.length && <div className="mt-2 space-y-2 text-amber-800 dark:text-amber-300"><p>Selected rooms not yet included: {estimate.scopeGaps.join(', ')}. Generate these rooms or update your scope before applying this estimate.</p><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" disabled={!!busy} onClick={() => void generate(estimate.scopeGaps)}>Generate missing rooms</Button><Button type="button" size="sm" variant="ghost" disabled={!!busy} onClick={() => setStep('scope')}>Change scope</Button></div></div>}</div>
             <CompleteEstimate estimate={estimate} disabled={!!busy} onComplete={complete} onRetry={() => void generate(undefined, true)} />
             {estimate.assumptions.some(note => /Pricing search|Live market research|no recent comparable|conflict|city is unknown/.test(note)) && <details className="min-w-0 rounded-xl border p-3 text-xs leading-5"><summary className="cursor-pointer font-medium">Why some prices are missing</summary><ul className="mt-2 list-disc space-y-1 pl-4">{estimate.assumptions.filter(note => /Pricing search|Live market research|no recent comparable|conflict|city is unknown/.test(note)).map((note, index) => <li key={index}>{note}</li>)}</ul></details>}
             <div className="rounded-xl bg-primary/5 p-4"><p className="text-xs font-medium text-primary">AI-generated estimate · rates and measurements require review</p><p className="mt-1 text-2xl font-semibold">{estimate.incomplete && estimate.totals.total === 0 ? 'Estimate pending' : estimate.totals.total.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-xs font-normal text-muted-foreground">{estimate.evidence.find(item => item.price)?.price?.currency || ''}</span></p><p className="mt-1 text-xs text-muted-foreground">{estimate.incomplete ? 'Partial total: excludes items with missing quantity or rate.' : 'Includes your existing tax and discount settings.'}</p></div>
@@ -219,15 +274,14 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
             <details className="rounded-xl border p-3 text-sm"><summary className="cursor-pointer font-medium">Refine this estimate</summary><fieldset className="mt-3 space-y-2"><legend className="mb-2 text-xs text-muted-foreground">Select rooms to regenerate. Other rooms stay in this estimate.</legend>{[...new Set(estimate.roomSections.map(row => row.roomName))].map(name => <label key={name} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={regenerateRooms.includes(name)} onChange={event => setRegenerateRooms(current => event.target.checked ? [...current, name] : current.filter(room => room !== name))} />{name}</label>)}</fieldset><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" disabled={!regenerateRooms.length || !!busy} onClick={() => void generate(regenerateRooms)}>Regenerate selected items</Button><Button type="button" size="sm" variant="ghost" disabled={!!busy} onClick={() => setStep('details')}>Edit Project Details</Button></div></details>
             <p className="text-xs text-muted-foreground">Open the editor to adjust products, measurements and rates, then use Save as Draft. Nothing is sent automatically.</p>
           </>}
-          {busy && <div role="status" className="space-y-2 rounded-xl bg-muted p-3"><div className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" />{busy}</div>{step === 'upload' && <progress aria-label="Upload progress" value={progress} max={100} className="h-1.5 w-full accent-primary" />}</div>}
-          {error && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm leading-6 text-destructive">{error}</p>}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 border-t bg-background px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+          {error && <p ref={errorBanner} tabIndex={-1} role="alert" className="w-full rounded-xl bg-destructive/10 p-3 text-sm leading-6 text-destructive outline-none">{error}</p>}
           {busy ? <Button variant="outline" type="button" onClick={() => abort.current?.()}>Cancel request</Button> : <>
             <Button variant="outline" type="button" onClick={step === 'upload' || step === 'analysis' && mode === 'details' ? onClose : back}><ArrowLeft className="mr-1 h-4 w-4" />{step === 'upload' || step === 'analysis' && mode === 'details' ? 'Cancel' : 'Back'}</Button>
             {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'review' ? <Button type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>
-              <Button type="button" variant="outline" className="min-w-0 flex-1" onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, false, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not apply the estimate.'); } }}>Edit Quotation</Button>
-              <Button type="button" className="w-full sm:w-auto" onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, true, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not save the estimate.'); } }}>Save as Draft</Button>
+              <Button type="button" variant="outline" className="min-w-0 flex-1" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, false, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not apply the estimate.'); } }}>Edit Quotation</Button>
+              <Button type="button" className="w-full sm:w-auto" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, true, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not save the estimate.'); } }}>Save as Draft</Button>
             </> : <Button type="button" className="min-w-0 flex-1" onClick={next}>Continue<ArrowRight className="ml-1 h-4 w-4" /></Button>}
           </>}
         </div>

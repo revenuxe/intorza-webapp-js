@@ -27,9 +27,20 @@ async function readBody(request: Request, max: number) {
 }
 export async function GET(request: Request) {
   const ctx = await adminContext(request); if (ctx.denied) return ctx.denied;
-  const result = await ctx.db.from('ai_training_documents').select('id,filename,status,extraction,created_at,reviewed_at').order('created_at', { ascending: false }).limit(50);
+  const params = new URL(request.url).searchParams;
+  const page = Number(params.get('page') || 0);
+  if (!Number.isSafeInteger(page) || page < 0 || page > 1000000) return json({ error: 'Invalid library page.' }, 400);
+  if (params.get('kind') === 'prices') {
+    let query = ctx.db.from('ai_reference_price_catalogue').select('*', { count: 'exact' });
+    const search = (params.get('search') || '').trim().slice(0, 150);
+    if (search) query = query.ilike('product_name', `%${search.replace(/[\\%_]/g, '\\$&')}%`);
+    const result = await query.order('product_name').order('id').range(page * 50, page * 50 + 49);
+    if (result.error) return json({ error: 'Price catalogue unavailable. Apply the reference pricing migration.' }, 503);
+    return json({ prices: result.data, total: result.count, page });
+  }
+  const result = await ctx.db.from('ai_training_documents').select('id,filename,status,extraction,created_at,reviewed_at', { count: 'exact' }).order('created_at', { ascending: false }).order('id').range(page * 50, page * 50 + 49);
   if (result.error) return json({ error: 'Training library unavailable. Apply the admin AI migration.' }, 503);
-  return json({ documents: result.data });
+  return json({ documents: result.data, total: result.count, page });
 }
 export async function POST(request: Request) {
   let cleanup: (() => Promise<unknown>) | undefined;

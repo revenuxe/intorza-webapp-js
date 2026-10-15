@@ -27,6 +27,10 @@ describe('Supabase uploads and database references', () => {
     expect(result.bucket).toBe(bucket);
     expect(result.key.startsWith('owner-id/')).toBe(true);
     expect(mockUpload.mock.calls[0][2]).toMatchObject({ upsert: false });
+    if (bucket === 'company-logos') {
+      expect(result.url).toBe(result.key);
+      expect(mockSign).not.toHaveBeenCalled();
+    }
   });
   it('removes an uploaded object when saving its DB reference fails', async () => {
     await expect(uploadAndSave(new File(['image'], 'test.png', { type: 'image/png' }), 'logo', async () => { throw new Error('Database unavailable'); })).rejects.toThrow('Database unavailable');

@@ -1,3 +1,5 @@
+import { resolveCompanyAssetUrl } from '@/lib/company-assets';
+import { CompanyAssetImage } from "@/components/CompanyAssetImage";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Upload, Palette, Check, Loader2, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -136,7 +138,7 @@ export const BrandColorExtractor = ({
       };
       
       img.onerror = () => resolve([]);
-      img.src = imageUrl;
+      resolveCompanyAssetUrl(imageUrl).then(url => { img.src = url; }).catch(() => resolve([]));
     });
   }, []);
 
@@ -283,7 +285,7 @@ export const BrandColorExtractor = ({
           )}>
             {logoPreview ? (
               <>
-                <img 
+                <CompanyAssetImage
                   src={logoPreview} 
                   alt="Logo preview" 
                   className="w-full h-full object-contain"

@@ -16,7 +16,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   getUser.mockResolvedValue({ data: { user: { id: 'admin-id' } }, error: null });
   rpc.mockImplementation((name: string) => Promise.resolve(name === 'is_admin' ? { data: true, error: null } : { error: null }));
-  from.mockImplementation(() => ({ select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), order: jest.fn().mockReturnThis(), limit: jest.fn().mockResolvedValue({ data: [], error: null }), maybeSingle, insert }));
+  from.mockImplementation(() => ({ select: jest.fn().mockReturnThis(), eq: jest.fn().mockReturnThis(), order: jest.fn().mockReturnThis(), range: jest.fn().mockResolvedValue({ data: [], count: 0, error: null }), ilike: jest.fn().mockReturnThis(), maybeSingle, insert }));
   maybeSingle.mockResolvedValue({ data: null, error: null }); insert.mockResolvedValue({ error: null });
   upload.mockResolvedValue({ error: null }); remove.mockResolvedValue({ error: null });
   (createClient as jest.Mock).mockReturnValue({ auth: { getUser }, rpc, from, storage: { from: () => ({ upload, remove }) } });
@@ -29,6 +29,16 @@ it('requires valid server-verified administrator access for listing and uploads'
   rpc.mockResolvedValueOnce({ data: false }); expect((await GET(request())).status).toBe(403);
   rpc.mockResolvedValueOnce({ data: false }); expect((await POST(pdf())).status).toBe(403);
   expect(from).not.toHaveBeenCalled(); expect(upload).not.toHaveBeenCalled();
+});
+it('paginates both documents and aggregated prices and validates page numbers', async () => {
+  const pageRequest = (query: string) => new Request(`https://app.intorza.com/api/admin/ai/training?${query}`, { headers: { Authorization: 'Bearer admin-session' } });
+  expect((await GET(pageRequest('page=1'))).status).toBe(200);
+  expect(from.mock.results[0].value.range).toHaveBeenCalledWith(50, 99);
+  expect((await GET(pageRequest('kind=prices&page=2&search=wardrobe'))).status).toBe(200);
+  expect(from).toHaveBeenLastCalledWith('ai_reference_price_catalogue');
+  expect(from.mock.results[1].value.range).toHaveBeenCalledWith(100, 149);
+  expect(from.mock.results[1].value.ilike).toHaveBeenCalledWith('product_name', '%wardrobe%');
+  expect((await GET(pageRequest('page=-1'))).status).toBe(400);
 });
 it('rejects invalid PDF contents and rate-limits before processing', async () => {
   expect((await POST(pdf('<script>bad</script>'))).status).toBe(422);

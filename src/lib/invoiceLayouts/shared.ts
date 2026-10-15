@@ -1,3 +1,4 @@
+import { resolveCompanyAssetUrl } from '@/lib/company-assets';
 import jsPDF from 'jspdf';
 import { PDFEditorSettings, InvoiceSettings, PDFTheme, getThemeById, hexToRgb, getFontById, applyBrandColorsToTheme } from '../pdfThemes';
 import { getNumericFont, createPDFCurrencyFormatter, registerPDFCurrencyFont } from '../pdfCurrencyFormatter';
@@ -103,6 +104,7 @@ export interface LayoutContext {
 export const NUMERIC_FONT = getNumericFont();
 
 export const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
+  imageUrl = await resolveCompanyAssetUrl(imageUrl);
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';

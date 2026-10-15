@@ -47,12 +47,42 @@ tips collapsed, and room details can be expanded individually.
 One vision request analyses the document(s), including PDF pages. Results preserve
 room type, floor label, source file/page, printed dimensions converted to feet,
 confidence and observations. Unscaled inferred dimensions are cleared. The user can
-correct rooms and dimensions. Scope, finish, optional budget and client/location
-questions run locally without model calls. The no-plan path collects rooms directly.
+correct rooms and dimensions. Full Interior, Kitchen, Bedrooms, combined and selected-room
+scopes are available only when relevant rooms are present. After scope selection,
+each included room gets a work checklist based on its detected type and plan
+observations. Kitchen cabinetry/counters, bedroom storage, living-room features,
+bathroom fittings and other room-specific work have separate fields. Known
+ceiling/floor coverage is prefilled from reliable room dimensions; cabinet/wall
+measurements are never substituted with floor area. User requirements and unknown
+measurements are retained. Finish, optional budget and missing client/location
+questions run locally without model calls. Existing client/city answers skip the
+client step. The no-plan path collects rooms directly.
+
+Scope now starts with an explicit yes/no question about whole-plan coverage.
+No opens an initially empty room selection, with optional focused presets.
+Each applicable room feature (including TV units) needs an explicit yes/no
+answer; suggested essentials are not treated as confirmed decisions. Optional
+measurements and requirements expand only for included work. A design-direction
+step confirms coordinated finishes and retention of existing furniture/finishes;
+these choices and notes are stored in the brief and passed to generation.
+The server rejects contradictions between feature decisions and included items.
+
+The workflow dialog has a bounded viewport height, one scrolling content panel,
+and fixed header/footer regions. Upload/analysis/generation progress is displayed
+in a fixed status region directly below the header, with cancellation always
+available in the footer. Content is inert while a request is pending. Step and
+room changes reset the panel scroll and focus the step heading without scrolling
+the underlying page. Validation focuses and reveals the first unanswered work
+question; other errors are shown in the fixed footer.
 The catalogue context is capped at 60 candidates with shortened specifications; canonical
 rates and full provenance remain on the server. No model call is made for each form field.
 
-One structured text request proposes items. It cannot choose arbitrary prices or taxes.
+Structured requests propose work for at most four rooms each, two batches at a
+time. A deterministic coverage check creates any confirmed work fields omitted
+by sparse model output. All selected rooms and work remain present, including
+items with pending measurements or pricing. Up to 40 detected rooms and 600
+quotation items across 80 editor sections are supported; capacity violations
+fail visibly instead of truncating rows. The model cannot choose arbitrary prices or taxes.
 The server resolves current approved rate references first, then researches missing
 rates using OpenAI Responses web search, then uses labelled recent historical rates
 where available. Product names must match referenced rates. Currency/location
@@ -126,6 +156,14 @@ The original editor snapshot is checked before applying. Generated sections appe
 to existing content, preserving manual sections/items. Edit Quotation opens the current
 editor; Save as Draft explicitly applies the reviewed estimate and invokes its normal
 save flow after state has rendered. Saving links the analysis record to the quotation.
+The editor transfer verifies every expected item identity and count. Refinement
+preserves matching item IDs, manual rates and explicit dimensions; older estimates
+without a work checklist retain omitted rows. Only explicit checklist deselection
+removes work during room refinement. Nested saves are read back and reconciled
+before navigation. Browser verification covers Edit Quotation, Save as Draft and
+reload without losing selected fields. Separately billed services stay listed
+as pending, with their billing basis in the description; they are not converted
+to square-foot rates.
 Finalizing a newly generated estimate requires complete client/title/item/measurement/rate
 fields. Nothing is automatically sent.
 
@@ -158,6 +196,18 @@ money calculations, selective regeneration, review before applying/saving, and a
 preservation on errors. Browser checks mock auth/storage/provider responses and exercise
 320/390/768/1440 pixel layouts and the in-app flow. These do not establish physical iPhone
 keyboard behavior, deployed storage policies, live provider access or drawing accuracy.
+
+The October 15 scope/preservation update passed 136 targeted automated tests,
+TypeScript, scoped ESLint, a production Next build and the mocked browser flow
+at 320/390/768/1440 widths. A 25-room/75-item regression covers both API batching
+and transfer into the existing editor. These frontend changes await deployment.
+
+The subsequent guided-question/navigation update passed 129 AI/builder tests,
+TypeScript, scoped ESLint and the production build. An isolated fresh production
+test server verified pinned loading/cancel controls at 320/390/768/1440 widths,
+scroll/focus resets between steps and rooms, whole-plan and selected-room paths,
+explicit TV-unit rejection, design answers, and preservation through edit/save/reload.
+Browser requests used synthetic data and mocked provider/database responses.
 
 API format verified against official OpenAI documentation:
 https://developers.openai.com/api/docs/guides/file-inputs

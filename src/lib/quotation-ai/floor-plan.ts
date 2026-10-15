@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { draftSchema, itemCalculation, quotationTotals, type VoiceDraft } from './domain';
+import { roomWorkSchema, roomWorkOptions } from './room-work';
 
 export const MAX_PLAN_BYTES = 10 * 1024 * 1024;
 export const MAX_PLAN_FILES = 3;
@@ -18,10 +19,12 @@ export const analysisSchema = z.object({
 }).strict();
 export type PlanAnalysis = z.infer<typeof analysisSchema>;
 export const briefSchema = z.object({
-  scope: z.enum(['complete', 'kitchen-wardrobes', 'living-bedrooms', 'selected']),
+  scope: z.enum(['complete', 'kitchen', 'bedrooms', 'kitchen-wardrobes', 'living-bedrooms', 'selected']),
   roomNames: z.array(label).min(1).max(40), finish: z.enum(['Budget-friendly', 'Standard', 'Premium', 'Luxury', 'Recommend']),
   budget: z.number().finite().positive().max(1000000000).nullable(),
   clientName: label, location: label, address: z.string().max(1000),
+  roomWork: z.array(roomWorkSchema).max(40).optional(),
+  design: z.object({ coordinatedLook: z.boolean().nullable(), retainExisting: z.boolean().nullable(), notes: z.string().trim().max(600) }).strict().optional(),
 }).strict();
 export type ProjectBrief = z.infer<typeof briefSchema>;
 export const generatedSchema = z.object({
@@ -29,7 +32,7 @@ export const generatedSchema = z.object({
     productName: label, description: z.string().max(1000), rateId: z.string().max(100).nullable(),
     quantity: dimension, measurementStatus: z.enum(['measured', 'estimated', 'unknown']),
     measurementReason: z.string().max(600),
-  }).strict()).min(1).max(12) }).strict()).min(1).max(12),
+  }).strict()).min(1).max(20) }).strict()).min(1).max(40),
   assumptions: z.array(z.string().max(600)).max(20),
 }).strict();
 export type PriceEvidence = {
@@ -44,7 +47,7 @@ export type Estimate = ReturnType<typeof buildEstimate>;
 export const estimateCompletionSchema = z.object({ action: z.literal('complete'), projectId: z.string().uuid(),
   changes: z.array(z.object({ itemId: z.string().uuid(), widthFt: dimension, heightFt: dimension,
     ratePerSft: z.number().finite().nonnegative().max(10000000).nullable(),
-  }).strict()).min(1).max(60),
+  }).strict()).min(1).max(600),
 }).strict();
 
 export function completeEstimate(previous: Estimate, changes: z.infer<typeof estimateCompletionSchema>['changes']) {
@@ -90,6 +93,8 @@ export function detectPlanType(bytes: Uint8Array) {
 export function scopedRooms(analysis: PlanAnalysis, brief: Pick<ProjectBrief, 'scope' | 'roomNames'>) {
   return analysis.rooms.filter(room => brief.roomNames.includes(room.name) && (
     brief.scope === 'complete' || brief.scope === 'selected' ||
+    brief.scope === 'kitchen' && room.kind === 'kitchen' ||
+    brief.scope === 'bedrooms' && room.kind === 'bedroom' ||
     brief.scope === 'kitchen-wardrobes' && ['kitchen', 'bedroom'].includes(room.kind) ||
     brief.scope === 'living-bedrooms' && ['living', 'bedroom'].includes(room.kind)
   ));
@@ -108,55 +113,97 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
       if (seen.has(key)) throw new Error('The proposal contains a duplicate item. Please regenerate.');
       seen.add(key);
       const price = rates.find(rate => rate.id === item.rateId && rate.unit === 'sqft'
+        && !/Billing: (piece|lump_sum); price separately/i.test(item.description)
         && rate.name.trim().toLowerCase() === item.productName.trim().toLowerCase()
         && Number.isFinite(rate.rate) && rate.rate >= 0 && rate.rate <= 10000000) ?? null;
       const id = crypto.randomUUID();
       const room = analysis.rooms.find(room => room.name === section.roomName)!;
       // Ceiling coverage is directly related to printed/user-entered room area. Cabinetry is not.
-      const ceilingArea = /^false ceiling(?: work)?$/i.test(item.productName.trim())
+      const workAnswer = brief.roomWork?.find(answer => answer.roomName === room.name);
+      const work = workAnswer?.items.find(answer => roomWorkOptions(room, brief.scope).find(option => option.key === answer.key)?.name === item.productName);
+      const explicitDimensions = work?.widthFt != null && work?.heightFt != null;
+      const ceilingArea = !workAnswer && /^false ceiling(?: work)?$/i.test(item.productName.trim())
         && ['printed','user'].includes(room.source) && room.widthFt != null && room.lengthFt != null
         ? Math.round(room.widthFt * room.lengthFt * 10000) / 10000 : null;
       // A model's interpretation is never a verified site measurement.
-      evidence.push({ itemId: id, quantityStatus: ceilingArea != null ? 'estimated' : item.measurementStatus === 'measured' ? 'estimated' : item.measurementStatus,
+      evidence.push({ itemId: id, quantityStatus: work && item.quantity != null ? 'user_entered' : ceilingArea != null ? 'estimated' : item.measurementStatus === 'measured' ? 'estimated' : item.measurementStatus,
         reason: ceilingArea != null ? `Full-room ceiling allowance: ${room.widthFt} ft × ${room.lengthFt} ft. Assumes complete ceiling coverage; verify cutouts and design.` : item.measurementReason, price });
-      return { id, productName: price?.name ?? item.productName, productDetails: price?.description || item.description,
-        side: '', measurementMode: 'direct_area' as const, widthFt: null, heightFt: null,
-        sftArea: ceilingArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
+      return { id, productName: price?.name ?? item.productName, productDetails: work ? item.description : price?.description || item.description,
+        side: '', measurementMode: explicitDimensions ? 'dimensions' as const : 'direct_area' as const, widthFt: explicitDimensions ? work.widthFt : null, heightFt: explicitDimensions ? work.heightFt : null,
+        sftArea: explicitDimensions ? null : ceilingArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
     }) };
   });
   const draft = draftSchema.parse({ ...base, revision: base.revision + 1,
     project: { ...base.project, projectTitle: base.project.projectTitle || `${brief.finish} Interior Estimate`, clientName: brief.clientName, clientAddress: brief.address, placeOfProject: brief.location, projectType: analysis.propertyType }, sections });
   const items = draft.sections.flatMap(section => section.items);
   const amounts = items.map(item => Number(itemCalculation(item).cents ?? 0n) / 100);
-  return { draft, evidence, roomSections: draft.sections.map((section, index) => ({ sectionId: section.id, roomName: proposal.sections[index].roomName })), totals: quotationTotals(amounts, draft.pricing),
-    incomplete: items.some(item => item.sftArea == null || item.ratePerSft == null),
+  return { draft, evidence, scopeGaps: [...allowed].filter(name => !proposal.sections.some(section => section.roomName === name)), roomSections: draft.sections.map((section, index) => ({ sectionId: section.id, roomName: proposal.sections[index].roomName })), totals: quotationTotals(amounts, draft.pricing),
+    incomplete: items.some(item => itemCalculation(item).area == null || item.ratePerSft == null),
     assumptions: [...analysis.warnings, ...proposal.assumptions,
       ...(brief.budget != null && quotationTotals(amounts, draft.pricing).total > brief.budget ? ['The priced items exceed your target budget. Review the scope or finish before finalizing.'] : []),
       'Room floor area is not cabinetry or wall-work area. All proposed work quantities require review.',
-      'Only square-foot work is inserted into this editor. Running-feet, piece, set and package work requires separate pricing; it is excluded from these totals.',
+      'Square-foot work uses the existing editor calculation. Selected piece/package services remain listed with separate pricing pending and are excluded from provisional totals.',
       'Historical rates are not current supplier quotes. Taxes and discounts use the existing quotation settings.'] };
+}
+
+/** Refining details must not silently replace a room with fewer work fields. */
+export function preserveRefinedItems(previous: Estimate, next: Estimate, brief: ProjectBrief): Estimate {
+  const draft = draftSchema.parse(next.draft);
+  const evidence = next.evidence.map(row => ({ ...row }));
+  const roomSections = next.roomSections.map(row => ({ ...row }));
+  for (const section of draft.sections) {
+    const roomName = roomSections.find(row => row.sectionId === section.id)?.roomName;
+    const oldSections = previous.draft.sections.filter(old => previous.roomSections.some(row => row.sectionId === old.id && row.roomName === roomName));
+    const oldItems = oldSections.flatMap(old => old.items);
+    for (const item of section.items) {
+      const old = oldItems.find(old => old.productName.trim().toLowerCase() === item.productName.trim().toLowerCase());
+      if (!old) continue;
+      const row = evidence.find(row => row.itemId === item.id)!;
+      const oldEvidence = previous.evidence.find(row => row.itemId === old.id);
+      row.itemId = old.id; item.id = old.id;
+      if (oldEvidence?.price?.source === 'manual') { item.ratePerSft = old.ratePerSft; row.price = oldEvidence.price; }
+      if (oldEvidence?.quantityStatus === 'user_entered' && row.quantityStatus !== 'user_entered') {
+        item.measurementMode = old.measurementMode; item.widthFt = old.widthFt; item.heightFt = old.heightFt; item.sftArea = old.sftArea;
+        row.quantityStatus = oldEvidence.quantityStatus; row.reason = oldEvidence.reason;
+      }
+    }
+    // A confirmed checklist explicitly defines additions/removals. Older
+    // estimates without that checklist retain unmatched rows during refinement.
+    if (!brief.roomWork?.some(answer => answer.roomName === roomName)) for (const old of oldItems) {
+      if (section.items.some(item => item.id === old.id)) continue;
+      section.items.push({ ...old });
+      const row = previous.evidence.find(row => row.itemId === old.id);
+      if (row) evidence.push({ ...row });
+    }
+    if (oldSections.length === 1) {
+      const mapping = roomSections.find(row => row.sectionId === section.id)!;
+      section.id = oldSections[0].id; mapping.sectionId = section.id;
+    }
+  }
+  return completeEstimate({ ...next, draft, evidence, roomSections }, []);
 }
 
 /** Replace only reviewed rooms; refresh retained rates from the current owner-scoped sources. */
 export function mergeRoomEstimates(previous: Estimate, next: Estimate, roomNames: string[], rates: PriceEvidence[]) {
   const previousDraft = draftSchema.parse(previous.draft);
-  const mapping = z.array(z.object({ sectionId: z.string(), roomName: label }).strict()).max(12).parse(previous.roomSections);
-  const priorEvidence = z.array(z.object({ itemId: z.string(), quantityStatus: z.string().max(30), reason: z.string().max(600), price: z.object({ id: z.string() }).passthrough().nullable() }).strict()).max(60).parse(previous.evidence);
+  const mapping = z.array(z.object({ sectionId: z.string(), roomName: label }).strict()).max(80).parse(previous.roomSections);
+  const priorEvidence = z.array(z.object({ itemId: z.string(), quantityStatus: z.string().max(30), reason: z.string().max(600), price: z.object({ id: z.string() }).passthrough().nullable() }).strict()).max(600).parse(previous.evidence);
   const retained = previousDraft.sections.filter(section => !mapping.some(row => row.sectionId === section.id && roomNames.includes(row.roomName)));
   const retainedIds = new Set(retained.flatMap(section => section.items.map(item => item.id)));
   const evidence = priorEvidence.filter(row => retainedIds.has(row.itemId)).map(row => {
     const item = retained.flatMap(section => section.items).find(item => item.id === row.itemId)!;
-    const price = rates.find(rate => rate.id === row.price?.id && rate.unit === 'sqft' && rate.name.toLowerCase() === item.productName.toLowerCase()) ?? null;
+    const price = row.price?.source === 'manual' ? row.price as PriceEvidence
+      : rates.find(rate => rate.id === row.price?.id && rate.unit === 'sqft' && rate.name.toLowerCase() === item.productName.toLowerCase()) ?? null;
     item.ratePerSft = price?.rate ?? null;
     return { itemId: row.itemId, quantityStatus: row.quantityStatus, reason: row.reason, price };
   });
   const draft = draftSchema.parse({ ...next.draft, sections: [...retained, ...next.draft.sections] });
   const items = draft.sections.flatMap(section => section.items);
-  if (items.length > 60) throw new Error('Keep the estimate within 60 items.');
+  if (items.length > 600) throw new Error('Keep the estimate within 600 items.');
   return { ...next, draft, evidence: [...evidence, ...next.evidence],
     roomSections: [...mapping.filter(row => retained.some(section => section.id === row.sectionId)).map(row => ({ sectionId: row.sectionId, roomName: row.roomName })), ...next.roomSections],
     totals: quotationTotals(items.map(item => Number(itemCalculation(item).cents ?? 0n) / 100), draft.pricing),
-    incomplete: items.some(item => item.sftArea == null || item.ratePerSft == null),
+    incomplete: items.some(item => itemCalculation(item).area == null || item.ratePerSft == null),
     assumptions: [...new Set([...z.array(z.string().max(600)).max(50).parse(previous.assumptions), ...next.assumptions])],
   };
 }

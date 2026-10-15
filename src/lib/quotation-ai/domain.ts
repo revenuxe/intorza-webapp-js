@@ -20,8 +20,10 @@ export const pricingFields = z.object({
 export const draftSchema = z.object({
   version: z.literal(1), revision: z.number().int().nonnegative(),
   project: projectFields, pricing: pricingFields,
-  sections: z.array(z.object({ id, title: text, items: z.array(itemFields.extend({ id })).max(60) }).strict()).max(12),
-}).strict();
+  sections: z.array(z.object({ id, title: text, items: z.array(itemFields.extend({ id })).max(60) }).strict()).max(80),
+}).strict().superRefine((draft, context) => {
+  if (draft.sections.reduce((count, section) => count + section.items.length, 0) > 600) context.addIssue({ code: 'custom', message: 'Keep each quotation within 600 items.' });
+});
 export type VoiceDraft = z.infer<typeof draftSchema>;
 export const operationSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('update_project'), fields: projectFields.partial() }).strict(),
@@ -123,14 +125,14 @@ export function applyOperations(draft: VoiceDraft, operations: Operation[], make
   }
   const sectionIds = parsed.sections.map(section => section.id);
   const itemIds = parsed.sections.flatMap(section => section.items.map(item => item.id));
-  if (new Set(sectionIds).size !== sectionIds.length || new Set(itemIds).size !== itemIds.length || itemIds.length > 60) throw new Error('Draft exceeds item limits or contains duplicate identifiers.');
+  if (new Set(sectionIds).size !== sectionIds.length || new Set(itemIds).size !== itemIds.length || itemIds.length > 600) throw new Error('Draft exceeds item limits or contains duplicate identifiers.');
   return parsed;
 }
 
 export type LegacySection = { id: string; title: string; items: { id: string; productName: string; productDetails: string; side: string; widthFt: number; heightFt: number; sftArea: number; ratePerSft: number; amount: number }[] };
 export function fromQuotation(project: VoiceDraft['project'], sections: LegacySection[], pricing: VoiceDraft['pricing']): VoiceDraft {
   return draftSchema.parse({ version: 1, revision: 0, project, pricing, sections: sections.map(section => ({ ...section,
-    items: section.items.filter(item => item.productName || item.widthFt || item.heightFt || item.sftArea || item.ratePerSft).map(item => ({
+    items: section.items.filter(item => item.productName || item.productDetails || item.widthFt || item.heightFt || item.sftArea || item.ratePerSft).map(item => ({
       id: item.id, productName: item.productName, productDetails: item.productDetails, side: item.side,
       measurementMode: (item.widthFt > 0 || item.heightFt > 0) && (!item.sftArea || Math.abs(item.widthFt * item.heightFt - item.sftArea) < 0.0001) ? 'dimensions' : 'direct_area',
       widthFt: (item.widthFt > 0 || item.heightFt > 0) && (!item.sftArea || Math.abs(item.widthFt * item.heightFt - item.sftArea) < 0.0001) ? item.widthFt || null : null,

@@ -1,3 +1,4 @@
+import { resolveCompanyAssetUrl } from '@/lib/company-assets';
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -137,6 +138,7 @@ export interface QuotationData {
 const NUMERIC_FONT = getNumericFont();
 
 const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: number): Promise<string> => {
+  imageUrl = await resolveCompanyAssetUrl(imageUrl);
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';

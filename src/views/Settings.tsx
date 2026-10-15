@@ -1,4 +1,6 @@
 "use client";
+import { CompanyAssetImage } from "@/components/CompanyAssetImage";
+
 
 import { useState, useEffect } from "react";
 import { Link } from "@/lib/navigation";
@@ -426,7 +428,7 @@ const Settings = () => {
           <CardContent className="space-y-4">
             {profile.logo_url && (
               <div className="flex justify-center p-4 bg-muted/30 rounded-lg">
-                <img 
+                <CompanyAssetImage
                   src={profile.logo_url} 
                   alt="Company Logo" 
                   className="max-h-32 object-contain"
@@ -463,7 +465,7 @@ const Settings = () => {
           <CardContent className="space-y-4">
             {profile.signature_url && (
               <div className="flex justify-center p-4 bg-muted/30 rounded-lg">
-                <img 
+                <CompanyAssetImage
                   src={profile.signature_url} 
                   alt="Signature" 
                   className="max-h-24 object-contain"

@@ -1,3 +1,4 @@
+import { CompanyAssetImage } from "@/components/CompanyAssetImage";
 import { useState, useEffect } from "react";
 import { Plus, Trash2, Star, Edit2, Loader2, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -337,7 +338,7 @@ export const BankDetailsTab = () => {
               <Label>Payment QR Code</Label>
               {formData.qr_code_url && (
                 <div className="flex justify-center p-4 bg-muted/30 rounded-lg">
-                  <img src={formData.qr_code_url} alt="QR Code" className="max-h-32 object-contain" />
+                  <CompanyAssetImage src={formData.qr_code_url} alt="QR Code" className="max-h-32 object-contain" />
                 </div>
               )}
               <div className="flex items-center gap-2">

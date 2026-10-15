@@ -49,6 +49,24 @@ Check/inspect commands do not read tenant records or apply SQL migrations.
 
 ## Remaining rollout work
 
+On October 15, 2026, `20261015190000_private_company_assets` was applied
+individually to the linked project and recorded in migration history.
+`company-logos` is now private: authenticated owners alone can read, list,
+upload, update, and delete their files. This bucket also contains signatures,
+payment QR codes, and hero images. The four-column public company directory
+uses a definer view without granting access to private profiles.
+Transactional checks verified anonymous and cross-account denial, owner
+storage access, profile isolation, and blocked subscription self-upgrades.
+An anonymous Storage API list returned an empty array.
+
+The accompanying frontend changes require deployment. Company image fields
+now store durable object keys; legacy public/signed URLs are resolved under
+the signed-in user's RLS to one-hour signed links. Image previews refresh
+their links, and PDF generation resolves links on demand. Older deployed
+frontends using public links may show missing branding until updated.
+The targeted 21 storage tests and TypeScript checks pass; existing lint
+violations remain in older components and PDF code.
+
 The remote migration history differs from local filenames, often by seconds,
 and includes remote-only migrations. Do not run `supabase db push` or repair
 history based on timestamps alone. Retrieve and compare the remote SQL, then
@@ -61,6 +79,38 @@ no legacy-provider URLs in logos, signatures, hero images, gallery images,
 room photos, or bank QR codes. Existing Supabase storage objects are retained.
 
 ## Reliable saving and uploads
+
+### Admin quotation price library (October 15, 2026)
+
+`20261015200000_ai_reference_price_catalogue` was applied individually to the
+linked database. The admin AI panel accepts multiple PDFs and processes each
+separately (10 MB per PDF), retaining failed or rate-limited files for retry.
+There is no application limit on the number of stored quotation documents;
+provider quotas and storage capacity still apply. Documents and catalogue
+results are paginated rather than silently stopping at the first 50 records.
+
+After admin review and approval, the catalogue groups prices by normalized
+product, material, specification, city, currency, billing unit, tax treatment
+and installation. Square-metre rates are normalized to square feet. Each PDF
+contributes one median observation per identical specification. The view
+aggregates every approved priced reference before pagination and exposes
+historical and recent (90-day) medians, ranges and source counts. Null/zero,
+unapproved and future-dated prices do not enter the catalogue.
+
+Floor-plan estimates read every matching catalogue page, prioritize the user's
+approved matching rates, and use recent comparable installed, tax-exclusive
+square-foot reference medians before market research. A range wider than 3x
+is excluded from automatic reference pricing. Different specifications are
+kept separate; matching an unseen product by name alone cannot select a
+material variant. Market research and owner history remain fallback sources.
+No other business's private quotation or price history is queried.
+
+Frontend deployment is pending. This feature does not change voice interview
+pricing or enable automatic piece/package billing in the square-foot editor.
+The existing per-document extraction limit remains 60 reviewed patterns.
+Validation: 48 targeted tests, TypeScript, scoped ESLint, and a rolled-back
+database check with 122 synthetic PDFs, repeated items, stale prices, unit
+conversion, material variants and customer RLS.
 
 `save_quotation` saves quotation headers, sections, items, and selected gallery
 references in one authenticated, RLS-enforced transaction. Existing section and

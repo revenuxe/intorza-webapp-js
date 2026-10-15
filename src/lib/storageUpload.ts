@@ -121,7 +121,7 @@ async function compressImage(
 }
 
 /**
- * Upload a file/blob to Supabase Storage and return its public URL.
+ * Upload a file/blob to Supabase Storage and return a durable reference or public URL.
  * Files are stored under `<user-id>/<folder>/<filename>` so storage
  * policies scoped to the owner's folder keep working.
  */
@@ -205,6 +205,10 @@ export async function uploadToStorage(
       throw new Error("This file is too large for storage. Please choose a smaller image.");
     }
     throw new Error(msg);
+  }
+
+  if (bucket === "company-logos") {
+    return { key, url: key, bucket };
   }
 
   if (bucket === "room-photos") {
