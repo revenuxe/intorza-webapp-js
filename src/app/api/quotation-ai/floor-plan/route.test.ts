@@ -7,6 +7,8 @@ import { OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
 import { briefFixture, draftFixture, planFixture, proposalFixture } from '@/test/floor-plan-fixtures';
 import { buildEstimate, type Estimate } from '@/lib/quotation-ai/floor-plan';
 import { defaultRoomWork } from '@/lib/quotation-ai/room-work';
+import { toQuotation, reviewDraft } from '@/lib/quotation-ai/domain';
+import { workAreaSqft } from '@/lib/quotation-ai/measurement-units';
 
 jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }));
 jest.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: jest.fn() }));
@@ -78,6 +80,55 @@ it('uses reviewed global quotation references before paid market research', asyn
   expect(result.estimate.evidence[0].price.source).toBe('admin_reference');
   expect(research).not.toHaveBeenCalled();
   expect(generate).toHaveBeenCalledWith(expect.objectContaining({ reviewedPatterns: [expect.objectContaining({ product: 'Wardrobe' })] }), expect.anything());
+});
+it('fills a product key from the live catalogue basis before market research', async () => {
+  referenceRows = [{ id: 'admin-tv', product_name: 'TV Unit', material: 'Laminate', specification: '18mm plywood', unit: 'sqft',
+    recent_rate: 1400, recent_low: 1200, recent_high: 1600, recent_source_count: 1, source_count: 1,
+    tax: 'unknown', installation_included: false, location: 'bangalore', currency: 'INR', price_date: '2026-10-15' }];
+  const proposal = proposalFixture();
+  Object.assign(proposal.sections[0].items[0], { productName: 'tv_unit', description: 'Proposed TV unit', rateId: null });
+  generate.mockResolvedValueOnce(proposal);
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  const { estimate } = await response.json();
+  expect(estimate.draft.sections[0].items[0].ratePerSft).toBe(1400);
+  expect(estimate.evidence[0].price).toMatchObject({ source: 'admin_reference', confidence: 'low', match: { type: 'close' } });
+  expect(estimate.evidence[0].price.basisWarnings).toHaveLength(2);
+  expect(research).not.toHaveBeenCalled();
+});
+it('calculates a live-style base unit reference through measurement completion and editor export', async () => {
+  referenceRows = [{ id: 'base-reference', product_name: 'base unit', material: '18mm ply BWP IS 710 grade with 1mm laminate, soft close and shelves installed', specification: '56.16 sqft', unit: 'sqft',
+    recent_rate: '1200.00', recent_low: '1200.00', recent_high: '1200.00', recent_source_count: 1, source_count: 1,
+    tax: 'unknown', installation_included: true, location: 'bangalore', currency: 'INR', price_date: '2026-10-15' }];
+  const proposal = proposalFixture();
+  Object.assign(proposal.sections[0].items[0], { productName: 'Kitchen base cabinets', description: '18mm ply BWP IS 710 grade with 1mm laminate, soft close and shelves installed; retain sink clearance.', rateId: null, quantity: null, measurementStatus: 'unknown' });
+  generate.mockResolvedValueOnce(proposal);
+  const generated = await POST(request(payload()));
+  expect(generated.status).toBe(200);
+  storedEstimate = (await generated.json()).estimate;
+  const item = storedEstimate!.draft.sections[0].items[0];
+  expect(item).toMatchObject({ ratePerSft: 1200, sftArea: null });
+  expect(storedEstimate!.totals.total).toBe(0);
+  expect(research).not.toHaveBeenCalled();
+  const completed = await POST(request({ action: 'complete', projectId: '00000000-0000-4000-8000-000000000001', changes: [{ itemId: item.id, widthFt: null, heightFt: null, areaSqft: workAreaSqft('feet', 18.72, 3), ratePerSft: null }] }));
+  expect(completed.status).toBe(200);
+  const { estimate } = await completed.json();
+  expect(estimate.incomplete).toBe(false);
+  expect(estimate.totals).toEqual({ subtotal: 67392, discount: 3369.6, tax: 11524.03, total: 75546.43 });
+  expect(reviewDraft(estimate.draft)).toMatchObject({ missing: [], ...estimate.totals });
+  const exported = toQuotation(estimate.draft)[0].items[0];
+  expect(exported).toMatchObject({ sftArea: 56.16, widthFt: 0, heightFt: 0, ratePerSft: 1200, amount: 67392 });
+  expect(exported.productDetails).toContain('retain sink clearance');
+  expect(exported.productDetails).toContain('Source tax treatment: unknown');
+  expect(estimate.evidence[0].price.source).toBe('admin_reference');
+});
+it('rejects a model-selected price ID for an incompatible material', async () => {
+  referenceRows = [{ id: 'wrong-material', product_name: 'Wardrobe', material: '18mm plywood laminate', specification: '', unit: 'sqft', recent_rate: 1400, recent_low: 1400, recent_high: 1400, recent_source_count: 1, tax: 'unknown', installation_included: false, location: 'bangalore', currency: 'INR', price_date: '2026-10-15' }];
+  const proposal = proposalFixture(); Object.assign(proposal.sections[0].items[0], { description: '12mm MDF acrylic wardrobe', rateId: 'wrong-material' });
+  generate.mockResolvedValueOnce(proposal);
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  expect((await response.json()).estimate.draft.sections[0].items[0].ratePerSft).toBeNull();
 });
 it('automatically prices an empty catalogue using retrieved market evidence', async () => {
   research.mockResolvedValueOnce({ rates: [{ id: 'market-1', name: 'Wardrobe', description: 'Proposed wardrobe', rate: 1300, unit: 'sqft', currency: 'INR', location: 'Bengaluru', source: 'market_estimate', verifiedAt: '2026-10-15', sourceUrl: 'https://supplier.example/rates', inclusions: 'Installed, excluding GST' }], limitations: [] });

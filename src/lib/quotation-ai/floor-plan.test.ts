@@ -21,7 +21,8 @@ describe('floor plan quotation boundary', () => {
     const base = fixture(); const snapshot = JSON.stringify(base);
     const estimate = buildEstimate(proposal(), plan, brief, [rate], base);
     expect(estimate.totals).toEqual({ subtotal: 67200, discount: 3360, tax: 11491.2, total: 75331.2 });
-    expect(estimate.draft.sections[0].items[0].productDetails).toBe('Approved specification');
+    expect(estimate.draft.sections[0].items[0].productDetails).toContain('Proposed wardrobe');
+    expect(estimate.draft.sections[0].items[0].productDetails).toContain('Pricing specification: Approved specification');
     expect(JSON.stringify(base)).toBe(snapshot);
   });
   it('keeps unknown quantities and missing, mismatched or non-sqft rates pending', () => {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { draftSchema, itemCalculation, quotationTotals, type VoiceDraft } from './domain';
 import { roomWorkSchema, roomWorkOptions } from './room-work';
+import { normalizeReferenceText, referenceProduct } from './reference-pricing';
 
 export const MAX_PLAN_BYTES = 10 * 1024 * 1024;
 export const MAX_PLAN_FILES = 3;
@@ -43,6 +44,7 @@ export type PriceEvidence = {
   currency: string; sourceUrl: string | null; inclusions: string;
   range?: { low: number; high: number };
   confidence?: 'low' | 'medium';
+  basisWarnings?: string[];
   match?: { type: 'close'; referenceName: string; referenceDescription: string; score: number; assumptions: string[] };
   sources?: { name: string; url: string; publishedDate: string | null; retrievedAt: string; quote: string; specification: string; inclusions: string }[];
 };
@@ -118,12 +120,12 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
   const sections = proposal.sections.map(section => {
     if (!allowed.has(section.roomName)) throw new Error('The proposal includes a room outside your selected scope.');
     return { id: crypto.randomUUID(), title: section.title, items: section.items.map(item => {
-      const key = `${section.roomName}:${item.productName}`.toLowerCase();
+      const key = `${section.roomName}:${normalizeReferenceText(item.productName)}`.toLowerCase();
       if (seen.has(key)) throw new Error('The proposal contains a duplicate item. Please regenerate.');
       seen.add(key);
       const price = rates.find(rate => rate.id === item.rateId && rate.unit === 'sqft'
         && !/Billing: (piece|lump_sum); price separately/i.test(item.description)
-        && rate.name.trim().toLowerCase() === item.productName.trim().toLowerCase()
+        && referenceProduct(rate.name) === referenceProduct(item.productName)
         && Number.isFinite(rate.rate) && rate.rate >= 0 && rate.rate <= 10000000) ?? null;
       const id = crypto.randomUUID();
       const room = analysis.rooms.find(room => room.name === section.roomName)!;
@@ -131,13 +133,17 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
       const workAnswer = brief.roomWork?.find(answer => answer.roomName === room.name);
       const work = workAnswer?.items.find(answer => roomWorkOptions(room, brief.scope).find(option => option.key === answer.key)?.name === item.productName);
       const explicitDimensions = work?.widthFt != null && work?.heightFt != null;
-      const ceilingArea = !workAnswer && /^false ceiling(?: work)?$/i.test(item.productName.trim())
+      const ceilingArea = !workAnswer && /^false ceiling(?: work)?$/i.test(normalizeReferenceText(item.productName))
         && ['printed','user'].includes(room.source) && room.widthFt != null && room.lengthFt != null
         ? Math.round(room.widthFt * room.lengthFt * 10000) / 10000 : null;
       // A model's interpretation is never a verified site measurement.
       evidence.push({ itemId: id, quantityStatus: work && item.quantity != null ? 'user_entered' : ceilingArea != null ? 'estimated' : item.measurementStatus === 'measured' ? 'estimated' : item.measurementStatus,
         reason: ceilingArea != null ? `Full-room ceiling allowance: ${room.widthFt} ft × ${room.lengthFt} ft. Assumes complete ceiling coverage; verify cutouts and design.` : item.measurementReason, price });
-      return { id, productName: price?.name ?? item.productName, productDetails: work ? item.description : price?.description || item.description,
+      const details = [item.description,
+        price && !price.match && normalizeReferenceText(price.description) !== normalizeReferenceText(item.description) ? `Pricing specification: ${price.description}` : '',
+        price?.basisWarnings?.length ? `Provisional reference price. ${price.basisWarnings.join(' ')}` : '',
+      ].filter(Boolean).join('\n');
+      return { id, productName: price?.name ?? item.productName, productDetails: details.slice(0, 1000),
         side: '', measurementMode: 'direct_area' as const, widthFt: null, heightFt: null,
         sftArea: explicitDimensions ? Math.round(work.widthFt * work.heightFt * 10000) / 10000 : ceilingArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
     }) };

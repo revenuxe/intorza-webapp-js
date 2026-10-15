@@ -7,7 +7,7 @@ import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
 import { MarketResearchError, OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
-import { closeReferencePrice, matchingReferenceRate, normalizeReferenceText, referencePriceEvidence, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
+import { closeReferencePrice, matchingReferenceRate, normalizeReferenceText, referenceCity, unknownReferenceCity, referencePriceEvidence, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
 
 export const dynamic = 'force-dynamic';
 type Env = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; OPENAI_FLOOR_PLAN_MODEL?: string; OPENAI_MARKET_MODEL?: string; QUOTATION_MARKET_RESEARCH?: string; QUOTATION_AI_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> } };
@@ -121,16 +121,16 @@ export async function POST(request: Request) {
     const references: { data: ReferencePrice[]; error: unknown } = { data: [], error: null };
     for (let offset = 0; ; offset += 500) {
       const page = await db.from('ai_reference_price_catalogue').select('*')
-        .eq('location', normalizeReferenceText(brief.location)).eq('currency', currency)
+        .eq('currency', currency)
         .order('id').range(offset, offset + 499);
       if (page.error) { references.error = page.error; references.data = []; break; }
-      references.data.push(...(page.data ?? []));
+      references.data.push(...(page.data ?? []).filter(row => unknownReferenceCity(brief.location) || referenceCity(row.location) === referenceCity(brief.location)));
       if ((page.data?.length ?? 0) < 500) break;
     }
     const rates: PriceEvidence[] = (approved.data ?? []).map((row: Record<string, unknown>) => ({
       id: String(row.id), name: String(row.product_name).slice(0, 150), description: String(row.specification).slice(0, 1000), rate: Number(row.rate), unit: String(row.unit), source: 'approved' as const,
       currency: String(row.currency), location: String(row.location).slice(0, 150), verifiedAt: String(row.verified_at), sourceUrl: row.source_url ? String(row.source_url).slice(0, 2000) : null, inclusions: String(row.inclusions).slice(0, 600),
-    })).filter(rate => rate.currency === currency && rate.unit === 'sqft' && Number.isFinite(rate.rate) && rate.rate >= 0 && rate.rate <= 10000000 && (!rate.location || rate.location.toLowerCase() === brief.location.toLowerCase())
+    })).filter(rate => rate.currency === currency && rate.unit === 'sqft' && Number.isFinite(rate.rate) && rate.rate >= 0 && rate.rate <= 10000000 && (!rate.location || referenceCity(rate.location) === referenceCity(brief.location))
       && Date.now() >= Date.parse(rate.verifiedAt) && Date.now() - Date.parse(rate.verifiedAt) <= 90 * 86400000);
     const patternContext: { section: string; product: string; material: string; specification: string }[] = [];
     // Only admin-reviewed, anonymized global records are visible through this table's RLS.
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
       if (row.currency !== currency) continue;
       patternContext.push({ section: String(row.section).slice(0, 150), product: String(row.product_name).slice(0, 150), material: String(row.material).slice(0, 300), specification: String(row.specification).slice(0, 600) });
     }
-    rates.push(...referencePriceEvidence(references.data, currency, brief.location)
+    rates.push(...referencePriceEvidence(references.data, currency, brief.location, true)
       .filter(row => !rates.some(rate => rate.source === 'approved' && normalizeReferenceText(rate.name) === normalizeReferenceText(row.name)
         && normalizeReferenceText(rate.description) === normalizeReferenceText(row.description))));
     const approvedIds = new Set(rates.map(rate => rate.id));
@@ -191,9 +191,15 @@ export async function POST(request: Request) {
     // bounded model context. Never swap material variants based on name alone.
     for (const section of proposal.sections) for (const item of section.items) {
       if (/Billing: (piece|lump_sum); price separately/i.test(item.description)) { item.rateId = null; continue; }
-      if (approvedIds.has(item.rateId)) continue;
+      // Validate the requested specification server-side, even if the model
+      // supplied a real catalogue ID belonging to a different material variant.
+      item.rateId = null;
       const match = matchingReferenceRate(rates, item.productName, item.description);
       if (match) item.rateId = match.id;
+      else {
+        const close = closeReferencePrice(rates, item.productName, item.description, currency, brief.location);
+        if (close) { rates.push(close); approvedIds.add(close.id); item.rateId = close.id; }
+      }
     }
     const products = [...new Map(proposal.sections.flatMap(section => section.items).filter(item => !approvedIds.has(item.rateId) && !/Billing: (piece|lump_sum); price separately/i.test(item.description))
       .map(item => [JSON.stringify([item.productName.trim().toLowerCase(), item.description.trim().toLowerCase()]), { name: item.productName, specification: item.description,

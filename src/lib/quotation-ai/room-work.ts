@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeReferenceText } from './reference-pricing';
 import type { PlanAnalysis, ProjectBrief, generatedSchema } from './floor-plan';
 
 const size = z.number().finite().positive().max(100000).nullable();
@@ -77,10 +78,13 @@ export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, roo
     const baseline = ensureRoomWorkCoverage({ sections: [], assumptions: [] }, rooms,
       { ...brief, roomWork: rooms.map(room => defaultRoomWork(room, brief.scope)) });
     return { ...raw, sections: rooms.map(room => {
-      const proposed = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items);
+      const options = roomWorkOptions(room, brief.scope);
+      const proposed = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items).map(item => ({ ...item,
+        productName: options.find(option => normalizeReferenceText(option.key) === normalizeReferenceText(item.productName))?.name ?? item.productName,
+      }));
       const essentials = baseline.sections.find(section => section.roomName === room.name)!.items;
-      const items = [...proposed];
-      for (const item of essentials) if (!items.some(row => row.productName.trim().toLowerCase() === item.productName.toLowerCase())) items.push(item);
+      const items: z.infer<typeof generatedSchema>['sections'][number]['items'] = [...proposed];
+      for (const item of essentials) if (!items.some(row => normalizeReferenceText(row.productName) === normalizeReferenceText(item.productName))) items.push(item);
       return { title: room.name, roomName: room.name, items };
     }) };
   }
