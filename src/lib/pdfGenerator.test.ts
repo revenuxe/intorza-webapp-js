@@ -1,3 +1,4 @@
+import { getQuotationSettings } from '@/components/CustomizeFieldsDrawer';
 import { TextDecoder, TextEncoder } from 'node:util';
 import { defaultEditorSettings } from './pdfThemes';
 import type { QuotationData } from './pdfGenerator';
@@ -49,6 +50,13 @@ const quotationData: QuotationData = {
 };
 
 describe('quotation PDF editor settings', () => {
+  it('prints area without width/height columns for an area-only quotation', async () => {
+    const pdf = await generateQuotationPDF({ ...quotationData, settings: { ...getQuotationSettings(), showProjectDetails: true, areaOnly: true } });
+    const output = pdf.internal.pages.flat().join("\n");
+    expect(output).toContain('Sq.Ft');
+    expect(output).not.toContain('W \\(ft\\)');
+    expect(output).not.toContain('H \\(ft\\)');
+  });
   it.each([
     ['font size', { fontSize: 'large' as const }],
     ['page margins', { pageMargins: 'wide' as const }],

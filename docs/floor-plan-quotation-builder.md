@@ -2,6 +2,28 @@
 
 ## Simplified upload path
 
+Before generation, the upload path now asks which measurement input unit to use:
+Feet, Sqft, Metres or Square metres. The preference is persisted in the project
+brief and controls completion inputs; drawing dimensions keep their extracted
+units and are normalized by analysis independently. Feet/metres require two
+work dimensions, while sqft/sqm accept direct work coverage. All entered areas
+normalize to sqft (1 sqm = 10.7639104167 sqft), with rates explicitly per sqft.
+This is an input-unit selector, not support for running-foot/piece billing.
+Generated work, the AI editor and its PDF use direct area with no width/height
+columns. Missing cabinet/wall coverage remains pending instead of borrowing
+room floor area. Legacy dimension-completion requests still convert to sqft.
+Validation includes unit conversions, rejected single lengths, selected-unit
+completion, PDF column checks and an upload/edit/save/reload browser run.
+
+Generation automatically updates a metric profile to imperial through the
+authenticated owner's profile permissions before pricing. The response syncs
+the editor's measurement labels, and the preview confirms that the setting was
+switched. Plan extraction already converts printed metric dimensions to feet;
+this change does not reinterpret existing numeric quotation fields or change
+currency. Saving the setting must succeed before generation proceeds.
+The scope screen explains the automatic square-foot billing choice.
+Validated with 25 API/UI tests, TypeScript and scoped ESLint.
+
 Detail-based price fallback now compares product-name tokens and specification
 overlap against recent, compatible admin reference prices. Conflicting core
 materials, finishes, thicknesses and cabinet types are rejected. Ambiguous

@@ -25,6 +25,7 @@ export const briefSchema = z.object({
   clientName: z.string().trim().max(150), location: label, address: z.string().max(1000),
   roomWork: z.array(roomWorkSchema).max(40).optional(),
   automatic: z.boolean().optional(),
+  measurementInputUnit: z.enum(['sqft','feet','sqm','metres']).optional(),
   design: z.object({ coordinatedLook: z.boolean().nullable(), retainExisting: z.boolean().nullable(), notes: z.string().trim().max(600) }).strict().optional(),
 }).strict();
 export type ProjectBrief = z.infer<typeof briefSchema>;
@@ -48,6 +49,7 @@ export type PriceEvidence = {
 export type Estimate = ReturnType<typeof buildEstimate>;
 export const estimateCompletionSchema = z.object({ action: z.literal('complete'), projectId: z.string().uuid(),
   changes: z.array(z.object({ itemId: z.string().uuid(), widthFt: dimension, heightFt: dimension,
+    areaSqft: dimension.optional(),
     ratePerSft: z.number().finite().nonnegative().max(10000000).nullable(),
   }).strict()).min(1).max(600),
 }).strict();
@@ -61,8 +63,13 @@ export function completeEstimate(previous: Estimate, changes: z.infer<typeof est
     const row = evidence.find(row => row.itemId === item.id);
     if (change.widthFt != null || change.heightFt != null) {
       if (change.widthFt == null || change.heightFt == null) throw new Error('Enter both width/length and height in feet.');
-      item.measurementMode = 'dimensions'; item.widthFt = change.widthFt; item.heightFt = change.heightFt; item.sftArea = null;
+      item.measurementMode = 'direct_area'; item.widthFt = null; item.heightFt = null; item.sftArea = Math.round(change.widthFt * change.heightFt * 10000) / 10000;
       if (row) { row.quantityStatus = 'user_entered'; row.reason = `Work face entered by you: ${change.widthFt} ft × ${change.heightFt} ft. Verify before final confirmation.`; }
+    }
+    if (change.areaSqft != null) {
+      if (change.widthFt != null || change.heightFt != null) throw new Error('Enter either square-foot area or work dimensions, not both.');
+      item.measurementMode = 'direct_area'; item.widthFt = null; item.heightFt = null; item.sftArea = change.areaSqft;
+      if (row) { row.quantityStatus = 'user_entered'; row.reason = `Work coverage entered by you: ${change.areaSqft} sqft. Verify before final confirmation.`; }
     }
     if (change.ratePerSft != null && change.ratePerSft !== item.ratePerSft) {
       item.ratePerSft = change.ratePerSft;
@@ -131,8 +138,8 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
       evidence.push({ itemId: id, quantityStatus: work && item.quantity != null ? 'user_entered' : ceilingArea != null ? 'estimated' : item.measurementStatus === 'measured' ? 'estimated' : item.measurementStatus,
         reason: ceilingArea != null ? `Full-room ceiling allowance: ${room.widthFt} ft × ${room.lengthFt} ft. Assumes complete ceiling coverage; verify cutouts and design.` : item.measurementReason, price });
       return { id, productName: price?.name ?? item.productName, productDetails: work ? item.description : price?.description || item.description,
-        side: '', measurementMode: explicitDimensions ? 'dimensions' as const : 'direct_area' as const, widthFt: explicitDimensions ? work.widthFt : null, heightFt: explicitDimensions ? work.heightFt : null,
-        sftArea: explicitDimensions ? null : ceilingArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
+        side: '', measurementMode: 'direct_area' as const, widthFt: null, heightFt: null,
+        sftArea: explicitDimensions ? Math.round(work.widthFt * work.heightFt * 10000) / 10000 : ceilingArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
     }) };
   });
   const draft = draftSchema.parse({ ...base, revision: base.revision + 1,

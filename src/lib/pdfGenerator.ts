@@ -23,6 +23,7 @@ export interface QuotationPdfSettings {
   showCompanyAddress: boolean;
   showProjectDetails: boolean;
   showDetailedSizeColumns: boolean;
+  areaOnly?: boolean;
   useSimpleItemLayout: boolean;
   showSubtotal: boolean;
   showTaxGst: boolean;
@@ -802,7 +803,8 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       });
     } else {
       // Detailed layout with size columns - respect all settings
-      const showSizeColumns = settings.showDetailedSizeColumns;
+      const areaOnly = settings.areaOnly === true;
+      const showSizeColumns = settings.showDetailedSizeColumns && !areaOnly;
       const showSide = settings.showSideColumn;
       const showDetails = settings.showProductDetails;
       const hasAnyImages = settings.showItemImages && section.items.some(item => item.imageUrls && item.imageUrls.length > 0);
@@ -820,6 +822,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       if (showSizeColumns) {
         headerCols.push(`W (${lengthShort})`, `H (${lengthShort})`, areaShort);
       }
+      if (areaOnly) headerCols.push(areaShort);
       headerCols.push(`Price/${areaShort}`, 'Amount');
       
       const tableHead = [headerCols];
@@ -844,6 +847,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         if (showSizeColumns) {
           row.push(item.widthFt.toFixed(1), item.heightFt.toFixed(1), item.sftArea.toFixed(2));
         }
+        if (areaOnly) row.push(item.sftArea.toFixed(2));
         // Use professional currency formatting
         const fmtCurrencyLocal = createPDFCurrencyFormatter({
           currencyCode: data.localization?.currencyCode || 'INR',
@@ -873,7 +877,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
               Math.min(advSettings!.columnWidths.height, 12),
               Math.min(advSettings!.columnWidths.area, 14),
             ]
-          : []),
+          : areaOnly ? [Math.min(advSettings!.columnWidths.area, 18)] : []),
         Math.min(advSettings!.columnWidths.rate, 23),
         Math.min(advSettings!.columnWidths.amount, 24),
       ], contentWidth - horizontalCellPadding * 2 * columnCount, minDetailsWidth);
@@ -925,6 +929,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         colStyles[colIndex++] = { cellWidth: aWidth, halign: 'center', fontSize: 6, valign: 'middle' };
       }
       // Rate column
+      if (areaOnly) colStyles[colIndex++] = { cellWidth: nextImageWidth(), halign: 'center', fontSize: 6, valign: 'middle' };
       colStyles[colIndex++] = { 
         cellWidth: nextImageWidth(),
         halign: 'right', 

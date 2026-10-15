@@ -146,6 +146,7 @@ test('floor plan builder stays within mobile/tablet/desktop widths and preserves
   await expect(dialog.getByRole('button', { name: 'Full interior', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(dialog.getByRole('group', { name: /^Include/ })).toHaveCount(0);
   expect(paidRequests).toBe(1);
+  await dialog.getByRole('radio', { name: 'Sqft Direct area', exact: true }).check();
   await dialog.getByRole('button', { name: 'Generate Quotation', exact: true }).click();
   await expect(dialog.getByRole('heading', { name: 'Your quotation is ready to review' })).toBeVisible();
   expect(paidRequests).toBe(2);

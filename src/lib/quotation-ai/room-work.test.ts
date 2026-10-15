@@ -2,6 +2,7 @@ import { defaultRoomWork, ensureRoomWorkCoverage, roomWorkOptions } from './room
 import { buildEstimate, generatedSchema, preserveRefinedItems, scopedRooms } from './floor-plan';
 import { appendFloorPlanEstimate } from './apply-estimate';
 import { fromQuotation } from './domain';
+import { completeEstimate } from './floor-plan';
 import { planFixture, briefFixture, draftFixture, proposalFixture } from '@/test/floor-plan-fixtures';
 
 it('offers work specific to detected room types and filters kitchen/bedroom-only scopes', () => {
@@ -30,7 +31,7 @@ it('uses confirmed work measurements rather than the room floor area', () => {
   answer.items.find(item => item.key === 'ceiling')!.areaSqft = 50;
   const brief = { ...briefFixture(), roomWork: [answer] };
   const result = buildEstimate(ensureRoomWorkCoverage(generatedSchema.parse(proposalFixture()), plan.rooms, brief), plan, brief, [], draftFixture());
-  expect(result.draft.sections[0].items[0]).toMatchObject({ widthFt: 8, heightFt: 7, measurementMode: 'dimensions', sftArea: null });
+  expect(result.draft.sections[0].items[0]).toMatchObject({ widthFt: null, heightFt: null, measurementMode: 'direct_area', sftArea: 56 });
   expect(result.draft.sections[0].items[1].sftArea).toBe(50);
 });
 it('transfers more than 12 rooms and 60 items to the editor without dropping pending rows', () => {
@@ -81,4 +82,11 @@ it('automatically covers every detected room without requiring user work answers
   expect(result.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe','False ceiling','Wall painting']);
   expect(result.sections[0].items[0].quantity).toBe(56);
   expect(result.sections[0].items[2].quantity).toBeNull();
+});
+it('completes unknown work using direct sqft and transfers no feet dimensions to the quotation', () => {
+  const proposal = proposalFixture(); proposal.sections[0].items[0].measurementStatus = 'unknown';
+  const estimate = buildEstimate(proposal, planFixture(), briefFixture(), [], draftFixture());
+  const completed = completeEstimate(estimate, [{ itemId: estimate.draft.sections[0].items[0].id, widthFt: null, heightFt: null, areaSqft: 56, ratePerSft: 1200 }]);
+  const item = appendFloorPlanEstimate(draftFixture(), completed.draft).sections[0].items[0];
+  expect(item).toMatchObject({ sftArea: 56, widthFt: 0, heightFt: 0, amount: 67200 });
 });

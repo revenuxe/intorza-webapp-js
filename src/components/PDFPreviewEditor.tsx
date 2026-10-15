@@ -327,6 +327,7 @@ export const PDFPreviewEditor = ({
 
       // Settings from customizeSettings
       const pdfSettings = {
+        areaOnly: customizeSettings.areaOnly,
         showCompanyLogo: customizeSettings.showCompanyLogo,
         showCompanyAddress: customizeSettings.showCompanyAddress,
         showProjectDetails: customizeSettings.showProjectDetails,

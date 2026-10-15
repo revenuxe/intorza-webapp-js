@@ -108,7 +108,13 @@ export async function POST(request: Request) {
       db.from('profiles').select('currency_code,country_code,measurement_system').eq('id', user.id).single(),
     ]);
     if (approved.error || history.error || profile.error) throw new Error('Could not load your pricing data. Check the floor plan database migration.');
-    if (profile.data?.measurement_system === 'metric') return json({ error: 'This builder currently uses square-foot billing. Switch the quotation measurement setting to imperial before generating an estimate.' }, 422);
+    // Plan dimensions and canonical rates already use feet/sqft. Persist the
+    // matching display setting before generation rather than blocking users.
+    const measurementChanged = profile.data?.measurement_system === 'metric';
+    if (measurementChanged) {
+      const updated = await db.from('profiles').update({ measurement_system: 'imperial' }).eq('id', user.id).select('id').single();
+      if (updated.error || !updated.data) return json({ error: 'Could not switch to square-foot billing automatically. Please retry; your quotation is unchanged.' }, 422);
+    }
     const currency = profile.data?.currency_code || 'INR';
     // The view aggregates all approved PDFs before pagination; never price from
     // an arbitrary first 60 source entries. Fetch every matching product group.
@@ -250,7 +256,7 @@ export async function POST(request: Request) {
       ? await db.from('quotation_plan_projects').update({ analysis, brief, estimate, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', user.id)
       : await db.from('quotation_plan_projects').insert({ id, user_id: user.id, analysis, brief, estimate });
     if (saved.error) throw new Error('Could not store the estimate. Your quotation has not changed.');
-    return json({ projectId: id, estimate });
+    return json({ projectId: id, estimate, measurementSystem: 'imperial', measurementChanged });
   } catch (error) {
     if (cleanup) await cleanup().catch(() => undefined);
     if (error instanceof InputError) return json({ error: error.message, requestId }, error.status);

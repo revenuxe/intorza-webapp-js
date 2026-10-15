@@ -25,6 +25,7 @@ type Props = {
   getCurrentDraft: () => VoiceDraft;
   onApply: (draft: VoiceDraft, base: string, projectId: string, saveDraft?: boolean, evidence?: Estimate['evidence']) => void;
   clients: { id: string; name: string; address: string | null }[];
+  onMeasurementSystemChange?: () => void;
 };
 type Step = 'upload' | 'analysis' | 'scope' | 'work' | 'design' | 'finish' | 'budget' | 'details' | 'review' | 'estimate';
 const emptyAnalysis: PlanAnalysis = { propertyType: 'Residential interior', floors: null, units: 'Not supplied', scale: 'Not supplied', rooms: [], warnings: ['No floor plan supplied. Work measurements require confirmation.'] };
@@ -42,7 +43,7 @@ function FilePreview({ file }: { file: File }) {
   return url ? <img src={url} alt="Selected floor plan" className="h-12 w-12 shrink-0 rounded-lg border bg-white object-contain" /> : <FileText className="h-8 w-8 shrink-0 text-primary" aria-hidden="true" />;
 }
 
-export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDraft, onApply, clients }: Props) {
+export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDraft, onApply, clients, onMeasurementSystemChange }: Props) {
   const [chooserOpen, setChooserOpen] = useState(false);
   const [step, setStep] = useState<Step>(mode === 'details' ? 'analysis' : 'upload');
   const [files, setFiles] = useState<File[]>([]);
@@ -54,6 +55,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const [wholePlan, setWholePlan] = useState<boolean | null>(null);
   const [regenerateRooms, setRegenerateRooms] = useState<string[]>([]);
   const [busy, setBusy] = useState('');
+  const [measurementChanged, setMeasurementChanged] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState('');
   const [invalidWorkKey, setInvalidWorkKey] = useState('');
@@ -92,7 +94,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     let draft: VoiceDraft;
     try { draft = getCurrentDraft(); } catch { onStart(next); return; }
     setBrief({ scope: 'complete', roomNames: [], finish: 'Standard', budget: null, clientName: draft.project.clientName, location: draft.project.placeOfProject, address: draft.project.clientAddress });
-    setFiles([]); setAnalysis(emptyAnalysis); setProjectId(null); setEstimate(null); setRegenerateRooms([]); setError(''); setWholePlan(null);
+    setFiles([]); setAnalysis(emptyAnalysis); setProjectId(null); setEstimate(null); setRegenerateRooms([]); setError(''); setWholePlan(null); setMeasurementChanged(false);
     setStep(next === 'upload' ? 'upload' : 'analysis'); onStart(next);
   };
   function selectFiles(incoming: File[]) {
@@ -138,6 +140,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     abort.current = () => controller.abort();
     try {
       const draft = getCurrentDraft();
+      if (mode === 'upload' && !brief.measurementInputUnit) throw new Error('Choose Sqft, Feet, Square metres or Metres before generating.');
       if ((selected || retryPricing) && JSON.stringify(draft) !== base.current) throw new Error('The editor changed. Go Back and generate a new estimate to preserve your edits.');
       base.current = JSON.stringify(draft);
       const response = await fetch('/api/quotation-ai/floor-plan', { method: 'POST', signal: controller.signal,
@@ -145,11 +148,13 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         body: JSON.stringify({ action: retryPricing ? 'retry_pricing' : 'generate', projectId, analysis, brief: mode === 'upload' ? { ...brief, automatic: true, location: brief.location.trim() || 'Unknown', roomWork: undefined } : brief, draft, ...(selected ? { regenerateRooms: selected } : {}) }) });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || 'Could not generate an estimate.');
+      if (body.measurementSystem === 'imperial') onMeasurementSystemChange?.();
+      if (body.measurementChanged) setMeasurementChanged(true);
       setEstimate(body.estimate); setProjectId(body.projectId); setRegenerateRooms([]); setStep('estimate');
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not generate an estimate.'); }
     finally { clearTimeout(timeout); pending.current = false; setBusy(''); abort.current = null; }
   }
-  async function complete(change: { itemId: string; widthFt: number | null; heightFt: number | null; ratePerSft: number | null }) {
+  async function complete(change: { itemId: string; widthFt: number | null; heightFt: number | null; areaSqft?: number | null; ratePerSft: number | null }) {
     if (!projectId || pending.current) return;
     pending.current = true; setBusy('Updating your estimate'); setError('');
     const controller = new AbortController(); abort.current = () => controller.abort();
@@ -267,8 +272,9 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
           {step === 'details' && <><div className="space-y-2"><Label>Client name</Label><ClientSelector value={brief.clientName} clients={clients} onChange={clientName => setBrief(current => ({ ...current, clientName }))} onClientSelect={client => setBrief(current => ({ ...current, address: client.address || current.address }))} /></div><div className="space-y-2"><Label htmlFor="plan-location">Project city or location</Label><Input id="plan-location" value={brief.location} maxLength={150} placeholder="e.g. Bengaluru" onChange={event => setBrief(current => ({ ...current, location: event.target.value }))} /></div><div className="space-y-2"><Label htmlFor="plan-address">Address (optional)</Label><Input id="plan-address" value={brief.address} maxLength={1000} onChange={event => setBrief(current => ({ ...current, address: event.target.value }))} /></div></>}
           {step === 'review' && <><dl className="space-y-3 rounded-xl border p-4 text-sm">{[['Property', `${analysis.propertyType} · ${analysis.floors ?? 'Unknown'} floor(s)`], ['Rooms included', scopedRooms(analysis, brief).map(room => room.name).join(', ')], ['Work included', (brief.roomWork ?? []).map(answer => `${answer.roomName}: ${answer.items.map(item => roomWorkOptions(analysis.rooms.find(room => room.name === answer.roomName)!, brief.scope).find(option => option.key === item.key)?.name).join(', ')}`).join('; ')], ['Design', brief.design ? `${brief.design.coordinatedLook ? 'Coordinated finishes' : 'Room-specific finishes'}; ${brief.design.retainExisting ? 'retain existing items where possible' : 'new interior work'}. ${brief.design.notes}` : 'Not set'], ['Finish', brief.finish], ['Client', brief.clientName], ['Location', brief.location], ['Budget', brief.budget?.toLocaleString() || 'Not set']].map(([name, value]) => <div key={name} className="grid grid-cols-[5rem_minmax(0,1fr)] gap-3"><dt className="text-muted-foreground">{name}</dt><dd>{value}</dd></div>)}</dl><p className="rounded-xl bg-muted p-3 text-xs leading-5">We use approved selling rates first, then research comparable published prices for your city. Sources, estimates and historical rates are labelled. Unavailable prices and missing work measurements remain pending. Your existing editor content is preserved.</p></>}
           {step === 'estimate' && estimate && <>
+            {measurementChanged && <p role="status" className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-5">Switched your measurement setting to feet and square feet automatically. Plan measurements are converted to feet; pricing and PDF units now use sqft.</p>}
             <div className="rounded-xl border p-3 text-xs leading-5"><p className="font-medium">{estimate.draft.sections.length} sections · {estimate.draft.sections.reduce((count, section) => count + section.items.length, 0)} items</p><p className="text-muted-foreground">All listed sections and items will be added to your quotation. Existing work stays in the editor.</p>{!!estimate.scopeGaps?.length && <div className="mt-2 space-y-2 text-amber-800 dark:text-amber-300"><p>Selected rooms not yet included: {estimate.scopeGaps.join(', ')}. Generate these rooms or update your scope before applying this estimate.</p><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" disabled={!!busy} onClick={() => void generate(estimate.scopeGaps)}>Generate missing rooms</Button><Button type="button" size="sm" variant="ghost" disabled={!!busy} onClick={() => setStep('scope')}>Change scope</Button></div></div>}</div>
-            <CompleteEstimate estimate={estimate} disabled={!!busy} onComplete={complete} onRetry={() => void generate(undefined, true)} />
+            <CompleteEstimate estimate={estimate} disabled={!!busy} inputUnit={brief.measurementInputUnit} onComplete={complete} onRetry={() => void generate(undefined, true)} />
             {estimate.assumptions.some(note => /Pricing search|Live market research|no recent comparable|conflict|city is unknown/.test(note)) && <details className="min-w-0 rounded-xl border p-3 text-xs leading-5"><summary className="cursor-pointer font-medium">Why some prices are missing</summary><ul className="mt-2 list-disc space-y-1 pl-4">{estimate.assumptions.filter(note => /Pricing search|Live market research|no recent comparable|conflict|city is unknown/.test(note)).map((note, index) => <li key={index}>{note}</li>)}</ul></details>}
             <div className="rounded-xl bg-primary/5 p-4"><p className="text-xs font-medium text-primary">AI-generated estimate · rates and measurements require review</p><p className="mt-1 text-2xl font-semibold">{estimate.incomplete && estimate.totals.total === 0 ? 'Estimate pending' : estimate.totals.total.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-xs font-normal text-muted-foreground">{estimate.evidence.find(item => item.price)?.price?.currency || ''}</span></p><p className="mt-1 text-xs text-muted-foreground">{estimate.incomplete ? 'Partial total: excludes items with missing quantity or rate.' : 'Includes your existing tax and discount settings.'}</p></div>
             {estimate.draft.sections.map(section => <div key={section.id} className="min-w-0 overflow-hidden rounded-xl border"><h3 className="border-b bg-muted/40 px-3 py-2 text-sm font-semibold">{section.title}</h3>{section.items.map(item => { const evidence = estimate.evidence.find(row => row.itemId === item.id); const amount = itemCalculation(item); return <div key={item.id} className="min-w-0 space-y-1 break-words border-b p-3 last:border-0"><p className="text-sm font-medium">{item.productName}</p><p className="text-xs leading-5 text-muted-foreground">{item.productDetails}</p><p className="text-sm">{amount.area ?? '?'} sqft × {item.ratePerSft ?? '?'} = {amount.cents == null ? 'Pending' : (Number(amount.cents) / 100).toLocaleString()}</p><p className="text-xs text-muted-foreground">{evidence?.quantityStatus === 'unknown' ? 'Requires measurement' : evidence?.quantityStatus === 'user_entered' ? 'Measurement entered by you' : `${evidence?.quantityStatus} quantity`}</p>{evidence?.reason && <p className="text-xs text-muted-foreground">{evidence.reason}</p>}<EstimatePriceDetails price={evidence?.price ?? null} /></div>; })}</div>)}

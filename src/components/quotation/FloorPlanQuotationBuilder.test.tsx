@@ -7,7 +7,8 @@ import { briefFixture, planFixture, proposalFixture } from '@/test/floor-plan-fi
 jest.mock('@/integrations/supabase/client', () => ({ supabase: { auth: { getSession: jest.fn() } } }));
 jest.mock('./ClientSelector', () => ({ ClientSelector: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <input aria-label="Client name" value={value} onChange={event => onChange(event.target.value)} /> }));
 const onApply = jest.fn();
-const props = () => ({ mode: 'details' as const, onStart: jest.fn(), onClose: jest.fn(), getCurrentDraft: draftFixture, onApply, clients: [] });
+const onMeasurementSystemChange = jest.fn();
+const props = () => ({ mode: 'details' as const, onStart: jest.fn(), onClose: jest.fn(), getCurrentDraft: draftFixture, onApply, onMeasurementSystemChange, clients: [] });
 beforeEach(() => {
   jest.clearAllMocks();
   (supabase.auth.getSession as jest.Mock).mockResolvedValue({ data: { session: { access_token: 'session' } } });
@@ -98,4 +99,12 @@ it('requires scope confirmation and directs the user to the first unanswered fea
   expect(screen.getByRole('alert')).toHaveTextContent('tv unit in Living Room');
   expect(within(screen.getByRole('group', { name: 'Include tv unit in Living Room?' })).getByRole('radio', { name: 'Yes' })).toHaveFocus();
   expect(global.fetch).not.toHaveBeenCalled();
+});
+it('syncs editor measurement labels and explains the automatic unit switch', async () => {
+  await reachReview();
+  const estimate = buildEstimate(proposalFixture(), planFixture(), briefFixture(), [], draftFixture());
+  (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: true, json: async () => ({ estimate, projectId: 'project', measurementSystem: 'imperial', measurementChanged: true }) });
+  fireEvent.click(screen.getByRole('button', { name: 'Generate Quotation' }));
+  await screen.findByText(/Switched your measurement setting/);
+  expect(onMeasurementSystemChange).toHaveBeenCalledTimes(1);
 });

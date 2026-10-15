@@ -19,13 +19,17 @@ const eq = jest.fn(); const insert = jest.fn();
 let projectExists = true;
 let referenceRows: Record<string, unknown>[] = [];
 let storedEstimate: Estimate | null = null;
+let metricProfile = false;
+let measurementUpdateFails = false;
+const profileUpdate = jest.fn();
 function database(table: string) {
-  const result = { data: table === 'profiles' ? { currency_code: 'INR', country_code: 'IN' } : table === 'ai_reference_price_catalogue' ? referenceRows : [], error: null };
+  const result = { data: table === 'profiles' ? { id: 'owner', currency_code: 'INR', country_code: 'IN', measurement_system: metricProfile ? 'metric' : 'imperial' } : table === 'ai_reference_price_catalogue' ? referenceRows : [], error: null };
+  let updatingProfile = false;
   const chain = { select: jest.fn().mockReturnThis(), eq: jest.fn(function (...args: unknown[]) { eq(table, ...args); return chain; }),
-    range: jest.fn((start: number, end: number) => Promise.resolve({ ...result, data: referenceRows.slice(start, end + 1) })), limit: jest.fn().mockResolvedValue(result), order: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue(result),
+    range: jest.fn((start: number, end: number) => Promise.resolve({ ...result, data: referenceRows.slice(start, end + 1) })), limit: jest.fn().mockResolvedValue(result), order: jest.fn().mockReturnThis(), single: jest.fn(() => Promise.resolve(updatingProfile && measurementUpdateFails ? { data: null, error: new Error('Denied') } : result)),
     maybeSingle: jest.fn().mockResolvedValue({ data: projectExists ? { id: 'project', estimate: storedEstimate } : null, error: null }),
     insert: jest.fn((row: unknown) => { insert(table, row); return Promise.resolve({ error: null }); }),
-    update: jest.fn().mockReturnThis(), then: (resolve: (value: unknown) => void) => Promise.resolve({ error: null }).then(resolve),
+    update: jest.fn((body: unknown) => { if (table === 'profiles') { updatingProfile = true; profileUpdate(body); } return chain; }), then: (resolve: (value: unknown) => void) => Promise.resolve({ error: null }).then(resolve),
   };
   return chain;
 }
@@ -34,7 +38,7 @@ function request(body: unknown, authenticated = true) {
 }
 const payload = () => ({ action: 'generate', projectId: null, analysis: planFixture(), brief: briefFixture(), draft: draftFixture() });
 beforeEach(() => {
-  jest.clearAllMocks(); projectExists = true; referenceRows = []; storedEstimate = null;
+  jest.clearAllMocks(); projectExists = true; referenceRows = []; storedEstimate = null; metricProfile = false; measurementUpdateFails = false;
   getUser.mockResolvedValue({ data: { user: { id: 'owner' } }, error: null });
   limit.mockResolvedValue({ success: true });
   (getCloudflareContext as jest.Mock).mockResolvedValue({ env: { OPENAI_API_KEY: 'secret', OPENAI_FLOOR_PLAN_MODEL: 'configured-vision-model', QUOTATION_AI_LIMITER: { limit } } });
@@ -144,6 +148,26 @@ it('requires a valid user before touching storage, data or provider', async () =
   getUser.mockResolvedValueOnce({ data: { user: null }, error: new Error('expired') });
   expect((await POST(request(payload()))).status).toBe(401);
   expect(from).not.toHaveBeenCalled(); expect(OpenAIFloorPlanProvider).not.toHaveBeenCalled();
+});
+it('automatically switches metric profiles to imperial with owner-scoped persistence', async () => {
+  metricProfile = true;
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  expect(profileUpdate).toHaveBeenCalledWith({ measurement_system: 'imperial' });
+  expect(eq).toHaveBeenCalledWith('profiles', 'id', 'owner');
+  expect(await response.json()).toMatchObject({ measurementSystem: 'imperial', measurementChanged: true });
+});
+it('does not generate mislabeled estimates if the automatic measurement switch fails', async () => {
+  metricProfile = true; measurementUpdateFails = true;
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(422);
+  expect((await response.json()).error).toContain('automatically');
+  expect(generate).not.toHaveBeenCalled(); expect(research).not.toHaveBeenCalled();
+});
+it('leaves an existing imperial setting alone', async () => {
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  expect(profileUpdate).not.toHaveBeenCalled();
 });
 it('enforces rate limits before reading a plan', async () => {
   limit.mockResolvedValueOnce({ success: false });

@@ -46,6 +46,7 @@ export interface QuotationSettings {
   showProjectType: boolean;
   // Item Table Layout
   showDetailedSizeColumns: boolean;
+  areaOnly?: boolean;
   useSimpleItemLayout: boolean;
   showSideColumn: boolean;
   showProductDetails: boolean;
