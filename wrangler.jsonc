@@ -4,6 +4,10 @@
   "main": "cloudflare-worker.mjs",
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "vars": {
+    "OPENAI_FLOOR_PLAN_MODEL": "gpt-4.1"
+  },
+  "keep_vars": true,
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
