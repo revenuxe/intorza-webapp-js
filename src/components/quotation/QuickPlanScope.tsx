@@ -1,5 +1,5 @@
 ﻿'use client';
-import { BedDouble, Check, ChevronDown, CookingPot, Grid2X2, House, MapPin, ScanLine, Sparkles } from 'lucide-react';
+import { BedDouble, Check, ChevronDown, CookingPot, Grid2X2, House, Layers3, MapPin, ScanLine, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { scopedRooms, type PlanAnalysis, type ProjectBrief } from '@/lib/quotation-ai/floor-plan';
 
@@ -10,6 +10,8 @@ export function QuickPlanScope({ analysis, brief, onChange }: { analysis: PlanAn
     { value: 'complete', name: 'Full interior', detail: 'Every room. One cohesive quotation.', icon: House },
     { value: 'kitchen', name: 'Kitchen', detail: 'Cabinetry, counters and finishes.', icon: CookingPot },
     { value: 'bedrooms', name: 'Bedrooms', detail: 'Wardrobes, storage and finishes.', icon: BedDouble },
+    { value: 'kitchen-wardrobes', name: 'Kitchen + wardrobes', detail: 'The most common core-interior package.', icon: Layers3 },
+    { value: 'living-bedrooms', name: 'Living + bedrooms', detail: 'TV feature and bedroom storage.', icon: BedDouble },
     { value: 'selected', name: 'Select rooms', detail: 'Focus on the spaces you choose.', icon: Grid2X2 },
   ] as const;
   return <div className="space-y-6">

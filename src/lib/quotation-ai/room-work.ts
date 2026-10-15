@@ -71,12 +71,18 @@ export function defaultRoomWork(room: Room, scope: ProjectBrief['scope']): RoomW
 
 function automaticRoomWork(room: Room, scope: ProjectBrief['scope']) {
   const answer = defaultRoomWork(room, scope);
-  // Lofts recur with bedroom and kitchen storage in the reviewed quotations.
-  // Include them in the fast path, while retaining full editability.
-  if (['bedroom', 'kitchen'].includes(room.kind) && !answer.items.some(item => item.key === 'loft')) {
-    answer.items.push({ key: 'loft', widthFt: null, heightFt: null, areaSqft: null, details: '' });
-  }
-  return answer;
+  // Fast upload follows the recurring, priced core in the reviewed quotations.
+  // Optional finishes and trade work are never assumed merely because a room
+  // exists on the floor plan.
+  const core: Record<Room['kind'], string[]> = {
+    kitchen: ['base_cabinets', 'wall_cabinets', 'loft'], bedroom: ['wardrobe', 'loft'], living: ['tv_unit'],
+    dining: ['crockery_unit'], study: ['study_storage'], bathroom: ['vanity'], utility: ['utility_storage'],
+    balcony: [], other: [],
+  };
+  const selected = new Set(core[room.kind]);
+  const items = answer.items.filter(item => selected.has(item.key));
+  for (const key of selected) if (!items.some(item => item.key === key)) items.push({ key, widthFt: null, heightFt: null, areaSqft: null, details: '' });
+  return { ...answer, items };
 }
 
 /** Every confirmed work field survives sparse AI output, including unpriced work. */

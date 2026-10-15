@@ -25,13 +25,16 @@ export class OpenAIFloorPlanProvider implements FloorPlanProvider {
     const billingInstructions = instructions.startsWith('Extract reusable interior quotation')
       ? 'Billing classification is mandatory. Use sqft only for genuine measured work face where amount equals width times height times the printed rate. A nominal 1 by 1 entry for accessories, hardware, lighting, demolition, granite, pantry, logo, profile shutters, appliances or a package is a fixed charge: use unit=lump_sum, quantity=1 and rate=the printed amount. Do not relabel fixed charges as sqft. Preserve printed width, height and calculated sqft in notes when relevant. Record a stated discount and whether grand total equals subtotal less discount in limitations. Do not infer GST when it is not printed. '
       : '';
+    const scopeInstructions = instructions.startsWith('Prepare an editable room-by-room interior estimate')
+      ? 'For automatic floor-plan uploads, use only the recurring priced core supported by the quotation library: kitchen base cabinets, wall cabinets and loft; bedroom wardrobes and loft; living TV unit; dining crockery; study storage; bathroom vanity; utility storage. Do not add wall painting, flooring, false ceiling, backsplash, countertop, electrical, plumbing, decorative panelling, pooja, shoe storage or fixed-price packages unless the user selected it or the plan clearly calls it out. Do not invent scope simply to increase the total. '
+      : '';
     let response: Response;
     try { response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST', signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]),
       headers: { Authorization: `Bearer ${this.key}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: this.model, store: false, max_output_tokens: 7000,
         ...(this.model.startsWith('gpt-5') ? { reasoning: { effort: 'low' } } : {}),
-        instructions: `${billingInstructions}${instructions}`, input: [{ role: 'user', content }],
+        instructions: `${billingInstructions}${scopeInstructions}${instructions}`, input: [{ role: 'user', content }],
         text: { format: { type: 'json_schema', name: 'floor_plan_result', strict: true, schema } } }),
     }); } catch { throw new ProviderError('The document service did not respond in time. Your quotation has not changed; please try again.', 502, 'FLOOR_PLAN_CONNECTION_FAILED'); }
     if (!response.ok) throw await openAIError(response);

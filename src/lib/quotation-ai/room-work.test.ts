@@ -79,10 +79,16 @@ it('automatically covers every detected room without requiring user work answers
   const plan = planFixture();
   const brief = { ...briefFixture(), automatic: true };
   const result = ensureRoomWorkCoverage(generatedSchema.parse(proposalFixture()), plan.rooms, brief);
-  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe','False ceiling','Wall painting','Loft storage']);
+  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe','Loft storage']);
   expect(result.sections[0].items[0].quantity).toBe(56);
-  expect(result.sections[0].items[2].quantity).toBeNull();
-  expect(result.sections[0].items[3].quantity).toBeNull();
+  expect(result.sections[0].items[1].quantity).toBeNull();
+});
+it('keeps automatic kitchen scope to quotation-supported cabinetry instead of generic finish work', () => {
+  const plan = planFixture(); plan.rooms[0] = { ...plan.rooms[0], name: 'Kitchen', kind: 'kitchen' };
+  const brief = { ...briefFixture(), automatic: true, roomNames: ['Kitchen'] };
+  const proposal = generatedSchema.parse({ sections: [{ ...proposalFixture().sections[0], title: 'Kitchen', roomName: 'Kitchen', items: [{ ...proposalFixture().sections[0].items[0], productName: 'Kitchen base cabinets' }] }], assumptions: [] });
+  const result = ensureRoomWorkCoverage(proposal, plan.rooms, brief);
+  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Kitchen base cabinets', 'Kitchen wall cabinets', 'Loft storage']);
 });
 it('completes unknown work using direct sqft and transfers no feet dimensions to the quotation', () => {
   const proposal = proposalFixture(); proposal.sections[0].items[0].measurementStatus = 'unknown';
