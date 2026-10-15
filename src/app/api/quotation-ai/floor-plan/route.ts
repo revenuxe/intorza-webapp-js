@@ -32,6 +32,7 @@ async function boundedBody(request: Request, maximum: number) {
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
   let cleanup: (() => Promise<unknown>) | undefined;
+  let uploadRequest = false;
   try {
     const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
     if (!token) return json({ error: 'Sign in to build a quotation.' }, 401);
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
     const model = env.OPENAI_FLOOR_PLAN_MODEL || process.env.OPENAI_FLOOR_PLAN_MODEL || env.OPENAI_MODEL || process.env.OPENAI_MODEL;
     const provider = new OpenAIFloorPlanProvider(key, model);
     const contentType = request.headers.get('content-type') ?? '';
+    uploadRequest = contentType.startsWith('multipart/form-data');
     if (contentType.startsWith('multipart/form-data')) {
       if (!key || !model) return json({ error: 'Configure the server OPENAI_API_KEY and a vision-capable OPENAI_FLOOR_PLAN_MODEL.' }, 503);
       const body = await boundedBody(request, MAX_PLAN_BYTES + 65536);
@@ -267,7 +269,7 @@ export async function POST(request: Request) {
     if (cleanup) await cleanup().catch(() => undefined);
     if (error instanceof InputError) return json({ error: error.message, requestId }, error.status);
     if (error instanceof ProviderError) return json({ error: error.message, code: error.code, requestId }, error.status);
-    if (error instanceof SyntaxError || error instanceof z.ZodError) return json({ error: 'The analysis could not be read safely. Check the plan or details and try again.', requestId }, 422);
+    if (error instanceof SyntaxError || error instanceof z.ZodError) return json({ error: uploadRequest ? 'The floor plan response could not be validated. Review the detected rooms and try again.' : 'The quotation response could not be validated. Your floor plan is unchanged; please try again.', requestId }, 422);
     return json({ error: error instanceof Error && error.name !== 'AbortError' && error.name !== 'TimeoutError' ? error.message : 'Analysis took too long. Please try fewer pages.', requestId }, 422);
   }
 }

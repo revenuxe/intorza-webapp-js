@@ -7,7 +7,6 @@ import { FloorPlanEstimateOverview } from './FloorPlanEstimateOverview';
 import { CompleteEstimate } from './CompleteEstimate';
 import { RoomWorkQuestions } from './RoomWorkQuestions';
 import { QuickPlanScope } from './QuickPlanScope';
-import { FloorPlanDesignBrief } from './FloorPlanDesignBrief';
 import { PlanScopeQuestions } from './PlanScopeQuestions';
 import { DesignIntentQuestions } from './DesignIntentQuestions';
 import { defaultRoomWork, roomWorkOptions } from '@/lib/quotation-ai/room-work';
@@ -28,12 +27,12 @@ type Props = {
   clients: { id: string; name: string; address: string | null }[];
   onMeasurementSystemChange?: () => void;
 };
-type Step = 'upload' | 'analysis' | 'scope' | 'brief' | 'work' | 'design' | 'finish' | 'budget' | 'details' | 'review' | 'estimate';
+type Step = 'upload' | 'analysis' | 'scope' | 'work' | 'design' | 'finish' | 'budget' | 'details' | 'review' | 'estimate';
 const emptyAnalysis: PlanAnalysis = { propertyType: 'Residential interior', floors: null, units: 'Not supplied', scale: 'Not supplied', rooms: [], warnings: ['No floor plan supplied. Work measurements require confirmation.'] };
 // Presentation values requested for this design. No wallet or credit deduction is implemented.
 const creditDisplay = { coins: 60, upload: 15, details: 10 } as const;
 const scopes = [{ value: 'complete', title: 'Full Interior', detail: 'All rooms in your plan' }, { value: 'kitchen', title: 'Kitchen', detail: 'Only kitchens detected in your plan' }, { value: 'bedrooms', title: 'Bedrooms', detail: 'Bedroom interiors in your plan' }, { value: 'kitchen-wardrobes', title: 'Kitchen & wardrobes', detail: 'Kitchen cabinetry and bedroom storage' }, { value: 'living-bedrooms', title: 'Living room & bedrooms', detail: 'Focus on everyday spaces' }, { value: 'selected', title: 'Choose specific rooms', detail: 'Include only the spaces you need' }] as const;
-const titles: Record<Step, string> = { upload: 'Upload your floor plan', analysis: 'Your property analysis', scope: 'What would you like to design?', brief: 'Tell us about your quotation', work: 'Confirm the work in each room', design: 'Set your design direction', finish: 'Choose your finish level', budget: 'Do you have a target budget?', details: 'Who is this project for?', review: 'Ready to build your estimate', estimate: 'Your quotation is ready to review' };
+const titles: Record<Step, string> = { upload: 'Upload your floor plan', analysis: 'Your property analysis', scope: 'What would you like to design?', work: 'Confirm the work in each room', design: 'Set your design direction', finish: 'Choose your finish level', budget: 'Do you have a target budget?', details: 'Who is this project for?', review: 'Ready to build your estimate', estimate: 'Your quotation is ready to review' };
 function FilePreview({ file }: { file: File }) {
   const [url, setUrl] = useState('');
   useEffect(() => {
@@ -168,7 +167,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update these details.'); }
     finally { clearTimeout(timeout); pending.current = false; setBusy(''); abort.current = null; }
   }
-  const back = () => { setError(''); setInvalidWorkKey(''); if (step === 'work' && workRoomIndex > 0) { setWorkRoomIndex(index => index - 1); return; } setStep(({ upload: 'upload', analysis: mode === 'upload' ? 'upload' : 'analysis', scope: mode === 'upload' ? 'upload' : 'analysis', brief: 'scope', work: 'scope', design: 'work', finish: 'design', budget: 'finish', details: 'budget', review: 'details', estimate: mode === 'upload' ? 'brief' : 'review' } as Record<Step, Step>)[step]); };
+  const back = () => { setError(''); setInvalidWorkKey(''); if (step === 'work' && workRoomIndex > 0) { setWorkRoomIndex(index => index - 1); return; } setStep(({ upload: 'upload', analysis: mode === 'upload' ? 'upload' : 'analysis', scope: mode === 'upload' ? 'upload' : 'analysis', work: 'scope', design: 'work', finish: 'design', budget: 'finish', details: 'budget', review: 'details', estimate: mode === 'upload' ? 'scope' : 'review' } as Record<Step, Step>)[step]); };
   const next = () => {
     setError('');
     setInvalidWorkKey('');
@@ -177,11 +176,6 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
       if (!analysis.rooms.length || analysis.rooms.some(room => !room.name.trim()) || new Set(analysis.rooms.map(room => room.name)).size !== analysis.rooms.length) { setError('Add at least one room, with a different name for each room.'); return; }
       setBrief(value => ({ ...value, roomNames: analysis.rooms.map(room => room.name) })); setStep('scope');
     } else if (step === 'scope') {
-      if (mode === 'upload') {
-        if (!scopedRooms(analysis, brief).length) { setError('Choose at least one room that matches this scope.'); return; }
-        if (!brief.measurementInputUnit) { setError('Choose the measurement unit you prefer before continuing.'); return; }
-        setStep('brief'); return;
-      }
       if (wholePlan == null) { setError('Tell us whether the interior work covers the whole plan.'); return; }
       if (!scopedRooms(analysis, brief).length) { setError('Choose at least one room that matches this scope.'); return; }
       const rooms = scopedRooms(analysis, brief);
@@ -208,7 +202,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     else if (step === 'details') { if (!brief.clientName.trim() || !brief.location.trim()) { setError('Enter the client name and project city.'); return; } setStep('review'); }
   };
   const updateRoom = (index: number, value: Partial<PlanAnalysis['rooms'][number]>) => setAnalysis(current => ({ ...current, rooms: current.rooms.map((room, i) => i === index ? { ...room, ...value } : room) }));
-  const groups = ['upload', 'analysis'].includes(step) ? 0 : ['scope', 'brief', 'work', 'design', 'finish', 'budget'].includes(step) ? 1 : step === 'details' ? 2 : 3;
+  const groups = ['upload', 'analysis'].includes(step) ? 0 : ['scope', 'work', 'design', 'finish', 'budget'].includes(step) ? 1 : step === 'details' ? 2 : 3;
   return <>
     <div className="col-span-2 min-w-0 sm:col-span-1 sm:min-w-[220px]">
       <Button type="button" aria-label="Built with AI" className="h-12 w-full gap-2 rounded-xl px-3 shadow-sm sm:px-4" onClick={() => setChooserOpen(true)}><BuilderMark className="h-4 w-4 shrink-0" /><span className="text-sm leading-5">Built with AI</span><span className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[11px] font-semibold leading-4 text-amber-900 shadow-sm"><GoldCoin className="h-3.5 w-3.5" />{creditDisplay.coins} coins</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Button>
@@ -267,7 +261,6 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
             <Button variant="outline" type="button" className="w-full gap-2" disabled={analysis.rooms.length >= 40} onClick={() => setAnalysis(current => ({ ...current, rooms: [...current.rooms, { name: `Room ${current.rooms.length + 1}`, kind: 'other', floor: '1', widthFt: null, lengthFt: null, source: 'user', confidence: 'high', file: '', page: 1, notes: '' }] }))}><Plus className="h-4 w-4" />Add room</Button>
           </>}
           {step === 'scope' && mode === 'upload' && <QuickPlanScope analysis={analysis} brief={brief} onChange={setBrief} />}
-          {step === 'brief' && mode === 'upload' && <FloorPlanDesignBrief analysis={analysis} brief={brief} onChange={setBrief} />}
           {step === 'scope' && mode !== 'upload' && <PlanScopeQuestions analysis={analysis} brief={brief} wholePlan={wholePlan} scopes={scopes} onWholePlan={setWholePlan} onChange={setBrief} />}
           {step === 'work' && scopedRooms(analysis, brief)[workRoomIndex] && <>
             <p className="text-xs font-medium text-primary">Room {workRoomIndex + 1} of {scopedRooms(analysis, brief).length} · {scopedRooms(analysis, brief)[workRoomIndex].name}</p>
@@ -294,7 +287,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
           {error && <p ref={errorBanner} tabIndex={-1} role="alert" className="w-full rounded-xl bg-destructive/10 p-3 text-sm leading-6 text-destructive outline-none">{error}</p>}
           {busy ? <Button variant="outline" type="button" onClick={() => abort.current?.()}>Cancel request</Button> : <>
             <Button variant="outline" type="button" onClick={step === 'upload' || step === 'analysis' && mode === 'details' ? onClose : back}><ArrowLeft className="mr-1 h-4 w-4" />{step === 'upload' || step === 'analysis' && mode === 'details' ? 'Cancel' : 'Back'}</Button>
-            {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'scope' && mode === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!scopedRooms(analysis, brief).length || !brief.measurementInputUnit} onClick={next}>Tell us what you need<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'brief' && mode === 'upload' ? <Button type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'review' ? <Button type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>
+            {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'scope' && mode === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!scopedRooms(analysis, brief).length || !brief.measurementInputUnit} onClick={() => void generate()}>Generate Quotation<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'review' ? <Button type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>
               <Button type="button" variant="outline" className="min-w-0 flex-1" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, false, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not apply the estimate.'); } }}>Edit Quotation</Button>
               <Button type="button" className="w-full sm:w-auto" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, true, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not save the estimate.'); } }}>Save as Draft</Button>
             </> : <Button type="button" className="min-w-0 flex-1" onClick={next}>Continue<ArrowRight className="ml-1 h-4 w-4" /></Button>}
