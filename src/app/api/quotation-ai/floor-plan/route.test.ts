@@ -5,22 +5,24 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
 import { briefFixture, draftFixture, planFixture, proposalFixture } from '@/test/floor-plan-fixtures';
+import { buildEstimate, type Estimate } from '@/lib/quotation-ai/floor-plan';
 
 jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }));
 jest.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: jest.fn() }));
 jest.mock('@/lib/quotation-ai/floor-plan-provider', () => ({ OpenAIFloorPlanProvider: jest.fn() }));
-jest.mock('@/lib/quotation-ai/market-pricing', () => ({ OpenAIWebMarketPricing: jest.fn() }));
+jest.mock('@/lib/quotation-ai/market-pricing', () => ({ ...jest.requireActual('@/lib/quotation-ai/market-pricing'), OpenAIWebMarketPricing: jest.fn() }));
 const research = jest.fn();
 const getUser = jest.fn(); const limit = jest.fn(); const analyse = jest.fn(); const generate = jest.fn();
 const upload = jest.fn(); const remove = jest.fn(); const from = jest.fn();
 const eq = jest.fn(); const insert = jest.fn();
 let projectExists = true;
 let referenceRows: Record<string, unknown>[] = [];
+let storedEstimate: Estimate | null = null;
 function database(table: string) {
   const result = { data: table === 'profiles' ? { currency_code: 'INR', country_code: 'IN' } : table === 'ai_training_patterns' ? referenceRows : [], error: null };
   const chain = { select: jest.fn().mockReturnThis(), eq: jest.fn(function (...args: unknown[]) { eq(table, ...args); return chain; }),
     limit: jest.fn().mockResolvedValue(result), order: jest.fn().mockReturnThis(), single: jest.fn().mockResolvedValue(result),
-    maybeSingle: jest.fn().mockResolvedValue({ data: projectExists ? { id: 'project' } : null, error: null }),
+    maybeSingle: jest.fn().mockResolvedValue({ data: projectExists ? { id: 'project', estimate: storedEstimate } : null, error: null }),
     insert: jest.fn((row: unknown) => { insert(table, row); return Promise.resolve({ error: null }); }),
     update: jest.fn().mockReturnThis(), then: (resolve: (value: unknown) => void) => Promise.resolve({ error: null }).then(resolve),
   };
@@ -31,7 +33,7 @@ function request(body: unknown, authenticated = true) {
 }
 const payload = () => ({ action: 'generate', projectId: null, analysis: planFixture(), brief: briefFixture(), draft: draftFixture() });
 beforeEach(() => {
-  jest.clearAllMocks(); projectExists = true; referenceRows = [];
+  jest.clearAllMocks(); projectExists = true; referenceRows = []; storedEstimate = null;
   getUser.mockResolvedValue({ data: { user: { id: 'owner' } }, error: null });
   limit.mockResolvedValue({ success: true });
   (getCloudflareContext as jest.Mock).mockResolvedValue({ env: { OPENAI_API_KEY: 'secret', OPENAI_FLOOR_PLAN_MODEL: 'configured-vision-model', QUOTATION_AI_LIMITER: { limit } } });
@@ -42,6 +44,24 @@ beforeEach(() => {
   research.mockResolvedValue({ rates: [], limitations: ['No comparable published rates found.'] });
   generate.mockResolvedValue(proposalFixture()); analyse.mockResolvedValue(planFixture());
   upload.mockResolvedValue({ error: null }); remove.mockResolvedValue({ error: null });
+});
+it('completes stored estimates with validated measurements and no provider calls', async () => {
+  storedEstimate = buildEstimate(proposalFixture(), planFixture(), briefFixture(), [], draftFixture());
+  const itemId = storedEstimate.draft.sections[0].items[0].id;
+  const response = await POST(request({ action: 'complete', projectId: '00000000-0000-4000-8000-000000000001', changes: [{ itemId, widthFt: 8, heightFt: 7, ratePerSft: 1200 }] }));
+  expect(response.status).toBe(200); expect((await response.json()).estimate.totals.total).toBe(75331.2);
+  expect(generate).not.toHaveBeenCalled(); expect(research).not.toHaveBeenCalled();
+  projectExists = false;
+  expect((await POST(request({ action: 'complete', projectId: '00000000-0000-4000-8000-000000000001', changes: [{ itemId, widthFt: 8, heightFt: 7, ratePerSft: 1200 }] }))).status).toBe(403);
+});
+it('retries only pricing while preserving quotation item IDs and quantities', async () => {
+  storedEstimate = buildEstimate(proposalFixture(), planFixture(), briefFixture(), [], draftFixture());
+  research.mockResolvedValueOnce({ rates: [{ id: 'market-1', name: 'Wardrobe', description: 'Proposed wardrobe', rate: 1300, unit: 'sqft', currency: 'INR', location: 'Bengaluru', source: 'market_estimate', verifiedAt: '2026-10-15', sourceUrl: 'https://supplier.example/rates', inclusions: 'Installed, excluding GST' }], limitations: [] });
+  const response = await POST(request({ ...payload(), action: 'retry_pricing', projectId: '00000000-0000-4000-8000-000000000001' }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(generate).not.toHaveBeenCalled(); expect(research).toHaveBeenCalledTimes(1);
+  expect(result.estimate.draft.sections[0].items[0]).toMatchObject({ id: storedEstimate.draft.sections[0].items[0].id, sftArea: 56, ratePerSft: 1300 });
 });
 it('uses reviewed global quotation references before paid market research', async () => {
   referenceRows = [{ id: 'admin-rate', section: 'Bedroom', product_name: 'Wardrobe', material: 'Laminate', specification: 'Reviewed specification', unit: 'sqft', rate: 1400, tax: 'excluded', installation_included: true, location: 'Bengaluru', currency: 'INR', price_date: new Date().toISOString().slice(0, 10), source_page: 2, notes: '', project_type: 'Apartment' }];

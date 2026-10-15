@@ -34,13 +34,44 @@ export const generatedSchema = z.object({
 }).strict();
 export type PriceEvidence = {
   id: string; name: string; description: string; rate: number; unit: string;
-  source: 'approved' | 'historical' | 'market_estimate' | 'admin_reference'; location: string; verifiedAt: string;
+  source: 'approved' | 'historical' | 'market_estimate' | 'admin_reference' | 'manual'; location: string; verifiedAt: string;
   currency: string; sourceUrl: string | null; inclusions: string;
   range?: { low: number; high: number };
   confidence?: 'low' | 'medium';
   sources?: { name: string; url: string; publishedDate: string | null; retrievedAt: string; quote: string; specification: string; inclusions: string }[];
 };
 export type Estimate = ReturnType<typeof buildEstimate>;
+export const estimateCompletionSchema = z.object({ action: z.literal('complete'), projectId: z.string().uuid(),
+  changes: z.array(z.object({ itemId: z.string().uuid(), widthFt: dimension, heightFt: dimension,
+    ratePerSft: z.number().finite().nonnegative().max(10000000).nullable(),
+  }).strict()).min(1).max(60),
+}).strict();
+
+export function completeEstimate(previous: Estimate, changes: z.infer<typeof estimateCompletionSchema>['changes']) {
+  const draft = draftSchema.parse(previous.draft);
+  const evidence = previous.evidence.map(row => ({ ...row }));
+  for (const change of changes) {
+    const item = draft.sections.flatMap(section => section.items).find(row => row.id === change.itemId);
+    if (!item) throw new Error('This estimate item is no longer available.');
+    const row = evidence.find(row => row.itemId === item.id);
+    if (change.widthFt != null || change.heightFt != null) {
+      if (change.widthFt == null || change.heightFt == null) throw new Error('Enter both width/length and height in feet.');
+      item.measurementMode = 'dimensions'; item.widthFt = change.widthFt; item.heightFt = change.heightFt; item.sftArea = null;
+      if (row) { row.quantityStatus = 'user_entered'; row.reason = `Work face entered by you: ${change.widthFt} ft × ${change.heightFt} ft. Verify before final confirmation.`; }
+    }
+    if (change.ratePerSft != null && change.ratePerSft !== item.ratePerSft) {
+      item.ratePerSft = change.ratePerSft;
+      if (row) row.price = { id: `manual-${item.id}`, name: item.productName, description: item.productDetails, rate: change.ratePerSft, unit: 'sqft', source: 'manual', currency: row.price?.currency || '', location: draft.project.placeOfProject,
+        verifiedAt: new Date().toISOString(), sourceUrl: null, inclusions: 'Rate entered explicitly by the user; supplier inclusions and GST must be checked.' };
+    }
+  }
+  draft.revision++;
+  const items = draft.sections.flatMap(section => section.items);
+  return { ...previous, draft: draftSchema.parse(draft), evidence,
+    totals: quotationTotals(items.map(item => Number(itemCalculation(item).cents ?? 0n) / 100), draft.pricing),
+    incomplete: items.some(item => itemCalculation(item).area == null || item.ratePerSft == null),
+  };
+}
 
 /** File signatures are checked independently of the client name and MIME type. */
 export function detectPlanType(bytes: Uint8Array) {

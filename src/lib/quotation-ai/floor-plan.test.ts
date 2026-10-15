@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { buildEstimate, mergeRoomEstimates, detectPlanType, scopedRooms, MAX_PLAN_BYTES, type PlanAnalysis, type PriceEvidence, type ProjectBrief } from './floor-plan';
+import { buildEstimate, completeEstimate, estimateCompletionSchema, mergeRoomEstimates, detectPlanType, scopedRooms, MAX_PLAN_BYTES, type PlanAnalysis, type PriceEvidence, type ProjectBrief } from './floor-plan';
 import { draftFixture as fixture } from '@/test/floor-plan-fixtures';
 
 export const plan: PlanAnalysis = { propertyType: 'Apartment', floors: 1, units: 'Feet', scale: 'Unknown', warnings: [], rooms: [
@@ -41,6 +41,18 @@ describe('floor plan quotation boundary', () => {
   });
   it('uses detected room types for contextual scope', () => {
     expect(scopedRooms(plan, { scope: 'living-bedrooms', roomNames: brief.roomNames }).map(room => room.name)).toEqual(['Bedroom']);
+  });
+  it('completes missing measurements and an explicit rate with exact server totals and stable IDs', () => {
+    const raw = proposal(); raw.sections[0].items[0].measurementStatus = 'unknown';
+    const previous = buildEstimate(raw, plan, brief, [], fixture());
+    const itemId = previous.draft.sections[0].items[0].id;
+    const completed = completeEstimate(previous, [{ itemId, widthFt: 8, heightFt: 7, ratePerSft: 1200 }]);
+    expect(completed.totals.total).toBe(75331.2); expect(completed.incomplete).toBe(false);
+    expect(completed.evidence[0].price.source).toBe('manual'); expect(completed.evidence[0].quantityStatus).toBe('user_entered');
+    expect(completed.draft.sections[0].items[0].id).toBe(itemId);
+    expect(previous.draft.sections[0].items[0].ratePerSft).toBeNull();
+    expect(() => completeEstimate(previous, [{ itemId: crypto.randomUUID(), widthFt: 8, heightFt: 7, ratePerSft: null }])).toThrow('no longer');
+    expect(estimateCompletionSchema.safeParse({ action: 'complete', projectId: crypto.randomUUID(), changes: [{ itemId, widthFt: -1, heightFt: 7, ratePerSft: 1000 }] }).success).toBe(false);
   });
   it('derives a reviewable ceiling allowance from room dimensions without using that area for wardrobes', () => {
     const raw = proposal(); raw.sections[0].items[0].productName = 'False ceiling'; raw.sections[0].items[0].measurementStatus = 'unknown';

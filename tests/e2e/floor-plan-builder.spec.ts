@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { mockCaptcha } from './mock-captcha';
-import { buildEstimate } from '../../src/lib/quotation-ai/floor-plan';
+import { buildEstimate, completeEstimate, type Estimate } from '../../src/lib/quotation-ai/floor-plan';
 import { proposalFixture } from '../../src/test/floor-plan-fixtures';
 
 test('floor plan builder stays within mobile/tablet/desktop widths and preserves the quotation', async ({ page }) => {
@@ -8,15 +8,22 @@ test('floor plan builder stays within mobile/tablet/desktop widths and preserves
   const id = '00000000-0000-4000-8000-000000000001';
   const user = { id, email: 'check@example.test', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() };
   let paidRequests = 0;
+  let currentEstimate: Estimate | null = null;
   const room = { name: 'Bedroom', kind: 'bedroom', floor: '1', widthFt: null, lengthFt: null, source: 'unknown', confidence: 'low', file: 'plan.pdf', page: 1, notes: 'Measurements require review. '.repeat(12) };
   await page.route('**/*', async route => {
     const req = route.request(); const url = new URL(req.url());
     if (url.pathname === '/api/quotation-ai/floor-plan') {
-      paidRequests++;
       if (req.headers()['content-type']?.includes('application/json')) {
         const input = req.postDataJSON();
-        return route.fulfill({ json: { projectId: id, estimate: buildEstimate(proposalFixture(), input.analysis, input.brief, [], input.draft) } });
+        if (input.action === 'complete') {
+          currentEstimate = completeEstimate(currentEstimate!, input.changes);
+          return route.fulfill({ json: { projectId: id, estimate: currentEstimate } });
+        }
+        paidRequests++;
+        currentEstimate = buildEstimate(proposalFixture(), input.analysis, input.brief, [], input.draft);
+        return route.fulfill({ json: { projectId: id, estimate: currentEstimate } });
       }
+      paidRequests++;
       return route.fulfill({ json: { projectId: id, analysis: { propertyType: 'Apartment', floors: 1, units: 'Unknown', scale: 'Unknown', warnings: ['Uncertain dimensions. '.repeat(25)], rooms: [room] } } });
     }
     if (url.hostname === '127.0.0.1') return route.continue();
@@ -112,11 +119,15 @@ test('floor plan builder stays within mobile/tablet/desktop widths and preserves
   await dialog.getByRole('button', { name: 'Generate Quotation', exact: true }).click();
   await expect(dialog.getByRole('heading', { name: 'Your quotation is ready to review' })).toBeVisible();
   await expect(dialog.getByText(/Partial total/)).toBeVisible();
+  await dialog.getByLabel('Known selling rate per sqft (optional)').fill('1200');
+  await dialog.getByRole('button', { name: 'Apply details', exact: true }).click();
+  await expect(dialog.getByText(/Partial total/)).not.toBeVisible();
+  expect(paidRequests).toBe(2);
   await dialog.getByRole('button', { name: 'Edit Quotation', exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await expect(page.locator('#projectTitle')).toHaveValue('Preserve my manual title');
   await expect(page.getByPlaceholder('Enter or select client name')).toHaveValue('Rahul');
   await expect(page.getByText(/AI-generated estimate — rates and measurements require review/)).toBeVisible();
-  await expect(page.getByText('Provisional Total', { exact: true })).toBeVisible();
+  await expect(page.getByText('Grand Total', { exact: true })).toBeVisible();
   expect(paidRequests).toBe(2);
 });

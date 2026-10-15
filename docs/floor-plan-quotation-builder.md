@@ -100,6 +100,21 @@ claim that edited values were externally verified. Full-room false ceiling cover
 can use printed/user-provided room width × length as an explicitly labelled allowance.
 Cabinetry never receives floor area as a substitute for manufacturing dimensions.
 
+### Recovering an incomplete estimate
+
+The preview now offers a one-item-at-a-time completion form for missing work-face
+width/length and height, plus an optional known unit rate. These details are validated,
+stored and recalculated on the server without a model call (`action: complete`).
+User-entered pricing is labelled separately. A project budget is never used as a rate.
+`Retry pricing only` reuses stored sections, quantities, IDs and manual rates; it runs
+fresh market research without rerunning plan analysis or item generation. Model/account
+configuration, usage-limit, timeout and invalid-search-output failures now have distinct
+safe messages under “Why some prices are missing”, instead of a generic swallowed error.
+Running-foot source rates can normalize to sqft only when the user explicitly supplied
+the work height: per-rft rate ÷ height. The conversion and its height are recorded in
+price evidence; changing height requires checking that rate. No default cabinet heights
+or inferred room-to-cabinet quantities are introduced.
+
 Existing fixed-point quotation arithmetic computes all totals. Duplicate products
 within a room and proposals outside the selected scope are rejected. All model work
 measurements remain estimates requiring review, even when the model says measured.

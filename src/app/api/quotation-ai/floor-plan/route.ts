@@ -1,16 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { z } from 'zod';
-import { analysisSchema, briefSchema, buildEstimate, mergeRoomEstimates, detectPlanType, MAX_PLAN_BYTES, MAX_PLAN_FILES, scopedRooms, type Estimate, type PriceEvidence } from '@/lib/quotation-ai/floor-plan';
-import { draftSchema } from '@/lib/quotation-ai/domain';
+import { analysisSchema, briefSchema, buildEstimate, completeEstimate, estimateCompletionSchema, generatedSchema, mergeRoomEstimates, detectPlanType, MAX_PLAN_BYTES, MAX_PLAN_FILES, scopedRooms, type Estimate, type PriceEvidence } from '@/lib/quotation-ai/floor-plan';
+import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
-import { OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
+import { MarketResearchError, OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
 
 export const dynamic = 'force-dynamic';
 type Env = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; OPENAI_FLOOR_PLAN_MODEL?: string; OPENAI_MARKET_MODEL?: string; QUOTATION_MARKET_RESEARCH?: string; QUOTATION_AI_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> } };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } });
-const generation = z.object({ action: z.literal('generate'), projectId: z.string().uuid().nullable(), analysis: analysisSchema, brief: briefSchema, draft: draftSchema, regenerateRooms: z.array(z.string().min(1).max(150)).min(1).max(40).optional() }).strict();
+const generation = z.object({ action: z.enum(['generate','retry_pricing']), projectId: z.string().uuid().nullable(), analysis: analysisSchema, brief: briefSchema, draft: draftSchema, regenerateRooms: z.array(z.string().min(1).max(150)).min(1).max(40).optional() }).strict();
 class InputError extends Error { constructor(message: string, public status: number) { super(message); } }
 // Bound bodies while streaming, including chunked requests without Content-Length.
 async function boundedBody(request: Request, maximum: number) {
@@ -44,10 +44,10 @@ export async function POST(request: Request) {
     if (env.QUOTATION_AI_LIMITER && !(await env.QUOTATION_AI_LIMITER.limit({ key: `floor-plan:${user.id}` })).success) return json({ error: 'Please wait a minute before trying again.' }, 429);
     const key = env.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
     const model = env.OPENAI_FLOOR_PLAN_MODEL || process.env.OPENAI_FLOOR_PLAN_MODEL || env.OPENAI_MODEL || process.env.OPENAI_MODEL;
-    if (!key || !model) return json({ error: 'Configure the server OPENAI_API_KEY and a vision-capable OPENAI_FLOOR_PLAN_MODEL.' }, 503);
     const provider = new OpenAIFloorPlanProvider(key, model);
     const contentType = request.headers.get('content-type') ?? '';
     if (contentType.startsWith('multipart/form-data')) {
+      if (!key || !model) return json({ error: 'Configure the server OPENAI_API_KEY and a vision-capable OPENAI_FLOOR_PLAN_MODEL.' }, 503);
       const body = await boundedBody(request, MAX_PLAN_BYTES + 65536);
       const form = await new Response(body, { headers: { 'Content-Type': contentType } }).formData();
       const entries = form.getAll('files');
@@ -75,9 +75,21 @@ export async function POST(request: Request) {
     }
     if (!contentType.startsWith('application/json')) return json({ error: 'Use JSON or a floor plan upload.' }, 415);
     const body = await boundedBody(request, 131072);
-    const parsed = generation.safeParse(JSON.parse(await body.text()));
+    const raw = JSON.parse(await body.text());
+    if (raw.action === 'complete') {
+      const completion = estimateCompletionSchema.safeParse(raw);
+      if (!completion.success) return json({ error: 'Enter positive sizes and a valid rate.' }, 400);
+      const stored = await db.from('quotation_plan_projects').select('estimate').eq('id', completion.data.projectId).eq('user_id', user.id).maybeSingle();
+      if (stored.error || !stored.data?.estimate) return json({ error: 'This estimate is not available to your account.' }, 403);
+      const estimate = completeEstimate(stored.data.estimate as Estimate, completion.data.changes);
+      const saved = await db.from('quotation_plan_projects').update({ estimate, updated_at: new Date().toISOString() }).eq('id', completion.data.projectId).eq('user_id', user.id);
+      if (saved.error) return json({ error: 'Could not save these measurements. Please retry.' }, 422);
+      return json({ projectId: completion.data.projectId, estimate });
+    }
+    if (!key || !model) return json({ error: 'Configure the server OPENAI_API_KEY and a vision-capable OPENAI_FLOOR_PLAN_MODEL.' }, 503);
+    const parsed = generation.safeParse(raw);
     if (!parsed.success) return json({ error: 'Check the project details and selected rooms.' }, 400);
-    const { projectId, analysis, brief, draft, regenerateRooms } = parsed.data;
+    const { projectId, analysis, brief, draft, regenerateRooms, action } = parsed.data;
     let previousEstimate: Estimate | null = null;
     if (!scopedRooms(analysis, brief).length) return json({ error: 'Select at least one room for this scope.' }, 400);
     if (projectId) {
@@ -86,6 +98,7 @@ export async function POST(request: Request) {
       previousEstimate = (existing.data as { estimate: Estimate | null }).estimate;
     }
     if (regenerateRooms && (!previousEstimate || regenerateRooms.some(name => !scopedRooms(analysis, brief).some(room => room.name === name)))) return json({ error: 'Select rooms from the current estimate to regenerate.' }, 400);
+    if (action === 'retry_pricing' && (!previousEstimate || regenerateRooms)) return json({ error: 'Open an existing estimate to retry its pricing.' }, 400);
     // RLS and an explicit owner filter both apply. Pattern rates are historical, never approved.
     const [approved, history, profile, references] = await Promise.all([
       db.from('quotation_approved_rates').select('*').eq('user_id', user.id).eq('active', true).limit(100),
@@ -126,15 +139,26 @@ export async function POST(request: Request) {
     const requestedBrief = regenerateRooms ? { ...brief, roomNames: regenerateRooms } : brief;
     // Bound context cost. Full evidence remains server-side; the model only needs matching specifications and IDs.
     const rateContext = rates.slice(0, 60).map(({ id, name, description, unit, source }) => ({ id, name, description: description.slice(0, 400), unit, source }));
-    const proposal = await provider.generate({ rooms: scopedRooms(analysis, requestedBrief), property: analysis.propertyType, brief: requestedBrief, rates: rateContext, reviewedPatterns: patternContext.slice(0, 30) }, request.signal);
+    const proposal = action === 'retry_pricing' ? generatedSchema.parse({
+      sections: draftSchema.parse(previousEstimate.draft).sections.map(section => ({ title: section.title,
+        roomName: previousEstimate.roomSections.find(row => row.sectionId === section.id)?.roomName,
+        items: section.items.map(item => ({ productName: item.productName, description: item.productDetails,
+          rateId: rates.find(rate => rate.name === item.productName && (rate.source === 'approved' || rate.source === 'admin_reference'))?.id ?? null,
+          quantity: itemCalculation(item).area, measurementStatus: itemCalculation(item).area == null ? 'unknown' : 'estimated',
+          measurementReason: previousEstimate.evidence.find(row => row.itemId === item.id)?.reason || 'Previous work measurement retained.',
+        })),
+      })), assumptions: [],
+    }) : await provider.generate({ rooms: scopedRooms(analysis, requestedBrief), property: analysis.propertyType, brief: requestedBrief, rates: rateContext, reviewedPatterns: patternContext.slice(0, 30) }, request.signal);
     const researchLimitations: string[] = [];
     if (references.error) researchLimitations.push('The admin reference library is unavailable; business and market pricing were used where possible.');
     const products = [...new Map(proposal.sections.flatMap(section => section.items).filter(item => !approvedIds.has(item.rateId))
-      .map(item => [item.productName.trim().toLowerCase(), { name: item.productName, specification: item.description }])).values()];
+      .map(item => [item.productName.trim().toLowerCase(), { name: item.productName, specification: item.description,
+        ...(action === 'retry_pricing' ? { heightFt: previousEstimate.draft.sections.flatMap(section => section.items).find(row => row.productName === item.productName && row.productDetails === item.description)?.heightFt ?? undefined } : {}),
+      }])).values()];
     const enabled = (env.QUOTATION_MARKET_RESEARCH || process.env.QUOTATION_MARKET_RESEARCH || 'openai') === 'openai';
     if (products.length && enabled && !/^(unknown|not set|n\/a|none)$/i.test(brief.location.trim())) {
       // Cache only this owner's previously saved evidence, at most 24h, with identical specification/currency/city.
-      const cached = (previousEstimate?.evidence ?? []).flatMap(row => row.price?.source === 'market_estimate' ? [row.price] : [])
+      const cached = (action === 'retry_pricing' ? [] : previousEstimate?.evidence ?? []).flatMap(row => row.price?.source === 'market_estimate' ? [row.price] : [])
         .filter(rate => rate.currency === currency && rate.location.toLowerCase() === brief.location.toLowerCase()
           && Number.isFinite(Date.parse(rate.verifiedAt)) && Date.now() >= Date.parse(rate.verifiedAt) && Date.now() - Date.parse(rate.verifiedAt) < 86400000
           && products.some(product => product.name === rate.name && product.specification === rate.description));
@@ -146,7 +170,7 @@ export async function POST(request: Request) {
             .research({ products: uncached.slice(0, 12), location: brief.location, currency, finish: brief.finish }, request.signal);
           rates.push(...research.rates); researchLimitations.push(...research.limitations);
           if (uncached.length > 12) researchLimitations.push('Research was limited to 12 distinct products to control cost; remaining prices require review.');
-        } catch { researchLimitations.push('Live market research was unavailable. Available historical rates are labelled; other prices remain pending.'); }
+        } catch (failure) { researchLimitations.push(failure instanceof MarketResearchError ? failure.message : 'Live market research was unavailable. Available historical rates are labelled; other prices remain pending.'); }
       }
       if (cached.length) researchLimitations.push('Some market evidence is cached from this project within the last 24 hours; retrieval dates are shown.');
     } else if (products.length) researchLimitations.push('Live pricing research is disabled or the project city is unknown. Enter a city or review pending rates.');
@@ -156,6 +180,22 @@ export async function POST(request: Request) {
       if (researched) item.rateId = researched.id;
     }
     let estimate = buildEstimate(proposal, analysis, requestedBrief, rates, draft);
+    if (action === 'retry_pricing') {
+      // Keep stable identities and explicit manual rates/dimensions; only retry non-manual pricing.
+      estimate.draft.sections.forEach((section, sectionIndex) => {
+        const oldSection = previousEstimate.draft.sections[sectionIndex];
+        const generatedSectionId = section.id; section.id = oldSection.id;
+        estimate.roomSections.find(row => row.sectionId === generatedSectionId)!.sectionId = oldSection.id;
+        section.items.forEach((item, itemIndex) => {
+          const oldItem = oldSection.items[itemIndex];
+          const row = estimate.evidence.find(row => row.itemId === item.id)!; row.itemId = oldItem.id; item.id = oldItem.id;
+          const oldEvidence = previousEstimate.evidence.find(row => row.itemId === oldItem.id);
+          if (oldEvidence?.price?.source === 'manual') { item.ratePerSft = oldItem.ratePerSft; row.price = oldEvidence.price; }
+          if (oldItem.measurementMode === 'dimensions') { item.measurementMode = 'dimensions'; item.widthFt = oldItem.widthFt; item.heightFt = oldItem.heightFt; item.sftArea = null; if (oldEvidence) { row.quantityStatus = oldEvidence.quantityStatus; row.reason = oldEvidence.reason; } }
+        });
+      });
+      estimate = completeEstimate(estimate, []);
+    }
     estimate.assumptions.push(...researchLimitations);
     if (regenerateRooms && previousEstimate) estimate = mergeRoomEstimates(previousEstimate, estimate, regenerateRooms, rates);
     const id = projectId || crypto.randomUUID();

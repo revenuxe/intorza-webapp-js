@@ -23,6 +23,12 @@ it('normalizes sqm rates and rejects widely conflicting comparable prices', () =
   const result = resolve([sample(), sample(other, 5000, 6000)], ['https://supplier.example/wardrobe', other]);
   expect(result.rates).toHaveLength(0); expect(result.limitations.join()).toContain('conflict');
 });
+it('converts running-foot cabinetry rates only with an explicitly supplied work height', () => {
+  const raw = { observations: [{ ...sample(), unit: 'rft', low: 3000, high: 3600 }], limitations: [] };
+  expect(resolveMarketEvidence(raw, [sample().sourceUrl], input, now).rates).toHaveLength(0);
+  const result = resolveMarketEvidence(raw, [sample().sourceUrl], { ...input, products: [{ ...input.products[0], heightFt: 2.5 }] }, now);
+  expect(result.rates[0].rate).toBe(1320); expect(result.rates[0].inclusions).toContain('2.5 ft');
+});
 it('deduplicates equivalent domains rather than inflating source confidence', () => {
   expect(resolve([sample(), sample()]).rates[0].confidence).toBe('low');
 });
@@ -32,6 +38,10 @@ it('does not fabricate a fallback if search fails or the model never searches', 
   await expect(provider.research(input, new AbortController().signal)).rejects.toThrow('429');
   (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ status: 'completed', output: [] }) });
   await expect(provider.research(input, new AbortController().signal)).rejects.toThrow('No live search');
+});
+it('reports search model configuration failures explicitly instead of hiding them as missing sources', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400 });
+  await expect(new OpenAIWebMarketPricing('secret', 'configured-model').research(input, new AbortController().signal)).rejects.toThrow('OPENAI_MARKET_MODEL');
 });
 it('sends a bounded search request and accepts only URLs returned by that search', async () => {
   const row = { ...sample(), publishedDate: new Date().toISOString().slice(0, 10) };
