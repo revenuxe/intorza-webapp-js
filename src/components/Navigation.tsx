@@ -109,7 +109,7 @@ export const Navigation = ({ mobile }: NavigationProps) => {
           <Crown className="h-5 w-5 shrink-0" />
           <div className="flex-1 text-left">
             <span className="block text-sm font-semibold leading-5">Upgrade to Pro</span>
-            <span className="mt-0.5 flex items-baseline gap-1.5"><s className="text-[11px] font-medium opacity-65">{settings.countryCode === 'IN' ? '₹2,999' : '$29'}</s><strong className="text-lg font-bold leading-none tracking-tight">{priceText}</strong><span className="text-[10px] font-medium opacity-75">limited-time offer</span></span>
+            <span className="mt-0.5 flex flex-nowrap items-baseline gap-1 whitespace-nowrap"><s className="shrink-0 text-[10px] font-medium opacity-65">{settings.countryCode === 'IN' ? '₹2,999' : '$29'}</s><strong className="shrink-0 text-lg font-bold leading-none tracking-tight">{priceText}</strong><span className="shrink-0 text-[9px] font-medium opacity-75">limited-time offer</span></span>
           </div>
         </button>
       )}
