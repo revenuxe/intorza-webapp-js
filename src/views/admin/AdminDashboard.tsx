@@ -765,7 +765,18 @@ const AdminDashboard = () => {
             </TabsList>
           </div>
 
-          <TabsContent value="ai" className="space-y-4"><CoinWalletAdminPanel /><AITrainingPanel /></TabsContent>
+          <TabsContent value="ai" className="space-y-4">
+            <Tabs defaultValue="access" className="space-y-4">
+              <div className="overflow-x-auto -mx-1 px-1">
+                <TabsList className="inline-flex h-auto w-max gap-1 rounded-xl p-1">
+                  <TabsTrigger value="access" className="px-3 py-2 text-xs sm:text-sm">AI access</TabsTrigger>
+                  <TabsTrigger value="train" className="px-3 py-2 text-xs sm:text-sm">Train AI</TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="access" className="mt-0"><CoinWalletAdminPanel /></TabsContent>
+              <TabsContent value="train" className="mt-0"><AITrainingPanel /></TabsContent>
+            </Tabs>
+          </TabsContent>
           <TabsContent value="users" className="space-y-4">
             <Card>
               <CardHeader className="p-3 sm:p-6">
