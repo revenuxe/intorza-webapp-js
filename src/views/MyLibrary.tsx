@@ -144,36 +144,38 @@ const MyLibrary = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 md:grid-cols-7 h-auto gap-1">
-            <TabsTrigger value="items" className="flex flex-col md:flex-row items-center gap-1 py-2 text-xs">
+          <div className="-mx-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
+          <TabsList className="flex h-auto w-max min-w-full justify-start gap-1 p-1">
+            <TabsTrigger value="items" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Package className="h-4 w-4" />
-              <span className="hidden md:inline">Items</span>
+              <span>Items</span>
             </TabsTrigger>
-            <TabsTrigger value="sections" className="flex flex-col md:flex-row items-center gap-1 py-2 text-xs">
+            <TabsTrigger value="sections" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Layers className="h-4 w-4" />
-              <span className="hidden md:inline">Sections</span>
+              <span>Sections</span>
             </TabsTrigger>
-            <TabsTrigger value="quotations" className="flex flex-col md:flex-row items-center gap-1 py-2 text-xs">
+            <TabsTrigger value="quotations" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Receipt className="h-4 w-4" />
-              <span className="hidden md:inline">Quotes</span>
+              <span>Quotes</span>
             </TabsTrigger>
-            <TabsTrigger value="payment" className="flex flex-col md:flex-row items-center gap-1 py-2 text-xs">
+            <TabsTrigger value="payment" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <CreditCard className="h-4 w-4" />
-              <span className="hidden md:inline">Payment</span>
+              <span>Payment</span>
             </TabsTrigger>
-            <TabsTrigger value="terms" className="flex flex-col md:flex-row items-center gap-1 py-2 text-xs">
+            <TabsTrigger value="terms" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <FileText className="h-4 w-4" />
-              <span className="hidden md:inline">Terms</span>
+              <span>Terms</span>
             </TabsTrigger>
-            <TabsTrigger value="bank" className="flex flex-col md:flex-row items-center gap-1 py-2 text-xs">
+            <TabsTrigger value="bank" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Building2 className="h-4 w-4" />
-              <span className="hidden md:inline">Bank</span>
+              <span>Bank</span>
             </TabsTrigger>
-            <TabsTrigger value="warranty" className="flex flex-col md:flex-row items-center gap-1 py-2 text-xs">
+            <TabsTrigger value="warranty" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Shield className="h-4 w-4" />
-              <span className="hidden md:inline">Warranty</span>
+              <span>Warranty</span>
             </TabsTrigger>
           </TabsList>
+          </div>
 
           <TabsContent value="items" className="mt-6">
             <ItemsPricingTab />

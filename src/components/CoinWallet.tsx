@@ -13,11 +13,16 @@ import { cn } from '@/lib/utils';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare global { interface Window { Razorpay: any } }
 const quickAmounts = [50, 100, 250, 500] as const;
-const loadCheckout = () => new Promise<boolean>(resolve => {
-  if (window.Razorpay) return resolve(true);
-  const script = document.createElement('script'); script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-  script.onload = () => resolve(true); script.onerror = () => resolve(false); document.body.appendChild(script);
-});
+let checkoutLoader: Promise<boolean> | null = null;
+const loadCheckout = () => {
+  if (window.Razorpay) return Promise.resolve(true);
+  if (checkoutLoader) return checkoutLoader;
+  checkoutLoader = new Promise<boolean>(resolve => {
+    const script = document.createElement('script'); script.src = 'https://checkout.razorpay.com/v1/checkout.js'; script.async = true;
+    script.onload = () => resolve(true); script.onerror = () => { checkoutLoader = null; resolve(false); }; document.body.appendChild(script);
+  });
+  return checkoutLoader;
+};
 const notifyWalletChanged = () => window.dispatchEvent(new Event('intorza:wallet-changed'));
 const pause = (milliseconds: number) => new Promise(resolve => window.setTimeout(resolve, milliseconds));
 async function verifyCoinPayment(accessToken: string, response: Record<string, string>) {
@@ -43,7 +48,7 @@ export function CoinWallet({ triggerClassName }: { triggerClassName?: string }) 
     setBalance(wallet?.balance ?? 0); if (withActivity) setActivity((ledger.data ?? []) as LedgerEntry[]);
   };
   useEffect(() => {
-    void refresh(); const onWalletChanged = () => void refresh(open); const onOpenWallet = () => { setOpen(true); void refresh(true); }; window.addEventListener('intorza:wallet-changed', onWalletChanged); window.addEventListener('intorza:open-wallet', onOpenWallet);
+    void refresh(); if (open) void loadCheckout(); const onWalletChanged = () => void refresh(open); const onOpenWallet = () => { setOpen(true); void refresh(true); }; window.addEventListener('intorza:wallet-changed', onWalletChanged); window.addEventListener('intorza:open-wallet', onOpenWallet);
     const channel = supabase.channel('coin-wallet').on('postgres_changes', { event: '*', schema: 'public', table: 'coin_wallets' }, () => notifyWalletChanged()).subscribe();
     return () => { window.removeEventListener('intorza:wallet-changed', onWalletChanged); window.removeEventListener('intorza:open-wallet', onOpenWallet); void supabase.removeChannel(channel); };
   }, [open]);
