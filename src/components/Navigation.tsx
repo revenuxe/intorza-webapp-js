@@ -106,10 +106,10 @@ export const Navigation = ({ mobile }: NavigationProps) => {
           onClick={() => setPaywallOpen(true, 'Upgrade')}
           className="flex items-center gap-3 rounded-lg px-3 py-3 mb-2 text-sm font-medium bg-gradient-to-r from-amber-500/10 to-amber-600/10 text-amber-700 border border-amber-500/20 hover:from-amber-500/20 hover:to-amber-600/20 transition-colors"
         >
-          <Crown className="h-5 w-5" />
+          <Crown className="h-5 w-5 shrink-0" />
           <div className="flex-1 text-left">
-            <span className="block font-semibold">Upgrade to Pro</span>
-            <span className="text-xs opacity-80"><s>{settings.countryCode === 'IN' ? '₹2,999' : '$29'}</s> {countryFlag} {priceText} limited-time offer</span>
+            <span className="block text-sm font-semibold leading-5">Upgrade to Pro</span>
+            <span className="mt-0.5 flex items-baseline gap-1.5"><s className="text-[11px] font-medium opacity-65">{settings.countryCode === 'IN' ? '₹2,999' : '$29'}</s><strong className="text-lg font-bold leading-none tracking-tight">{priceText}</strong><span className="text-[10px] font-medium opacity-75">limited-time offer</span></span>
           </div>
         </button>
       )}
