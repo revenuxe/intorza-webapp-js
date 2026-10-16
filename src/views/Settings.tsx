@@ -411,19 +411,6 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* Brand Colors Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="h-5 w-5" />
-              Brand Colors
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BrandColorExtractor />
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -495,6 +482,19 @@ const Settings = () => {
             <p className="text-xs text-muted-foreground">
               Upload your signature image. This will appear at the bottom of all quotations and invoices.
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Brand Colors Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="h-5 w-5" />
+              Brand Colors
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BrandColorExtractor />
           </CardContent>
         </Card>
 
