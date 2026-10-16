@@ -154,7 +154,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         xhr.send(form);
       });
       setAnalysis(result.analysis); setProjectId(result.projectId); setBrief(value => ({ ...value, roomNames: result.analysis.rooms.map(room => room.name) })); setStep('scope'); void refreshWalletBalance();
-    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not analyse the plan.'); }
+    } catch (failure) { const message = failure instanceof Error ? failure.message : 'Could not analyse the plan.'; setError(message); if (/no coins left|insufficient coins|COINS_REQUIRED/i.test(message)) window.dispatchEvent(new Event('intorza:open-wallet')); }
     finally { pending.current = false; setBusy(''); abort.current = null; }
   }
   async function generate(selected?: string[], retryPricing = false) {
@@ -183,7 +183,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         onApply(body.estimate.draft, base.current, body.projectId, true, body.estimate.evidence);
         setAutoSaved(true);
       }
-    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not generate an estimate.'); }
+    } catch (failure) { const message = failure instanceof Error ? failure.message : 'Could not generate an estimate.'; setError(message); if (/no coins left|insufficient coins|COINS_REQUIRED/i.test(message)) window.dispatchEvent(new Event('intorza:open-wallet')); }
     finally { clearTimeout(timeout); pending.current = false; setBusy(''); abort.current = null; }
   }
   async function complete(change: { itemId: string; widthFt: number | null; heightFt: number | null; areaSqft?: number | null; ratePerSft: number | null }) {
@@ -238,7 +238,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const groups = ['upload', 'analysis'].includes(step) ? 0 : ['scope', 'work', 'design', 'finish', 'budget'].includes(step) ? 1 : step === 'details' ? 2 : 3;
   return <>
     <div className="col-span-2 min-w-0 sm:col-span-1 sm:min-w-[220px]">
-      <Button type="button" aria-label="Built with AI" className="h-12 w-full gap-2 rounded-xl px-3 shadow-sm sm:px-4" onClick={() => { void refreshWalletBalance(); setChooserOpen(true); }}><BuilderMark className="h-4 w-4 shrink-0" /><span className="text-sm leading-5">Built with AI</span><span className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[11px] font-semibold leading-4 text-amber-900 shadow-sm"><GoldCoin className="h-3.5 w-3.5" />{walletBalance ?? '—'} coins</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Button>
+      <Button type="button" aria-label="Built with AI" className="h-12 w-full gap-2 rounded-xl px-3 shadow-sm sm:px-4" onClick={() => { void refreshWalletBalance(); setChooserOpen(true); }}><BuilderMark className="h-4 w-4 shrink-0" /><span className="text-sm leading-5">Built with AI</span><span role="button" tabIndex={0} aria-label="Top up coins" onClick={event => { event.stopPropagation(); window.dispatchEvent(new Event('intorza:open-wallet')); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); window.dispatchEvent(new Event('intorza:open-wallet')); } }} className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[11px] font-semibold leading-4 text-amber-900 shadow-sm"><GoldCoin className="h-3.5 w-3.5" />{walletBalance ?? '—'} coins</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Button>
     </div>
     <Dialog open={chooserOpen} onOpenChange={setChooserOpen}>
       <DialogContent className="max-h-[90dvh] min-w-0 max-w-xl gap-5 overflow-y-auto rounded-3xl p-4 sm:p-6">
