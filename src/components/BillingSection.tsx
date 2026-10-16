@@ -40,7 +40,7 @@ export const BillingSection = () => {
   
   // Determine price text and flag based on country
   const isIndia = settings.countryCode === 'IN';
-  const priceText = isIndia ? '₹1' : '$1';
+  const priceText = isIndia ? '₹499' : '$1';
   const countryFlag = countryConfig?.flag || '🌍';
 
   useEffect(() => {

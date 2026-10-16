@@ -14,7 +14,8 @@ export async function getOwnedPayment(paymentId: string, expectedUser?: string, 
   const order=await fetchRazorpay<ProviderOrder>(`orders/${encodeURIComponent(payment.order_id)}`);
   const userId=order.notes?.user_id;
   if (!userId || (expectedUser && userId !== expectedUser) || order.notes?.type !== 'pro_activation' || order.notes?.plan !== 'monthly' || order.id !== payment.order_id) throw new Error('Payment ownership or purpose mismatch');
-  if (order.amount !== 100 || payment.amount !== order.amount || !['INR','USD'].includes(order.currency) || payment.currency !== order.currency) throw new Error('Payment amount or currency mismatch');
+  const expectedAmount=order.currency==='INR' ? 49900 : order.currency==='USD' ? 100 : null;
+  if (expectedAmount===null || order.amount !== expectedAmount || payment.amount !== order.amount || payment.currency !== order.currency) throw new Error('Payment amount or currency mismatch');
   return {payment,order,userId};
 }
 export async function getCapturedPayment(paymentId: string, expectedUser?: string, expectedOrder?: string) {

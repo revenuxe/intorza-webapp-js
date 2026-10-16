@@ -85,7 +85,7 @@ export const Navigation = ({ mobile }: NavigationProps) => {
   const { openFeedback } = useFeedback();
   
   // Determine price text and flag based on country
-  const priceText = settings.countryCode === 'IN' ? '₹1' : '$1';
+  const priceText = settings.countryCode === 'IN' ? '₹499' : '$1';
   const countryFlag = countryConfig?.flag || '🌍';
 
   const handleNavClick = (e: React.MouseEvent, item: typeof navItems[0]) => {

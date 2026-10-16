@@ -37,7 +37,7 @@ export const PaywallModal: React.FC = () => {
   const [loading, setLoading] = useState(false);
   
   // Determine price text and flag based on country
-  const priceText = settings.countryCode === 'IN' ? '₹1' : '$1';
+  const priceText = settings.countryCode === 'IN' ? '₹499' : '$1';
   const countryFlag = countryConfig?.flag || '🌍';
 
   const loadRazorpayScript = (): Promise<boolean> => {

@@ -15,7 +15,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const PLAN_CONFIG = {
   monthly: {
     INR: {
-      amount: 100, // 100 paise (₹1) - Razorpay minimum for India
+      amount: 49900, // 100 paise (â‚¹1) - Razorpay minimum for India
       currency: 'INR',
     },
     USD: {
