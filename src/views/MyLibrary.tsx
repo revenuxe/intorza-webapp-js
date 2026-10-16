@@ -155,22 +155,22 @@ const MyLibrary = () => {
         }} className="w-full">
           <div className="-mx-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
           <TabsList className="flex h-auto w-max min-w-full justify-start gap-1 p-1">
-            <TabsTrigger value="items" aria-label="Items — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
+            <TabsTrigger value="items" aria-label="Items — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Package className="h-4 w-4" />
               <span>Items</span>
               {!isPro && <LockKeyhole className="h-3 w-3" />}
             </TabsTrigger>
-            <TabsTrigger value="sections" aria-label="Sections — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
+            <TabsTrigger value="sections" aria-label="Sections — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Layers className="h-4 w-4" />
               <span>Sections</span>
               {!isPro && <LockKeyhole className="h-3 w-3" />}
             </TabsTrigger>
-            <TabsTrigger value="quotations" aria-label="Quotes — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
+            <TabsTrigger value="quotations" aria-label="Quotes — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Receipt className="h-4 w-4" />
               <span>Quotes</span>
               {!isPro && <LockKeyhole className="h-3 w-3" />}
             </TabsTrigger>
-            <TabsTrigger value="payment" aria-label="Payment — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
+            <TabsTrigger value="payment" aria-label="Payment — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <CreditCard className="h-4 w-4" />
               <span>Payment</span>
               {!isPro && <LockKeyhole className="h-3 w-3" />}
@@ -179,12 +179,12 @@ const MyLibrary = () => {
               <FileText className="h-4 w-4" />
               <span>Terms</span>
             </TabsTrigger>
-            <TabsTrigger value="bank" aria-label="Bank — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
+            <TabsTrigger value="bank" aria-label="Bank — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Building2 className="h-4 w-4" />
               <span>Bank</span>
               {!isPro && <LockKeyhole className="h-3 w-3" />}
             </TabsTrigger>
-            <TabsTrigger value="warranty" aria-label="Warranty — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
+            <TabsTrigger value="warranty" aria-label="Warranty — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Shield className="h-4 w-4" />
               <span>Warranty</span>
               {!isPro && <LockKeyhole className="h-3 w-3" />}
