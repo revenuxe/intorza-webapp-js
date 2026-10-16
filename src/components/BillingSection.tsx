@@ -41,6 +41,7 @@ export const BillingSection = () => {
   // Determine price text and flag based on country
   const isIndia = settings.countryCode === 'IN';
   const priceText = isIndia ? '₹499' : '$1';
+  const regularPriceText = isIndia ? '₹2,999' : '$29';
   const countryFlag = countryConfig?.flag || '🌍';
 
   useEffect(() => {
@@ -237,13 +238,11 @@ export const BillingSection = () => {
                   <div>
                     <p className="font-semibold text-sm text-foreground">Intorza Pro</p>
                     <p className="text-xs text-muted-foreground">
-                      {status === 'trial' ? 'Free Trial' : plan === 'monthly' ? '₹49/month' : plan}
+                      {plan === 'monthly' ? '₹499/month' : plan || 'Pro'}
                     </p>
                   </div>
                 </div>
-                {status === 'trial' ? (
-                  <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/20 text-[10px]">Trial</Badge>
-                ) : status === 'cancelled' ? (
+                {status === 'cancelled' ? (
                   <Badge className="bg-gray-500/10 text-gray-700 border-gray-500/20 text-[10px]">Cancelled</Badge>
                 ) : (
                   <Badge className="bg-green-500/10 text-green-700 border-green-500/20 text-[10px]">Active</Badge>
@@ -254,7 +253,7 @@ export const BillingSection = () => {
                 <div className="flex items-center gap-1.5">
                   <Calendar className="h-3 w-3 text-muted-foreground" />
                   <span className="text-muted-foreground">
-                    {status === 'cancelled' ? 'Access until:' : status === 'trial' ? 'Trial ends:' : 'Renews:'}
+                    {status === 'cancelled' ? 'Access until:' : 'Renews:'}
                   </span>
                 </div>
                 <span className="font-medium text-right">
@@ -285,10 +284,7 @@ export const BillingSection = () => {
                     <AlertDialogHeader>
                       <AlertDialogTitle className="text-base">Cancel Subscription?</AlertDialogTitle>
                       <AlertDialogDescription className="text-xs">
-                        {status === 'trial' 
-                          ? 'Your trial will end immediately and you will lose Pro features.'
-                          : `You will retain Pro access until ${expiry ? new Date(expiry).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'the end of your billing period'}. No further charges will be made.`
-                        }
+                        {`You will retain Pro access until ${expiry ? new Date(expiry).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'the end of your billing period'}. No further charges will be made.`}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -328,7 +324,7 @@ export const BillingSection = () => {
               </div>
               <h3 className="font-semibold text-sm mb-1">Free Plan</h3>
               <p className="text-xs text-muted-foreground mb-3">
-                Try Pro FREE for 1 month! <span className="inline-flex items-center gap-1">({countryFlag} {priceText})</span>
+                Limited-time offer: <span className="inline-flex items-center gap-1"><s>{regularPriceText}</s> {countryFlag} {priceText}</span>
               </p>
               <Button 
                 onClick={() => setPaywallOpen(true, 'Upgrade')}
@@ -336,7 +332,7 @@ export const BillingSection = () => {
                 className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs h-8"
               >
                 <Crown className="h-3 w-3 mr-1" />
-                Start Free Trial
+                Get Pro
               </Button>
             </div>
           )}

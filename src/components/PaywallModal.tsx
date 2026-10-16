@@ -38,6 +38,7 @@ export const PaywallModal: React.FC = () => {
   
   // Determine price text and flag based on country
   const priceText = settings.countryCode === 'IN' ? '₹499' : '$1';
+  const regularPriceText = settings.countryCode === 'IN' ? '₹2,999' : '$29';
   const countryFlag = countryConfig?.flag || '🌍';
 
   const loadRazorpayScript = (): Promise<boolean> => {
@@ -85,21 +86,11 @@ export const PaywallModal: React.FC = () => {
         return;
       }
 
-      // If trial was activated without payment, just refresh and close
-      if (data.trialActivated && !data.orderId) {
-        toast.success('Free trial activated! Enjoy Pro for 30 days.');
-        window.dispatchEvent(new Event('subscription-payment-success'));
-        await refreshSubscription();
-        setPaywallOpen(false);
-        navigate('/dashboard');
-        return;
-      }
-
       // Always use order-based flow (all payment methods)
       const options = {
         key: data.keyId,
         name: 'Intorza',
-        description: 'Pro Activation • 30 Days Free',
+        description: 'Intorza Pro limited-time offer',
         amount: data.amount,
         currency: data.currency,
         order_id: data.orderId,
@@ -166,7 +157,7 @@ export const PaywallModal: React.FC = () => {
       <DialogContent className="w-[calc(100%-2rem)] max-w-[19.5rem] gap-0 overflow-hidden rounded-3xl border-0 p-0 shadow-2xl sm:max-w-[20.5rem] sm:p-0 [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:z-10 [&>button:last-child]:rounded-full [&>button:last-child]:bg-white/15 [&>button:last-child]:p-1.5 [&>button:last-child]:text-white [&>button:last-child]:opacity-100 [&>button:last-child]:ring-1 [&>button:last-child]:ring-white/20 [&>button:last-child]:hover:bg-white/25">
         <DialogTitle className="sr-only">Upgrade to Intorza Pro</DialogTitle>
         <DialogDescription className="sr-only">
-          Start your free trial of Intorza Pro to unlock all premium features.
+          Unlock Intorza Pro at the limited-time offer price.
         </DialogDescription>
         {/* Header */}
         <div className="relative overflow-hidden bg-gradient-to-br from-[#d96848] via-primary to-[#263b63] px-4 pb-5 pt-5 text-center text-primary-foreground">
@@ -174,9 +165,9 @@ export const PaywallModal: React.FC = () => {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
             <Crown className="h-6 w-6 text-amber-100" />
           </div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">Intorza Pro</p><h2 className="mt-1 text-xl font-semibold tracking-tight">One month free</h2>
-          <div className="my-1 flex items-center justify-center gap-1.5 text-2xl font-bold tracking-tight">
-            <span className="text-base">{countryFlag}</span> {priceText}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">Intorza Pro</p><h2 className="mt-1 text-xl font-semibold tracking-tight">Limited-time offer</h2>
+          <div className="my-1 flex items-center justify-center gap-2 text-2xl font-bold tracking-tight">
+            <span className="text-sm font-medium text-white/65 line-through">{regularPriceText}</span><span><span className="mr-1 text-base">{countryFlag}</span>{priceText}</span>
           </div>
           <p className="text-xs text-primary-foreground/75">Unlock the complete workspace.</p>
         </div>
@@ -200,7 +191,7 @@ export const PaywallModal: React.FC = () => {
             disabled={loading}
             className="h-10 w-full rounded-xl bg-gradient-to-r from-primary to-secondary text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:from-primary/90 hover:to-secondary/90"
           >
-            {loading ? 'Processing...' : 'Start Free Trial'}
+            {loading ? 'Processing...' : `Get Pro for ${priceText}`}
           </Button>
           <Button
             variant="ghost"
@@ -212,7 +203,7 @@ export const PaywallModal: React.FC = () => {
         </div>
 
         <p className="px-4 pb-4 text-center text-[9px] text-muted-foreground">
-          Cancel anytime • No charge until trial ends
+          Secure payment • Cancel anytime
         </p>
       </DialogContent>
     </Dialog>

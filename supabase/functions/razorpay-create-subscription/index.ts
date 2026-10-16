@@ -23,7 +23,7 @@ const PLAN_CONFIG = {
       currency: 'USD',
     },
     name: 'Intorza Pro',
-    trialDays: 30,
+
   }
 };
 
@@ -174,8 +174,6 @@ serve(async (req) => {
       currency: pricing.currency,
       keyId: RAZORPAY_KEY_ID,
       plan: plan,
-      trial: true,
-      trialDays: planConfig.trialDays,
       prefill: {
         name: profile.full_name || profile.company_name || '',
         email: profile.email || user.email || '',
