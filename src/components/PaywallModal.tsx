@@ -163,7 +163,7 @@ export const PaywallModal: React.FC = () => {
 
   return (
     <Dialog open={paywallOpen} onOpenChange={(open) => setPaywallOpen(open)}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-[19.5rem] gap-0 overflow-hidden rounded-3xl border-0 p-0 shadow-2xl sm:max-w-[20.5rem] [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:z-10 [&>button:last-child]:rounded-full [&>button:last-child]:bg-white/15 [&>button:last-child]:p-1.5 [&>button:last-child]:text-white [&>button:last-child]:opacity-100 [&>button:last-child]:ring-1 [&>button:last-child]:ring-white/20 [&>button:last-child]:hover:bg-white/25">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-[19.5rem] gap-0 overflow-hidden rounded-3xl border-0 p-0 shadow-2xl sm:max-w-[20.5rem] sm:p-0 [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:z-10 [&>button:last-child]:rounded-full [&>button:last-child]:bg-white/15 [&>button:last-child]:p-1.5 [&>button:last-child]:text-white [&>button:last-child]:opacity-100 [&>button:last-child]:ring-1 [&>button:last-child]:ring-white/20 [&>button:last-child]:hover:bg-white/25">
         <DialogTitle className="sr-only">Upgrade to Intorza Pro</DialogTitle>
         <DialogDescription className="sr-only">
           Start your free trial of Intorza Pro to unlock all premium features.
