@@ -39,7 +39,7 @@ const navItems = [
     title: "My Quotations",
     href: "/quotations",
     icon: FileText,
-    requiresPro: false,
+    requiresPro: true,
   },
   {
     title: "Invoices",

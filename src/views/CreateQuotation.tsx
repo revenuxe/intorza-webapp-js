@@ -3,7 +3,7 @@
 import { appendFloorPlanEstimate } from '@/lib/quotation-ai/apply-estimate';
 import { useState, useEffect, useRef, useMemo } from "react";
 import dynamic from 'next/dynamic';
-import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon } from "lucide-react";
+import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon, LockKeyhole } from "lucide-react";
 import { getCountryByCode } from "@/lib/countryConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { quotationsApi } from "@/lib/api";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useSearchParams } from "@/lib/navigation";
 import { useAuthAction } from "@/hooks/useAuthAction";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useQuotationAutomation } from "@/hooks/useQuotationAutomation";
 import { CustomizeFieldsDrawer, QuotationSettings, getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
 import { PDFPreviewEditor } from "@/components/PDFPreviewEditor";
@@ -73,6 +74,7 @@ const CreateQuotation = () => {
     clearPendingAction,
     getPendingAction
   } = useAuthAction();
+  const { isPro, setPaywallOpen } = useSubscription();
   const [searchParams, setSearchParams] = useSearchParams();
   const quotationId = searchParams.get('id');
   const continueAction = searchParams.get('continueAction');
@@ -287,18 +289,22 @@ const CreateQuotation = () => {
           } else if (continueAction === 'saveDraft') {
             await handleSaveQuotation('draft');
           } else if (continueAction === 'downloadPdf') {
-            const savedId = await handleSaveQuotation('pending');
+            const savedId = await handleSaveQuotation('draft');
             if (savedId) {
               await handleDownloadPDF(undefined, savedId, freshProfile);
             }
           } else if (continueAction === 'saveAndSend') {
-            await handleSaveQuotation('pending', true);
+            if (!isPro) {
+              setPaywallOpen(true, 'Save & Send');
+            } else {
+              await handleSaveQuotation('pending', true);
+            }
           }
         }
       }
     };
     executePendingAction();
-  }, [continueAction, formRestored, actionExecuted]);
+  }, [continueAction, formRestored, actionExecuted, isPro, setPaywallOpen]);
   const loadProfile = async () => {
     try {
       const {
@@ -1496,7 +1502,7 @@ const CreateQuotation = () => {
                       // Fetch fresh profile for PDF generation
                       const freshProfile = await fetchFreshProfile();
                       if (!quotationId) {
-                        const savedId = await handleSaveQuotation("pending");
+                        const savedId = await handleSaveQuotation("draft");
                         if (savedId) {
                           await handleDownloadPDF(undefined, savedId, freshProfile || undefined);
                         }
@@ -1511,8 +1517,14 @@ const CreateQuotation = () => {
               >
                 Download PDF
               </Button>
-              <Button className="w-full" onClick={() => requireAuth(async () => { await handleSaveQuotation('pending', true); }, 'saveAndSend', getFormData())}>
-                <Share2 className="h-4 w-4 mr-2" />
+              <Button className={!isPro ? "w-full bg-primary/70 text-primary-foreground hover:bg-primary/80" : "w-full"} onClick={() => requireAuth(async () => {
+                if (!isPro) {
+                  setPaywallOpen(true, 'Save & Send');
+                  return;
+                }
+                await handleSaveQuotation('pending', true);
+              }, 'saveAndSend', getFormData())}>
+                {isPro ? <Share2 className="h-4 w-4 mr-2" /> : <LockKeyhole className="h-4 w-4 mr-2" />}
                 Save & Send
               </Button>
             </div>
