@@ -13,13 +13,15 @@ serve(async request => {
     const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const { data: { user }, error: authError } = await supabase.auth.getUser(authorization.slice(7));
     if (authError || !user) return reply({ error: 'Unauthorized' }, 401);
+    const { data: profile } = await supabase.from('profiles').select('full_name,company_name,email,phone,is_pro,pro_expiry').eq('id', user.id).single();
+    const activePro = !!profile?.is_pro && (!profile.pro_expiry || Date.parse(profile.pro_expiry) > Date.now());
+    if (!activePro) return reply({ error: 'An active Pro subscription is required to top up AI coins.' }, 403);
     const { data: allowed } = await supabase.rpc('consume_user_api_limit', { p_user: user.id, p_operation: 'razorpay-create-coin-order' });
     if (!allowed) return reply({ error: 'Too many payment attempts. Please wait a minute.' }, 429);
     const { coins } = await request.json();
     if (!Number.isInteger(coins) || coins < 10 || coins > 100000) return reply({ error: 'Choose between 10 and 100,000 coins.' }, 400);
     const id = Deno.env.get('RAZORPAY_KEY_ID'), secret = Deno.env.get('RAZORPAY_KEY_SECRET');
     if (!id || !secret) return reply({ error: 'Coin payments are not configured.' }, 503);
-    const { data: profile } = await supabase.from('profiles').select('full_name,company_name,email,phone').eq('id', user.id).single();
     const amount = coins * 100;
     const created = await fetch('https://api.razorpay.com/v1/orders', { method: 'POST', headers: { Authorization: `Basic ${btoa(`${id}:${secret}`)}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, currency: 'INR', receipt: `coins_${user.id.slice(0, 8)}_${Date.now().toString(36)}`, notes: { user_id: user.id, type: 'coin_topup', coins: String(coins) } }) });
     const order = await created.json(); if (!created.ok || !/^order_[A-Za-z0-9]+$/.test(order.id)) throw new Error('Razorpay could not create the coin order');
