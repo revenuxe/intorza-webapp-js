@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ClientSelector } from './ClientSelector';
 import { supabase } from '@/integrations/supabase/client';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { MAX_PLAN_BYTES, MAX_PLAN_FILES, scopedRooms, type PlanAnalysis, type ProjectBrief, type Estimate } from '@/lib/quotation-ai/floor-plan';
 import { type VoiceDraft } from '@/lib/quotation-ai/domain';
 
@@ -44,6 +45,7 @@ function FilePreview({ file }: { file: File }) {
 }
 
 export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDraft, onApply, clients, onMeasurementSystemChange }: Props) {
+  const { isPro, loading: proLoading, setPaywallOpen } = useSubscription();
   const [chooserOpen, setChooserOpen] = useState(false);
   const [step, setStep] = useState<Step>(mode === 'details' ? 'analysis' : 'upload');
   const [files, setFiles] = useState<File[]>([]);
@@ -238,7 +240,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const groups = ['upload', 'analysis'].includes(step) ? 0 : ['scope', 'work', 'design', 'finish', 'budget'].includes(step) ? 1 : step === 'details' ? 2 : 3;
   return <>
     <div className="col-span-2 min-w-0 sm:col-span-1 sm:min-w-[220px]">
-      <Button type="button" aria-label="Built with AI" className="h-12 w-full gap-2 rounded-xl px-3 shadow-sm sm:px-4" onClick={() => { void refreshWalletBalance(); setChooserOpen(true); }}><BuilderMark className="h-4 w-4 shrink-0" /><span className="text-sm leading-5">Built with AI</span><span role="button" tabIndex={0} aria-label="Top up coins" onClick={event => { event.stopPropagation(); window.dispatchEvent(new Event('intorza:open-wallet')); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); window.dispatchEvent(new Event('intorza:open-wallet')); } }} className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[11px] font-semibold leading-4 text-amber-900 shadow-sm"><GoldCoin className="h-3.5 w-3.5" />{walletBalance ?? '—'} coins</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Button>
+      <Button type="button" aria-label="Built with AI" className="h-12 w-full gap-2 rounded-xl px-3 shadow-sm sm:px-4" onClick={() => { if (!proLoading && !isPro) { setPaywallOpen(true, 'Build with AI'); return; } void refreshWalletBalance(); setChooserOpen(true); }}><BuilderMark className="h-4 w-4 shrink-0" /><span className="text-sm leading-5">Build with AI</span><span role="button" tabIndex={0} aria-label="Top up coins" onClick={event => { event.stopPropagation(); window.dispatchEvent(new Event('intorza:open-wallet')); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); window.dispatchEvent(new Event('intorza:open-wallet')); } }} className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[11px] font-semibold leading-4 text-amber-900 shadow-sm"><GoldCoin className="h-3.5 w-3.5" />{walletBalance ?? '—'} coins</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Button>
     </div>
     <Dialog open={chooserOpen} onOpenChange={setChooserOpen}>
       <DialogContent className="max-h-[90dvh] min-w-0 max-w-xl gap-5 overflow-y-auto rounded-3xl p-4 sm:p-6">

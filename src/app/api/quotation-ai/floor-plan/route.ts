@@ -42,6 +42,9 @@ export async function POST(request: Request) {
     });
     const { data: { user }, error } = await db.auth.getUser(token);
     if (error || !user) return json({ error: 'Please sign in again.' }, 401);
+    const { data: hasPro, error: proError } = await db.rpc('is_pro_user', { _user_id: user.id });
+    if (proError) throw new Error('Could not verify your Pro access. Please retry.');
+    if (!hasPro) return json({ error: 'Build with AI is available with an active Pro subscription. Upgrade to Pro, then use your wallet coins for each AI request.', code: 'PRO_REQUIRED', requestId }, 403);
     let env: Env = {};
     try { env = (await getCloudflareContext({ async: true })).env as unknown as Env; } catch { /* Local development. */ }
     if (!env.QUOTATION_AI_LIMITER && process.env.NODE_ENV === 'production') return json({ error: 'AI rate limiting is not configured.' }, 503);
