@@ -163,42 +163,42 @@ export const PaywallModal: React.FC = () => {
 
   return (
     <Dialog open={paywallOpen} onOpenChange={(open) => setPaywallOpen(open)}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-[21rem] gap-0 overflow-hidden rounded-[1.75rem] border-0 p-0 shadow-2xl sm:max-w-sm">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-[19.5rem] gap-0 overflow-hidden rounded-3xl border-0 p-0 shadow-2xl sm:max-w-[20.5rem] [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:z-10 [&>button:last-child]:rounded-full [&>button:last-child]:bg-white/15 [&>button:last-child]:p-1.5 [&>button:last-child]:text-white [&>button:last-child]:opacity-100 [&>button:last-child]:ring-1 [&>button:last-child]:ring-white/20 [&>button:last-child]:hover:bg-white/25">
         <DialogTitle className="sr-only">Upgrade to Intorza Pro</DialogTitle>
         <DialogDescription className="sr-only">
           Start your free trial of Intorza Pro to unlock all premium features.
         </DialogDescription>
         {/* Header */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#d96848] via-primary to-[#263b63] px-5 pb-6 pt-7 text-center text-primary-foreground">
-          <Sparkles className="absolute left-7 top-7 h-4 w-4 text-amber-200/80" /><Sparkles className="absolute bottom-7 right-9 h-3.5 w-3.5 text-white/60" />
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
-            <Crown className="h-7 w-7 text-amber-100" />
+        <div className="relative overflow-hidden bg-gradient-to-br from-[#d96848] via-primary to-[#263b63] px-4 pb-5 pt-5 text-center text-primary-foreground">
+          <Sparkles className="absolute left-6 top-6 h-3.5 w-3.5 text-amber-200/80" /><Sparkles className="absolute bottom-5 right-8 h-3 w-3 text-white/60" />
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+            <Crown className="h-6 w-6 text-amber-100" />
           </div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">Intorza Pro</p><h2 className="mt-2 text-2xl font-semibold tracking-tight">One month free</h2>
-          <div className="my-2 flex items-center justify-center gap-2 text-3xl font-bold tracking-tight">
-            <span className="text-lg">{countryFlag}</span> {priceText}
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/70">Intorza Pro</p><h2 className="mt-1 text-xl font-semibold tracking-tight">One month free</h2>
+          <div className="my-1 flex items-center justify-center gap-1.5 text-2xl font-bold tracking-tight">
+            <span className="text-base">{countryFlag}</span> {priceText}
           </div>
-          <p className="text-sm text-primary-foreground/75">Unlock the complete workspace.</p>
+          <p className="text-xs text-primary-foreground/75">Unlock the complete workspace.</p>
         </div>
 
         {/* Features */}
-        <div className="space-y-2 p-5 pb-3">
+        <div className="space-y-1.5 px-4 pb-2 pt-4">
           {PRO_FEATURES.map((feature, index) => (
             <div key={index} className="flex items-center gap-2">
-              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50">
+              <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-50">
                 <Check className="h-3 w-3 text-emerald-600" />
               </div>
-              <span className="text-sm text-foreground">{feature}</span>
+              <span className="text-[13px] text-foreground">{feature}</span>
             </div>
           ))}
         </div>
 
         {/* Actions */}
-        <div className="space-y-2 p-5 pt-2">
+        <div className="space-y-1 p-4 pt-2">
           <Button
             onClick={handleUpgrade}
             disabled={loading}
-            className="h-11 w-full rounded-xl bg-gradient-to-r from-primary to-secondary text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:from-primary/90 hover:to-secondary/90"
+            className="h-10 w-full rounded-xl bg-gradient-to-r from-primary to-secondary text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:from-primary/90 hover:to-secondary/90"
           >
             {loading ? 'Processing...' : 'Start Free Trial'}
           </Button>
@@ -211,7 +211,7 @@ export const PaywallModal: React.FC = () => {
           </Button>
         </div>
 
-        <p className="px-5 pb-5 text-center text-[10px] text-muted-foreground">
+        <p className="px-4 pb-4 text-center text-[9px] text-muted-foreground">
           Cancel anytime • No charge until trial ends
         </p>
       </DialogContent>
