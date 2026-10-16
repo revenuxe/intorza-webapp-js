@@ -51,7 +51,7 @@ const navItems = [
     title: "Clients",
     href: "/clients",
     icon: Users,
-    requiresPro: false,
+    requiresPro: true,
   },
   {
     title: "Team",
