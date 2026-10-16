@@ -9,6 +9,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { FeedbackProvider } from "@/components/FeedbackProvider";
 import { PaywallModal } from "@/components/PaywallModal";
+import { WelcomeCoinsDialog } from "@/components/WelcomeCoinsDialog";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ServiceWorkerRegistration } from "@/components/next/ServiceWorkerRegistration";
@@ -30,7 +31,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <SubscriptionProvider>
               <FeedbackProvider>
                 <Toaster /><Sonner />
-                <PaywallModal /><PWAInstallPrompt /><OfflineIndicator />
+                <PaywallModal /><WelcomeCoinsDialog /><PWAInstallPrompt /><OfflineIndicator />
                 <ServiceWorkerRegistration />
                 {children}
               </FeedbackProvider>

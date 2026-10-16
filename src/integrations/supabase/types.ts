@@ -15,9 +15,9 @@ export type Database = {
   public: {
     Tables: {
       coin_wallets: {
-        Row: { user_id: string; balance: number; lifetime_earned: number; lifetime_spent: number; created_at: string; updated_at: string }
-        Insert: { user_id: string; balance?: number; lifetime_earned?: number; lifetime_spent?: number; created_at?: string; updated_at?: string }
-        Update: { balance?: number; lifetime_earned?: number; lifetime_spent?: number; updated_at?: string }
+        Row: { user_id: string; balance: number; lifetime_earned: number; lifetime_spent: number; welcome_claimed_at: string | null; created_at: string; updated_at: string }
+        Insert: { user_id: string; balance?: number; lifetime_earned?: number; lifetime_spent?: number; welcome_claimed_at?: string | null; created_at?: string; updated_at?: string }
+        Update: { balance?: number; lifetime_earned?: number; lifetime_spent?: number; welcome_claimed_at?: string | null; updated_at?: string }
         Relationships: []
       }
       coin_ledger: {
@@ -1669,6 +1669,7 @@ export type Database = {
       refund_failed_ai_charge: { Args: { p_reference: string; p_note?: string | null }; Returns: number }
       admin_adjust_coins: { Args: { p_admin: string; p_user: string; p_amount: number; p_note?: string | null }; Returns: number }
       admin_coin_overview: { Args: never; Returns: Json }
+      claim_welcome_coins: { Args: never; Returns: number | null }
       respond_to_quotation: {
         Args: { p_action: string; p_id: string }
         Returns: Json

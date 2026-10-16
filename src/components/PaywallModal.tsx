@@ -12,10 +12,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLocalization } from '@/hooks/useLocalization';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Check, Crown } from 'lucide-react';
+import { Check, Crown, Sparkles } from 'lucide-react';
 
 declare global {
   interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Razorpay: any;
   }
 }
@@ -107,7 +108,7 @@ export const PaywallModal: React.FC = () => {
         theme: {
           color: '#f59e0b',
         },
-        handler: async function (response: any) {
+        handler: async function (response: Record<string, string>) {
           try {
             // Close modal and navigate to processing page
             setPaywallOpen(false);
@@ -137,7 +138,7 @@ export const PaywallModal: React.FC = () => {
             // Dispatch event and refresh
             window.dispatchEvent(new Event('subscription-payment-success'));
             await refreshSubscription();
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error('Payment verification error:', error);
             // Don't show error toast - the payment processing page will handle status
           }
@@ -152,9 +153,9 @@ export const PaywallModal: React.FC = () => {
       const razorpay = new window.Razorpay(options);
       razorpay.open();
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Upgrade error:', error);
-      toast.error(error.message || 'Failed to start checkout');
+      toast.error(error instanceof Error ? error.message : 'Failed to start checkout');
     } finally {
       setLoading(false);
     }
@@ -162,56 +163,55 @@ export const PaywallModal: React.FC = () => {
 
   return (
     <Dialog open={paywallOpen} onOpenChange={(open) => setPaywallOpen(open)}>
-      <DialogContent className="max-w-[260px] sm:max-w-[280px] p-0 gap-0 overflow-hidden rounded-xl">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-[21rem] gap-0 overflow-hidden rounded-[1.75rem] border-0 p-0 shadow-2xl sm:max-w-sm">
         <DialogTitle className="sr-only">Upgrade to Intorza Pro</DialogTitle>
         <DialogDescription className="sr-only">
           Start your free trial of Intorza Pro to unlock all premium features.
         </DialogDescription>
         {/* Header */}
-        <div className="bg-gradient-to-br from-primary to-secondary p-4 sm:p-5 text-center text-primary-foreground">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 bg-primary-foreground/15 rounded-full flex items-center justify-center backdrop-blur-sm">
-            <Crown className="w-5 h-5 sm:w-6 sm:h-6" />
+        <div className="relative overflow-hidden bg-gradient-to-br from-[#d96848] via-primary to-[#263b63] px-5 pb-6 pt-7 text-center text-primary-foreground">
+          <Sparkles className="absolute left-7 top-7 h-4 w-4 text-amber-200/80" /><Sparkles className="absolute bottom-7 right-9 h-3.5 w-3.5 text-white/60" />
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20 backdrop-blur-sm">
+            <Crown className="h-7 w-7 text-amber-100" />
           </div>
-          <h2 className="text-lg sm:text-xl font-bold mb-1">1 Month FREE</h2>
-          <div className="text-3xl sm:text-4xl font-bold my-2 flex items-center justify-center gap-2">
-            <span className="text-xl">{countryFlag}</span> Just {priceText}
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">Intorza Pro</p><h2 className="mt-2 text-2xl font-semibold tracking-tight">One month free</h2>
+          <div className="my-2 flex items-center justify-center gap-2 text-3xl font-bold tracking-tight">
+            <span className="text-lg">{countryFlag}</span> {priceText}
           </div>
-          <p className="text-primary-foreground/80 text-xs sm:text-sm">
-            Unlock all Pro features
-          </p>
+          <p className="text-sm text-primary-foreground/75">Unlock the complete workspace.</p>
         </div>
 
         {/* Features */}
-        <div className="p-2.5 sm:p-3 space-y-1">
+        <div className="space-y-2 p-5 pb-3">
           {PRO_FEATURES.map((feature, index) => (
             <div key={index} className="flex items-center gap-2">
-              <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Check className="w-2 h-2" style={{ color: 'hsl(var(--chart-2))' }} />
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50">
+                <Check className="h-3 w-3 text-emerald-600" />
               </div>
-              <span className="text-[11px] sm:text-xs text-foreground">{feature}</span>
+              <span className="text-sm text-foreground">{feature}</span>
             </div>
           ))}
         </div>
 
         {/* Actions */}
-        <div className="p-2.5 sm:p-3 pt-0 space-y-1.5">
+        <div className="space-y-2 p-5 pt-2">
           <Button
             onClick={handleUpgrade}
             disabled={loading}
-            className="w-full h-8 sm:h-9 text-xs sm:text-sm bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-primary-foreground font-semibold rounded-lg shadow-lg shadow-primary/25"
+            className="h-11 w-full rounded-xl bg-gradient-to-r from-primary to-secondary text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:from-primary/90 hover:to-secondary/90"
           >
             {loading ? 'Processing...' : 'Start Free Trial'}
           </Button>
           <Button
             variant="ghost"
             onClick={() => setPaywallOpen(false)}
-            className="w-full h-6 sm:h-7 text-muted-foreground text-[10px] sm:text-xs"
+            className="h-8 w-full text-xs text-muted-foreground"
           >
             Maybe later
           </Button>
         </div>
 
-        <p className="text-[8px] sm:text-[9px] text-center text-muted-foreground pb-2.5 sm:pb-3 px-3">
+        <p className="px-5 pb-5 text-center text-[10px] text-muted-foreground">
           Cancel anytime • No charge until trial ends
         </p>
       </DialogContent>

@@ -154,6 +154,11 @@ export const Header = () => {
             </Button>
           )}
         </div>
+        <div className="hidden items-center gap-3 lg:flex">
+          {isAuthenticated && <CoinWallet />}
+          {isAuthenticated && !isPro && <Button variant="outline" size="sm" onClick={() => setPaywallOpen(true, 'Upgrade')} className="h-9 gap-2 rounded-full border-amber-200 bg-amber-50 px-3 text-amber-800 hover:bg-amber-100"><Crown className="h-4 w-4" />Upgrade</Button>}
+          {isAuthenticated && isPro && <Badge className="rounded-full border-0 bg-gradient-to-r from-amber-500 to-orange-500 px-2.5 py-1 text-white"><Crown className="mr-1 h-3.5 w-3.5" />Pro</Badge>}
+        </div>
       </div>
     </header>
   );
