@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Library, CreditCard, FileText, Building2, Shield, Package, Receipt, Layers } from "lucide-react";
+import { Library, CreditCard, FileText, Building2, Shield, Package, Receipt, Layers, LockKeyhole } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PaymentTemplatesTab } from "@/components/library/PaymentTemplatesTab";
 import { TermsTemplatesTab } from "@/components/library/TermsTemplatesTab";
@@ -12,14 +12,20 @@ import { QuotationsLibraryTab } from "@/components/library/QuotationsLibraryTab"
 import { SectionTemplatesTab } from "@/components/library/SectionTemplatesTab";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/contexts/SubscriptionContext";
 
 const MyLibrary = () => {
-  const [activeTab, setActiveTab] = useState("items");
+  const [activeTab, setActiveTab] = useState("terms");
   const { toast } = useToast();
+  const { isPro, loading: subscriptionLoading, setPaywallOpen } = useSubscription();
 
   useEffect(() => {
-    autoMigrateFromProfile();
-  }, []);
+    if (!subscriptionLoading && isPro) autoMigrateFromProfile();
+  }, [subscriptionLoading, isPro]);
+
+  useEffect(() => {
+    if (!subscriptionLoading && !isPro && activeTab !== 'terms') setActiveTab('terms');
+  }, [subscriptionLoading, isPro, activeTab]);
 
   const autoMigrateFromProfile = async () => {
     try {
@@ -143,67 +149,76 @@ const MyLibrary = () => {
           </p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={(tab) => {
+          if (tab === 'terms' || isPro) setActiveTab(tab);
+          else setPaywallOpen(true, 'My Library');
+        }} className="w-full">
           <div className="-mx-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
           <TabsList className="flex h-auto w-max min-w-full justify-start gap-1 p-1">
-            <TabsTrigger value="items" className="shrink-0 gap-1 px-3 py-2 text-xs">
+            <TabsTrigger value="items" aria-label="Items — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
               <Package className="h-4 w-4" />
               <span>Items</span>
+              {!isPro && <LockKeyhole className="h-3 w-3" />}
             </TabsTrigger>
-            <TabsTrigger value="sections" className="shrink-0 gap-1 px-3 py-2 text-xs">
+            <TabsTrigger value="sections" aria-label="Sections — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
               <Layers className="h-4 w-4" />
               <span>Sections</span>
+              {!isPro && <LockKeyhole className="h-3 w-3" />}
             </TabsTrigger>
-            <TabsTrigger value="quotations" className="shrink-0 gap-1 px-3 py-2 text-xs">
+            <TabsTrigger value="quotations" aria-label="Quotes — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
               <Receipt className="h-4 w-4" />
               <span>Quotes</span>
+              {!isPro && <LockKeyhole className="h-3 w-3" />}
             </TabsTrigger>
-            <TabsTrigger value="payment" className="shrink-0 gap-1 px-3 py-2 text-xs">
+            <TabsTrigger value="payment" aria-label="Payment — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
               <CreditCard className="h-4 w-4" />
               <span>Payment</span>
+              {!isPro && <LockKeyhole className="h-3 w-3" />}
             </TabsTrigger>
             <TabsTrigger value="terms" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <FileText className="h-4 w-4" />
               <span>Terms</span>
             </TabsTrigger>
-            <TabsTrigger value="bank" className="shrink-0 gap-1 px-3 py-2 text-xs">
+            <TabsTrigger value="bank" aria-label="Bank — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
               <Building2 className="h-4 w-4" />
               <span>Bank</span>
+              {!isPro && <LockKeyhole className="h-3 w-3" />}
             </TabsTrigger>
-            <TabsTrigger value="warranty" className="shrink-0 gap-1 px-3 py-2 text-xs">
+            <TabsTrigger value="warranty" aria-label="Warranty — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs data-[state=inactive]:opacity-60">
               <Shield className="h-4 w-4" />
               <span>Warranty</span>
+              {!isPro && <LockKeyhole className="h-3 w-3" />}
             </TabsTrigger>
           </TabsList>
           </div>
 
-          <TabsContent value="items" className="mt-6">
+          {isPro && <TabsContent value="items" className="mt-6">
             <ItemsPricingTab />
-          </TabsContent>
+          </TabsContent>}
 
-          <TabsContent value="sections" className="mt-6">
+          {isPro && <TabsContent value="sections" className="mt-6">
             <SectionTemplatesTab />
-          </TabsContent>
+          </TabsContent>}
 
-          <TabsContent value="quotations" className="mt-6">
+          {isPro && <TabsContent value="quotations" className="mt-6">
             <QuotationsLibraryTab />
-          </TabsContent>
+          </TabsContent>}
 
-          <TabsContent value="payment" className="mt-6">
+          {isPro && <TabsContent value="payment" className="mt-6">
             <PaymentTemplatesTab />
-          </TabsContent>
+          </TabsContent>}
           
           <TabsContent value="terms" className="mt-6">
             <TermsTemplatesTab />
           </TabsContent>
           
-          <TabsContent value="bank" className="mt-6">
+          {isPro && <TabsContent value="bank" className="mt-6">
             <BankDetailsTab />
-          </TabsContent>
+          </TabsContent>}
           
-          <TabsContent value="warranty" className="mt-6">
+          {isPro && <TabsContent value="warranty" className="mt-6">
             <WarrantyNotesTab />
-          </TabsContent>
+          </TabsContent>}
         </Tabs>
       </div>
     </div>
