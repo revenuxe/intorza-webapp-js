@@ -31,7 +31,7 @@ it('uses confirmed work measurements rather than the room floor area', () => {
   answer.items.find(item => item.key === 'ceiling')!.areaSqft = 50;
   const brief = { ...briefFixture(), roomWork: [answer] };
   const result = buildEstimate(ensureRoomWorkCoverage(generatedSchema.parse(proposalFixture()), plan.rooms, brief), plan, brief, [], draftFixture());
-  expect(result.draft.sections[0].items[0]).toMatchObject({ widthFt: null, heightFt: null, measurementMode: 'direct_area', sftArea: 56 });
+  expect(result.draft.sections[0].items[0]).toMatchObject({ widthFt: 8, heightFt: 7, measurementMode: 'dimensions', sftArea: null });
   expect(result.draft.sections[0].items[1].sftArea).toBe(50);
 });
 it('transfers more than 12 rooms and 60 items to the editor without dropping pending rows', () => {
@@ -79,13 +79,22 @@ it('automatically covers every detected room without requiring user work answers
   const plan = planFixture();
   const brief = { ...briefFixture(), automatic: true };
   const result = ensureRoomWorkCoverage(generatedSchema.parse(proposalFixture()), plan.rooms, brief);
-  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe','Loft storage']);
+  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe','False ceiling','Wall painting','Loft storage']);
   expect(result.sections[0].items[0].quantity).toBe(56);
-  expect(result.sections[0].items[1].quantity).toBeNull();
+  expect(result.sections[0].items.find(item => item.productName === 'Loft storage').quantity).toBeNull();
+});
+it('keeps modular scope free of painting and respects explicit full-interior finish exclusions', () => {
+  const plan = planFixture();
+  const raw = generatedSchema.parse(proposalFixture());
+  raw.sections[0].items.push({ ...raw.sections[0].items[0], productName: 'Wall painting' });
+  const modular = ensureRoomWorkCoverage(raw, plan.rooms, { ...briefFixture(), scope: 'modular', automatic: true });
+  expect(modular.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe', 'Loft storage']);
+  const excluded = ensureRoomWorkCoverage(raw, plan.rooms, { ...briefFixture(), automatic: true, requestNotes: 'No wall painting, skip false ceiling.' });
+  expect(excluded.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe', 'Loft storage']);
 });
 it('keeps automatic kitchen scope to quotation-supported cabinetry instead of generic finish work', () => {
   const plan = planFixture(); plan.rooms[0] = { ...plan.rooms[0], name: 'Kitchen', kind: 'kitchen' };
-  const brief = { ...briefFixture(), automatic: true, roomNames: ['Kitchen'] };
+  const brief = { ...briefFixture(), scope: 'modular' as const, automatic: true, roomNames: ['Kitchen'] };
   const proposal = generatedSchema.parse({ sections: [{ ...proposalFixture().sections[0], title: 'Kitchen', roomName: 'Kitchen', items: [{ ...proposalFixture().sections[0].items[0], productName: 'Kitchen base cabinets' }] }], assumptions: [] });
   const result = ensureRoomWorkCoverage(proposal, plan.rooms, brief);
   expect(result.sections[0].items.map(item => item.productName)).toEqual(['Kitchen base cabinets', 'Kitchen wall cabinets', 'Loft storage']);

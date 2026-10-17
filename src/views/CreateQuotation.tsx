@@ -535,6 +535,11 @@ const CreateQuotation = () => {
           }
           // Auto-calculate amount when rate or sftArea changes
           if (field === 'ratePerSft' || field === 'sftArea') {
+            // Direct area replaces dimensions; stale dimensions must not reach saved/PDF rows.
+            if (field === 'sftArea') {
+              updatedItem.widthFt = 0;
+              updatedItem.heightFt = 0;
+            }
             updatedItem.amount = lineAmount(updatedItem.sftArea, updatedItem.ratePerSft);
           }
           return updatedItem;
@@ -739,7 +744,9 @@ const CreateQuotation = () => {
           ratePerSft: item.ratePerSft,
         }))
       );
-      trackItemUsage(allItems);
+      // Auto-saved AI drafts are proposals, not confirmed pricing evidence.
+      // Learn final user-reviewed quotations without reinforcing an AI's own draft.
+      if (status !== 'draft') trackItemUsage(allItems);
 
       // Auto-save quotation as template (silently)
       try {
@@ -966,7 +973,7 @@ const CreateQuotation = () => {
           areaUnit: profileToUse.measurement_system === 'metric' ? 'Square Meters' : 'Square Feet',
           areaUnitShort: profileToUse.measurement_system === 'metric' ? 'SQM' : 'Sq.Ft',
         },
-        settings: { ...customizeSettings, areaOnly: !!lastAIDraft.current },
+        settings: { ...customizeSettings, areaOnly: !customizeSettings.showDetailedSizeColumns && !!lastAIDraft.current },
         editorSettings: editorSettings || getEditorSettings()
       });
       toast({
@@ -1217,17 +1224,17 @@ const CreateQuotation = () => {
               <div className="hidden md:block overflow-x-auto">
                 <div className="min-w-[800px]">
                   <div className="grid gap-2 text-sm font-medium text-muted-foreground border-b pb-2" style={{
-                gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${lastAIDraft.current ? '100px ' : customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
+                gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : lastAIDraft.current ? '100px ' : ''}100px 100px`
               }}>
                     {customizeSettings.showSideColumn && <div>Side</div>}
                     <div>Product Name</div>
                     {customizeSettings.showProductDetails && <div>Product Details</div>}
-                    {!lastAIDraft.current && customizeSettings.showDetailedSizeColumns && <>
+                    {customizeSettings.showDetailedSizeColumns && <>
                         <div>Width (Ft)</div>
                         <div>Height (Ft)</div>
                         <div>Sft Area</div>
                       </>}
-                    {lastAIDraft.current && <div>Area (sqft)</div>}
+                    {lastAIDraft.current && !customizeSettings.showDetailedSizeColumns && <div>Area (sqft)</div>}
                     <div>Rate/{profile.measurement_system === 'metric' ? 'Sqm' : 'Sft'}</div>
                     <div>Amount</div>
                   </div>
@@ -1269,7 +1276,7 @@ const CreateQuotation = () => {
                   <div className="hidden md:block overflow-x-auto">
                     <div className="min-w-[800px]">
                       <div className="grid gap-2" style={{
-                  gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${lastAIDraft.current ? '100px ' : customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : ''}100px 100px`
+                  gridTemplateColumns: `${customizeSettings.showSideColumn ? '60px ' : ''}120px ${customizeSettings.showProductDetails ? '1fr ' : ''}${customizeSettings.showDetailedSizeColumns ? '80px 80px 80px ' : lastAIDraft.current ? '100px ' : ''}100px 100px`
                 }}>
                         {customizeSettings.showSideColumn && <Input value={item.side} onChange={e => updateItem(section.id, item.id, "side", e.target.value)} placeholder="A" className="h-9" />}
                         <ProductNameInput
@@ -1289,12 +1296,12 @@ const CreateQuotation = () => {
                           className="h-9"
                         />
                         {customizeSettings.showProductDetails && <Textarea value={item.productDetails} onChange={e => updateItem(section.id, item.id, "productDetails", e.target.value)} placeholder="Detailed description..." className="resize-none h-9 min-h-[36px]" rows={1} />}
-                        {!lastAIDraft.current && customizeSettings.showDetailedSizeColumns && <>
+                        {customizeSettings.showDetailedSizeColumns && <>
                             <Input type="number" value={item.widthFt || ""} onChange={e => updateItem(section.id, item.id, "widthFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" className="h-9" />
                             <Input type="number" value={item.heightFt || ""} onChange={e => updateItem(section.id, item.id, "heightFt", parseFloat(e.target.value) || 0)} placeholder="0" step="0.1" className="h-9" />
                             <Input type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
                           </>}
-                        {lastAIDraft.current && <Input aria-label="Work area (sqft)" type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="Pending" step="0.01" className="h-9" />}
+                        {lastAIDraft.current && !customizeSettings.showDetailedSizeColumns && <Input aria-label="Work area (sqft)" type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="Pending" step="0.01" className="h-9" />}
                         <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" className="h-9" />
                         <div className="h-9 flex items-center font-semibold tabular-nums">
                           {isPendingAIItem(item) ? 'Pending' : <>{profile.currency_symbol}{item.amount.toLocaleString(profile.locale, {
@@ -1336,7 +1343,7 @@ const CreateQuotation = () => {
                         <Textarea value={item.productDetails} onChange={e => updateItem(section.id, item.id, "productDetails", e.target.value)} placeholder="Detailed description..." rows={2} />
                       </div>}
 
-                    {!lastAIDraft.current && customizeSettings.showDetailedSizeColumns && <>
+                    {customizeSettings.showDetailedSizeColumns && <>
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-2">
                             <Label>Width (Ft)</Label>
@@ -1354,7 +1361,7 @@ const CreateQuotation = () => {
                       </>}
 
                     <div className="space-y-2">
-                      {lastAIDraft.current && <div className="space-y-2"><Label>Area (sqft)</Label><Input aria-label="Work area (sqft)" type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="Pending" step="0.01" /></div>}
+                      {lastAIDraft.current && !customizeSettings.showDetailedSizeColumns && <div className="space-y-2"><Label>Area (sqft)</Label><Input aria-label="Work area (sqft)" type="number" value={item.sftArea || ""} onChange={e => updateItem(section.id, item.id, "sftArea", parseFloat(e.target.value) || 0)} placeholder="Pending" step="0.01" /></div>}
                       <Label>Rate/{profile.measurement_system === 'metric' ? 'Sqm' : 'Sft'} ({profile.currency_symbol})</Label>
                       <Input type="number" value={item.ratePerSft || ""} onChange={e => updateItem(section.id, item.id, "ratePerSft", parseFloat(e.target.value) || 0)} placeholder="0" step="0.01" />
                     </div>
@@ -1532,7 +1539,7 @@ const CreateQuotation = () => {
         </Card>
 
         {/* PDF Preview Editor */}
-        <PDFPreviewEditor open={showPreview} onClose={() => setShowPreview(false)} onDownload={(settings, terms) => handleDownloadPDF(settings, undefined, undefined, terms)} quotationData={quotationPreviewData} customizeSettings={{ ...customizeSettings, areaOnly: !!lastAIDraft.current }} />
+        <PDFPreviewEditor open={showPreview} onClose={() => setShowPreview(false)} onDownload={(settings, terms) => handleDownloadPDF(settings, undefined, undefined, terms)} quotationData={quotationPreviewData} customizeSettings={{ ...customizeSettings, areaOnly: !customizeSettings.showDetailedSizeColumns && !!lastAIDraft.current }} />
         
         {/* Gallery Image Picker */}
         <GalleryImagePicker

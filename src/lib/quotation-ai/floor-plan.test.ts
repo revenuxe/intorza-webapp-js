@@ -1,6 +1,7 @@
 /** @jest-environment node */
 import { automaticWorkFaceAllowance, buildEstimate, completeEstimate, estimateCompletionSchema, mergeRoomEstimates, detectPlanType, scopedRooms, MAX_PLAN_BYTES, type PlanAnalysis, type PriceEvidence, type ProjectBrief } from './floor-plan';
 import { draftFixture as fixture } from '@/test/floor-plan-fixtures';
+import { itemCalculation, toQuotation } from './domain';
 
 export const plan: PlanAnalysis = { propertyType: 'Apartment', floors: 1, units: 'Feet', scale: 'Unknown', warnings: [], rooms: [
   { name: 'Bedroom', kind: 'bedroom', floor: '1', widthFt: 12, lengthFt: 10, source: 'printed', confidence: 'high', file: 'plan.pdf', page: 1, notes: '' },
@@ -10,6 +11,20 @@ export const brief: ProjectBrief = { scope: 'complete', roomNames: ['Bedroom', '
 const rate: PriceEvidence = { id: 'rate', name: 'Wardrobe', description: 'Approved specification', rate: 1200, unit: 'sqft', source: 'approved', location: 'Bengaluru', verifiedAt: '2026-10-15', currency: 'INR', sourceUrl: null, inclusions: 'Installation included' };
 export const proposal = () => ({ sections: [{ title: 'Bedroom', roomName: 'Bedroom', items: [{ productName: 'Wardrobe', description: 'Proposed wardrobe', rateId: 'rate', quantity: 56, measurementStatus: 'estimated', measurementReason: 'User provided work area' }] }], assumptions: [] });
 describe('floor plan quotation boundary', () => {
+  it('calculates reproducible painting work from plan perimeter and labels assumed height and openings', () => {
+    const raw = proposal(); raw.sections[0].items[0].productName = 'Wall painting';
+    const painting = { ...rate, name: 'Wall painting', rate: 25 };
+    const result = buildEstimate(raw, plan, { ...brief, automatic: true }, [painting], fixture());
+    const item = toQuotation(result.draft, true)[0].items[0];
+    expect(item).toMatchObject({ widthFt: 44, heightFt: 10, sftArea: 440, ratePerSft: 25, amount: 11000 });
+    expect(result.evidence[0].reason).toContain('assumed 10 ft');
+    expect(result.evidence[0].reason).toContain('No door/window deductions');
+  });
+  it('preserves multi-sentence product specifications for editor and PDF', () => {
+    const raw = proposal(); raw.sections[0].items[0].description = '18mm BWP plywood. 1mm laminate finish. Soft-close hinges.';
+    const result = buildEstimate(raw, plan, brief, [rate], fixture());
+    expect(toQuotation(result.draft, true)[0].items[0].productDetails).toContain(raw.sections[0].items[0].description);
+  });
   it('rejects disguised, empty and oversized files', () => {
     expect(() => detectPlanType(new TextEncoder().encode('<script>not an image</script>'))).toThrow('Invalid file');
     expect(() => detectPlanType(new Uint8Array())).toThrow();
@@ -21,7 +36,8 @@ describe('floor plan quotation boundary', () => {
     const base = fixture(); const snapshot = JSON.stringify(base);
     const estimate = buildEstimate(proposal(), plan, brief, [rate], base);
     expect(estimate.totals).toEqual({ subtotal: 67200, discount: 3360, tax: 11491.2, total: 75331.2 });
-    expect(estimate.draft.sections[0].items[0].productDetails).toBe('Proposed wardrobe');
+    expect(estimate.draft.sections[0].items[0].productDetails).toContain('Proposed wardrobe');
+    expect(estimate.draft.sections[0].items[0].productDetails).toContain('Approved specification');
     expect(JSON.stringify(base)).toBe(snapshot);
   });
   it('keeps unknown quantities and missing, mismatched or non-sqft rates pending', () => {
@@ -55,9 +71,18 @@ describe('floor plan quotation boundary', () => {
     expect(completed.totals.total).toBe(75331.2); expect(completed.incomplete).toBe(false);
     expect(completed.evidence[0].price.source).toBe('manual'); expect(completed.evidence[0].quantityStatus).toBe('user_entered');
     expect(completed.draft.sections[0].items[0].id).toBe(itemId);
+    expect(completed.draft.sections[0].items[0]).toMatchObject({ measurementMode: 'dimensions', widthFt: 8, heightFt: 7, sftArea: null });
+    expect(toQuotation(completed.draft, true)[0].items[0]).toMatchObject({ widthFt: 8, heightFt: 7, sftArea: 56, ratePerSft: 1200, amount: 67200 });
     expect(previous.draft.sections[0].items[0].ratePerSft).toBeNull();
     expect(() => completeEstimate(previous, [{ itemId: crypto.randomUUID(), widthFt: 8, heightFt: 7, ratePerSft: null }])).toThrow('no longer');
     expect(estimateCompletionSchema.safeParse({ action: 'complete', projectId: crypto.randomUUID(), changes: [{ itemId, widthFt: -1, heightFt: 7, ratePerSft: 1000 }] }).success).toBe(false);
+  });
+  it('preserves reviewed work dimensions when generating editor and PDF rows', () => {
+    const result = buildEstimate(proposal(), plan, { ...brief, roomWork: [{ roomName: 'Bedroom', notes: '', items: [
+      { key: 'wardrobe', widthFt: 8, heightFt: 7, areaSqft: null, details: '' },
+    ] }] }, [rate], fixture());
+    expect(result.draft.sections[0].items[0]).toMatchObject({ measurementMode: 'dimensions', widthFt: 8, heightFt: 7, sftArea: null });
+    expect(toQuotation(result.draft, true)[0].items[0]).toMatchObject({ widthFt: 8, heightFt: 7, sftArea: 56, amount: 67200 });
   });
   it('derives a reviewable ceiling allowance from room dimensions without using that area for wardrobes', () => {
     const raw = proposal(); raw.sections[0].items[0].productName = 'False ceiling'; raw.sections[0].items[0].measurementStatus = 'unknown';
@@ -73,7 +98,7 @@ describe('floor plan quotation boundary', () => {
     const raw = proposal();
     Object.assign(raw.sections[0].items[0], { quantity: 300, measurementStatus: 'estimated' });
     const result = buildEstimate(raw, plan, automatic, [rate], fixture());
-    expect(result.draft.sections[0].items[0]).toMatchObject({ sftArea: 56, ratePerSft: 1200 });
+    expect(result.draft.sections[0].items[0]).toMatchObject({ measurementMode: 'dimensions', widthFt: 8, heightFt: 7, sftArea: null, ratePerSft: 1200 });
     expect(result.evidence[0]).toMatchObject({ quantityStatus: 'estimated' });
     expect(result.evidence[0].reason).toContain('AI-estimated wardrobe work face');
   });
@@ -81,8 +106,8 @@ describe('floor plan quotation boundary', () => {
     const automatic = { ...brief, automatic: true };
     const raw = proposal(); Object.assign(raw.sections[0].items[0], { quantity: 56, measurementStatus: 'estimated' });
     const result = buildEstimate(raw, plan, automatic, [rate], fixture());
-    expect(result.draft.sections[0].items[0].sftArea).toBe(56);
-    expect(result.evidence[0].reason).toContain('AI-estimated work coverage');
+    expect(itemCalculation(result.draft.sections[0].items[0]).area).toBe(56);
+    expect(result.evidence[0].reason).toContain('AI-estimated wardrobe work face');
   });
   it('regenerates selected rooms while preserving other room edits and refreshing their rates', () => {
     const raw = proposal();

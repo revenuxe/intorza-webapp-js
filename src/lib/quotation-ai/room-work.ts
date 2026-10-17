@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { normalizeReferenceText } from './reference-pricing';
+import { normalizeReferenceText, referenceProduct } from './reference-pricing';
 import type { PlanAnalysis, ProjectBrief, generatedSchema } from './floor-plan';
 
 const size = z.number().finite().positive().max(100000).nullable();
@@ -29,7 +29,7 @@ export function roomWorkOptions(room: Room, scope: ProjectBrief['scope']): WorkO
       option('wall_cabinets', 'Kitchen wall cabinets', 'Total wall-cabinet front length × height, excluding windows and chimney.', true),
       option('countertop', 'Kitchen countertop', 'Countertop length × depth; confirm sink and hob cutouts.', true),
       option('backsplash', 'Kitchen backsplash', 'Wall length × backsplash height; deduct openings.', true),
-      option('tall_cabinets', 'Kitchen tall unit', 'Confirm the tall-unit location and front width × height.'), loft, ceiling,
+      option('tall_cabinets', 'Kitchen tall unit', 'Confirm the tall-unit location and front width × height.'), loft, ceiling, painting,
       option('plumbing', 'Kitchen plumbing', 'Confirm sink relocation and plumbing changes; priced separately.', false, false, 'lump_sum'),
     ]; break;
     case 'bedroom': options = [option('wardrobe', 'Wardrobe', 'Confirm the wardrobe wall, shutter style, front width × height and depth.', true), loft,
@@ -52,6 +52,7 @@ export function roomWorkOptions(room: Room, scope: ProjectBrief['scope']): WorkO
     case 'balcony': options = [option('utility_storage', 'Balcony storage', 'Confirm weather exposure and storage front dimensions.'), painting]; break;
     default: options = [option('storage', 'Room storage', 'Describe the intended storage and its front dimensions.', true), ceiling, painting];
   }
+  if (scope === 'modular') return options.filter(item => !['ceiling','painting','plumbing','countertop','backsplash','tile_work','mirror'].includes(item.key));
   if (scope === 'kitchen-wardrobes') return room.kind === 'bedroom'
     ? options.filter(item => ['wardrobe','loft'].includes(item.key))
     : options.filter(item => !['ceiling','painting','plumbing'].includes(item.key));
@@ -69,18 +70,20 @@ export function defaultRoomWork(room: Room, scope: ProjectBrief['scope']): RoomW
   })) };
 }
 
-function automaticRoomWork(room: Room, scope: ProjectBrief['scope'], extras: string[] = []) {
+function automaticRoomWork(room: Room, scope: ProjectBrief['scope'], extras: string[] = [], notes = '') {
   const answer = defaultRoomWork(room, scope);
-  // Fast upload follows the recurring, priced core in the reviewed quotations.
-  // Optional finishes and trade work are never assumed merely because a room
-  // exists on the floor plan.
+  // Scope defines the baseline: modular cabinetry versus full interiors.
+  // Other optional trades require explicit selection.
   const core: Record<Room['kind'], string[]> = {
     kitchen: ['base_cabinets', 'wall_cabinets', 'loft'], bedroom: ['wardrobe', 'loft'], living: ['tv_unit'],
     dining: ['crockery_unit'], study: ['study_storage'], bathroom: ['vanity'], utility: ['utility_storage'],
     balcony: [], other: [],
   };
   const available = new Set(roomWorkOptions(room, scope).map(item => item.key));
-  const selected = new Set([...core[room.kind], ...extras.filter(key => available.has(key))]);
+  const fullInterior = scope === 'complete' ? ['ceiling', 'painting'] : [];
+  const excluded = (key: string) => (key === 'painting' && /\b(?:no|exclude|skip|without)\s+(?:wall\s+)?paint(?:ing)?\b/i.test(notes))
+    || (key === 'ceiling' && /\b(?:no|exclude|skip|without)\s+(?:false\s+)?ceiling\b/i.test(notes));
+  const selected = new Set([...core[room.kind], ...fullInterior, ...extras].filter(key => available.has(key) && !excluded(key)));
   const items = answer.items.filter(item => selected.has(item.key));
   for (const key of selected) if (!items.some(item => item.key === key)) items.push({ key, widthFt: null, heightFt: null, areaSqft: null, details: '' });
   return { ...answer, items };
@@ -93,12 +96,17 @@ export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, roo
     // Automatic mode: keep the AI's room-specific proposal and supplement any
     // omitted essential work, without forcing the user through a checklist.
     const baseline = ensureRoomWorkCoverage({ sections: [], assumptions: [] }, rooms,
-      { ...brief, roomWork: rooms.map(room => automaticRoomWork(room, brief.scope, brief.quoteExtras)) });
+      { ...brief, roomWork: rooms.map(room => automaticRoomWork(room, brief.scope, brief.quoteExtras, brief.requestNotes)) });
     return { ...raw, sections: rooms.map(room => {
       const options = roomWorkOptions(room, brief.scope);
-      const proposed = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items).map(item => ({ ...item,
-        productName: options.find(option => normalizeReferenceText(option.key) === normalizeReferenceText(item.productName))?.name ?? item.productName,
-      }));
+      const proposed = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items).flatMap(item => {
+        const task = options.find(option => normalizeReferenceText(option.key) === normalizeReferenceText(item.productName)
+          || referenceProduct(option.name) === referenceProduct(item.productName));
+        if (!task) return [];
+        if (task.key === 'painting' && /\b(?:no|exclude|skip|without)\s+(?:wall\s+)?paint(?:ing)?\b/i.test(brief.requestNotes || '')) return [];
+        if (task.key === 'ceiling' && /\b(?:no|exclude|skip|without)\s+(?:false\s+)?ceiling\b/i.test(brief.requestNotes || '')) return [];
+        return [{ ...item, productName: task.name }];
+      });
       const essentials = baseline.sections.find(section => section.roomName === room.name)!.items;
       const items: z.infer<typeof generatedSchema>['sections'][number]['items'] = [...proposed];
       for (const item of essentials) if (!items.some(row => normalizeReferenceText(row.productName) === normalizeReferenceText(item.productName))) items.push(item);

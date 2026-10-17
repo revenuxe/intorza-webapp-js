@@ -36,6 +36,25 @@ export function referenceProduct(value: string) {
 export const referenceCity = (value: string) => normalizeReferenceText(value).replace(/\bbangalore\b/g, 'bengaluru').replace(/\bbombay\b/g, 'mumbai').replace(/\bmadras\b/g, 'chennai');
 export const unknownReferenceCity = (value: string) => !value.trim() || /^(unknown|not set|n\/a|none)$/i.test(value.trim());
 
+/** Explicit My Library prices take precedence over global PDF references/web research. */
+export function preferredLibraryRates(rows: Record<string, unknown>[], currency: string, location: string, country: string, now = Date.now()): PriceEvidence[] {
+  return rows.flatMap(row => {
+    const rate = Number(row.preferred_rate);
+    // A preferred rate is an explicit library choice. Automatically collected default rates
+    // remain historical fallback. Older imports may have no country populated.
+    const date = String(row.updated_at || row.last_used_at || '');
+    const timestamp = Date.parse(date);
+    if (row.preferred_rate == null || !Number.isFinite(rate) || rate <= 0 || rate > 10000000
+      || (row.country_code && row.country_code !== country)
+      || !Number.isFinite(timestamp) || timestamp > now || now - timestamp > 90 * 86400000
+      || !String(row.product_name || '').trim()) return [];
+    return [{ id: `library-${row.id}`, name: String(row.product_name).slice(0, 150), description: String(row.product_details || '').slice(0, 1000),
+      rate, unit: 'sqft', source: 'approved' as const, currency, location, verifiedAt: date, sourceUrl: null,
+      basisWarnings: ['User-selected library rate. Confirm project locality, GST and installation inclusions.'],
+      inclusions: 'Preferred square-foot rate selected in My Library or imported from your quotation. Reused unchanged; confirm tax, installation and specification before sharing.' }];
+  });
+}
+
 export function referencePriceEvidence(rows: ReferencePrice[], currency: string, location: string, allowIndicative = false): PriceEvidence[] {
   return rows.flatMap(row => {
     const rate = Number(row.recent_rate), low = Number(row.recent_low), high = Number(row.recent_high);

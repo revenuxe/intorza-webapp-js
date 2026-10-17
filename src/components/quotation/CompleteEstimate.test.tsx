@@ -14,7 +14,7 @@ it('lets a user complete a pending item without regenerating or treating a budge
   expect(onRetry).toHaveBeenCalledTimes(1);
   expect(screen.getByText(/not your project budget/)).toBeVisible();
 });
-it('uses selected feet measurements to submit sqft without changing the per-sqft price', () => {
+it('preserves selected feet measurements without changing the per-sqft price', () => {
   const proposal = proposalFixture(); proposal.sections[0].items[0].measurementStatus = 'unknown';
   const estimate = buildEstimate(proposal, planFixture(), briefFixture(), [], draftFixture());
   const onComplete = jest.fn();
@@ -23,5 +23,5 @@ it('uses selected feet measurements to submit sqft without changing the per-sqft
   fireEvent.change(screen.getByLabelText('Work height / depth (feet)'), { target: { value: '7' } });
   fireEvent.change(screen.getByLabelText('Known selling rate per sqft (optional)'), { target: { value: '1200' } });
   fireEvent.click(screen.getByRole('button', { name: 'Apply details' }));
-  expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ areaSqft: 56, widthFt: null, heightFt: null, ratePerSft: 1200 }));
+  expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ areaSqft: null, widthFt: 8, heightFt: 7, ratePerSft: 1200 }));
 });

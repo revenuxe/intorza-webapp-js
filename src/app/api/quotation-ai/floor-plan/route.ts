@@ -7,7 +7,7 @@ import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
 import { MarketResearchError, OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
-import { closeReferencePrice, matchingReferenceRate, normalizeReferenceText, referenceCity, unknownReferenceCity, referencePriceEvidence, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
+import { closeReferencePrice, matchingReferenceRate, normalizeReferenceText, referenceCity, unknownReferenceCity, referencePriceEvidence, preferredLibraryRates, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
 
 export const dynamic = 'force-dynamic';
 type Env = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; OPENAI_FLOOR_PLAN_MODEL?: string; OPENAI_MARKET_MODEL?: string; QUOTATION_MARKET_RESEARCH?: string; QUOTATION_AI_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> } };
@@ -116,10 +116,22 @@ export async function POST(request: Request) {
       if (charged.error) return json({ error: /Insufficient coins/i.test(charged.error.message) ? 'No coins left for AI Quotation Builder. Top up your wallet to continue.' : charged.error.message, code: 'COINS_REQUIRED', requestId }, 402);
       coinCharge = { type: 'ai_builder', amount: 10 };
     }
-    // RLS and an explicit owner filter both apply. Pattern rates are historical, never approved.
+    // Read the complete owner library before matching; older products must not be
+    // hidden by an arbitrary first-page cap. RLS and owner filtering both apply.
+    const ownerPricing = async (table: 'quotation_approved_rates' | 'item_usage_patterns') => {
+      const rows: Record<string, any>[] = [];
+      for (let offset = 0; ; offset += 500) {
+        let query = db.from(table).select('*').eq('user_id', user.id);
+        if (table === 'quotation_approved_rates') query = query.eq('active', true);
+        const page = await query.order('id').range(offset, offset + 499);
+        if (page.error) return { data: rows, error: page.error };
+        rows.push(...(page.data ?? []));
+        if ((page.data?.length ?? 0) < 500) return { data: rows, error: null };
+      }
+    };
     const [approved, history, profile] = await Promise.all([
-      db.from('quotation_approved_rates').select('*').eq('user_id', user.id).eq('active', true).limit(100),
-      db.from('item_usage_patterns').select('*').eq('user_id', user.id).order('last_used_at', { ascending: false }).limit(60),
+      ownerPricing('quotation_approved_rates'),
+      ownerPricing('item_usage_patterns'),
       db.from('profiles').select('currency_code,country_code,measurement_system').eq('id', user.id).single(),
     ]);
     if (approved.error || history.error || profile.error) throw new Error('Could not load your pricing data. Check the floor plan database migration.');
@@ -148,6 +160,9 @@ export async function POST(request: Request) {
     })).filter(rate => rate.currency === currency && rate.unit === 'sqft' && Number.isFinite(rate.rate) && rate.rate >= 0 && rate.rate <= 10000000 && (!rate.location || referenceCity(rate.location) === referenceCity(brief.location))
       && Date.now() >= Date.parse(rate.verifiedAt) && Date.now() - Date.parse(rate.verifiedAt) <= 90 * 86400000);
     const patternContext: { section: string; product: string; material: string; specification: string }[] = [];
+    rates.push(...preferredLibraryRates(history.data ?? [], currency, brief.location, profile.data?.country_code || '')
+      .filter(row => !rates.some(rate => normalizeReferenceText(rate.name) === normalizeReferenceText(row.name)
+        && normalizeReferenceText(rate.description) === normalizeReferenceText(row.description))));
     // Only admin-reviewed, anonymized global records are visible through this table's RLS.
     if (!references.error) for (const row of references.data ?? []) {
       if (row.currency !== currency) continue;
@@ -193,7 +208,10 @@ export async function POST(request: Request) {
         const group = await Promise.all(batches.slice(index, index + 2).map(batch => provider.generate({
           rooms: batch, property: analysis.propertyType,
           brief: { ...requestedBrief, roomNames: batch.map(room => room.name), roomWork: requestedBrief.roomWork?.filter(answer => batch.some(room => room.name === answer.roomName)) },
-          rates: rateContext, reviewedPatterns: patternContext.slice(0, 30),
+          rates: rateContext, reviewedPatterns: [...patternContext].sort((a, b) => {
+            const relevance = (row: typeof a) => relevanceTerms.reduce((sum, term) => sum + (normalizeReferenceText(`${row.product} ${row.material} ${row.specification}`).includes(term) ? 1 : 0), 0);
+            return relevance(b) - relevance(a);
+          }).slice(0, 60),
         }, request.signal)));
         results.push(...group);
       }

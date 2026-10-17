@@ -20,7 +20,7 @@ export const analysisSchema = z.object({
 }).strict();
 export type PlanAnalysis = z.infer<typeof analysisSchema>;
 export const briefSchema = z.object({
-  scope: z.enum(['complete', 'kitchen', 'bedrooms', 'kitchen-wardrobes', 'living-bedrooms', 'selected']),
+  scope: z.enum(['complete', 'modular', 'kitchen', 'bedrooms', 'kitchen-wardrobes', 'living-bedrooms', 'selected']),
   roomNames: z.array(label).min(1).max(40), finish: z.enum(['Budget-friendly', 'Standard', 'Premium', 'Luxury', 'Recommend']),
   budget: z.number().finite().positive().max(1000000000).nullable(),
   clientName: z.string().trim().max(150), location: label, address: z.string().max(1000),
@@ -67,7 +67,7 @@ export function completeEstimate(previous: Estimate, changes: z.infer<typeof est
     const row = evidence.find(row => row.itemId === item.id);
     if (change.widthFt != null || change.heightFt != null) {
       if (change.widthFt == null || change.heightFt == null) throw new Error('Enter both width/length and height in feet.');
-      item.measurementMode = 'direct_area'; item.widthFt = null; item.heightFt = null; item.sftArea = Math.round(change.widthFt * change.heightFt * 10000) / 10000;
+      item.measurementMode = 'dimensions'; item.widthFt = change.widthFt; item.heightFt = change.heightFt; item.sftArea = null;
       if (row) { row.quantityStatus = 'user_entered'; row.reason = `Work face entered by you: ${change.widthFt} ft × ${change.heightFt} ft. Verify before final confirmation.`; }
     }
     if (change.areaSqft != null) {
@@ -105,7 +105,7 @@ export function detectPlanType(bytes: Uint8Array) {
 
 export function scopedRooms(analysis: PlanAnalysis, brief: Pick<ProjectBrief, 'scope' | 'roomNames'>) {
   return analysis.rooms.filter(room => brief.roomNames.includes(room.name) && (
-    brief.scope === 'complete' || brief.scope === 'selected' ||
+    brief.scope === 'complete' || brief.scope === 'modular' || brief.scope === 'selected' ||
     brief.scope === 'kitchen' && room.kind === 'kitchen' ||
     brief.scope === 'bedrooms' && room.kind === 'bedroom' ||
     brief.scope === 'kitchen-wardrobes' && ['kitchen', 'bedroom'].includes(room.kind) ||
@@ -116,12 +116,11 @@ export function scopedRooms(analysis: PlanAnalysis, brief: Pick<ProjectBrief, 's
 function conciseProductDetails(value: string, fallback: string) {
   const clean = value.replace(/\s+/g, ' ').replace(/\b(?:pricing specification|provisional reference price)\b[\s\S]*/i, '').trim();
   if (!clean) return `${fallback} as per the selected design.`;
-  const first = clean.split(/(?<=[.!?])\s+|\n/)[0].trim();
-  if (first.length <= 180) return first;
-  return `${first.slice(0, 177).replace(/\s+\S*$/, '').trim()}…`;
+  if (clean.length <= 600) return clean;
+  return `${clean.slice(0, 597).replace(/\s+\S*$/, '').trim()}…`;
 }
 
-type AutomaticAllowance = { area: number; reason: string };
+type AutomaticAllowance = { area: number; widthFt: number; heightFt: number; reason: string };
 /**
  * Fast-upload estimates need a useful first total. These are intentionally
  * conservative work-face allowances, never floor areas, and are labelled for
@@ -132,6 +131,7 @@ export function automaticWorkFaceAllowance(room: PlanAnalysis['rooms'][number], 
   const wall = Math.max(room.widthFt, room.lengthFt);
   const product = referenceProduct(productName);
   const coverage = (length: number, height: number, label: string) => ({
+    widthFt: Math.round(length * 10000) / 10000, heightFt: height,
     area: Math.round(length * height * 10000) / 10000,
     reason: `AI-estimated ${label}: ${length} ft × ${height} ft from the room's longest ${wall} ft wall. Editable; verify on site.`,
   });
@@ -148,6 +148,19 @@ export function automaticWorkFaceAllowance(room: PlanAnalysis['rooms'][number], 
   if (product === 'wall panelling') return coverage(Math.min(wall, 10), 4, 'wall-panelling coverage');
   if (product === 'shoe storage') return coverage(Math.min(wall, 5), 4, 'shoe-storage work face');
   if (product === 'loft storage') return coverage(Math.min(wall, 12), 2.5, 'loft work face');
+  if (product === 'crockery unit') return coverage(Math.min(wall, 6), 7, 'crockery-unit work face');
+  if (product === 'vanity cabinet') return coverage(Math.min(wall, 4), 2.5, 'vanity work face');
+  if (product === 'utility storage' || product === 'balcony storage') return coverage(Math.min(wall, 6), 7, 'utility-storage work face');
+  if (product === 'false ceiling' || product === 'flooring') return {
+    widthFt: room.widthFt, heightFt: room.lengthFt,
+    area: Math.round(room.widthFt * room.lengthFt * 10000) / 10000,
+    reason: `AI-estimated full-room coverage: ${room.widthFt} ft × ${room.lengthFt} ft. Height column represents plan length. Verify cutouts and actual coverage.`,
+  };
+  if (product === 'wall painting') {
+    const perimeter = Math.round(2 * (room.widthFt + room.lengthFt) * 10000) / 10000;
+    return { widthFt: perimeter, heightFt: 10, area: Math.round(perimeter * 10 * 10000) / 10000,
+      reason: `AI-estimated gross wall painting: room perimeter ${perimeter} ft × assumed 10 ft wall height. No door/window deductions; excludes ceiling paint. Confirm wall height and net coverage on site.` };
+  }
   return null;
 }
 
@@ -190,9 +203,21 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
       evidence.push({ itemId: id, quantityStatus: work && item.quantity != null ? 'user_entered' : ceilingArea != null || autoArea != null ? 'estimated' : item.measurementStatus === 'measured' ? 'estimated' : item.measurementStatus,
         reason: ceilingArea != null ? `Full-room ceiling allowance: ${room.widthFt} ft × ${room.lengthFt} ft. Assumes complete ceiling coverage; verify cutouts and design.` : autoReason ?? item.measurementReason, price });
       const productName = price?.name ?? item.productName;
-      return { id, productName, productDetails: conciseProductDetails(item.description, productName),
-        side: '', measurementMode: 'direct_area' as const, widthFt: null, heightFt: null,
-        sftArea: explicitDimensions ? Math.round(work.widthFt * work.heightFt * 10000) / 10000 : ceilingArea ?? autoArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
+      // Automatic quantities are reproducible from the plan and explicit assumptions.
+      // Never reverse-engineer dimensions from a model's area-only quantity.
+      const dimensions = explicitDimensions ? { widthFt: work.widthFt!, heightFt: work.heightFt! }
+        : automaticAllowance && brief.automatic ? automaticAllowance : null;
+      if (dimensions && !explicitDimensions) {
+        const row = evidence[evidence.length - 1];
+        row.quantityStatus = 'estimated'; row.reason = automaticAllowance!.reason;
+      }
+      const details = conciseProductDetails(item.description, productName);
+      const specification = price?.description && !normalizeReferenceText(details).includes(normalizeReferenceText(price.description))
+        ? `Pricing specification: ${price.description}` : '';
+      return { id, productName, productDetails: [details, specification, ...(price?.basisWarnings ?? [])].filter(Boolean).join(' ').slice(0, 1000),
+        side: '', measurementMode: dimensions ? 'dimensions' as const : 'direct_area' as const,
+        widthFt: dimensions?.widthFt ?? null, heightFt: dimensions?.heightFt ?? null,
+        sftArea: dimensions ? null : ceilingArea ?? autoArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
     }) };
   });
   const draft = draftSchema.parse({ ...base, revision: base.revision + 1,

@@ -1,4 +1,15 @@
-import { closeReferencePrice, matchingReferenceRate, referencePriceEvidence, type ReferencePrice } from './reference-pricing';
+import { closeReferencePrice, matchingReferenceRate, referencePriceEvidence, preferredLibraryRates, type ReferencePrice } from './reference-pricing';
+it('reuses explicit recent library preferences but excludes defaults, stale and foreign-country rates', () => {
+  const now = Date.parse('2026-10-17');
+  const base = { id: 'user-rate', product_name: 'Wardrobe', product_details: '18mm BWP plywood. Laminate finish.', preferred_rate: 1350, updated_at: '2026-10-16' };
+  expect(preferredLibraryRates([base], 'INR', 'Bengaluru', 'IN', now)[0]).toMatchObject({
+    id: 'library-user-rate', source: 'approved', rate: 1350, description: base.product_details,
+  });
+  expect(preferredLibraryRates([
+    { ...base, preferred_rate: null, default_rate: 1350 }, { ...base, updated_at: '2025-01-01' },
+    { ...base, country_code: 'US' }, { ...base, updated_at: '2027-01-01' },
+  ], 'INR', 'Bengaluru', 'IN', now)).toEqual([]);
+});
 const row = (patch: Partial<ReferencePrice> = {}): ReferencePrice => ({
   id: 'laminate', product_name: 'wardrobe', material: 'laminate', specification: '18mm plywood',
   location: 'bengaluru', currency: 'INR', unit: 'sqft', tax: 'excluded', installation_included: true,

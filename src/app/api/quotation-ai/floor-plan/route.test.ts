@@ -21,15 +21,16 @@ const rpc = jest.fn();
 const eq = jest.fn(); const insert = jest.fn();
 let projectExists = true;
 let referenceRows: Record<string, unknown>[] = [];
+let libraryRows: Record<string, unknown>[] = [];
 let storedEstimate: Estimate | null = null;
 let metricProfile = false;
 let measurementUpdateFails = false;
 const profileUpdate = jest.fn();
 function database(table: string) {
-  const result = { data: table === 'profiles' ? { id: 'owner', currency_code: 'INR', country_code: 'IN', measurement_system: metricProfile ? 'metric' : 'imperial' } : table === 'ai_reference_price_catalogue' ? referenceRows : [], error: null };
+  const result = { data: table === 'profiles' ? { id: 'owner', currency_code: 'INR', country_code: 'IN', measurement_system: metricProfile ? 'metric' : 'imperial' } : table === 'ai_reference_price_catalogue' ? referenceRows : table === 'item_usage_patterns' ? libraryRows : [], error: null };
   let updatingProfile = false;
   const chain = { select: jest.fn().mockReturnThis(), eq: jest.fn(function (...args: unknown[]) { eq(table, ...args); return chain; }),
-    range: jest.fn((start: number, end: number) => Promise.resolve({ ...result, data: referenceRows.slice(start, end + 1) })), limit: jest.fn().mockResolvedValue(result), order: jest.fn().mockReturnThis(), single: jest.fn(() => Promise.resolve(updatingProfile && measurementUpdateFails ? { data: null, error: new Error('Denied') } : result)),
+    range: jest.fn((start: number, end: number) => Promise.resolve({ ...result, data: Array.isArray(result.data) ? result.data.slice(start, end + 1) : [] })), limit: jest.fn().mockResolvedValue(result), order: jest.fn().mockReturnThis(), single: jest.fn(() => Promise.resolve(updatingProfile && measurementUpdateFails ? { data: null, error: new Error('Denied') } : result)),
     maybeSingle: jest.fn().mockResolvedValue({ data: projectExists ? { id: 'project', estimate: storedEstimate } : null, error: null }),
     insert: jest.fn((row: unknown) => { insert(table, row); return Promise.resolve({ error: null }); }),
     update: jest.fn((body: unknown) => { if (table === 'profiles') { updatingProfile = true; profileUpdate(body); } return chain; }), then: (resolve: (value: unknown) => void) => Promise.resolve({ error: null }).then(resolve),
@@ -41,7 +42,7 @@ function request(body: unknown, authenticated = true) {
 }
 const payload = () => ({ action: 'generate', projectId: null, analysis: planFixture(), brief: briefFixture(), draft: draftFixture() });
 beforeEach(() => {
-  jest.clearAllMocks(); projectExists = true; referenceRows = []; storedEstimate = null; metricProfile = false; measurementUpdateFails = false;
+  jest.clearAllMocks(); projectExists = true; referenceRows = []; libraryRows = []; storedEstimate = null; metricProfile = false; measurementUpdateFails = false;
   getUser.mockResolvedValue({ data: { user: { id: 'owner' } }, error: null });
   limit.mockResolvedValue({ success: true });
   (getCloudflareContext as jest.Mock).mockResolvedValue({ env: { OPENAI_API_KEY: 'secret', OPENAI_FLOOR_PLAN_MODEL: 'configured-vision-model', QUOTATION_AI_LIMITER: { limit } } });
@@ -82,6 +83,36 @@ it('uses reviewed global quotation references before paid market research', asyn
   expect(result.estimate.evidence[0].price.source).toBe('admin_reference');
   expect(research).not.toHaveBeenCalled();
   expect(generate).toHaveBeenCalledWith(expect.objectContaining({ reviewedPatterns: [expect.objectContaining({ product: 'Wardrobe' })] }), expect.anything());
+});
+it('uses the user preferred library rate before global PDF rates and web research', async () => {
+  libraryRows = [{ id: 'preferred', product_name: 'Wardrobe', product_details: '18mm plywood', preferred_rate: 1550, country_code: 'IN', updated_at: new Date().toISOString() }];
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.draft.sections[0].items[0].ratePerSft).toBe(1550);
+  expect(result.estimate.evidence[0].price.id).toBe('library-preferred');
+  expect(research).not.toHaveBeenCalled();
+});
+it('finds preferred rates beyond the first 500 owner library entries', async () => {
+  libraryRows = Array.from({ length: 500 }, (_, index) => ({ id: `other-${index}`, product_name: `Other ${index}`, preferred_rate: null }));
+  libraryRows.push({ id: 'last', product_name: 'Wardrobe', product_details: '18mm plywood', preferred_rate: 1490, updated_at: new Date().toISOString() });
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.evidence[0].price.id).toBe('library-last');
+  expect(result.estimate.draft.sections[0].items[0].ratePerSft).toBe(1490);
+  expect(research).not.toHaveBeenCalled();
+});
+it('fills missing full-interior painting prices through research and calculates plan-based work dimensions', async () => {
+  const input = payload(); input.brief = { ...input.brief, automatic: true };
+  research.mockReset();
+  research.mockImplementation(async (input: { products: { name: string; specification: string }[] }) => ({ rates: input.products.filter(row => row.name === 'Wall painting').map(row => ({ id: 'paint', name: row.name, description: row.specification, rate: 25, unit: 'sqft', source: 'market_estimate', location: 'Bengaluru', currency: 'INR', verifiedAt: new Date().toISOString(), sourceUrl: 'https://supplier.example/paint', inclusions: 'Installed, GST excluded' })), limitations: [] }));
+  const response = await POST(request(input));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  const painting = toQuotation(result.estimate.draft, true)[0].items.find(item => item.productName === 'Wall painting');
+  expect(painting).toMatchObject({ widthFt: 44, heightFt: 10, sftArea: 440, ratePerSft: 25, amount: 11000 });
+  expect(result.estimate.evidence.find(row => row.itemId === painting.id).price.source).toBe('market_estimate');
 });
 it('fills a product key from the live catalogue basis before market research', async () => {
   referenceRows = [{ id: 'admin-tv', product_name: 'TV Unit', material: 'Laminate', specification: '18mm plywood', unit: 'sqft',
