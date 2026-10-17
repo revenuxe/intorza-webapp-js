@@ -7,10 +7,11 @@ it('lets a user complete a pending item without regenerating or treating a budge
   const estimate = buildEstimate(proposal, planFixture(), briefFixture(), [], draftFixture());
   const onComplete = jest.fn(); const onRetry = jest.fn();
   render(<CompleteEstimate estimate={estimate} disabled={false} onComplete={onComplete} onRetry={onRetry} />);
+  fireEvent.click(screen.getByText('Enter a known correction manually (optional)'));
   fireEvent.change(screen.getByLabelText('Work area (sqft)'), { target: { value: '56' } });
   fireEvent.click(screen.getByRole('button', { name: 'Apply details' }));
   expect(onComplete).toHaveBeenCalledWith({ itemId: estimate.draft.sections[0].items[0].id, widthFt: null, heightFt: null, areaSqft: 56, ratePerSft: null });
-  fireEvent.click(screen.getByRole('button', { name: 'Retry pricing only' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Estimate remaining items with AI' }));
   expect(onRetry).toHaveBeenCalledTimes(1);
   expect(screen.getByText(/not your project budget/)).toBeVisible();
 });
@@ -19,6 +20,7 @@ it('preserves selected feet measurements without changing the per-sqft price', (
   const estimate = buildEstimate(proposal, planFixture(), briefFixture(), [], draftFixture());
   const onComplete = jest.fn();
   render(<CompleteEstimate estimate={estimate} disabled={false} onComplete={onComplete} onRetry={jest.fn()} inputUnit="feet" />);
+  fireEvent.click(screen.getByText('Enter a known correction manually (optional)'));
   fireEvent.change(screen.getByLabelText('Work width / length (feet)'), { target: { value: '8' } });
   fireEvent.change(screen.getByLabelText('Work height / depth (feet)'), { target: { value: '7' } });
   fireEvent.change(screen.getByLabelText('Known selling rate per sqft (optional)'), { target: { value: '1200' } });

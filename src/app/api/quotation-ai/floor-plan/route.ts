@@ -7,10 +7,11 @@ import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
 import { MarketResearchError, OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
+import { OpenAIEstimateCompletion } from '@/lib/quotation-ai/estimate-completion';
 import { closeReferencePrice, matchingReferenceRate, normalizeReferenceText, referenceCity, unknownReferenceCity, referencePriceEvidence, preferredLibraryRates, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
 
 export const dynamic = 'force-dynamic';
-type Env = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; OPENAI_FLOOR_PLAN_MODEL?: string; OPENAI_MARKET_MODEL?: string; QUOTATION_MARKET_RESEARCH?: string; QUOTATION_AI_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> } };
+type Env = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; OPENAI_FLOOR_PLAN_MODEL?: string; OPENAI_MARKET_MODEL?: string; OPENAI_ESTIMATE_MODEL?: string; QUOTATION_MARKET_RESEARCH?: string; QUOTATION_AI_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> } };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const generation = z.object({ action: z.enum(['generate','retry_pricing']), projectId: z.string().uuid().nullable(), analysis: analysisSchema, brief: briefSchema, draft: draftSchema, regenerateRooms: z.array(z.string().min(1).max(150)).min(1).max(40).optional() }).strict();
 class InputError extends Error { constructor(message: string, public status: number) { super(message); } }
@@ -266,10 +267,6 @@ export async function POST(request: Request) {
       }
     }
     let estimate = buildEstimate(proposal, analysis, requestedBrief, rates, draft);
-    for (const section of estimate.draft.sections) for (const item of section.items) {
-      const evidence = estimate.evidence.find(row => row.itemId === item.id);
-      if (evidence && !evidence.price) evidence.reason = `${evidence.reason} Price pending: no supported exact or close specification match was found for this product in the selected city/currency. Confirm material, thickness, finish, hardware, installation and billing unit.`.slice(0, 600);
-    }
     if (previousEstimate && action !== 'retry_pricing') estimate = preserveRefinedItems(previousEstimate, estimate, requestedBrief);
     if (action === 'retry_pricing') {
       // Keep stable identities and explicit manual rates/dimensions; only retry non-manual pricing.
@@ -289,6 +286,16 @@ export async function POST(request: Request) {
     }
     estimate.assumptions.push(...researchLimitations);
     if (regenerateRooms && previousEstimate) estimate = mergeRoomEstimates(previousEstimate, estimate, regenerateRooms, rates);
+    // Complete provisional prices and work dimensions automatically instead of
+    // requiring the customer to research trade prices or fill a second form.
+    if (brief.automatic || action === 'retry_pricing') {
+      estimate = await new OpenAIEstimateCompletion(key, env.OPENAI_ESTIMATE_MODEL || process.env.OPENAI_ESTIMATE_MODEL || 'gpt-6-astra')
+        .complete(estimate, analysis, brief, rates, currency, request.signal);
+    }
+    for (const section of estimate.draft.sections) for (const item of section.items) {
+      const evidence = estimate.evidence.find(row => row.itemId === item.id);
+      if (evidence && !evidence.price) evidence.reason = `${evidence.reason} Price pending: no supported exact or close specification match was found for this product in the selected city/currency. Confirm material, thickness, finish, hardware, installation and billing unit.`.slice(0, 600);
+    }
     estimate.scopeGaps = scopedRooms(analysis, brief).map(room => room.name).filter(name => !estimate.roomSections.some(row => row.roomName === name));
     const id = projectId || crypto.randomUUID();
     const saved = projectId

@@ -2,6 +2,21 @@
 
 Scope: local source inspection and automated checks. No production database, uploaded PDF corpus, live provider response or current supplier price was inspected.
 
+## Latest update: automatic provisional completion
+
+The previous release could return many price-pending items because source-backed web research only accepts comparable recent installed, tax-exclusive rates. Automatic generation now adds a separate completion stage after library/reference matching and web research:
+
+- `OpenAIEstimateCompletion` uses the Responses API with strict structured output and a separately configured reasoning model (`OPENAI_ESTIMATE_MODEL`, default `gpt-6-astra`). Production `OPENAI_MARKET_MODEL` also selects `gpt-6-astra`; the vision/extraction model remains separately configured.
+- Missing square-foot rates receive provisional installed, GST-exclusive AI allowances with a range and a concise explanation. These use a distinct `ai_estimate` evidence source, low confidence, and no fabricated source URL. They are not described as searched competitor rates.
+- Missing work dimensions receive room/product-specific proposed dimensions. Existing priced rates, confirmed dimensions and known areas remain locked. An area-only AI estimate may acquire proposed dimensions that reproduce that area; a user's confirmed area-only measurement is preserved.
+- Completion runs automatically before saving/returning a generated estimate. Existing estimates can use the main “Estimate remaining items with AI” action; manual entry is collapsed and optional.
+- Structured batches reject missing/duplicate IDs, changed known area, invalid ranges and incomplete provider output. Failed completion does not save a superficially finished quotation or zero-price substitute. API access/quota failures remain explicit errors.
+- Piece/package services retain their actual separate billing workflow; automatic square-foot allowances never relabel those charges as sqft.
+
+The completion provider was tested with mocked structured outputs; no local OpenAI key was available for a real inference call. Actual model access, quote quality and competitor coverage need an authenticated production quotation. See [official model migration guidance](https://developers.openai.com/api/docs/guides/latest-model/gpt-6-astra.md#migration-quickstart) and [web-search documentation](https://developers.openai.com/api/docs/guides/tools-web-search).
+
+Released as Cloudflare worker version `4c4eee09-5281-4864-a8b9-36409ebb47dd`. The production build and TypeScript passed; 124 relevant tests passed across the validation runs, including completion across 25 items/three batches. The live quotations page returned HTTP 200, BUILD_ID matched the release, and unauthenticated generation returned HTTP 401. These checks do not constitute a live authenticated model-inference test.
+
 ## Implemented follow-up: library-first estimates
 
 The findings below describe the initial audit. Subsequent local implementation now:

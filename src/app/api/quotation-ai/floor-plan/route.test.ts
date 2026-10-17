@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
+import { OpenAIEstimateCompletion, applyCompletion, completionItems } from '@/lib/quotation-ai/estimate-completion';
 import { briefFixture, draftFixture, planFixture, proposalFixture } from '@/test/floor-plan-fixtures';
 import { buildEstimate, type Estimate } from '@/lib/quotation-ai/floor-plan';
 import { defaultRoomWork } from '@/lib/quotation-ai/room-work';
@@ -14,6 +15,8 @@ jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }));
 jest.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext: jest.fn() }));
 jest.mock('@/lib/quotation-ai/floor-plan-provider', () => ({ OpenAIFloorPlanProvider: jest.fn() }));
 jest.mock('@/lib/quotation-ai/market-pricing', () => ({ ...jest.requireActual('@/lib/quotation-ai/market-pricing'), OpenAIWebMarketPricing: jest.fn() }));
+jest.mock('@/lib/quotation-ai/estimate-completion', () => ({ ...jest.requireActual('@/lib/quotation-ai/estimate-completion'), OpenAIEstimateCompletion: jest.fn() }));
+const autoComplete = jest.fn();
 const research = jest.fn();
 const getUser = jest.fn(); const limit = jest.fn(); const analyse = jest.fn(); const generate = jest.fn();
 const upload = jest.fn(); const remove = jest.fn(); const from = jest.fn();
@@ -51,6 +54,8 @@ beforeEach(() => {
   (createClient as jest.Mock).mockReturnValue({ auth: { getUser }, from, rpc, storage: { from: () => ({ upload, remove }) } });
   (OpenAIFloorPlanProvider as jest.Mock).mockReturnValue({ analyse, generate });
   (OpenAIWebMarketPricing as jest.Mock).mockReturnValue({ research });
+  (OpenAIEstimateCompletion as jest.Mock).mockReturnValue({ complete: autoComplete });
+  autoComplete.mockImplementation(async estimate => estimate);
   research.mockResolvedValue({ rates: [], limitations: ['No comparable published rates found.'] });
   generate.mockResolvedValue(proposalFixture()); analyse.mockResolvedValue(planFixture());
   upload.mockResolvedValue({ error: null }); remove.mockResolvedValue({ error: null });
@@ -63,6 +68,28 @@ it('completes stored estimates with validated measurements and no provider calls
   expect(generate).not.toHaveBeenCalled(); expect(research).not.toHaveBeenCalled();
   projectExists = false;
   expect((await POST(request({ action: 'complete', projectId: '00000000-0000-4000-8000-000000000001', changes: [{ itemId, widthFt: 8, heightFt: 7, ratePerSft: 1200 }] }))).status).toBe(403);
+});
+it('automatically finishes all default full-interior items when research returns no rates', async () => {
+  autoComplete.mockImplementation(async (estimate: Estimate, _analysis, brief, _rates, currency) => applyCompletion(estimate, {
+    items: completionItems(estimate).map(item => ({ itemId: item.id, widthFt: item.widthFt ?? 8, heightFt: item.heightFt ?? 7,
+      ratePerSqft: item.productName === 'Wall painting' ? 25 : 1200, low: item.productName === 'Wall painting' ? 20 : 1000,
+      high: item.productName === 'Wall painting' ? 35 : 1500, measurementAssumption: 'Proposed work face; verify on site.', pricingAssumption: 'Installed allowance excluding GST.' })),
+  }, brief, currency));
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), automatic: true } }));
+  expect(response.status).toBe(200);
+  const { estimate } = await response.json();
+  expect(estimate.incomplete).toBe(false);
+  const items = toQuotation(estimate.draft, true).flatMap(section => section.items);
+  expect(items.map(item => item.productName)).toEqual(expect.arrayContaining(['Wardrobe', 'Wall painting', 'False ceiling', 'Loft storage']));
+  expect(items.every(item => item.widthFt > 0 && item.heightFt > 0 && item.ratePerSft > 0 && item.amount > 0)).toBe(true);
+  expect(estimate.evidence.every(row => row.price.source === 'ai_estimate' && !row.reason.includes('Price pending'))).toBe(true);
+  expect(OpenAIEstimateCompletion).toHaveBeenCalledWith('secret', 'gpt-6-astra');
+});
+it('does not save an apparently complete quotation when automatic estimation fails', async () => {
+  autoComplete.mockRejectedValueOnce(new Error('Estimation model unavailable. Retry automatic estimation.'));
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), automatic: true } }));
+  expect(response.status).toBe(422);
+  expect(insert).not.toHaveBeenCalledWith('quotation_plan_projects', expect.anything());
 });
 it('retries only pricing while preserving quotation item IDs and quantities', async () => {
   storedEstimate = buildEstimate(proposalFixture(), planFixture(), briefFixture(), [], draftFixture());

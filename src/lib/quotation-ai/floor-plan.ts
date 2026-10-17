@@ -42,7 +42,7 @@ export const generatedSchema = z.object({
 }).strict();
 export type PriceEvidence = {
   id: string; name: string; description: string; rate: number; unit: string;
-  source: 'approved' | 'historical' | 'market_estimate' | 'admin_reference' | 'manual'; location: string; verifiedAt: string;
+  source: 'approved' | 'historical' | 'market_estimate' | 'admin_reference' | 'manual' | 'ai_estimate'; location: string; verifiedAt: string;
   currency: string; sourceUrl: string | null; inclusions: string;
   range?: { low: number; high: number };
   confidence?: 'low' | 'medium';
@@ -279,7 +279,7 @@ export function mergeRoomEstimates(previous: Estimate, next: Estimate, roomNames
   const retainedIds = new Set(retained.flatMap(section => section.items.map(item => item.id)));
   const evidence = priorEvidence.filter(row => retainedIds.has(row.itemId)).map(row => {
     const item = retained.flatMap(section => section.items).find(item => item.id === row.itemId)!;
-    const price = row.price?.source === 'manual' ? row.price as PriceEvidence
+    const price = row.price?.source === 'manual' || row.price?.source === 'ai_estimate' ? row.price as PriceEvidence
       : rates.find(rate => rate.id === row.price?.id && rate.unit === 'sqft' && rate.name.toLowerCase() === item.productName.toLowerCase()) ?? null;
     item.ratePerSft = price?.rate ?? null;
     return { itemId: row.itemId, quantityStatus: row.quantityStatus, reason: row.reason, price };

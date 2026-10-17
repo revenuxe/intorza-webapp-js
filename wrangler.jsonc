@@ -5,7 +5,9 @@
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "vars": {
-    "OPENAI_FLOOR_PLAN_MODEL": "gpt-4.1"
+    "OPENAI_FLOOR_PLAN_MODEL": "gpt-4.1",
+    "OPENAI_MARKET_MODEL": "gpt-6-astra",
+    "OPENAI_ESTIMATE_MODEL": "gpt-6-astra"
   },
   "keep_vars": true,
   "assets": {

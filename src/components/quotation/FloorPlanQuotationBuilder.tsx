@@ -161,7 +161,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   }
   async function generate(selected?: string[], retryPricing = false) {
     if (pending.current) return;
-    pending.current = true; setBusy(retryPricing ? 'Searching for comparable prices' : 'Preparing your editable estimate'); setError('');
+    pending.current = true; setBusy(retryPricing ? 'Completing prices and work measurements with AI' : 'Preparing your editable estimate'); setError('');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 360000);
     abort.current = () => controller.abort();
