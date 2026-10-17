@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Navigation, Calendar, ChevronRight, CheckCircle, XCircle, FileQuestion, AlertCircle, Hash, Copy, RefreshCw, ListTodo, BarChart3, MessageSquare, Target, TrendingUp, Award } from "lucide-react";
+import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Navigation, Calendar, ChevronRight, CheckCircle, XCircle, FileQuestion, AlertCircle, Hash, Copy, RefreshCw, ListTodo, BarChart3, MessageSquare, Target, TrendingUp, Award, Building2, ArrowUpRight } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useFeedback } from "@/components/FeedbackProvider";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -663,72 +663,94 @@ const Team = () => {
   }
 
   return (
-    <div className="space-y-3 pb-20">
-      {/* Compact Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-lg font-bold">Team</h1>
-          <p className="text-xs text-muted-foreground">{companyName || 'Your Organization'}</p>
+    <div className="mx-auto w-full min-w-0 max-w-[1440px] space-y-6 overflow-x-clip px-4 py-5 pb-24 sm:px-6 sm:py-7 lg:px-8 lg:py-8">
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+            <Users className="h-4 w-4" />
+            Workspace
+          </p>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Team</h1>
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Building2 className="h-4 w-4 shrink-0" />
+            <span className="truncate">{companyName || 'Your Organization'}</span>
+          </p>
         </div>
-        <div className="flex gap-1.5">
-          <Button variant="outline" size="sm" className="rounded-xl h-8 text-xs" onClick={() => setTeamDialogOpen(true)}>
-            <FolderPlus className="h-3.5 w-3.5 mr-1" />
-            <span className="hidden sm:inline">Team</span>
+        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex">
+          <Button variant="outline" className="h-11 rounded-xl px-3 sm:px-4" onClick={() => setTeamDialogOpen(true)}>
+            <FolderPlus className="mr-2 h-4 w-4" />
+            Create team
           </Button>
-          <Button size="sm" className="rounded-xl h-8 text-xs" onClick={() => { setEditingMember(null); setMemberDialogOpen(true); }}>
-            <UserPlus className="h-3.5 w-3.5 mr-1" />
-            <span className="hidden sm:inline">Member</span>
+          <Button className="h-11 rounded-xl px-3 sm:px-4" onClick={() => { setEditingMember(null); setMemberDialogOpen(true); }}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add member
           </Button>
         </div>
-      </div>
+      </header>
 
-      {/* Org Code - Inline Compact */}
-      <div className="flex items-center gap-2 p-2.5 bg-muted/40 rounded-xl">
-        <Hash className="h-4 w-4 text-primary shrink-0" />
-        <span className="text-xs text-muted-foreground">Org Code:</span>
-        {orgCode ? (
-          <span className="font-mono font-bold text-sm tracking-wider">{orgCode}</span>
-        ) : (
-          <span className="text-xs text-muted-foreground">Not set</span>
-        )}
-        <button onClick={orgCode ? copyOrgCode : () => { setOrgCodeInput(orgCode || ''); setOrgCodeDialogOpen(true); }} className="ml-auto">
-          {orgCode ? <Copy className="h-3.5 w-3.5 text-muted-foreground" /> : <Button variant="ghost" size="sm" className="h-6 text-xs rounded-lg">Set</Button>}
-        </button>
-      </div>
+      <Card className="overflow-hidden rounded-2xl border-border/80 shadow-sm">
+        <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Hash className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Organization code</p>
+              <p className="text-xs text-muted-foreground">Share this code so people can find your organization.</p>
+            </div>
+            {orgCode ? (
+              <span className="ml-1 rounded-lg bg-muted px-2.5 py-1 font-mono text-sm font-bold tracking-wider sm:ml-3">{orgCode}</span>
+            ) : (
+              <span className="ml-1 text-sm text-muted-foreground sm:ml-3">Not set</span>
+            )}
+          </div>
+          <Button
+            variant={orgCode ? "outline" : "secondary"}
+            size="sm"
+            className="h-10 w-full rounded-xl sm:w-auto"
+            onClick={orgCode ? copyOrgCode : () => { setOrgCodeInput(orgCode || ''); setOrgCodeDialogOpen(true); }}
+          >
+            {orgCode ? <Copy className="mr-2 h-4 w-4" /> : <Edit className="mr-2 h-4 w-4" />}
+            {orgCode ? "Copy code" : "Set code"}
+          </Button>
+        </div>
+      </Card>
 
-      {/* Quick Stats - Ultra Compact */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { icon: Users, value: teamMembers.length, label: 'Members', color: 'text-primary' },
           { icon: Briefcase, value: projectTeams.length, label: 'Projects', color: 'text-blue-600' },
           { icon: Clock, value: activeWorkers, label: 'Active', color: 'text-green-600' },
           { icon: ListTodo, value: pendingTasks + inProgressTasks, label: 'Tasks', color: 'text-amber-600' },
         ].map((stat, i) => (
-          <div key={i} className="flex items-center gap-1.5 p-2 bg-card border rounded-xl">
-            <stat.icon className={`h-4 w-4 ${stat.color} shrink-0`} />
-            <div className="min-w-0">
-              <p className="text-base font-bold tabular-nums leading-none">{stat.value}</p>
-              <p className="text-[10px] text-muted-foreground leading-tight">{stat.label}</p>
-            </div>
-          </div>
+          <Card key={i} className="rounded-2xl border-border/80 shadow-sm">
+            <CardContent className="flex items-center gap-3 p-4 sm:p-5">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted/70 ${stat.color}`}>
+                <stat.icon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold leading-none tabular-nums">{stat.value}</p>
+                <p className="mt-1.5 text-xs font-medium text-muted-foreground">{stat.label}</p>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="teams" className="space-y-2">
-        <div className="overflow-x-auto -mx-4 px-4">
-          <TabsList className="inline-flex w-max gap-0.5 p-0.5 h-9">
-            <TabsTrigger value="teams" className="text-xs px-2.5 h-8">Teams</TabsTrigger>
-            <TabsTrigger value="members" className="text-xs px-2.5 h-8">Members</TabsTrigger>
-            <TabsTrigger value="tasks" className="text-xs px-2.5 h-8 relative">
+      <Tabs defaultValue="teams" className="min-w-0 space-y-4">
+        <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex h-11 min-w-max gap-1 rounded-xl border bg-card p-1 shadow-sm">
+            <TabsTrigger value="teams" className="h-9 rounded-lg px-4 text-sm">Teams</TabsTrigger>
+            <TabsTrigger value="members" className="h-9 rounded-lg px-4 text-sm">Members</TabsTrigger>
+            <TabsTrigger value="tasks" className="relative h-9 rounded-lg px-4 text-sm">
               Tasks
               {pendingTasks > 0 && <span className="ml-1 inline-flex items-center justify-center h-4 w-4 rounded-full bg-amber-500 text-white text-[9px] font-bold">{pendingTasks}</span>}
             </TabsTrigger>
-            <TabsTrigger value="performance" className="text-xs px-2.5 h-8">
-              <BarChart3 className="h-3 w-3 mr-1" />
-              Stats
+            <TabsTrigger value="performance" className="h-9 rounded-lg px-4 text-sm">
+              <BarChart3 className="mr-1.5 h-4 w-4" />
+              Performance
             </TabsTrigger>
-            <TabsTrigger value="approvals" className="text-xs px-2.5 h-8 relative">
+            <TabsTrigger value="approvals" className="relative h-9 rounded-lg px-4 text-sm">
               Approvals
               {pendingCount > 0 && <span className="ml-1 inline-flex items-center justify-center h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold">{pendingCount}</span>}
             </TabsTrigger>
@@ -738,15 +760,52 @@ const Team = () => {
         {/* Teams Tab */}
         <TabsContent value="teams" className="space-y-2">
           {projectTeams.length === 0 ? (
-            <div className="text-center py-10">
-              <Briefcase className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">No project teams yet</p>
-              <Button variant="outline" size="sm" onClick={() => setTeamDialogOpen(true)} className="mt-3 rounded-xl text-xs">
-                <FolderPlus className="h-3.5 w-3.5 mr-1.5" />Create First Team
-              </Button>
-            </div>
+            <Card className="overflow-hidden rounded-2xl border-border/80 shadow-sm">
+              <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
+                <div className="flex flex-col items-center px-5 py-10 text-center sm:px-8 sm:py-14 lg:items-start lg:text-left">
+                  <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Briefcase className="h-7 w-7" />
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Project teams</p>
+                  <h2 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">Bring your project crew together</h2>
+                  <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
+                    Create a team around a project to keep the right people, tasks, and progress in one place.
+                  </p>
+                  <div className="mt-6 flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                    <Button className="h-11 rounded-xl px-5" onClick={() => setTeamDialogOpen(true)}>
+                      <FolderPlus className="mr-2 h-4 w-4" />
+                      Create your first team
+                    </Button>
+                    {teamMembers.length === 0 && (
+                      <Button variant="outline" className="h-11 rounded-xl px-5" onClick={() => setMemberDialogOpen(true)}>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Add a member
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="border-t bg-muted/30 p-5 sm:p-8 lg:border-l lg:border-t-0">
+                  <h3 className="text-sm font-semibold">How it works</h3>
+                  <ol className="mt-4 space-y-4">
+                    {[
+                      { title: "Choose a project", description: "Start with one of your quotations." },
+                      { title: "Add the right people", description: "Assign team members to the project." },
+                      { title: "Track work together", description: "Follow attendance, tasks, and progress." },
+                    ].map((step, index) => (
+                      <li key={step.title} className="flex gap-3">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-card text-xs font-semibold text-primary shadow-sm">{index + 1}</span>
+                        <div>
+                          <p className="text-sm font-medium">{step.title}</p>
+                          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{step.description}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </div>
+            </Card>
           ) : (
-            <div className="space-y-2">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {projectTeams.map((team) => {
                 const activeCount = todayAttendance.filter(a => 
                   team.members.some(m => m.id === a.team_member_id) && a.clock_in && !a.clock_out
@@ -757,7 +816,7 @@ const Team = () => {
                 return (
                   <div
                     key={team.quotation.id} 
-                    className="p-3 border rounded-2xl cursor-pointer hover:bg-muted/30 transition-colors"
+                    className="rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:border-primary/30 hover:bg-muted/20"
                     onClick={() => navigate(`/team/project/${team.quotation.id}`)}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
