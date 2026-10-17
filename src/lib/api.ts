@@ -218,7 +218,14 @@ export const invoicesApi = {
 };
 
 // ---------------------- other resources ----------------------
-export const clientsApi = tableCrud('clients');
+export const clientsApi = {
+  ...tableCrud('clients'),
+  deleteWithRecords: async (clientId: string | null, clientName: string, quotationIds: string[], invoiceIds: string[]) => {
+    await requireUserId();
+    return unwrap(await supabase.rpc('delete_client_records', { p_client_id: clientId, p_client_name: clientName,
+      p_quotation_ids: quotationIds, p_invoice_ids: invoiceIds }));
+  },
+};
 // Tasks are shared with assigned team members; their company/assignee RLS
 // policies govern visibility. This table has company_id, not user_id.
 export const tasksApi = tableCrud('tasks', { userScoped: false });
