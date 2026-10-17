@@ -2,6 +2,16 @@
 
 Scope: local source inspection and automated checks. No production database, uploaded PDF corpus, live provider response or current supplier price was inspected.
 
+## Subscription refresh gate correction
+
+The Build with AI button previously allowed the chooser to open while subscription status was loading. It now shows a disabled checking state, allows the chooser only after Pro is verified, and opens the paywall on a free user's first enabled click. Unknown/failed status is distinct from a free plan and offers a retry. Header/navigation upgrade controls stay hidden during the check.
+
+Subscription display now reads the same protected, owner-scoped profile fields directly, avoiding the status edge function's extra auth/profile round trip. Server-side paid-feature enforcement remains authoritative. Same-account token refreshes retain verified display status; account changes hide old entitlement immediately, and stale requests cannot restore it. Stored browser Pro flags are never used to authorize access.
+
+Validation: eight component/context tests passed, covering delayed checks, account switching, token refresh, expiry and errors. Two Chromium tests with delayed mocked subscription responses passed at 390px and 1440px: refresh could not open the AI chooser, and the first enabled free-user click opened the paywall. TypeScript and the production Cloudflare build passed.
+
+Released as worker version `80fa45ee-a65b-422a-a1a9-e282ef6f2615`; the live quotations page returned HTTP 200 and its BUILD_ID matched the release.
+
 ## Latest update: automatic provisional completion
 
 The previous release could return many price-pending items because source-backed web research only accepts comparable recent installed, tax-exclusive rates. Automatic generation now adds a separate completion stage after library/reference matching and web research:

@@ -45,7 +45,7 @@ function FilePreview({ file }: { file: File }) {
 }
 
 export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDraft, onApply, clients, onMeasurementSystemChange }: Props) {
-  const { isPro, loading: proLoading, setPaywallOpen } = useSubscription();
+  const { isPro, loading: proLoading, status: proStatus, refreshSubscription, setPaywallOpen } = useSubscription();
   const [chooserOpen, setChooserOpen] = useState(false);
   const [step, setStep] = useState<Step>(mode === 'details' ? 'analysis' : 'upload');
   const [files, setFiles] = useState<File[]>([]);
@@ -116,7 +116,10 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     return () => window.removeEventListener('intorza:wallet-changed', update);
   }, []);
   useEffect(() => { if (mode === 'details') setStep(current => current === 'upload' ? 'analysis' : current); }, [mode]);
+  useEffect(() => { if (proLoading || !isPro) setChooserOpen(false); }, [proLoading, isPro]);
   const start = (next: BuilderMode) => {
+    if (proLoading) return;
+    if (!isPro) { setChooserOpen(false); setPaywallOpen(true, 'Build with AI'); return; }
     setChooserOpen(false);
     let draft: VoiceDraft;
     try { draft = getCurrentDraft(); } catch { onStart(next); return; }
@@ -240,9 +243,9 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const groups = ['upload', 'analysis'].includes(step) ? 0 : ['scope', 'work', 'design', 'finish', 'budget'].includes(step) ? 1 : step === 'details' ? 2 : 3;
   return <>
     <div className="col-span-2 min-w-0 sm:col-span-1 sm:min-w-[220px]">
-      <Button type="button" aria-label={isPro ? 'Build with AI' : 'Build with AI — Pro required'} className={`h-12 w-full gap-2 rounded-xl px-3 shadow-sm sm:px-4 ${!isPro ? 'bg-primary/65 text-primary-foreground shadow-none hover:bg-primary/75' : ''}`} onClick={() => { if (!proLoading && !isPro) { setPaywallOpen(true, 'Build with AI'); return; } void refreshWalletBalance(); setChooserOpen(true); }}>{isPro ? <BuilderMark className="h-4 w-4 shrink-0" /> : <LockKeyhole className="h-4 w-4 shrink-0" />}<span className="text-sm leading-5">Build with AI</span><span role="button" tabIndex={0} aria-label="Top up coins" onClick={event => { event.stopPropagation(); window.dispatchEvent(new Event('intorza:open-wallet')); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); window.dispatchEvent(new Event('intorza:open-wallet')); } }} className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[11px] font-semibold leading-4 text-amber-900 shadow-sm"><GoldCoin className="h-3.5 w-3.5" />{walletBalance ?? '—'} coins</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Button>
+      <Button type="button" disabled={proLoading} aria-busy={proLoading} aria-label={proLoading ? 'Checking Pro access' : proStatus === 'unavailable' ? 'Retry Pro access check' : isPro ? 'Build with AI' : 'Build with AI - Pro required'} className={`h-12 w-full gap-2 rounded-xl px-3 shadow-sm sm:px-4 ${!proLoading && !isPro ? 'bg-primary/65 text-primary-foreground shadow-none hover:bg-primary/75' : ''}`} onClick={() => { if (proLoading) return; if (proStatus === 'unavailable') { void refreshSubscription(); return; } if (!isPro) { setPaywallOpen(true, 'Build with AI'); return; } void refreshWalletBalance(); setChooserOpen(true); }}>{proLoading ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : isPro ? <BuilderMark className="h-4 w-4 shrink-0" /> : <LockKeyhole className="h-4 w-4 shrink-0" />}<span className="text-sm leading-5">{proLoading ? 'Checking access...' : proStatus === 'unavailable' ? 'Retry access check' : 'Build with AI'}</span><span role="button" tabIndex={0} aria-label="Top up coins" onClick={event => { event.stopPropagation(); window.dispatchEvent(new Event('intorza:open-wallet')); }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); window.dispatchEvent(new Event('intorza:open-wallet')); } }} className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200/80 bg-amber-50 px-2 py-1 text-[11px] font-semibold leading-4 text-amber-900 shadow-sm"><GoldCoin className="h-3.5 w-3.5" />{walletBalance ?? '—'} coins</span><ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" /></Button>
     </div>
-    <Dialog open={chooserOpen} onOpenChange={setChooserOpen}>
+    <Dialog open={chooserOpen && !proLoading && isPro} onOpenChange={setChooserOpen}>
       <DialogContent className="max-h-[90dvh] min-w-0 max-w-xl gap-5 overflow-y-auto rounded-3xl p-4 sm:p-6">
         <DialogHeader className="pr-5 text-left">
           <div className="mb-3 flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-xs font-medium text-primary"><BuilderMark className="h-4 w-4" />INTORZA STUDIO</span><span className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900"><GoldCoin />{walletBalance ?? '—'} coins</span></div>
@@ -260,7 +263,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         </div>
       </DialogContent>
     </Dialog>
-    <Dialog open={mode !== null} onOpenChange={open => { if (!open && !busy) onClose(); }}>
+    <Dialog open={mode !== null && !proLoading && isPro} onOpenChange={open => { if (!open && !busy) onClose(); }}>
       <DialogContent className="flex h-[min(90dvh,900px)] max-h-[calc(100dvh-1rem)] min-w-0 max-w-2xl flex-col gap-0 overflow-hidden p-0 sm:p-0" onInteractOutside={event => { if (busy) event.preventDefault(); }} onEscapeKeyDown={event => { if (busy) event.preventDefault(); }}>
         <DialogHeader className="shrink-0 border-b px-5 pb-4 pt-6 text-left sm:px-6">
           <p className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-primary"><BuilderMark className="h-4 w-4" />Intorza Studio</p>

@@ -80,7 +80,7 @@ const navItems = [
 ];
 
 export const Navigation = ({ mobile }: NavigationProps) => {
-  const { isPro, setPaywallOpen } = useSubscription();
+  const { isPro, loading: proLoading, status: proStatus, setPaywallOpen } = useSubscription();
   const { settings, countryConfig } = useLocalization();
   const { openFeedback } = useFeedback();
   
@@ -89,6 +89,7 @@ export const Navigation = ({ mobile }: NavigationProps) => {
   const countryFlag = countryConfig?.flag || '🌍';
 
   const handleNavClick = (e: React.MouseEvent, item: typeof navItems[0]) => {
+    if (item.requiresPro && (proLoading || proStatus === 'unavailable')) { e.preventDefault(); return; }
     if (item.requiresPro && !isPro) {
       e.preventDefault();
       setPaywallOpen(true, item.title);
@@ -101,7 +102,7 @@ export const Navigation = ({ mobile }: NavigationProps) => {
       mobile ? "pt-8" : "h-full"
     )}>
       {/* Upgrade Banner for non-Pro users */}
-      {!isPro && (
+      {!proLoading && proStatus !== 'unavailable' && !isPro && (
         <button
           onClick={() => setPaywallOpen(true, 'Upgrade')}
           className="flex items-center gap-3 rounded-lg px-3 py-3 mb-2 text-sm font-medium bg-gradient-to-r from-amber-500/10 to-amber-600/10 text-amber-700 border border-amber-500/20 hover:from-amber-500/20 hover:to-amber-600/20 transition-colors"
@@ -116,13 +117,14 @@ export const Navigation = ({ mobile }: NavigationProps) => {
 
       {navItems.map((item) => {
         const Icon = item.icon;
-        const isLocked = item.requiresPro && !isPro;
+        const isLocked = item.requiresPro && !proLoading && proStatus !== 'unavailable' && !isPro;
         const showProBadge = item.requiresPro && isPro;
         
         return (
           <NavLink
             key={item.href}
             to={item.href}
+            aria-disabled={item.requiresPro && (proLoading || proStatus === 'unavailable')}
             end={item.href === "/"}
             onClick={(e) => handleNavClick(e, item)}
             className={cn(

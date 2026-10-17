@@ -24,8 +24,9 @@ const STORAGE_KEY = 'intorza_pro_status';
 
 // Always start from a consistent SSR-safe state. Browser storage is not proof
 // of entitlement, and must not carry Pro status across account changes.
-const getInitialState = (): SubscriptionState => {
+const getInitialState = (): SubscriptionState & { ownerId: string | null } => {
   return {
+    ownerId: null,
     isPro: false,
     plan: null,
     expiry: null,
@@ -41,7 +42,9 @@ const SubscriptionContext = createContext<SubscriptionContextType | undefined>(u
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, session, loading: authLoading } = useAuth();
   const requestVersion = useRef(0);
-  const [state, setState] = useState<SubscriptionState>(getInitialState);
+  const identity = useRef(user?.id ?? null);
+  identity.current = user?.id ?? null;
+  const [state, setState] = useState(getInitialState);
   const [paywallOpen, setPaywallOpenState] = useState(false);
   const [paywallAction, setPaywallAction] = useState('');
 
@@ -63,8 +66,9 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const refreshSubscription = useCallback(async () => {
     const version = ++requestVersion.current;
-    if (!session?.access_token) {
+    if (!user || !session?.access_token) {
       const newState = { 
+        ownerId: null,
         isPro: false, 
         plan: null, 
         expiry: null, 
@@ -74,32 +78,36 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         initialLoadComplete: true 
       };
       setState(newState);
-      localStorage.removeItem(STORAGE_KEY);
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* Storage may be unavailable. */ }
       return;
     }
 
+    setState(prev => prev.ownerId === user.id && prev.initialLoadComplete && prev.status !== 'unavailable'
+      ? prev : { ...getInitialState(), ownerId: user.id });
+
     try {
-      const { data, error } = await supabase.functions.invoke('subscription-status', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+      // The existing status function reads these same owner-scoped fields.
+      // One authenticated RLS query avoids an edge-function cold start plus
+      // a second auth/profile round trip. Paid APIs still enforce access server-side.
+      const { data, error } = await supabase.from('profiles')
+        .select('is_pro,pro_since,pro_plan,pro_expiry,payment_status').eq('id', user.id).single();
 
       // A response from a previous account or request cannot restore its status.
-      if (version !== requestVersion.current) return;
+      if (version !== requestVersion.current || identity.current !== user.id) return;
 
-      if (error || !data || typeof data.isPro !== 'boolean') {
+      if (error || !data || typeof data.is_pro !== 'boolean') {
         console.error('Error fetching subscription status:', error);
-        setState(prev => ({ ...prev, loading: false, initialLoadComplete: true }));
+        setState(prev => ({ ...prev, ownerId: user.id, isPro: false, status: 'unavailable', loading: false, initialLoadComplete: true }));
         return;
       }
 
       const newState = {
-        isPro: data.isPro || false,
-        plan: data.plan,
-        expiry: data.expiry,
-        proSince: data.proSince,
-        status: data.status || 'inactive',
+        ownerId: user.id,
+        isPro: data.is_pro && (!data.pro_expiry || Date.parse(data.pro_expiry) > Date.now()),
+        plan: data.pro_plan,
+        expiry: data.pro_expiry,
+        proSince: data.pro_since,
+        status: data.payment_status || 'inactive',
         loading: false,
         initialLoadComplete: true,
       };
@@ -107,21 +115,22 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setState(newState);
       persistStatus(newState);
     } catch (error) {
-      if (version !== requestVersion.current) return;
+      if (version !== requestVersion.current || identity.current !== user.id) return;
       console.error('Failed to refresh subscription:', error);
-      setState(prev => ({ ...prev, loading: false, initialLoadComplete: true }));
+      setState(prev => ({ ...prev, ownerId: user.id, isPro: false, status: 'unavailable', loading: false, initialLoadComplete: true }));
     }
-  }, [session?.access_token, persistStatus]);
+  }, [user?.id, session?.access_token, persistStatus]);
 
   // Fetch subscription status on mount and when user changes
   useEffect(() => {
     if (authLoading) return;
-    setState(getInitialState());
+    setState(prev => prev.ownerId === (user?.id ?? null) ? prev : getInitialState());
     setPaywallOpenState(false);
     if (user && session) {
       refreshSubscription();
     } else {
       setState({
+        ownerId: null,
         isPro: false,
         plan: null,
         expiry: null,
@@ -169,21 +178,25 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, []);
 
   const checkProFeature = useCallback((actionName: string, callback: () => void) => {
+    if (authLoading || state.ownerId !== (user?.id ?? null) || state.loading || !state.initialLoadComplete || state.status === 'unavailable') return;
     if (state.isPro) {
       callback();
     } else {
       setPaywallOpen(true, actionName);
     }
-  }, [state.isPro, setPaywallOpen]);
+  }, [authLoading, user?.id, state, setPaywallOpen]);
 
   return (
     <SubscriptionContext.Provider
       value={{
         ...state,
+        isPro: !authLoading && state.ownerId === (user?.id ?? null) && state.initialLoadComplete && state.isPro,
+        loading: authLoading || state.ownerId !== (user?.id ?? null) || state.loading,
+        initialLoadComplete: !authLoading && state.ownerId === (user?.id ?? null) && state.initialLoadComplete,
         refreshSubscription,
         checkProFeature,
         setPaywallOpen,
-        paywallOpen,
+        paywallOpen: !authLoading && state.ownerId === (user?.id ?? null) && paywallOpen,
         paywallAction,
       }}
     >
