@@ -21,6 +21,7 @@ import { generateInvoicePDF } from "@/lib/invoicePdfGenerator";
 import { InvoicePreviewEditor } from "@/components/InvoicePreviewEditor";
 import { PDFEditorSettings, InvoiceSettings, getEditorSettings, getInvoiceSettings } from "@/lib/pdfThemes";
 import { getLibraryTerms } from "@/lib/libraryDefaults";
+import { paymentReceiptSummary } from "@/lib/payment-receipt";
 
 interface Invoice {
   id: string;
@@ -44,6 +45,7 @@ interface Payment {
   payment_date: string;
   payment_method: string;
   notes: string;
+  created_at?: string;
 }
 
 const getStatusColor = (status: string) => {
@@ -334,16 +336,14 @@ const InvoiceDetail = () => {
     if (!invoice) return;
     
     try {
+      const summary = paymentReceiptSummary(invoice.total_amount, payments, payment.id);
       await generateInvoicePDF({
         invoiceNumber: `${invoice.invoice_number}-R${payments.indexOf(payment) + 1}`,
         invoiceDate: formatDate(payment.payment_date),
         clientName: invoice.client_name,
         projectName: invoice.project_name,
-        totalAmount: payment.amount,
-        paidAmount: payment.amount,
-        remainingAmount: 0,
-        status: 'paid',
-        notes: `Payment receipt for ${invoice.invoice_number}\n${payment.notes || ''}`,
+        ...summary,
+        notes: `Payment receipt for ${invoice.invoice_number}. Summary includes payments through this receipt; later payments are excluded.\n${payment.notes || ''}`,
         payments: [{
           amount: payment.amount,
           payment_date: formatDate(payment.payment_date),
@@ -554,6 +554,7 @@ const InvoiceDetail = () => {
                       <Button
                         variant="ghost"
                         size="sm"
+                        aria-label={`Download receipt for payment ${index + 1}`}
                         onClick={() => handleDownloadPaymentReceipt(payment)}
                         className="h-8 px-2"
                       >
