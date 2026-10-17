@@ -605,105 +605,81 @@ const InvoiceDetail = () => {
 
       {/* Add Payment Dialog */}
       <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Payment</DialogTitle>
-            <DialogDescription>
-              Record a payment for {invoice.invoice_number}
-            </DialogDescription>
+        <DialogContent className="flex max-h-[85dvh] w-[calc(100%-1.5rem)] max-w-[420px] flex-col gap-0 overflow-hidden p-0 sm:p-0">
+          <DialogHeader className="shrink-0 border-b px-4 py-4 pr-10 text-left">
+            <DialogTitle className="text-base">Add Payment</DialogTitle>
+            <DialogDescription className="truncate text-xs">{invoice.invoice_number}</DialogDescription>
           </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Payment Amount (₹)</Label>
-              <Input
-                type="number"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(parseFloat(e.target.value) || 0)}
-                placeholder="Enter amount"
-              />
-              {/* Quick amount buttons */}
-              <div className="flex gap-2">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setPaymentAmount(invoice?.remaining_amount || 0)}
-                >
-                  Full (₹{(invoice?.remaining_amount || 0).toLocaleString('en-IN')})
+
+          <div className="min-h-0 space-y-3 overflow-y-auto overscroll-contain p-4">
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-muted/60 px-3 py-2 text-xs">
+              <span className="text-muted-foreground">Outstanding balance</span>
+              <span className="font-semibold tabular-nums">{formatCurrency(invoice.remaining_amount || 0, true)}</span>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="payment-amount" className="text-xs">Payment amount (₹)</Label>
+              <Input id="payment-amount" type="number" value={paymentAmount}
+                onChange={e => setPaymentAmount(parseFloat(e.target.value) || 0)}
+                placeholder="Enter amount" className="h-11 text-base font-semibold tabular-nums" />
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" size="sm" className="h-9 min-w-0 justify-between gap-1 px-2 text-xs"
+                  onClick={() => setPaymentAmount(invoice.remaining_amount || 0)}>
+                  <span>Full</span><span className="text-[11px] tabular-nums sm:text-xs">{formatCurrency(invoice.remaining_amount || 0, true)}</span>
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setPaymentAmount((invoice?.remaining_amount || 0) / 2)}
-                >
-                  Half (₹{((invoice?.remaining_amount || 0) / 2).toLocaleString('en-IN')})
+                <Button type="button" variant="outline" size="sm" className="h-9 min-w-0 justify-between gap-1 px-2 text-xs"
+                  onClick={() => setPaymentAmount((invoice.remaining_amount || 0) / 2)}>
+                  <span>Half</span><span className="text-[11px] tabular-nums sm:text-xs">{formatCurrency((invoice.remaining_amount || 0) / 2, true)}</span>
                 </Button>
               </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label>Payment Method</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="upi">UPI</SelectItem>
-                  <SelectItem value="bank">Bank Transfer</SelectItem>
-                  <SelectItem value="cheque">Cheque</SelectItem>
-                </SelectContent>
-              </Select>
+
+            <div className="grid min-w-0 grid-cols-2 gap-3">
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="payment-method" className="text-xs">Method</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger id="payment-method" className="h-10 min-w-0 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="upi">UPI</SelectItem>
+                    <SelectItem value="bank">Bank Transfer</SelectItem>
+                    <SelectItem value="cheque">Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <Label htmlFor="payment-date" className="text-xs">Payment date</Label>
+                <Input id="payment-date" type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)}
+                  className="h-10 min-w-0 max-w-full px-2 text-base" />
+              </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label>Payment Date</Label>
-              <Input
-                type="date"
-                value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Next Payment Due Date (Optional)</Label>
-              <Input
-                type="date"
-                value={nextPaymentDue}
-                onChange={(e) => setNextPaymentDue(e.target.value)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Next Payment Amount (Optional)</Label>
-              <Input
-                type="number"
-                value={nextPaymentAmount || ''}
-                onChange={(e) => setNextPaymentAmount(parseFloat(e.target.value) || 0)}
-                placeholder="Expected next payment"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Notes (Optional)</Label>
-              <Textarea
-                value={paymentNotes}
-                onChange={(e) => setPaymentNotes(e.target.value)}
-                placeholder="Any additional notes"
-                rows={2}
-              />
-            </div>
+
+            <details className="group rounded-xl border">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-medium [&::-webkit-details-marker]:hidden">
+                <span>Next payment &amp; notes <span className="font-normal text-muted-foreground">(optional)</span></span>
+                <Plus className="h-3.5 w-3.5 shrink-0 transition-transform group-open:rotate-45" aria-hidden="true" />
+              </summary>
+              <div className="space-y-3 border-t p-3">
+                <div className="grid min-w-0 grid-cols-2 gap-3">
+                  <div className="min-w-0 space-y-1.5">
+                    <Label htmlFor="next-payment-due" className="text-xs">Next due date</Label>
+                    <Input id="next-payment-due" type="date" value={nextPaymentDue} onChange={e => setNextPaymentDue(e.target.value)} className="h-10 min-w-0 max-w-full px-2 text-base" />
+                  </div>
+                  <div className="min-w-0 space-y-1.5">
+                    <Label htmlFor="next-payment-amount" className="text-xs">Next amount</Label>
+                    <Input id="next-payment-amount" type="number" value={nextPaymentAmount || ''} onChange={e => setNextPaymentAmount(parseFloat(e.target.value) || 0)} placeholder="Amount" className="h-10 text-base" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="payment-notes" className="text-xs">Notes</Label>
+                  <Textarea id="payment-notes" value={paymentNotes} onChange={e => setPaymentNotes(e.target.value)} placeholder="Add a note..." rows={2} className="min-h-[64px] resize-none text-base" />
+                </div>
+              </div>
+            </details>
           </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPaymentDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddPayment}>
-              Add Payment
-            </Button>
+
+          <DialogFooter className="grid shrink-0 grid-cols-2 gap-2 border-t bg-background px-4 py-3 sm:space-x-0">
+            <Button variant="outline" className="h-10" onClick={() => setPaymentDialogOpen(false)}>Cancel</Button>
+            <Button className="h-10" onClick={handleAddPayment}>Add Payment</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
