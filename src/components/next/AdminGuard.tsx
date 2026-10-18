@@ -8,22 +8,23 @@ import { GlobalLoader } from '@/components/GlobalLoader';
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const userId = user?.id;
   const router = useRouter();
   const [authorizedUser, setAuthorizedUser] = useState<string | null>(null);
   useEffect(() => {
     if (loading) return;
     let active = true;
-    if (!user) {
+    if (!userId) {
       router.replace('/admin/login');
       return;
     }
     void supabase.rpc('is_admin').then(({ data, error }) => {
       if (!active) return;
-      if (!error && data === true) setAuthorizedUser(user.id);
+      if (!error && data === true) setAuthorizedUser(userId);
       else router.replace('/admin/login');
     }, () => { if (active) router.replace('/admin/login'); });
     return () => { active = false; };
-  }, [user?.id, loading, router]);
+  }, [userId, loading, router]);
   if (!user || authorizedUser !== user.id) return <GlobalLoader message="Checking admin access…" fullScreen={false} />;
   return <>{children}</>;
 }

@@ -9,26 +9,27 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 type Payment = { id: string; created_at: string; amount: number; currency: string; status: string; event_type: string; provider_event_id: string; payment_id?: string | null; order_id?: string | null };
 type History = { payments: Payment[]; total: number };
 export function PaymentHistoryDialog({ account, onClose }: { account: { id: string; login_email: string | null } | null; onClose: () => void }) {
+  const accountId = account?.id;
   const [page, setPage] = useState(0);
   const [history, setHistory] = useState<History>({ payments: [], total: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
-  useEffect(() => { setPage(0); }, [account?.id]);
+  useEffect(() => { setPage(0); }, [accountId]);
   useEffect(() => {
-    if (!account) return;
+    if (!accountId) return;
     let active = true;
     setLoading(true); setError(false);
     void (async () => {
       try {
-        const result = await supabase.rpc('admin_payment_history', { p_user: account.id, p_page: page });
+        const result = await supabase.rpc('admin_payment_history', { p_user: accountId, p_page: page });
         if (result.error) throw result.error;
         if (active) setHistory(result.data as unknown as History);
       } catch { if (active) setError(true); }
       finally { if (active) setLoading(false); }
     })();
     return () => { active = false; };
-  }, [account?.id, page, retry]);
+  }, [accountId, page, retry]);
   return <Dialog open={!!account} onOpenChange={open => { if (!open) onClose(); }}><DialogContent className="max-h-[85dvh] max-w-2xl overflow-y-auto">
     <DialogHeader className="pr-6 text-left"><DialogTitle>Payment history</DialogTitle><DialogDescription className="break-all">{account?.login_email || account?.id}</DialogDescription></DialogHeader>
     <p className="text-xs text-muted-foreground">Newest first. Includes captured payments, failed attempts and refund events. Manual Pro grants are not payments.</p>

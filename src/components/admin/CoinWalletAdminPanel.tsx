@@ -11,7 +11,7 @@ type Wallet = { user_id: string; balance: number; lifetime_earned: number; lifet
 type Overview = { total_users: number; total_balance: number; purchases_today: number; revenue_today_paise: number };
 type WalletPage = { wallets: Wallet[]; total: number };
 
-export function CoinWalletAdminPanel() {
+export function CoinWalletAdminPanel({ refreshVersion = 0 }: { refreshVersion?: number }) {
   const [data, setData] = useState<WalletPage>({ wallets: [], total: 0 });
   const [overview, setOverview] = useState<Overview | null>(null);
   const [amount, setAmount] = useState<Record<string, string>>({});
@@ -36,7 +36,7 @@ export function CoinWalletAdminPanel() {
       finally { if (active) setBusy(false); }
     }, 250);
     return () => { active = false; clearTimeout(timer); };
-  }, [search, page, refresh]);
+  }, [search, page, refresh, refreshVersion]);
   const adjustCoins = async (wallet: Wallet) => {
     const delta = Number(amount[wallet.user_id]);
     if (!Number.isInteger(delta) || !delta) return toast.error('Enter a whole positive or negative coin amount.');

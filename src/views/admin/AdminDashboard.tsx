@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@/lib/navigation";
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { LucideIcon } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -110,6 +112,13 @@ interface Stats {
 
 const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const loadErrors = useRef(new Set<string>());
+  const [failedSections, setFailedSections] = useState<string[]>([]);
+  const recordLoadResult = (section: string, failed: boolean) => {
+    if (failed) loadErrors.current.add(section); else loadErrors.current.delete(section);
+    setFailedSections([...loadErrors.current]);
+  };
   const [users, setUsers] = useState<User[]>([]);
   const [feedback, setFeedback] = useState<Feedback[]>([]);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
@@ -145,7 +154,7 @@ const AdminDashboard = () => {
 
   // Set up real-time subscriptions
   useEffect(() => {
-    const channels: any[] = [];
+    const channels: RealtimeChannel[] = [];
 
     // Subscribe to profiles changes
     const profilesChannel = supabase
@@ -263,6 +272,7 @@ const AdminDashboard = () => {
           supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('user_id', profile.id),
           supabase.from('team_members').select('id', { count: 'exact', head: true }).eq('company_id', profile.id),
         ]);
+        if (quotationsRes.error || invoicesRes.error || teamRes.error) throw new Error('Company activity could not be loaded');
         
         return {
           ...profile,
@@ -273,8 +283,10 @@ const AdminDashboard = () => {
       }));
 
       setUsers(usersWithStats);
+      recordLoadResult('Companies', false);
     } catch (error) {
       console.error('Error loading users:', error);
+      recordLoadResult('Companies', true);
     }
   };
 
@@ -289,17 +301,20 @@ const AdminDashboard = () => {
       if (error) throw error;
       
       const quotationsWithEmail = await Promise.all((data || []).map(async (q) => {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('email')
           .eq('id', q.user_id)
           .single();
+        if (profileError) throw profileError;
         return { ...q, user_email: profile?.email || 'Unknown' };
       }));
 
       setQuotations(quotationsWithEmail);
+      recordLoadResult('Quotes', false);
     } catch (error) {
       console.error('Error loading quotations:', error);
+      recordLoadResult('Quotes', true);
     }
   };
 
@@ -314,17 +329,20 @@ const AdminDashboard = () => {
       if (error) throw error;
       
       const invoicesWithEmail = await Promise.all((data || []).map(async (i) => {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('email')
           .eq('id', i.user_id)
           .single();
+        if (profileError) throw profileError;
         return { ...i, user_email: profile?.email || 'Unknown' };
       }));
 
       setInvoices(invoicesWithEmail);
+      recordLoadResult('Invoices', false);
     } catch (error) {
       console.error('Error loading invoices:', error);
+      recordLoadResult('Invoices', true);
     }
   };
 
@@ -339,17 +357,20 @@ const AdminDashboard = () => {
       if (error) throw error;
       
       const measurementsWithEmail = await Promise.all((data || []).map(async (m) => {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('email')
           .eq('id', m.user_id)
           .single();
+        if (profileError) throw profileError;
         return { ...m, user_email: profile?.email || 'Unknown' };
       }));
 
       setSiteMeasurements(measurementsWithEmail);
+      recordLoadResult('Sites', false);
     } catch (error) {
       console.error('Error loading site measurements:', error);
+      recordLoadResult('Sites', true);
     }
   };
 
@@ -363,17 +384,20 @@ const AdminDashboard = () => {
       if (error) throw error;
       
       const membersWithCompany = await Promise.all((data || []).map(async (m) => {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('company_name')
           .eq('id', m.company_id)
           .single();
+        if (profileError) throw profileError;
         return { ...m, company_name: profile?.company_name || 'Unknown' };
       }));
 
       setTeamMembers(membersWithCompany);
+      recordLoadResult('Teams', false);
     } catch (error) {
       console.error('Error loading team members:', error);
+      recordLoadResult('Teams', true);
     }
   };
 
@@ -387,17 +411,20 @@ const AdminDashboard = () => {
       if (error) throw error;
       
       const feedbackWithEmails = await Promise.all((data || []).map(async (f) => {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('email')
           .eq('id', f.user_id)
           .single();
+        if (profileError) throw profileError;
         return { ...f, user_email: profile?.email || 'Unknown', feedback_type: f.feedback_type || 'feedback' };
       }));
       
       setFeedback(feedbackWithEmails);
+      recordLoadResult('Feedback', false);
     } catch (error) {
       console.error('Error loading feedback:', error);
+      recordLoadResult('Feedback', true);
     }
   };
 
@@ -430,7 +457,10 @@ const AdminDashboard = () => {
         supabase.from('quotations').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
         supabase.from('invoices').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
         supabase.from('user_activity').select('user_id, activity_date'),
-      ]);
+      ]).then(results => {
+        if (results.some(result => result.error)) throw new Error('Overview queries failed');
+        return results;
+      });
 
       const totalRevenue = invoiceData?.reduce((sum, inv) => sum + (inv.paid_amount || 0), 0) || 0;
       const pendingRevenue = invoiceData?.reduce((sum, inv) => sum + (inv.remaining_amount || 0), 0) || 0;
@@ -486,8 +516,10 @@ const AdminDashboard = () => {
         quotationsToday: quotationsTodayCount || 0,
         invoicesToday: invoicesTodayCount || 0,
       });
+      recordLoadResult('Overview', false);
     } catch (error) {
       console.error('Error loading stats:', error);
+      recordLoadResult('Overview', true);
     }
   };
 
@@ -498,6 +530,7 @@ const AdminDashboard = () => {
   };
 
   const refreshData = async () => {
+    setRefreshVersion(value => value + 1);
     toast.info("Refreshing data...");
     await Promise.all([
       loadUsers(), 
@@ -508,7 +541,8 @@ const AdminDashboard = () => {
       loadSiteMeasurements(),
       loadTeamMembers()
     ]);
-    toast.success("Data refreshed");
+    if (loadErrors.current.size) toast.error("Some dashboard sections could not be refreshed.");
+    else toast.success("Dashboard data refreshed");
   };
 
   const renderStars = (rating: number) => {
@@ -548,7 +582,7 @@ const AdminDashboard = () => {
   };
 
   const getFeedbackTypeBadge = (type: string) => {
-    const typeConfig: Record<string, { color: string; icon: any }> = {
+    const typeConfig: Record<string, { color: string; icon: LucideIcon }> = {
       feedback: { color: "bg-blue-100 text-blue-800", icon: ThumbsUp },
       bug: { color: "bg-red-100 text-red-800", icon: Bug },
       issue: { color: "bg-orange-100 text-orange-800", icon: AlertTriangle },
@@ -599,7 +633,7 @@ const AdminDashboard = () => {
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <TechStackDialog />
-            <Button variant="outline" size="icon" onClick={refreshData} className="h-8 w-8">
+            <Button aria-label="Refresh dashboard" variant="outline" size="icon" onClick={refreshData} className="h-8 w-8">
               <RefreshCw className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" onClick={handleLogout} className="h-8 px-2 sm:px-3">
@@ -611,6 +645,7 @@ const AdminDashboard = () => {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6">
+        {failedSections.length > 0 && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Some data is unavailable or may be outdated: {failedSections.join(', ')}. Use Refresh to retry. Empty tables and totals in those sections are not confirmed.</div>}
         {/* Data Tables */}
         <Tabs defaultValue="users" className="space-y-3">
           <div className="overflow-x-auto -mx-3 px-3">
@@ -770,7 +805,7 @@ const AdminDashboard = () => {
 
           </TabsContent>
           <TabsContent value="ai" className="space-y-4"><AITrainingPanel /></TabsContent>
-          <TabsContent value="users" className="space-y-4"><AdminUserDirectory /></TabsContent>
+          <TabsContent value="users" className="space-y-4"><AdminUserDirectory refreshVersion={refreshVersion} /></TabsContent>
 
           <TabsContent value="companies" className="space-y-4">
             <Card>
@@ -811,7 +846,7 @@ const AdminDashboard = () => {
                             <TableCell className="font-medium">{user.company_name}</TableCell>
                             <TableCell>{user.full_name || 'N/A'}</TableCell>
                             <TableCell>{user.email}</TableCell>
-                            <TableCell>{(user as any).phone || 'N/A'}</TableCell>
+                            <TableCell>{user.phone || 'N/A'}</TableCell>
                             <TableCell className="text-center tabular-nums">{user.quotation_count}</TableCell>
                             <TableCell className="text-center tabular-nums">{user.invoice_count}</TableCell>
                             <TableCell className="text-center tabular-nums">{user.team_count}</TableCell>
@@ -830,8 +865,8 @@ const AdminDashboard = () => {
             <div><h2 className="text-2xl font-semibold">Billing</h2><p className="mt-1 text-sm text-muted-foreground">Subscriptions, payment history and coin balances in one place.</p></div>
             <Tabs defaultValue="subscriptions" className="space-y-4">
               <TabsList className="h-auto flex-wrap gap-1 p-1"><TabsTrigger value="subscriptions">Pro subscriptions</TabsTrigger><TabsTrigger value="coins">Coin wallets</TabsTrigger></TabsList>
-              <TabsContent value="subscriptions"><AdminUserDirectory billing /></TabsContent>
-              <TabsContent value="coins"><CoinWalletAdminPanel /></TabsContent>
+              <TabsContent value="subscriptions"><AdminUserDirectory billing refreshVersion={refreshVersion} /></TabsContent>
+              <TabsContent value="coins"><CoinWalletAdminPanel refreshVersion={refreshVersion} /></TabsContent>
             </Tabs>
           </TabsContent>
 
@@ -893,7 +928,7 @@ const AdminDashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Quotations Overview</CardTitle>
-                <CardDescription>All quotations created by users</CardDescription>
+                <CardDescription>Latest 100 quotations. This overview is not the complete quotation history.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -940,7 +975,7 @@ const AdminDashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Invoices Overview</CardTitle>
-                <CardDescription>All invoices created by users</CardDescription>
+                <CardDescription>Latest 100 invoices. This overview is not the complete invoice history.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -989,7 +1024,7 @@ const AdminDashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Site Measurement Projects</CardTitle>
-                <CardDescription>All site surveys created by users</CardDescription>
+                <CardDescription>Latest 100 site surveys. This overview is not the complete survey history.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">

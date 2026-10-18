@@ -24,7 +24,7 @@ const AdminLogin = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: isAdmin } = await supabase.rpc('is_admin');
-        if (isAdmin) {
+        if (isAdmin === true) {
           navigate('/admin/dashboard');
         }
       }
@@ -32,25 +32,14 @@ const AdminLogin = () => {
     checkAuth();
   }, [navigate]);
 
-  // Block team member emails
-  const isTeamMemberEmail = (email: string) => {
-    return email.toLowerCase().endsWith('@intorza.com');
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Block team member emails from admin login
-    if (isTeamMemberEmail(email)) {
-      toast.error("Team member accounts cannot access admin portal");
-      return;
-    }
-
     setLoading(true);
 
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
         options: { captchaToken: requireAuthCaptcha(captcha) },
       });
@@ -67,7 +56,7 @@ const AdminLogin = () => {
           throw new Error('Failed to verify admin access');
         }
 
-        if (!isAdmin) {
+        if (isAdmin !== true) {
           await supabase.auth.signOut();
           toast.error("Access denied. Admin privileges required.");
           return;
@@ -76,11 +65,12 @@ const AdminLogin = () => {
         toast.success("Welcome back, Admin!");
         navigate("/admin/dashboard");
       }
-    } catch (error: any) {
-      if (error.message?.includes("Invalid login credentials")) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Login failed';
+      if (message.includes("Invalid login credentials")) {
         toast.error("Invalid email or password");
       } else {
-        toast.error(error.message || "Login failed");
+        toast.error(message);
       }
     } finally {
       captcha.current?.reset();
@@ -110,6 +100,7 @@ const AdminLogin = () => {
               <Input
                 id="email"
                 type="email"
+                autoComplete="username"
                 placeholder="admin@intorza.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -122,6 +113,7 @@ const AdminLogin = () => {
               <Input
                 id="password"
                 type="password"
+                autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

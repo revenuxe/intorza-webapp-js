@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ type Account = {
 type Directory = { users: Account[]; total: number };
 const date = (value: string | null) => value ? new Date(value).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : 'Not recorded';
 
-export function AdminUserDirectory({ billing = false }: { billing?: boolean }) {
+export function AdminUserDirectory({ billing = false, refreshVersion = 0 }: { billing?: boolean; refreshVersion?: number }) {
   const [historyAccount, setHistoryAccount] = useState<Account | null>(null);
   const [sort, setSort] = useState(billing ? 'purchase' : 'newest');
   const [search, setSearch] = useState('');
@@ -30,7 +30,6 @@ export function AdminUserDirectory({ billing = false }: { billing?: boolean }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
   const [days, setDays] = useState<Record<string, string>>({});
-  const request = useRef(0);
   const updatePro = async (account: Account, revoke = false) => {
     const duration = revoke ? 0 : Number(days[account.id] || 30);
     if (!revoke && (!Number.isInteger(duration) || duration < 1 || duration > 3650)) { setError('Choose a Pro duration between 1 and 3650 days.'); return; }
@@ -45,19 +44,19 @@ export function AdminUserDirectory({ billing = false }: { billing?: boolean }) {
     finally { setSaving(null); }
   };
   useEffect(() => {
-    const current = ++request.current;
+    let active = true;
     setLoading(true);
     const timer = setTimeout(async () => {
       try {
         const result = await supabase.rpc('admin_user_directory', { p_search: search.trim(), p_status: status, p_page: page, p_sort: sort });
         if (result.error) throw result.error;
-        if (current === request.current) { setData(result.data as unknown as Directory); setError(''); }
+        if (active) { setData(result.data as unknown as Directory); setError(''); }
       } catch {
-        if (current === request.current) setError('Could not load account details. Please refresh to retry.');
-      } finally { if (current === request.current) setLoading(false); }
+        if (active) setError('Could not load account details. Please refresh to retry.');
+      } finally { if (active) setLoading(false); }
     }, 250);
-    return () => { clearTimeout(timer); request.current++; };
-  }, [search, status, page, refresh, sort]);
+    return () => { active = false; clearTimeout(timer); };
+  }, [search, status, page, refresh, sort, refreshVersion]);
 
   return <section className="space-y-5 rounded-2xl border bg-card p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
