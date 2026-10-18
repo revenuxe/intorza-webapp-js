@@ -17,6 +17,7 @@ import {
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { TechStackDialog } from "@/components/TechStackDialog";
 import { AITrainingPanel } from '@/components/admin/AITrainingPanel';
+import { AdminUserDirectory } from '@/components/admin/AdminUserDirectory';
 import { CoinWalletAdminPanel } from '@/components/admin/CoinWalletAdminPanel';
 
 interface User {
@@ -674,13 +675,13 @@ const AdminDashboard = () => {
 
         {/* Revenue Section */}
         <section>
-          <h2 className="text-base sm:text-lg font-semibold mb-3">Revenue</h2>
+          <h2 className="text-base sm:text-lg font-semibold mb-3">Customer invoices</h2>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
             <Card>
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground mb-0.5">Total Revenue</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">Customer invoice collections</p>
                     <p className="text-xl sm:text-2xl font-bold text-green-600 tabular-nums truncate">{formatCurrency(stats.totalRevenue)}</p>
                   </div>
                   <div className="p-2 rounded-full bg-green-100 shrink-0">
@@ -694,7 +695,7 @@ const AdminDashboard = () => {
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground mb-0.5">Pending Revenue</p>
+                    <p className="text-xs text-muted-foreground mb-0.5">Customer invoice outstanding</p>
                     <p className="text-xl sm:text-2xl font-bold text-orange-600 tabular-nums truncate">{formatCurrency(stats.pendingRevenue)}</p>
                   </div>
                   <div className="p-2 rounded-full bg-orange-100 shrink-0">
@@ -752,11 +753,11 @@ const AdminDashboard = () => {
         {/* Data Tables */}
         <Tabs defaultValue="users" className="space-y-3">
           <div className="overflow-x-auto -mx-3 px-3">
-            <TabsList className="inline-flex h-auto gap-1 p-1 w-max">
+            <TabsList className="flex h-auto flex-wrap justify-start gap-1 p-1 w-full">
               <TabsTrigger value="ai" className="text-xs sm:text-sm px-2 sm:px-3">AI</TabsTrigger>
               <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3">Users</TabsTrigger>
               <TabsTrigger value="companies" className="text-xs sm:text-sm px-2 sm:px-3">Companies</TabsTrigger>
-              <TabsTrigger value="billing" className="text-xs sm:text-sm px-2 sm:px-3">Billing</TabsTrigger>
+              <TabsTrigger value="billing" className="text-xs sm:text-sm px-2 sm:px-3">Pro & billing</TabsTrigger>
               <TabsTrigger value="feedback" className="text-xs sm:text-sm px-2 sm:px-3">Feedback</TabsTrigger>
               <TabsTrigger value="quotations" className="text-xs sm:text-sm px-2 sm:px-3">Quotes</TabsTrigger>
               <TabsTrigger value="invoices" className="text-xs sm:text-sm px-2 sm:px-3">Invoices</TabsTrigger>
@@ -777,52 +778,7 @@ const AdminDashboard = () => {
               <TabsContent value="train" className="mt-0"><AITrainingPanel /></TabsContent>
             </Tabs>
           </TabsContent>
-          <TabsContent value="users" className="space-y-4">
-            <Card>
-              <CardHeader className="p-3 sm:p-6">
-                <CardTitle className="text-base sm:text-lg">Users</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  All registered users
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 sm:p-6 sm:pt-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Email</TableHead>
-                        <TableHead className="text-xs hidden sm:table-cell">Name</TableHead>
-                        <TableHead className="text-xs hidden md:table-cell">Company</TableHead>
-                        <TableHead className="text-xs text-center">Quotes</TableHead>
-                        <TableHead className="text-xs text-center hidden sm:table-cell">Invoices</TableHead>
-                        <TableHead className="text-xs hidden lg:table-cell">Joined</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center text-muted-foreground py-8 text-sm">
-                            No users found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        users.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell className="text-xs font-medium max-w-[120px] sm:max-w-none truncate">{user.email}</TableCell>
-                            <TableCell className="text-xs hidden sm:table-cell">{user.full_name || '-'}</TableCell>
-                            <TableCell className="text-xs hidden md:table-cell">{user.company_name || '-'}</TableCell>
-                            <TableCell className="text-xs text-center tabular-nums">{user.quotation_count}</TableCell>
-                            <TableCell className="text-xs text-center tabular-nums hidden sm:table-cell">{user.invoice_count}</TableCell>
-                            <TableCell className="text-xs hidden lg:table-cell">{format(new Date(user.created_at), 'dd MMM')}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <TabsContent value="users" className="space-y-4"><AdminUserDirectory /></TabsContent>
 
           <TabsContent value="companies" className="space-y-4">
             <Card>
@@ -878,61 +834,7 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="billing" className="space-y-4">
-            <Card>
-              <CardHeader className="p-3 sm:p-6">
-                <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                  <Crown className="h-4 w-4 text-amber-500" />
-                  Pro Subscribers
-                </CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
-                  Users with active Pro subscriptions
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0 sm:p-6 sm:pt-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Email</TableHead>
-                        <TableHead className="text-xs">Plan</TableHead>
-                        <TableHead className="text-xs">Status</TableHead>
-                        <TableHead className="text-xs hidden sm:table-cell">Since</TableHead>
-                        <TableHead className="text-xs hidden sm:table-cell">Expires</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.filter(u => (u as any).is_pro).length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8 text-sm">
-                            No Pro subscribers yet
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        users.filter(u => (u as any).is_pro).map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell className="text-xs font-medium">{user.email}</TableCell>
-                            <TableCell className="text-xs">
-                              <Badge className="bg-amber-500/10 text-amber-700 text-[10px]">Monthly</Badge>
-                            </TableCell>
-                            <TableCell className="text-xs">
-                              <Badge className="bg-green-500/10 text-green-700 text-[10px]">Active</Badge>
-                            </TableCell>
-                            <TableCell className="text-xs hidden sm:table-cell">
-                              {(user as any).pro_since ? format(new Date((user as any).pro_since), 'dd MMM') : '-'}
-                            </TableCell>
-                            <TableCell className="text-xs hidden sm:table-cell">
-                              {(user as any).pro_expiry ? format(new Date((user as any).pro_expiry), 'dd MMM') : '-'}
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          <TabsContent value="billing" className="space-y-4"><AdminUserDirectory billing /></TabsContent>
 
           <TabsContent value="feedback" className="space-y-4">
             <Card>

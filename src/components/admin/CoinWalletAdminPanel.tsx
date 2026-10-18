@@ -36,7 +36,7 @@ export function CoinWalletAdminPanel() {
     setSaving(null); if (error) return toast.error(error.message); toast.success('Wallet updated.'); setAmount(current => ({ ...current, [wallet.user_id]: '' })); void load();
   };
   const setPro = async (wallet: Wallet, revoke = false) => {
-    const duration = revoke ? 0 : Number(days[wallet.user_id] || 30); if (!Number.isInteger(duration) || duration < 1 || duration > 3650) return toast.error('Enter Pro access from 1 to 3650 days.');
+    const duration = revoke ? 0 : Number(days[wallet.user_id] || 30); if (!revoke && (!Number.isInteger(duration) || duration < 1 || duration > 3650)) return toast.error('Enter Pro access from 1 to 3650 days.');
     const { data: { user } } = await supabase.auth.getUser(); if (!user) return;
     setSaving(wallet.user_id);
     const { error } = await supabase.rpc('admin_set_pro_access', { p_admin: user.id, p_user: wallet.user_id, p_days: duration, p_note: revoke ? 'Admin revoked Pro access' : `Admin granted ${duration} days of Pro access` });

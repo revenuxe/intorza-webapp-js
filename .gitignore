@@ -48,3 +48,7 @@ coverage/
 supabase/.temp
 supabase/checks/.security-preview.sql
 .security-audit-readonly/
+
+# Local transaction wrappers
+supabase/checks/.payment-fix-*.sql
+supabase/checks/.admin-directory-*.sql

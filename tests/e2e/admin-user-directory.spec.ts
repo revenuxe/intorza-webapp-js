@@ -1,0 +1,33 @@
+import { test, expect } from '@playwright/test';
+import { mockCaptcha } from './mock-captcha';
+test('admin directory separates login and quotation email and shows billing on mobile', async ({ page }) => {
+  await mockCaptcha(page); await page.setViewportSize({ width: 390, height: 844 });
+  const id = '00000000-0000-4000-8000-000000000001';
+  const user = { id, email: 'admin@example.test', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: new Date().toISOString() };
+  await page.route('**/*', async route => {
+    const req = route.request(); const url = new URL(req.url());
+    if (url.hostname === '127.0.0.1') return route.continue();
+    let body: unknown = [];
+    if (url.pathname.endsWith('/auth/v1/token')) body = { access_token: 'admin-session', refresh_token: 'refresh', token_type: 'bearer', expires_in: 3600, user };
+    else if (url.pathname.endsWith('/auth/v1/user')) body = user;
+    else if (url.pathname.endsWith('/rpc/admin_user_directory')) body = { total: 1, users: [{ id, login_email: 'login@example.test', quotation_email: 'quotation@example.test', full_name: 'Test Owner', company_name: 'Test Company', phone: '123456', pro_active: false, pro_plan: 'monthly', pro_expiry: '2026-01-01T00:00:00Z', payment_status: 'active', quotation_count: 3, invoice_count: 2, payments: [{id: 'receipt', amount: 49900, currency: 'INR', status: 'captured', event_type: 'pro_activation', provider_event_id: 'activation:pay_example', created_at: '2026-01-01T00:00:00Z'}] }] };
+    else if (url.pathname.endsWith('/rpc/is_admin')) body = true;
+    else if (url.pathname.endsWith('/profiles') && req.headers()['accept']?.includes('object')) body = { id, full_name: 'Admin' };
+    else if (!url.pathname.includes('/rest/v1/')) return route.abort();
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  await page.goto('/admin/login');
+  await page.getByLabel('Email', { exact: true }).fill('admin@example.test');
+  await page.getByLabel('Password', { exact: true }).fill('test-password-only');
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/dashboard$/);
+  await expect(page.getByText('login@example.test', { exact: true })).toBeVisible();
+  await expect(page.getByText('quotation@example.test', { exact: true })).toBeVisible();
+  await expect(page.getByText(id, { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Pro & billing', exact: true }).click();
+  await page.getByText(/recent records/).click();
+  await expect(page.getByText('activation:pay_example')).toBeAttached();
+  await expect(page.getByRole('tabpanel').getByText(/499.00/)).toBeAttached();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: 'test-results/admin-directory-mobile.png', fullPage: true });
+});
