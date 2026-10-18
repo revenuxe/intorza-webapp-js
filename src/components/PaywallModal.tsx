@@ -31,7 +31,7 @@ const PRO_FEATURES = [
 
 export const PaywallModal: React.FC = () => {
   const navigate = useNavigate();
-  const { paywallOpen, setPaywallOpen, refreshSubscription } = useSubscription();
+  const { paywallOpen, setPaywallOpen, refreshSubscription, paywallAction } = useSubscription();
   const { session } = useAuth();
   const { settings, countryConfig } = useLocalization();
   const [loading, setLoading] = useState(false);
@@ -101,9 +101,14 @@ export const PaywallModal: React.FC = () => {
         },
         handler: async function (response: Record<string, string>) {
           try {
-            // Close modal and navigate to processing page
             setPaywallOpen(false);
-            navigate('/payment-processing?return=/dashboard');
+            // When the paywall was triggered by an in-editor action (e.g. Save & Send),
+            // stay on the current page so the action auto-executes once isPro is confirmed.
+            // For generic upgrades, navigate to the payment-processing page as before.
+            const stayOnPage = paywallAction === 'Save & Send' || paywallAction === 'Build with AI';
+            if (!stayOnPage) {
+              navigate('/payment-processing?return=/dashboard');
+            }
             
             const { data: verifyData, error: verifyError } = await supabase.functions.invoke(
               'razorpay-verify-payment',

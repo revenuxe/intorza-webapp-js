@@ -82,6 +82,7 @@ const CreateQuotation = () => {
   const smartDefaultsApplied = useRef(false);
   const quotationSaveInProgress = useRef(false);
   const savedQuotationIdRef = useRef<string | null>(null);
+  const pendingSaveAndSend = useRef(false);
   
   // Use automation hook
   const {
@@ -295,6 +296,7 @@ const CreateQuotation = () => {
             }
           } else if (continueAction === 'saveAndSend') {
             if (!isPro) {
+              pendingSaveAndSend.current = true;
               setPaywallOpen(true, 'Save & Send');
             } else {
               await handleSaveQuotation('pending', true);
@@ -1082,6 +1084,17 @@ const CreateQuotation = () => {
     // Runs after the generated sections and project details have rendered.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveGeneratedDraft]);
+  // Auto-save quotation after Pro upgrade when Save & Send was pending.
+  // The user built a quotation, clicked Save & Send, paid for Pro, and now
+  // isPro flipped to true. Automatically complete the save so the quotation
+  // appears in My Quotations without a page refresh.
+  useEffect(() => {
+    if (isPro && pendingSaveAndSend.current) {
+      pendingSaveAndSend.current = false;
+      void handleSaveQuotation('pending', true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPro]);
   return <div className="container min-w-0 max-w-5xl mx-auto p-4 md:p-6 lg:p-8 pb-24 md:pb-8 relative">
       {feedback}
       {(isSaving || isLoadingQuotation) && <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" role="status" aria-live="polite">
@@ -1526,6 +1539,7 @@ const CreateQuotation = () => {
               </Button>
               <Button className={!isPro ? "w-full bg-primary/70 text-primary-foreground hover:bg-primary/80" : "w-full"} onClick={() => requireAuth(async () => {
                 if (!isPro) {
+                  pendingSaveAndSend.current = true;
                   setPaywallOpen(true, 'Save & Send');
                   return;
                 }
