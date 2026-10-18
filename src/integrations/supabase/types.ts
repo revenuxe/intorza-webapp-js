@@ -1651,7 +1651,9 @@ export type Database = {
       }
     }
     Functions: {
-      admin_user_directory: { Args: { p_search?: string; p_status?: string; p_page?: number }; Returns: Json }
+      admin_payment_history: { Args: { p_user: string; p_page?: number }; Returns: Json }
+      admin_wallet_directory: { Args: { p_search?: string; p_page?: number }; Returns: Json }
+      admin_user_directory: { Args: { p_search?: string; p_status?: string; p_page?: number; p_sort?: string }; Returns: Json }
       submit_pending_team_join: { Args: never; Returns: string | null }
       save_quotation: {
         Args: { p_id: string | null; p_payload: Json }

@@ -26,6 +26,6 @@ do $$ declare data jsonb; account jsonb; begin
 end $$;
 reset role;
 do $$ begin
-  if has_function_privilege('anon','public.admin_user_directory(text,text,integer)','execute') then raise exception 'Anonymous directory access allowed'; end if;
+  if has_function_privilege('anon','public.admin_user_directory(text,text,integer,text)','execute') then raise exception 'Anonymous directory access allowed'; end if;
 end $$;
 select 'PASS: admin-only directory, distinct login/PDF emails, search, expired Pro and pagination' as result;

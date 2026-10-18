@@ -594,7 +594,7 @@ const AdminDashboard = () => {
             </div>
             <div className="min-w-0">
               <h1 className="text-base sm:text-xl font-bold truncate">Admin Dashboard</h1>
-              <p className="text-xs text-muted-foreground hidden sm:block">INTORZA Management</p>
+              <p className="text-xs text-muted-foreground hidden sm:block">Accounts, billing, content and support</p>
             </div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
@@ -611,6 +611,24 @@ const AdminDashboard = () => {
       </header>
 
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6">
+        {/* Data Tables */}
+        <Tabs defaultValue="users" className="space-y-3">
+          <div className="overflow-x-auto -mx-3 px-3">
+            <TabsList aria-label="Admin sections" className="flex h-auto flex-wrap justify-start gap-1 p-1 w-full">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Overview</TabsTrigger>
+              <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3">Users</TabsTrigger>
+              <TabsTrigger value="companies" className="text-xs sm:text-sm px-2 sm:px-3">Companies</TabsTrigger>
+              <TabsTrigger value="billing" className="text-xs sm:text-sm px-2 sm:px-3">Billing</TabsTrigger>
+              <TabsTrigger value="ai" className="text-xs sm:text-sm px-2 sm:px-3">AI training</TabsTrigger>
+              <TabsTrigger value="feedback" className="text-xs sm:text-sm px-2 sm:px-3">Feedback</TabsTrigger>
+              <TabsTrigger value="quotations" className="text-xs sm:text-sm px-2 sm:px-3">Quotes</TabsTrigger>
+              <TabsTrigger value="invoices" className="text-xs sm:text-sm px-2 sm:px-3">Invoices</TabsTrigger>
+              <TabsTrigger value="sites" className="text-xs sm:text-sm px-2 sm:px-3">Sites</TabsTrigger>
+              <TabsTrigger value="teams" className="text-xs sm:text-sm px-2 sm:px-3">Teams</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="overview" className="space-y-6">
         {/* Overview Stats */}
         <section>
           <h2 className="text-base sm:text-lg font-semibold mb-3">Overview</h2>
@@ -750,34 +768,8 @@ const AdminDashboard = () => {
           </div>
         </section>
 
-        {/* Data Tables */}
-        <Tabs defaultValue="users" className="space-y-3">
-          <div className="overflow-x-auto -mx-3 px-3">
-            <TabsList className="flex h-auto flex-wrap justify-start gap-1 p-1 w-full">
-              <TabsTrigger value="ai" className="text-xs sm:text-sm px-2 sm:px-3">AI</TabsTrigger>
-              <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3">Users</TabsTrigger>
-              <TabsTrigger value="companies" className="text-xs sm:text-sm px-2 sm:px-3">Companies</TabsTrigger>
-              <TabsTrigger value="billing" className="text-xs sm:text-sm px-2 sm:px-3">Pro & billing</TabsTrigger>
-              <TabsTrigger value="feedback" className="text-xs sm:text-sm px-2 sm:px-3">Feedback</TabsTrigger>
-              <TabsTrigger value="quotations" className="text-xs sm:text-sm px-2 sm:px-3">Quotes</TabsTrigger>
-              <TabsTrigger value="invoices" className="text-xs sm:text-sm px-2 sm:px-3">Invoices</TabsTrigger>
-              <TabsTrigger value="sites" className="text-xs sm:text-sm px-2 sm:px-3">Sites</TabsTrigger>
-              <TabsTrigger value="teams" className="text-xs sm:text-sm px-2 sm:px-3">Teams</TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="ai" className="space-y-4">
-            <Tabs defaultValue="access" className="space-y-4">
-              <div className="overflow-x-auto -mx-1 px-1">
-                <TabsList className="inline-flex h-auto w-max gap-1 rounded-xl p-1">
-                  <TabsTrigger value="access" className="px-3 py-2 text-xs sm:text-sm">AI access</TabsTrigger>
-                  <TabsTrigger value="train" className="px-3 py-2 text-xs sm:text-sm">Train AI</TabsTrigger>
-                </TabsList>
-              </div>
-              <TabsContent value="access" className="mt-0"><CoinWalletAdminPanel /></TabsContent>
-              <TabsContent value="train" className="mt-0"><AITrainingPanel /></TabsContent>
-            </Tabs>
           </TabsContent>
+          <TabsContent value="ai" className="space-y-4"><AITrainingPanel /></TabsContent>
           <TabsContent value="users" className="space-y-4"><AdminUserDirectory /></TabsContent>
 
           <TabsContent value="companies" className="space-y-4">
@@ -834,7 +826,14 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="billing" className="space-y-4"><AdminUserDirectory billing /></TabsContent>
+          <TabsContent value="billing" className="space-y-4">
+            <div><h2 className="text-2xl font-semibold">Billing</h2><p className="mt-1 text-sm text-muted-foreground">Subscriptions, payment history and coin balances in one place.</p></div>
+            <Tabs defaultValue="subscriptions" className="space-y-4">
+              <TabsList className="h-auto flex-wrap gap-1 p-1"><TabsTrigger value="subscriptions">Pro subscriptions</TabsTrigger><TabsTrigger value="coins">Coin wallets</TabsTrigger></TabsList>
+              <TabsContent value="subscriptions"><AdminUserDirectory billing /></TabsContent>
+              <TabsContent value="coins"><CoinWalletAdminPanel /></TabsContent>
+            </Tabs>
+          </TabsContent>
 
           <TabsContent value="feedback" className="space-y-4">
             <Card>
