@@ -26,6 +26,8 @@ import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
 import { normalizeWarrantyInput } from "@/lib/warrantyFormatter";
 import { ClientSelector } from "@/components/quotation/ClientSelector";
 import { ProductNameInput } from "@/components/quotation/ProductNameInput";
+import { RoomPicker } from "@/components/quotation/RoomPicker";
+import { getRoomSuggestions } from "@/lib/roomSuggestions";
 import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
 import { GalleryImagePicker } from "@/components/quotation/GalleryImagePicker";
 import { GalleryImage } from "@/hooks/useGallery";
@@ -511,6 +513,20 @@ const CreateQuotation = () => {
       ...section,
       items: section.items.filter(item => item.id !== itemId)
     } : section));
+  };
+  const selectRoom = (sectionId: string, room: string) => {
+    setSections(current => current.map(section => {
+      if (section.id !== sectionId) return section;
+      const items = [...section.items];
+      for (const productName of getRoomSuggestions(room)) {
+        if (items.some(item => item.productName.trim().toLowerCase() === productName.toLowerCase())) continue;
+        // Fill pristine placeholders without overwriting entered work or images.
+        const emptyIndex = items.findIndex(item => !item.productName.trim() && !item.productDetails.trim() && !item.widthFt && !item.heightFt && !item.sftArea && !item.ratePerSft && !item.amount && (!item.side || item.side === 'A') && !itemImages[item.id]?.length);
+        if (emptyIndex >= 0) items[emptyIndex] = { ...items[emptyIndex], productName };
+        else items.push({ id: crypto.randomUUID(), side: 'A', productName, productDetails: '', widthFt: 0, heightFt: 0, sftArea: 0, ratePerSft: 0, amount: 0 });
+      }
+      return { ...section, title: room, items };
+    }));
   };
   const removeSection = (sectionId: string) => {
     setSections(sections.filter(section => section.id !== sectionId));
@@ -1222,11 +1238,12 @@ const CreateQuotation = () => {
           </CardContent>
         </Card>
 
-        {/* Sections & Items */}
+        {/* Rooms & Items */}
         {sections.map((section, sectionIndex) => <Card key={section.id}>
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
-                <Input value={section.title} onChange={e => updateSectionTitle(section.id, e.target.value)} className="text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0" placeholder="Section Title" />
+                <Input aria-label={`Room title ${sectionIndex + 1}`} value={section.title} onChange={e => updateSectionTitle(section.id, e.target.value)} className="min-w-0 text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0" placeholder="Room Title" />
+                <RoomPicker value={section.title} onChange={room => selectRoom(section.id, room)} />
                 {sections.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeSection(section.id)} className="text-destructive hover:text-destructive">
                     <Trash2 className="h-4 w-4" />
                   </Button>}
@@ -1391,9 +1408,9 @@ const CreateQuotation = () => {
                   {Object.prototype.hasOwnProperty.call(aiPriceEvidence, item.id) && <div className="rounded-lg bg-muted/30 px-3 py-2"><EstimatePriceDetails price={aiPriceEvidence[item.id]} /><p className="mt-1 text-[11px] text-muted-foreground">Original AI price evidence. Manual rate/specification changes require your review.</p></div>}
                 </div>)}
 
-              {/* Section Subtotal */}
+              {/* Room Subtotal */}
               <div className="flex justify-between items-center pt-4 border-t border-border">
-                <span className="font-medium">{section.items.some(isPendingAIItem) ? 'Provisional Section Total' : 'Section Total'}</span>
+                <span className="font-medium">{section.items.some(isPendingAIItem) ? 'Provisional Room Total' : 'Room Total'}</span>
                 <span className="text-lg font-bold text-primary">
                   {section.items.some(isPendingAIItem) && section.items.every(item => item.amount === 0) ? 'Pending' : <>{profile.currency_symbol}{section.items.reduce((sum, item) => sum + item.amount, 0).toLocaleString(profile.locale, {
                 minimumFractionDigits: 2
