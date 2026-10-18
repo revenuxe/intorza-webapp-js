@@ -1390,14 +1390,14 @@ const CreateQuotation = () => {
 
               <Button onClick={() => addItemToSection(section.id)} variant="outline" className="w-full gap-2">
                 <Plus className="h-4 w-4" />
-                Add Item to Section
+                Add Item to Room
               </Button>
             </CardContent>
           </Card>)}
 
         <Button onClick={addSection} variant="outline" className="w-full gap-2">
           <Plus className="h-4 w-4" />
-          Add New Section
+          Add Room
         </Button>
 
         {/* Summary */}
