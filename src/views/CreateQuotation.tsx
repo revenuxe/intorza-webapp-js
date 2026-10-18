@@ -1239,17 +1239,17 @@ const CreateQuotation = () => {
         </Card>
 
         {/* Rooms & Items */}
-        {sections.map((section, sectionIndex) => <Card key={section.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between gap-2">
-                <Input aria-label={`Room title ${sectionIndex + 1}`} value={section.title} onChange={e => updateSectionTitle(section.id, e.target.value)} className="min-w-0 text-lg font-semibold border-none p-0 h-auto focus-visible:ring-0" placeholder="Room Title" />
+        {sections.map((section, sectionIndex) => <Card key={section.id} className="min-w-0 max-w-full">
+            <CardHeader className="px-5 sm:px-8">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-3">
+                <Input aria-label={`Room title ${sectionIndex + 1}`} value={section.title} onChange={e => updateSectionTitle(section.id, e.target.value)} className="min-w-0 basis-40 flex-1 text-lg font-semibold border-none px-2 py-1 h-auto focus-visible:ring-0" placeholder="Room Title" />
                 <RoomPicker value={section.title} onChange={room => selectRoom(section.id, room)} />
                 {sections.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeSection(section.id)} className="text-destructive hover:text-destructive">
                     <Trash2 className="h-4 w-4" />
                   </Button>}
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="min-w-0 space-y-4 px-5 sm:px-8">
               {/* Table Header - Hidden on mobile, shown on tablet+ */}
               <div className="hidden md:block overflow-x-auto">
                 <div className="min-w-[800px]">
@@ -1272,7 +1272,7 @@ const CreateQuotation = () => {
               </div>
 
               {/* Items */}
-              {section.items.map((item, itemIndex) => <div key={item.id} className="p-4 border border-border rounded-lg space-y-4 bg-muted/30">
+              {section.items.map((item, itemIndex) => <div key={item.id} className="min-w-0 max-w-full p-5 sm:p-6 border border-border rounded-lg space-y-4 bg-muted/30">
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-medium text-muted-foreground">Item {itemIndex + 1}</span>
                     <div className="flex gap-1">
