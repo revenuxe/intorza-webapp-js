@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Info, X } from 'lucide-react';
 
-type Feedback = { title?: React.ReactNode; description?: React.ReactNode; variant?: string };
+type Feedback = { title?: React.ReactNode; description?: React.ReactNode; variant?: string; focusTargetId?: string };
 
 /** Feedback stays with the page instead of interrupting it with a floating toast. */
 export function useInlineFeedback({ autoRevealErrors = false }: { autoRevealErrors?: boolean } = {}) {
@@ -13,6 +13,14 @@ export function useInlineFeedback({ autoRevealErrors = false }: { autoRevealErro
   useEffect(() => {
     const element = messageRef.current;
     if (!autoRevealErrors || message?.variant !== 'destructive' || !element) return;
+    const field = message.focusTargetId ? document.getElementById(message.focusTargetId) : null;
+    if (field) {
+      // Reveal the input after validation renders and any loading overlay unmounts.
+      // Instant scrolling avoids mobile keyboard animation interrupting a smooth scroll.
+      field.focus({ preventScroll: true });
+      field.scrollIntoView({ behavior: 'instant', block: 'center' });
+      return;
+    }
     const bounds = element.getBoundingClientRect();
     // Leave room for the sticky navigation when revealing a message above the form.
     if (bounds.top >= 112 && bounds.bottom <= window.innerHeight) return;

@@ -12,6 +12,7 @@ interface Client {
 }
 
 interface ClientSelectorProps {
+  id?: string;
   value: string;
   onChange: (name: string) => void;
   onClientSelect?: (client: Client) => void;
@@ -20,6 +21,7 @@ interface ClientSelectorProps {
 }
 
 export const ClientSelector: React.FC<ClientSelectorProps> = ({
+  id,
   value,
   onChange,
   onClientSelect,
@@ -62,6 +64,7 @@ export const ClientSelector: React.FC<ClientSelectorProps> = ({
       <PopoverTrigger asChild>
         <div className="relative">
           <Input
+            id={id}
             value={inputValue}
             onChange={handleInputChange}
             onFocus={() => clients.length > 0 && setOpen(true)}

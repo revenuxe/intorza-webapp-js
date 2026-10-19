@@ -634,6 +634,7 @@ const CreateQuotation = () => {
         toast({
           title: "Complete the required details",
           description: `Add ${[!clientName.trim() && 'client name', !projectTitle.trim() && 'project title'].filter(Boolean).join(' and ')} to save your quotation.`,
+          focusTargetId: !clientName.trim() ? 'clientName' : 'projectTitle',
           variant: "destructive"
         });
         return null;
@@ -919,6 +920,7 @@ const CreateQuotation = () => {
         toast({
           title: "Complete the required details",
           description: `Add ${[!clientName.trim() && 'client name', !clientAddress.trim() && 'client address'].filter(Boolean).join(' and ')} to download your PDF.`,
+          focusTargetId: !clientName.trim() ? 'clientName' : 'clientAddress',
           variant: "destructive"
         });
         setIsDownloading(false);
@@ -1190,6 +1192,7 @@ const CreateQuotation = () => {
               {customizeSettings.showClientName && <div className="space-y-2">
                   <Label htmlFor="clientName">Client Name</Label>
                   <ClientSelector
+                    id="clientName"
                     value={clientName}
                     onChange={setClientName}
                     clients={clients}

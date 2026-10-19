@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { useInlineFeedback } from './useInlineFeedback';
 
-function Example({ autoRevealErrors = false, variant = 'destructive' } = {}) {
+function Example({ autoRevealErrors = false, variant = 'destructive', focusTargetId = '' } = {}) {
   const { toast, feedback } = useInlineFeedback({ autoRevealErrors });
-  return <>{feedback}<button onClick={() => toast({ title: 'Save failed', description: 'Your draft is still available.', variant })}>Save</button></>;
+  return <>{feedback}<input id="clientName" aria-label="Client name" /><button onClick={() => toast({ title: 'Save failed', description: 'Your draft is still available.', variant, focusTargetId })}>Save</button></>;
 }
 
 describe('revealing quotation errors', () => {
@@ -13,6 +13,24 @@ describe('revealing quotation errors', () => {
     HTMLElement.prototype.scrollIntoView = scrollIntoView;
   });
   afterEach(() => jest.restoreAllMocks());
+
+  it('reveals and focuses the missing client input instead of the notice', () => {
+    render(<Example autoRevealErrors focusTargetId="clientName" />);
+    fireEvent.click(screen.getByText('Save'));
+    const input = screen.getByRole('textbox', { name: 'Client name' });
+    expect(input).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'instant', block: 'center' });
+    expect(scrollIntoView.mock.instances[0]).toBe(input);
+    fireEvent.click(screen.getByText('Save'));
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to revealing the notice if the requested field is unavailable', () => {
+    render(<Example autoRevealErrors focusTargetId="unavailable-field" />);
+    fireEvent.click(screen.getByText('Save'));
+    expect(screen.getByRole('alert')).toHaveFocus();
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+  });
 
   it('scrolls to and focuses an offscreen error on every failed attempt', () => {
     jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: -300, bottom: -200 } as DOMRect);
