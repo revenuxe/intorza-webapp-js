@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { ArrowLeft, Search, Building2, CheckCircle2, MapPin, User, Hash } from "lucide-react";
 import intorzaLogo from "@/assets/intorza-logo.webp";
+import { trackMetaEvent } from '@/lib/meta-pixel';
 
 interface Company {
   id: string;
@@ -140,6 +141,9 @@ const TeamSignup = () => {
         setLoading(false);
         return;
       }
+
+      // Do not count Supabase's existing-email response as a new registration.
+      if (authData.user.identities?.length !== 0) trackMetaEvent('CompleteRegistration');
 
       if (!authData.session) {
         toast.success('Check your email to verify your account, then sign in to submit your join request.');

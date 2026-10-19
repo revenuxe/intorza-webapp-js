@@ -15,6 +15,7 @@ import { z } from "zod";
 import { OnboardingDialog } from "@/components/OnboardingDialog";
 import { GlobalLoader } from "@/components/GlobalLoader";
 import { AuthCaptcha, requireAuthCaptcha, type AuthCaptchaHandle } from '@/components/AuthCaptcha';
+import { trackMetaEvent } from '@/lib/meta-pixel';
 
 // Validation schemas
 const loginSchema = z.object({
@@ -388,10 +389,14 @@ const Auth = () => {
         return;
       }
 
+      if (!data.user) throw new Error("Account creation did not return a user.");
+      // Supabase can return a user with no identities for an already registered email.
+      if (data.user.identities?.length !== 0) trackMetaEvent("CompleteRegistration");
+
       toast.success("Account created! Please check your email to verify your account.");
       
       // If email confirmation is disabled, show onboarding
-      if (data.session && data.user) {
+      if (data.session) {
         const needsOnboarding = await checkOnboarding(data.user.id);
         if (!needsOnboarding) {
           const returnPath = getReturnPath();
