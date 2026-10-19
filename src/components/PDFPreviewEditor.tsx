@@ -472,6 +472,7 @@ export const PDFPreviewEditor = ({
   const updateSettings = (updates: Partial<PDFEditorSettings>) => {
     const normalizedUpdates = {
       ...updates,
+      ...(updates.theme ? { roomHeadingBackground: true } : {}),
       ...(updates.headingFont ? { headingFont: getSelectableFontId(updates.headingFont) } : {}),
       ...(updates.bodyFont ? { bodyFont: getSelectableFontId(updates.bodyFont) } : {}),
     };
