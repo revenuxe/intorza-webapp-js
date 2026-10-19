@@ -1,3 +1,4 @@
+import { getQuotationUnit, isAreaUnit, projectAreaSqft } from './quotationUnits';
 import { resolveCompanyAssetUrl } from '@/lib/company-assets';
 
 import jsPDF from 'jspdf';
@@ -58,6 +59,7 @@ export interface LineItem {
   side: string;
   productName: string;
   productDetails: string;
+  measurementUnit?: string;
   widthFt: number;
   heightFt: number;
   sftArea: number;
@@ -763,7 +765,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     yPosition += headingHeight + headingGap;
 
     // Calculate SFT
-    section.items.forEach(item => totalSFT += item.sftArea);
+    section.items.forEach(item => { totalSFT += projectAreaSqft(item); });
 
     // Table - different layouts based on settings
     if (settings.useSimpleItemLayout) {
@@ -779,7 +781,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const tableBody = section.items.map(item => [
         item.productName,
         item.productDetails || '-',
-        item.sftArea.toFixed(2),
+        `${item.sftArea.toFixed(2)} ${getQuotationUnit(item.measurementUnit)}`,
         fmtCurrencyLocal(item.ratePerSft),
         fmtCurrencyLocal(item.amount) 
       ]);
@@ -829,9 +831,6 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const showDetails = settings.showProductDetails;
       const hasAnyImages = settings.showItemImages && section.items.some(item => item.imageUrls && item.imageUrls.length > 0);
       
-      // Get localization for table headers
-      const areaShort = data.localization?.areaUnitShort || 'Sq.Ft';
-      const lengthShort = 'ft'; // TODO: Could be localized
       
       // Build dynamic header
       const headerCols: string[] = [];
@@ -840,10 +839,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       if (showDetails) headerCols.push('Details');
       if (hasAnyImages) headerCols.push('Img');
       if (showSizeColumns) {
-        headerCols.push(`W (${lengthShort})`, `H (${lengthShort})`, areaShort);
+        headerCols.push('Width', 'Height', 'Qty / unit');
       }
-      if (areaOnly) headerCols.push(areaShort);
-      headerCols.push(`Price/${areaShort}`, 'Amount');
+      if (areaOnly) headerCols.push('Qty / unit');
+      headerCols.push('Rate / unit', 'Amount');
       
       const tableHead = [headerCols];
       
@@ -861,13 +860,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       const tableBody = section.items.map(item => {
         const row: string[] = [];
         if (showSide) row.push(item.side || '-');
-        row.push(item.productName);
+        row.push(!showSizeColumns && !areaOnly ? `${item.productName}\n${item.sftArea.toFixed(2)} ${getQuotationUnit(item.measurementUnit)}` : item.productName);
         if (showDetails) row.push(item.productDetails || '-');
         if (hasAnyImages) row.push(''); // placeholder for image cell
         if (showSizeColumns) {
-          row.push(item.widthFt.toFixed(1), item.heightFt.toFixed(1), item.sftArea.toFixed(2));
+          row.push(isAreaUnit(item.measurementUnit) && item.widthFt ? `${item.widthFt.toFixed(2)} ${getQuotationUnit(item.measurementUnit) === 'Sq.m' ? 'm' : 'ft'}` : '-', isAreaUnit(item.measurementUnit) && item.heightFt ? `${item.heightFt.toFixed(2)} ${getQuotationUnit(item.measurementUnit) === 'Sq.m' ? 'm' : 'ft'}` : '-', `${item.sftArea.toFixed(2)} ${getQuotationUnit(item.measurementUnit)}`);
         }
-        if (areaOnly) row.push(item.sftArea.toFixed(2));
+        if (areaOnly) row.push(`${item.sftArea.toFixed(2)} ${getQuotationUnit(item.measurementUnit)}`);
         // Use professional currency formatting
         const fmtCurrencyLocal = createPDFCurrencyFormatter({
           currencyCode: data.localization?.currencyCode || 'INR',
@@ -1042,7 +1041,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
 
 
-    // Section Total - Right aligned with highlight (numeric-safe)
+    // Room Total - Right aligned with highlight (numeric-safe)
     const sectionTotal = section.items.reduce((sum, item) => sum + item.amount, 0);
 
     const fmtCurrencyLocal = createPDFCurrencyFormatter({
@@ -1161,7 +1160,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   });
 
   const summaryData: any[] = [
-    ['Total Project Area', `${totalSFT.toFixed(2)} ${loc.areaUnitShort}`],
+    ['Total Project Area', `${totalSFT.toFixed(2)} Sq.ft`],
   ];
 
   if (settings.showSubtotal) {

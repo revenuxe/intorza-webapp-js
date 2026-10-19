@@ -1,4 +1,6 @@
 "use client";
+import { getQuotationUnit } from '@/lib/quotationUnits';
+
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "@/lib/navigation";
@@ -196,6 +198,8 @@ const QuotationDetail = () => {
               productName: item.product_name,
               productDetails: item.product_details,
               side: item.side,
+              measurementUnit: getQuotationUnit(item.measurement_unit),
+
               widthFt: item.width_ft,
               heightFt: item.height_ft,
               sftArea: item.sft_area,

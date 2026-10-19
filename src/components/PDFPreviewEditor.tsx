@@ -1,3 +1,5 @@
+import { ItemMeasurements } from '@/components/quotation/ItemMeasurements';
+import { getQuotationUnit } from '@/lib/quotationUnits';
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, ListTree } from "lucide-react";
 import { generateQuotationPDF, type QuotationData } from "@/lib/pdfGenerator";
@@ -47,6 +49,7 @@ interface BrandColors {
 }
 
 interface PDFPreviewEditorProps {
+  onItemMeasurementChange?: (sectionIndex: number, itemIndex: number, field: 'measurementUnit' | 'widthFt' | 'heightFt' | 'sftArea' | 'ratePerSft', value: string | number) => void;
   open: boolean;
   onClose: () => void;
   onDownload: (settings: PDFEditorSettings, terms: TermsSection[]) => void;
@@ -70,6 +73,8 @@ interface PDFPreviewEditorProps {
         productName?: string;
         product_details?: string;
         productDetails?: string;
+        measurement_unit?: string;
+        measurementUnit?: string;
         width_ft?: number;
         widthFt?: number;
         height_ft?: number;
@@ -146,7 +151,8 @@ export const PDFPreviewEditor = ({
   onClose,
   onDownload,
   quotationData,
-  customizeSettings
+  customizeSettings,
+  onItemMeasurementChange
 }: PDFPreviewEditorProps) => {
   const [editorSettings, setEditorSettings] = useState<PDFEditorSettings>(getEditorSettings());
   const [termsReady, setTermsReady] = useState(false);
@@ -376,6 +382,8 @@ export const PDFPreviewEditor = ({
             side: item.side || '',
             productName: item.product_name || item.productName || '',
             productDetails: item.product_details || item.productDetails || '',
+            measurementUnit: getQuotationUnit(item.measurement_unit ?? item.measurementUnit),
+
             widthFt: item.width_ft || item.widthFt || 0,
             heightFt: item.height_ft || item.heightFt || 0,
             sftArea: item.sft_area || item.sftArea || 0,
@@ -595,6 +603,8 @@ export const PDFPreviewEditor = ({
 
         <div className="flex-1 min-h-0 overflow-auto px-4">
           <TabsContent value="content" className="mt-0">
+ {onItemMeasurementChange && <div className="mb-4 space-y-4">{quotationData.sections.map((section, sectionIndex) => <div key={sectionIndex} className="space-y-3"><h3 className="text-sm font-semibold">{section.title || section.section_name || 'Items'}</h3>{section.items.map((item, itemIndex) => <div key={itemIndex} className="space-y-3 rounded-lg border p-3"><p className="text-sm font-medium">{item.productName || item.product_name || 'Item ' + (itemIndex + 1)}</p><ItemMeasurements item={{measurementUnit: item.measurementUnit ?? item.measurement_unit, widthFt: item.widthFt ?? item.width_ft ?? 0, heightFt: item.heightFt ?? item.height_ft ?? 0, sftArea: item.sftArea ?? item.sft_area ?? 0}} onChange={(field, value) => onItemMeasurementChange(sectionIndex, itemIndex, field, value)} /><label className="block space-y-2 text-sm"><span>Rate / {getQuotationUnit(item.measurementUnit ?? item.measurement_unit)}</span><Input type="number" min="0" step="any" value={item.ratePerSft ?? item.rate_per_sft ?? ''} onChange={e => onItemMeasurementChange(sectionIndex, itemIndex, 'ratePerSft', Math.max(0, Number(e.target.value) || 0))} /></label></div>)}</div>)}</div>}
+
             <TermsBlockEditor
               value={termsConditions}
               templateName={termsTemplateName}

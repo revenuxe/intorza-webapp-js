@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { getMultiplier, roundPrice } from "@/lib/defaultTemplates";
 
 interface LineItem {
+  measurementUnit?: string;
   id: string;
   side: string;
   productName: string;
@@ -2958,7 +2959,7 @@ export const QuotationTemplates = ({ onSelectTemplate, currentSections, onSetQuo
       items: section.items.map(item => {
         // Apply country-specific pricing to the rate
         const adjustedRate = roundPrice(item.ratePerSft * multiplier, countryCode);
-        const newArea = item.widthFt * item.heightFt;
+        const newArea = item.sftArea || item.widthFt * item.heightFt;
         return {
           ...item,
           id: generateId(),

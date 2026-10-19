@@ -39,6 +39,7 @@ interface Section {
     id: string;
     product_name: string;
     product_details: string | null;
+    measurement_unit: string;
     width_ft: number | null;
     height_ft: number | null;
     sft_area: number | null;
@@ -115,7 +116,7 @@ export const QuotationsLibraryTab = () => {
     for (const section of sectionsData || []) {
       const { data: itemsData, error: itemsError } = await supabase
         .from('quotation_items')
-        .select('id, product_name, product_details, width_ft, height_ft, sft_area, rate_per_sft, amount')
+        .select('id, product_name, product_details, measurement_unit, width_ft, height_ft, sft_area, rate_per_sft, amount')
         .eq('section_id', section.id)
         .order('sort_order');
 
@@ -152,6 +153,7 @@ export const QuotationsLibraryTab = () => {
           side: "",
           productName: item.product_name,
           productDetails: item.product_details || "",
+          measurementUnit: item.measurement_unit,
           widthFt: item.width_ft || 0,
           heightFt: item.height_ft || 0,
           sftArea: item.sft_area || 0,

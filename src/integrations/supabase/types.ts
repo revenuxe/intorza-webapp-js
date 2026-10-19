@@ -726,6 +726,7 @@ export type Database = {
           sft_area: number | null
           side: string | null
           sort_order: number
+          measurement_unit: string
           width_ft: number | null
         }
         Insert: {
@@ -742,6 +743,7 @@ export type Database = {
           sft_area?: number | null
           side?: string | null
           sort_order?: number
+          measurement_unit?: string
           width_ft?: number | null
         }
         Update: {
@@ -758,6 +760,7 @@ export type Database = {
           sft_area?: number | null
           side?: string | null
           sort_order?: number
+          measurement_unit?: string
           width_ft?: number | null
         }
         Relationships: [

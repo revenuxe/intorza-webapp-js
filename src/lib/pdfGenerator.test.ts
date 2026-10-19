@@ -93,7 +93,7 @@ describe('quotation PDF editor settings', () => {
   it('prints area without width/height columns for an area-only quotation', async () => {
     const pdf = await generateQuotationPDF({ ...quotationData, settings: { ...getQuotationSettings(), showProjectDetails: true, areaOnly: true } });
     const output = pdf.internal.pages.flat().join("\n");
-    expect(output).toContain('Sq.Ft');
+    expect(output).toContain('Sq.ft');
     expect(output).not.toContain('W \\(ft\\)');
     expect(output).not.toContain('H \\(ft\\)');
   });
@@ -114,4 +114,28 @@ describe('quotation PDF editor settings', () => {
 
     expect(updatedPDF.output()).not.toBe(defaultPDF.output());
   });
+});
+
+// Verify actual document content across the supported item layouts.
+it.each([
+  { useSimpleItemLayout: true },
+  { showDetailedSizeColumns: true },
+  { areaOnly: true },
+  { showDetailedSizeColumns: false, areaOnly: false },
+])('exports mixed units without including counts in project area: %j', async layout => {
+  const base = quotationData.sections[0].items[0];
+  const pdf = await generateQuotationPDF({ ...quotationData,
+    settings: { ...getQuotationSettings(), ...layout },
+    sections: [{ title: 'Mixed units', items: [
+      { ...base, measurementUnit: 'Sq.m', sftArea: 2, widthFt: 1, heightFt: 2 },
+      { ...base, productName: 'Lights', measurementUnit: 'Nos', sftArea: 4, widthFt: 0, heightFt: 0 },
+      { ...base, productName: 'Installation', measurementUnit: 'L.S.', sftArea: 1, widthFt: 0, heightFt: 0 },
+    ] }],
+  });
+  const output = pdf.internal.pages.flat().join('\n');
+  const itemText = [...output.matchAll(/\(([^)]*)\) Tj/g)].map(match => match[1]).join(' ');
+  expect(itemText).toContain('2.00 Sq.m');
+  expect(itemText).toContain('4.00 Nos');
+  expect(itemText).toContain('1.00 L.S.');
+
 });
