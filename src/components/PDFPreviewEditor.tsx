@@ -241,7 +241,7 @@ export const PDFPreviewEditor = ({
     let active = true;
     const fallbackTimer = window.setTimeout(() => {
       if (!active) return;
-      setTermsError("Saved quotation terms are taking too long to load. Built-in terms are shown instead.");
+      setTermsError('Using default terms.');
       setTermsReady(true);
     }, 8000);
 
@@ -286,7 +286,7 @@ export const PDFPreviewEditor = ({
           setLibraryTerms(DEFAULT_QUOTATION_TERMS);
           setTermsTemplateName('Default quotation terms');
           setUsingFallbackTerms(true);
-          setTermsError('Saved quotation terms could not be loaded. Built-in terms are shown instead.');
+          setTermsError('Using default terms.');
           setTermsReady(true);
         }
       }
@@ -1415,18 +1415,18 @@ export const PDFPreviewEditor = ({
           className="px-4 pb-3 border-b shrink-0"
           style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               {showEditor && (
                 <Button variant="ghost" size="icon" className="md:hidden h-8 w-8" onClick={() => setShowEditor(false)}>
                   <ArrowLeft className="h-4 w-4" />
                 </Button>
               )}
-              <SheetTitle className="text-base md:text-xl">
+              <SheetTitle className="whitespace-nowrap text-base md:text-xl">
                 {showEditor ? 'Edit PDF Settings' : 'PDF Preview'}
               </SheetTitle>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {!showEditor ? (
                 <Button variant="outline" size="sm" onClick={() => setShowEditor(true)} className="md:hidden">
                   <Settings2 className="h-4 w-4 mr-1" />
@@ -1441,7 +1441,6 @@ export const PDFPreviewEditor = ({
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Reset
               </Button>
-              {termsError && <p role="alert" className="text-sm text-destructive">{termsError}</p>}
               <Button size="sm" onClick={handleDownload} disabled={!termsReady}>
                 <Download className="h-4 w-4 mr-1 md:mr-2" />
                 <span className="hidden sm:inline">Download PDF</span>
@@ -1452,6 +1451,22 @@ export const PDFPreviewEditor = ({
               </Button>
             </div>
           </div>
+          {termsError && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-left text-xs text-muted-foreground">
+              <p role="status">{termsError}</p>
+              <button
+                type="button"
+                className="inline-flex min-h-8 items-center rounded-sm px-1 font-medium text-primary underline underline-offset-4 hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => {
+                  setActiveTab('content');
+                  setShowEditor(true);
+                }}
+                aria-label="Review quotation terms"
+              >
+                Terms
+              </button>
+            </div>
+          )}
         </SheetHeader>
 
         {/* Mobile View */}
