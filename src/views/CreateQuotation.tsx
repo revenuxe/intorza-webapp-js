@@ -63,7 +63,7 @@ interface PaymentStage {
 const CreateQuotation = () => {
   const {
     toast, feedback, clearFeedback
-  } = useInlineFeedback();
+  } = useInlineFeedback({ autoRevealErrors: true });
   const [isSaving, setIsSaving] = useState(false);
   const [builderMode, setBuilderMode] = useState<BuilderMode | null>(null);
   const lastAIDraft = useRef<VoiceDraft | null>(null);
@@ -632,8 +632,8 @@ const CreateQuotation = () => {
       const draftProjectTitle = projectTitle.trim() || 'AI quotation draft';
       if (status !== 'draft' && (!clientName.trim() || !projectTitle.trim())) {
         toast({
-          title: "Missing information",
-          description: "Please fill in client name and project title",
+          title: "Complete the required details",
+          description: `Add ${[!clientName.trim() && 'client name', !projectTitle.trim() && 'project title'].filter(Boolean).join(' and ')} to save your quotation.`,
           variant: "destructive"
         });
         return null;
@@ -915,10 +915,10 @@ const CreateQuotation = () => {
   const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, overrideQuotationId?: string, overrideProfile?: typeof profile, editorTerms?: import("@/lib/libraryDefaults").TermsSection[]) => {
     setIsDownloading(true);
     try {
-      if (!clientName || !clientAddress) {
+      if (!clientName.trim() || !clientAddress.trim()) {
         toast({
-          title: "Missing information",
-          description: "Please fill in client name and address before downloading PDF",
+          title: "Complete the required details",
+          description: `Add ${[!clientName.trim() && 'client name', !clientAddress.trim() && 'client address'].filter(Boolean).join(' and ')} to download your PDF.`,
           variant: "destructive"
         });
         setIsDownloading(false);
