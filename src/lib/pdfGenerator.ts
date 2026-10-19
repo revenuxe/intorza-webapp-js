@@ -11,6 +11,7 @@ import { fitFixedColumnWidths } from './pdfTableLayout';
 import { formatWarrantyForPdf } from './warrantyFormatter';
 import {
   getPDFFontScale,
+  getPDFCardTextColor,
   getPDFLayoutMetrics,
   getPDFSummaryLayout,
   getPDFTableLineWidths,
@@ -717,30 +718,49 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   let totalSFT = 0;
 
   for (const section of data.sections) {
+    const filledRoomHeading = editorSettings?.roomHeadingBackground ?? false;
+    setHeadingFont('bold');
+    setPdfFontSize(8.5);
+    const headingPadding = compactMode ? 3 : 4;
+    const headingLines: string[] = doc.splitTextToSize(
+      section.title.toUpperCase(),
+      contentWidth - (filledRoomHeading ? headingPadding * 2 : 0),
+    );
+    const headingLineHeight = doc.getFontSize() / doc.internal.scaleFactor * doc.getLineHeightFactor();
+    const headingHeight = filledRoomHeading
+      ? headingPadding * 2 + headingLines.length * headingLineHeight
+      : 7 + Math.max(0, headingLines.length - 1) * headingLineHeight;
+    const headingGap = compactMode ? 2 : 5;
     // Check page break
-    if (yPosition > pageBottomY - 35) {
+    if (yPosition > pageBottomY - Math.max(35, headingHeight + headingGap + 22)) {
       doc.addPage();
       yPosition = pageTopY;
     }
 
-    // Section Header "Card"
-    // Clean underline style with bold text
-    setHeadingFont('bold');
-    setPdfFontSize(8.5);
-    doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-    doc.text(section.title.toUpperCase(), margin, yPosition + 4);
-    
-    // Draw a thick accent line below title
-    doc.setDrawColor(COLORS.ACCENT[0], COLORS.ACCENT[1], COLORS.ACCENT[2]);
-    doc.setLineWidth(0.7);
-    doc.line(margin, yPosition + 7, margin + 20, yPosition + 7); // Short accent line
-    
-    // Draw a thin full-width line
-    doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
-    doc.setLineWidth(0.2);
-    doc.line(margin, yPosition + 7, pageWidth - margin, yPosition + 7);
+    if (filledRoomHeading) {
+      const background = editorSettings?.customColors?.accent
+        ? hexToRgb(editorSettings.customColors.accent)
+        : theme.colors.accent;
+      doc.setFillColor(...background);
+      doc.roundedRect(margin, yPosition, contentWidth, headingHeight, 1.5, 1.5, 'F');
+      doc.setTextColor(...getPDFCardTextColor(background));
+      doc.text(headingLines, margin + headingPadding, yPosition + headingPadding + doc.getFontSize() / doc.internal.scaleFactor);
+    } else {
+      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+      doc.text(headingLines, margin, yPosition + 4);
 
-    yPosition += compactMode ? 9 : 12;
+      // Draw a thick accent line below title
+      doc.setDrawColor(COLORS.ACCENT[0], COLORS.ACCENT[1], COLORS.ACCENT[2]);
+      doc.setLineWidth(0.7);
+      doc.line(margin, yPosition + headingHeight, margin + 20, yPosition + headingHeight); // Short accent line
+
+      // Draw a thin full-width line
+      doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
+      doc.setLineWidth(0.2);
+      doc.line(margin, yPosition + headingHeight, pageWidth - margin, yPosition + headingHeight);
+    }
+
+    yPosition += headingHeight + headingGap;
 
     // Calculate SFT
     section.items.forEach(item => totalSFT += item.sftArea);

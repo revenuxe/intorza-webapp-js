@@ -981,6 +981,7 @@ export interface PDFEditorSettings {
   logoPlacement: 'left' | 'center' | 'right';
   highlightAmounts: boolean;
   boldAmounts: boolean;
+  roomHeadingBackground?: boolean;
   showBorders: boolean;
   compactMode: boolean;
   fontSize: 'small' | 'medium' | 'large';
@@ -1085,6 +1086,7 @@ export const defaultEditorSettings: PDFEditorSettings = {
   logoPlacement: 'left',
   highlightAmounts: true,
   boldAmounts: false,
+  roomHeadingBackground: false,
   showBorders: true,
   compactMode: false,
   fontSize: 'medium',

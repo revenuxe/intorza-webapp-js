@@ -1,4 +1,5 @@
 import {
+  getPDFCardTextColor,
   getPDFFontScale,
   getPDFLayoutMetrics,
   getPDFSummaryLayout,
@@ -7,6 +8,15 @@ import {
 } from './pdfEditorStyles';
 
 describe('PDF editor style settings', () => {
+  it.each([
+    [[0, 0, 0], [255, 255, 255]],
+    [[255, 255, 255], [0, 0, 0]],
+    [[255, 255, 0], [0, 0, 0]],
+    [[20, 60, 100], [255, 255, 255]],
+    [[255, 0, 0], [0, 0, 0]],
+  ])('keeps room card text readable on %j', (background, expected) => {
+    expect(getPDFCardTextColor(background as [number, number, number])).toEqual(expected);
+  });
   it('applies the selected page margins while preserving decoration clearance', () => {
     expect(getPDFLayoutMetrics(210, 297, { pageMargins: 'narrow' }).margin).toBe(10);
     expect(getPDFLayoutMetrics(210, 297, { pageMargins: 'wide' }).margin).toBe(22);

@@ -50,6 +50,46 @@ const quotationData: QuotationData = {
 };
 
 describe('quotation PDF editor settings', () => {
+  it.each([false, true])('fills every room heading with the custom accent (simple layout: %s)', async (useSimpleItemLayout) => {
+    const pdf = await generateQuotationPDF({
+      ...quotationData,
+      settings: { ...getQuotationSettings(), useSimpleItemLayout },
+      sections: [quotationData.sections[0], { ...quotationData.sections[0], title: 'Second room' }],
+      editorSettings: {
+        ...quotationData.editorSettings!,
+        roomHeadingBackground: true,
+        customColors: { accent: '#123456' },
+      },
+    });
+    const pages = pdf.internal.pages.flat().join('\n');
+    expect(pages.match(/0\.07 0\.2 0\.34 rg/g)).toHaveLength(2);
+    for (const title of ['TEST SECTION', 'SECOND ROOM']) {
+      const titlePosition = pages.indexOf(`(${title})`);
+      expect(titlePosition).toBeGreaterThan(0);
+      const fillPosition = pages.lastIndexOf('0.07 0.2 0.34 rg', titlePosition);
+      const precedingCommands = pages.slice(fillPosition, titlePosition);
+      // Both headings receive the same custom fill, a filled card, and white text.
+      expect(precedingCommands).toMatch(/0\.07 0\.2 0\.34 rg[\s\S]*\nf\nBT\n[\s\S]*1\. g/);
+    }
+  });
+
+  it('wraps long room headings within the card and keeps the table below it', async () => {
+    const pdf = await generateQuotationPDF({
+      ...quotationData,
+      sections: [{ ...quotationData.sections[0], title: 'Premium dining and display room '.repeat(8) }],
+      editorSettings: {
+        ...quotationData.editorSettings!,
+        roomHeadingBackground: true,
+        fontSize: 'large',
+        pageMargins: 'wide',
+        compactMode: true,
+      },
+    });
+    const pages = pdf.internal.pages.flat().join('\n');
+    expect(pages).toContain('PREMIUM DINING');
+    expect(pages).toContain('T*');
+    expect(pages.indexOf('(Product)')).toBeGreaterThan(pages.indexOf('PREMIUM DINING'));
+  });
   it('prints area without width/height columns for an area-only quotation', async () => {
     const pdf = await generateQuotationPDF({ ...quotationData, settings: { ...getQuotationSettings(), showProjectDetails: true, areaOnly: true } });
     const output = pdf.internal.pages.flat().join("\n");

@@ -1,5 +1,17 @@
 import type { PDFEditorSettings } from './pdfThemes';
 
+// Choose the higher-contrast black/white text using linearized sRGB luminance.
+export function getPDFCardTextColor(background: [number, number, number]): [number, number, number] {
+  const linear = background.map((channel) => {
+    const value = channel / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+  return (luminance + 0.05) / 0.05 >= 1.05 / (luminance + 0.05)
+    ? [0, 0, 0]
+    : [255, 255, 255];
+}
+
 const PAGE_MARGIN_PRESETS: Record<PDFEditorSettings['pageMargins'], number> = {
   narrow: 10,
   normal: 15,

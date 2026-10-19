@@ -994,6 +994,20 @@ export const PDFPreviewEditor = ({
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Visual Options</Label>
               <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <Label htmlFor="room-heading-background" className="text-sm">Room Heading Background</Label>
+                    <p id="room-heading-background-description" className="text-xs text-muted-foreground">
+                      Fill every room heading with the theme accent color as a full-width card
+                    </p>
+                  </div>
+                  <Switch
+                    id="room-heading-background"
+                    aria-describedby="room-heading-background-description"
+                    checked={editorSettings.roomHeadingBackground ?? false}
+                    onCheckedChange={(v) => updateSettings({ roomHeadingBackground: v })}
+                  />
+                </div>
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-sm">Highlight Amounts</Label>
