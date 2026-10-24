@@ -13,6 +13,15 @@ test('product-first item cards keep optional specifications, pricing and respons
   await page.locator('#projectTitle').fill('Product specifications check');
   const card = page.getByRole('article', { name: /^Item 1:/ });
   await card.getByLabel('Product Name', { exact: true }).fill('Wardrobe');
+  const description = card.getByLabel('Product Details', { exact: true });
+  const nameBox = await card.getByLabel('Product Name', { exact: true }).boundingBox();
+  const emptyBox = await description.boundingBox();
+  expect(Math.abs(emptyBox!.height - nameBox!.height)).toBeLessThanOrEqual(2);
+  await description.fill('Long description line\n'.repeat(8));
+  await expect.poll(async () => (await description.boundingBox())!.height).toBeGreaterThan(emptyBox!.height);
+  await description.fill('');
+  await expect.poll(async () => (await description.boundingBox())!.height).toBe(emptyBox!.height);
+
   await card.getByLabel('Product Details', { exact: true }).fill('4-door wardrobe with loft');
   await expect(card.getByLabel('Material', { exact: true })).toHaveCount(0);
   await card.getByRole('button', { name: 'Add specifications', exact: true }).click();

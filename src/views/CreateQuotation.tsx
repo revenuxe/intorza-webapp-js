@@ -8,7 +8,7 @@ import { getCountryByCode } from "@/lib/countryConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -1339,10 +1339,10 @@ const CreateQuotation = () => {
                   </div>
                   {customizeSettings.showProductDetails && <div className="min-w-0 space-y-2">
                     <Label htmlFor={`product-details-${item.id}`}>Product Details</Label>
-                    <Textarea id={`product-details-${item.id}`} value={details.description}
+                    <AutoGrowTextarea id={`product-details-${item.id}`} value={details.description}
                       maxLength={Math.max(details.description.length, 1000 - (item.productDetails.length - details.description.length))}
                       onChange={event => updateItem(section.id, item.id, 'productDetails', combineItemDetails(event.target.value, details.specifications))}
-                      placeholder="e.g. 4-door wardrobe with loft" rows={2} />
+                      placeholder="e.g. 4-door wardrobe with loft" />
                   </div>}
                   </div>
                   <ItemSpecifications value={item.productDetails} onChange={value => updateItem(section.id, item.id, 'productDetails', value)} />
