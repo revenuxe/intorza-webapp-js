@@ -57,6 +57,10 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const [brief, setBrief] = useState<ProjectBrief>({ scope: 'complete', roomNames: [], finish: 'Standard', budget: null, clientName: '', location: '', address: '' });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const [walletChecking, setWalletChecking] = useState(true);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const topUpShown = useRef(false);
+  const walletRead = useRef(0);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [autoSaved, setAutoSaved] = useState(false);
   const [workRoomIndex, setWorkRoomIndex] = useState(0);
@@ -88,20 +92,31 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     }) };
   };
   const refreshWalletBalance = async (): Promise<number | null> => {
+    const read = ++walletRead.current;
+    setWalletChecking(true);
     try {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) { setWalletBalance(null); return null; }
+      if (authError || !user) { if (read === walletRead.current) setWalletBalance(null); return null; }
       const { data, error: walletError } = await supabase.from('coin_wallets').select('balance').eq('user_id', user.id).maybeSingle();
-      if (walletError || !data || !Number.isInteger(data.balance)) { setWalletBalance(null); return null; }
-      setWalletBalance(data.balance);
+      if (walletError || !data || !Number.isInteger(data.balance)) { if (read === walletRead.current) setWalletBalance(null); return null; }
+      if (read === walletRead.current) setWalletBalance(data.balance);
       return data.balance;
-    } catch { setWalletBalance(null); return null; }
+    } catch { if (read === walletRead.current) setWalletBalance(null); return null; }
+    finally { if (read === walletRead.current) setWalletChecking(false); }
   };
   const requireCoins = async (cost: number) => {
     const balance = await refreshWalletBalance();
     if (balance === null) throw new Error('Could not check your coin balance. Please retry before starting AI.');
-    if (balance < cost) throw new Error(`Insufficient coins. You need ${cost} coins; your balance is ${balance}. Top up ${cost - balance} coins to continue.`);
+    if (balance < cost) { setTopUpOpen(true); throw new Error(`Insufficient coins. You need ${cost} coins; your balance is ${balance}. Top up ${cost - balance} coins to continue.`); }
   };
+  const requiredCoins = mode === 'upload' && step === 'upload' ? AI_COIN_COSTS.floor_plan : mode === 'details' && !projectId ? AI_COIN_COSTS.ai_builder : 0;
+  const coinsReady = requiredCoins === 0 || (!walletChecking && walletBalance !== null && walletBalance >= requiredCoins);
+  useEffect(() => { topUpShown.current = false; setTopUpOpen(false); }, [mode]);
+  useEffect(() => {
+    if (!mode || walletChecking || walletBalance === null || !requiredCoins) return;
+    if (walletBalance >= requiredCoins) { setTopUpOpen(false); setError(current => /insufficient coins/i.test(current) ? '' : current); return; }
+    if (!topUpShown.current) { topUpShown.current = true; setTopUpOpen(true); }
+  }, [mode, walletChecking, walletBalance, requiredCoins]);
   useEffect(() => {
     if (!mode) return;
     const frame = requestAnimationFrame(() => {
@@ -126,7 +141,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     const update = () => void refreshWalletBalance();
     window.addEventListener('intorza:wallet-changed', update);
     return () => window.removeEventListener('intorza:wallet-changed', update);
-  }, []);
+  }, [mode]);
   useEffect(() => { if (mode === 'details') setStep(current => current === 'upload' ? 'analysis' : current); }, [mode]);
   useEffect(() => { if (proLoading || !isPro) setChooserOpen(false); }, [proLoading, isPro]);
   const start = (next: BuilderMode) => {
@@ -140,6 +155,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     setStep(next === 'upload' ? 'upload' : 'analysis'); onStart(next);
   };
   function selectFiles(incoming: File[]) {
+    if (!coinsReady) return;
     const next = [...files, ...incoming];
     if (next.length > MAX_PLAN_FILES || next.reduce((sum, file) => sum + file.size, 0) > MAX_PLAN_BYTES) { setError('Choose up to 3 files, no more than 10 MB in total.'); return; }
     if (next.some(file => !/\.(pdf|jpe?g|png|webp)$/i.test(file.name))) { setError('Choose PDF, JPG, PNG or WEBP files.'); return; }
@@ -151,7 +167,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     return data.session.access_token;
   }
   async function analyse() {
-    if (pending.current || !files.length) return;
+    if (pending.current || !files.length || !coinsReady) return;
     pending.current = true; setBusy('Checking coin balance'); setError(''); setProgress(0);
     let cancelled = false;
     abort.current = () => { cancelled = true; };
@@ -173,11 +189,11 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         xhr.send(form);
       });
       setAnalysis(result.analysis); setProjectId(result.projectId); setBrief(value => ({ ...value, roomNames: result.analysis.rooms.map(room => room.name) })); setStep('scope'); void refreshWalletBalance();
-    } catch (failure) { const message = failure instanceof Error ? failure.message : 'Could not analyse the plan.'; setError(message); if (/no coins left|insufficient coins|COINS_REQUIRED/i.test(message)) window.dispatchEvent(new Event('intorza:open-wallet')); }
+    } catch (failure) { const message = failure instanceof Error ? failure.message : 'Could not analyse the plan.'; setError(message); if (/no coins left|insufficient coins|COINS_REQUIRED/i.test(message)) { setTopUpOpen(true); void refreshWalletBalance(); } }
     finally { pending.current = false; setBusy(''); abort.current = null; }
   }
   async function generate(selected?: string[], retryPricing = false) {
-    if (pending.current) return;
+    if (pending.current || !coinsReady) return;
     pending.current = true; setBusy(retryPricing ? 'Completing prices and work measurements with AI' : 'Preparing your editable estimate'); setError('');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 360000);
@@ -204,7 +220,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         onApply(body.estimate.draft, base.current, body.projectId, true, body.estimate.evidence);
         setAutoSaved(true);
       }
-    } catch (failure) { const message = failure instanceof Error ? failure.message : 'Could not generate an estimate.'; setError(message); if (/no coins left|insufficient coins|COINS_REQUIRED/i.test(message)) window.dispatchEvent(new Event('intorza:open-wallet')); }
+    } catch (failure) { const message = failure instanceof Error ? failure.message : 'Could not generate an estimate.'; setError(message); if (/no coins left|insufficient coins|COINS_REQUIRED/i.test(message)) { setTopUpOpen(true); void refreshWalletBalance(); } }
     finally { clearTimeout(timeout); pending.current = false; setBusy(''); abort.current = null; }
   }
   async function complete(change: { itemId: string; widthFt: number | null; heightFt: number | null; areaSqft?: number | null; ratePerSft: number | null }) {
@@ -290,10 +306,10 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         {busy && <div ref={busyBanner} tabIndex={-1} role="status" aria-live="polite" className="shrink-0 space-y-2 border-b bg-primary/5 px-5 py-3 outline-none sm:px-6"><div className="flex items-center gap-2 text-sm font-medium"><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{busy}</div>{step === 'upload' && <progress aria-label="Upload progress" value={progress} max={100} className="h-1.5 w-full accent-primary" />}</div>}
         <div ref={scrollPanel} role="region" aria-label="Quotation step content" aria-busy={!!busy} inert={!!busy} className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5 [overflow-wrap:anywhere] sm:px-6">
           {step === 'upload' && <>
-            <div className={`rounded-2xl border border-dashed px-4 py-6 text-center sm:py-8 ${dragging ? 'border-primary bg-primary/5' : 'border-primary/25 bg-primary/[0.025]'}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); if (!busy) selectFiles(Array.from(event.dataTransfer.files)); }}>
+            <div className={`rounded-2xl border border-dashed px-4 py-6 text-center sm:py-8 ${dragging ? 'border-primary bg-primary/5' : 'border-primary/25 bg-primary/[0.025]'}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); if (!busy && coinsReady) selectFiles(Array.from(event.dataTransfer.files)); }}>
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border bg-background shadow-sm"><UploadCloud className="h-6 w-6 text-primary" strokeWidth={1.5} /></div><p className="text-base font-semibold">Choose your floor plan</p><p className="mb-5 mt-1 text-xs text-muted-foreground">Drag it here, or select a file below.</p>
-              <input ref={picker} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="sr-only" aria-label="Floor plan files" onChange={event => { selectFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} disabled={!!busy} />
-              <Button type="button" variant="outline" className="gap-2 rounded-lg bg-background" onClick={() => picker.current?.click()} disabled={!!busy}><Plus className="h-4 w-4" />Browse files</Button>
+              <input ref={picker} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" className="sr-only" aria-label="Floor plan files" onChange={event => { selectFiles(Array.from(event.target.files ?? [])); event.target.value = ''; }} disabled={!!busy || !coinsReady} />
+              <Button type="button" variant="outline" className="gap-2 rounded-lg bg-background" onClick={() => picker.current?.click()} disabled={!!busy || !coinsReady}><Plus className="h-4 w-4" />Browse files</Button>
               <p className="mt-4 text-[11px] leading-5 text-muted-foreground">PDF, JPG, PNG or WEBP<br />Up to 3 files · 10 MB total</p>
             </div>
             {files.map((file, index) => <div key={`${file.name}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl border p-3"><FilePreview file={file} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{file.name}</p><p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB · {file.name.split('.').pop()?.toUpperCase()}</p></div><Button type="button" size="icon" variant="ghost" aria-label={`Remove ${file.name}`} disabled={!!busy} onClick={() => setFiles(current => current.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button></div>)}
@@ -341,17 +357,26 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 border-t bg-background px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
           {error && <div ref={errorBanner} tabIndex={-1} role="alert" className="w-full rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-950 outline-none"><p className="font-semibold">{error}</p>{/insufficient coins/i.test(error) && <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => window.dispatchEvent(new Event('intorza:open-wallet'))}>Top up coins</Button>}{error === AI_SERVICE_ISSUE && <><p className="mt-1 text-amber-900/80">Your coins will not be charged for this request.</p><p className="mt-2 text-xs text-amber-900/70">Feel free to go back and try again later.</p></>}</div>}
-          {!busy && walletBalance !== null && ((step === 'upload' && walletBalance < AI_COIN_COSTS.floor_plan) || (!projectId && (step === 'scope' || step === 'review') && walletBalance < AI_COIN_COSTS.ai_builder)) && !error && <div role="status" className="w-full rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">You have {walletBalance} coins. {step === 'upload' ? AI_COIN_COSTS.floor_plan : AI_COIN_COSTS.ai_builder} coins are required. <button type="button" className="font-semibold underline" onClick={() => window.dispatchEvent(new Event('intorza:open-wallet'))}>Top up coins</button></div>}
+          {!busy && requiredCoins > 0 && !coinsReady && <div role="status" className="flex w-full items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><span>{walletChecking ? 'Checking your coin balance...' : walletBalance === null ? 'Could not verify your coin balance.' : `You have ${walletBalance} coins. ${requiredCoins} coins are required.`}</span><Button type="button" variant="outline" size="sm" disabled={walletChecking} onClick={() => walletBalance === null ? void refreshWalletBalance() : setTopUpOpen(true)}>{walletBalance === null ? 'Retry balance check' : 'View top-up'}</Button></div>}
           {busy ? <Button variant="outline" type="button" onClick={() => abort.current?.()}>Cancel request</Button> : <>
             <Button variant="outline" type="button" onClick={step === 'upload' || step === 'analysis' && mode === 'details' ? onClose : back}><ArrowLeft className="mr-1 h-4 w-4" />{step === 'upload' || step === 'analysis' && mode === 'details' ? 'Cancel' : 'Back'}</Button>
-            {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'scope' ? <Button type="button" className="min-w-0 flex-1" disabled={!scopedRooms(analysis, brief).length || !brief.measurementInputUnit} onClick={() => void generate()}>Generate Quotation<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'review' ? <Button type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>
+            {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length || !coinsReady} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'scope' ? <Button type="button" className="min-w-0 flex-1" disabled={!coinsReady || !scopedRooms(analysis, brief).length || !brief.measurementInputUnit} onClick={() => void generate()}>Generate Quotation<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'review' ? <Button disabled={!coinsReady} type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>
             {autoSaved ? <Button type="button" className="min-w-0 flex-1" onClick={onClose}>Open quotation</Button> : <>
               <Button type="button" variant="outline" className="min-w-0 flex-1" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, false, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not apply the estimate.'); } }}>Edit Quotation</Button>
               <Button type="button" className="w-full sm:w-auto" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, true, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not save the estimate.'); } }}>Save as Draft</Button>
             </>}
-            </> : <Button type="button" className="min-w-0 flex-1" onClick={next}>Continue<ArrowRight className="ml-1 h-4 w-4" /></Button>}
+            </> : <Button type="button" className="min-w-0 flex-1" disabled={!coinsReady} onClick={next}>Continue<ArrowRight className="ml-1 h-4 w-4" /></Button>}
           </>}
         </div>
+      </DialogContent>
+    </Dialog>
+    <Dialog open={topUpOpen && mode !== null && isPro && !walletChecking && walletBalance !== null && requiredCoins > 0} onOpenChange={setTopUpOpen}>
+      <DialogContent className="max-w-sm rounded-2xl">
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><GoldCoin />Top up to use AI</DialogTitle><DialogDescription>{requiredCoins === AI_COIN_COSTS.floor_plan ? 'Floor plan analysis' : 'AI quotation generation'} needs {requiredCoins} coins. Add coins to unlock this feature.</DialogDescription></DialogHeader>
+        <dl className="space-y-3 rounded-xl bg-muted/50 p-4 text-sm"><div className="flex justify-between"><dt>Your balance</dt><dd className="font-semibold">{walletBalance ?? '-'} coins</dd></div><div className="flex justify-between"><dt>Required</dt><dd className="font-semibold">{requiredCoins} coins</dd></div><div className="flex justify-between border-t pt-3"><dt>Coins to add</dt><dd className="font-semibold text-primary">{Math.max(0, requiredCoins - (walletBalance ?? 0))} coins</dd></div></dl>
+        <p className="text-xs text-muted-foreground">Your progress is kept. AI actions unlock after your updated balance is verified.</p>
+        <Button type="button" className="w-full" onClick={() => { setTopUpOpen(false); window.dispatchEvent(new Event('intorza:open-wallet')); }}>Top up coins</Button>
+        <Button type="button" variant="ghost" onClick={() => setTopUpOpen(false)}>Maybe later</Button>
       </DialogContent>
     </Dialog>
   </>;

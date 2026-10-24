@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { FloorPlanQuotationBuilder } from './FloorPlanQuotationBuilder';
 import { draftFixture } from '@/test/floor-plan-fixtures';
 
@@ -13,37 +13,81 @@ jest.mock('@/integrations/supabase/client', () => ({ supabase: {
 const props = { onStart: jest.fn(), onClose: jest.fn(), getCurrentDraft: draftFixture, onApply: jest.fn(), clients: [] };
 beforeEach(() => { jest.clearAllMocks(); mockBalance = 5; mockWalletFailure = false; global.fetch = jest.fn(); });
 
-it('rechecks the balance before uploading and preserves selected files on rejection', async () => {
-  mockBalance = 60;
+
+it.each([0, 5, 39])('shows the floor-plan shortfall and disables upload with %i coins', async balance => {
+  mockBalance = balance;
   render(<FloorPlanQuotationBuilder {...props} mode="upload" />);
-  await waitFor(() => expect(mockReadWallet).toHaveBeenCalled());
-  const file = new File(['%PDF-1.7'], 'plan.pdf', { type: 'application/pdf' });
-  fireEvent.change(screen.getByLabelText('Floor plan files'), { target: { files: [file] } });
-  mockBalance = 5;
-  const send = jest.spyOn(XMLHttpRequest.prototype, 'send');
-  fireEvent.click(screen.getByRole('button', { name: 'Analyse Floor Plan' }));
-  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('You need 40 coins; your balance is 5. Top up 35 coins'));
-  expect(send).not.toHaveBeenCalled();
-  expect(screen.getByText('plan.pdf')).toBeVisible();
-  expect(screen.getByRole('button', { name: 'Top up coins' })).toBeVisible();
-  send.mockRestore();
+  const popup = await screen.findByRole('dialog', { name: 'Top up to use AI' });
+  expect(popup).toHaveTextContent('Your balance'+balance+' coins');
+  expect(popup).toHaveTextContent('Required40 coins');
+  expect(popup).toHaveTextContent('Coins to add'+(40-balance)+' coins');
+  fireEvent.click(screen.getByRole('button', { name: 'Maybe later' }));
+  expect(screen.getByRole('button', { name: 'Browse files' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Analyse Floor Plan' })).toBeDisabled();
+  expect(screen.getByLabelText('Floor plan files')).toBeDisabled();
 });
-it('blocks quotation generation before sending an AI request with only 5 coins', async () => {
+it.each([0, 5, 19])('blocks the quotation flow and explains the shortfall with %i coins', async balance => {
+  mockBalance = balance;
   render(<FloorPlanQuotationBuilder {...props} mode="details" />);
-  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
-  fireEvent.click(screen.getByRole('radio', { name: /Sqft/ }));
-  fireEvent.click(screen.getByRole('button', { name: 'Generate Quotation' }));
-  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('You need 20 coins; your balance is 5. Top up 15 coins'));
+  const popup = await screen.findByRole('dialog', { name: 'Top up to use AI' });
+  expect(popup).toHaveTextContent('Required20 coins');
+  expect(popup).toHaveTextContent('Coins to add'+(20-balance)+' coins');
+  fireEvent.click(screen.getByRole('button', { name: 'Maybe later' }));
+  expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
   expect(global.fetch).not.toHaveBeenCalled();
-  expect(props.onApply).not.toHaveBeenCalled();
 });
-it('does not upload when the wallet check fails', async () => {
+it('opens the wallet and unlocks upload only after a top-up is verified', async () => {
+  const openWallet = jest.fn();
+  window.addEventListener('intorza:open-wallet', openWallet);
+  render(<FloorPlanQuotationBuilder {...props} mode="upload" />);
+  await screen.findByRole('dialog', { name: 'Top up to use AI' });
+  fireEvent.click(screen.getByRole('button', { name: 'Top up coins' }));
+  expect(openWallet).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button', { name: 'Browse files' })).toBeDisabled();
+  mockBalance = 40;
+  act(() => { window.dispatchEvent(new Event('intorza:wallet-changed')); });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Browse files' })).toBeEnabled());
+  fireEvent.change(screen.getByLabelText('Floor plan files'), { target: { files: [new File(['pdf'], 'plan.pdf', { type: 'application/pdf' })] } });
+  expect(screen.getByRole('button', { name: 'Analyse Floor Plan' })).toBeEnabled();
+  window.removeEventListener('intorza:open-wallet', openWallet);
+});
+it('keeps actions disabled while the initial wallet read is pending', async () => {
+  let finish!: (value: { data: { balance: number }; error: null }) => void;
+  mockReadWallet.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  render(<FloorPlanQuotationBuilder {...props} mode="upload" />);
+  expect(screen.getByRole('button', { name: 'Browse files' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Analyse Floor Plan' })).toBeDisabled();
+  await waitFor(() => expect(finish).toEqual(expect.any(Function)));
+  await act(async () => { finish({ data: { balance: 40 }, error: null }); });
+  expect(screen.getByRole('button', { name: 'Browse files' })).toBeEnabled();
+});
+it('keeps actions disabled when balance verification fails and supports retry', async () => {
   mockWalletFailure = true;
   render(<FloorPlanQuotationBuilder {...props} mode="upload" />);
+  await screen.findByText('Could not verify your coin balance.');
+  expect(screen.getByRole('button', { name: 'Browse files' })).toBeDisabled();
+  mockWalletFailure = false; mockBalance = 40;
+  fireEvent.click(screen.getByRole('button', { name: 'Retry balance check' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Browse files' })).toBeEnabled());
+});
+
+it('preserves selected files and stays locked after a partial top-up', async () => {
+  mockBalance = 40;
+  render(<FloorPlanQuotationBuilder {...props} mode="upload" />);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Browse files' })).toBeEnabled());
   fireEvent.change(screen.getByLabelText('Floor plan files'), { target: { files: [new File(['pdf'], 'plan.pdf', { type: 'application/pdf' })] } });
-  const send = jest.spyOn(XMLHttpRequest.prototype, 'send');
-  fireEvent.click(screen.getByRole('button', { name: 'Analyse Floor Plan' }));
-  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not check your coin balance'));
-  expect(send).not.toHaveBeenCalled();
-  send.mockRestore();
+  mockBalance = 30;
+  act(() => { window.dispatchEvent(new Event('intorza:wallet-changed')); });
+  expect(await screen.findByRole('dialog', { name: 'Top up to use AI' })).toHaveTextContent('Coins to add10 coins');
+  fireEvent.click(screen.getByRole('button', { name: 'Maybe later' }));
+  expect(screen.getByText('plan.pdf')).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Analyse Floor Plan' })).toBeDisabled();
+});
+it('unlocks the quotation flow with exactly 20 coins after verification', async () => {
+  render(<FloorPlanQuotationBuilder {...props} mode="details" />);
+  await screen.findByRole('dialog', { name: 'Top up to use AI' });
+  fireEvent.click(screen.getByRole('button', { name: 'Maybe later' }));
+  mockBalance = 20;
+  act(() => { window.dispatchEvent(new Event('intorza:wallet-changed')); });
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled());
 });
