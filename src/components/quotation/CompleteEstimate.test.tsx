@@ -8,7 +8,7 @@ it('lets a user complete a pending item without regenerating or treating a budge
   const onComplete = jest.fn(); const onRetry = jest.fn();
   render(<CompleteEstimate estimate={estimate} disabled={false} onComplete={onComplete} onRetry={onRetry} />);
   fireEvent.click(screen.getByText('Enter a known correction manually (optional)'));
-  fireEvent.change(screen.getByLabelText('Work area (sqft)'), { target: { value: '56' } });
+  fireEvent.change(screen.getByLabelText('Area (sq ft)'), { target: { value: '56' } });
   fireEvent.click(screen.getByRole('button', { name: 'Apply details' }));
   expect(onComplete).toHaveBeenCalledWith({ itemId: estimate.draft.sections[0].items[0].id, widthFt: null, heightFt: null, areaSqft: 56, ratePerSft: null });
   fireEvent.click(screen.getByRole('button', { name: 'Estimate remaining items with AI' }));
@@ -21,9 +21,64 @@ it('preserves selected feet measurements without changing the per-sqft price', (
   const onComplete = jest.fn();
   render(<CompleteEstimate estimate={estimate} disabled={false} onComplete={onComplete} onRetry={jest.fn()} inputUnit="feet" />);
   fireEvent.click(screen.getByText('Enter a known correction manually (optional)'));
-  fireEvent.change(screen.getByLabelText('Work width / length (feet)'), { target: { value: '8' } });
-  fireEvent.change(screen.getByLabelText('Work height / depth (feet)'), { target: { value: '7' } });
+  fireEvent.change(screen.getByLabelText('Width (ft)'), { target: { value: '8' } });
+  fireEvent.change(screen.getByLabelText('Height (ft)'), { target: { value: '7' } });
   fireEvent.change(screen.getByLabelText('Known selling rate per sqft (optional)'), { target: { value: '1200' } });
   fireEvent.click(screen.getByRole('button', { name: 'Apply details' }));
   expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ areaSqft: null, widthFt: 8, heightFt: 7, ratePerSft: 1200 }));
+});
+
+it.each(['sqft', 'feet', 'sqm', 'metres'] as const)('shows dimensions and calculated area for %s', unit => {
+  const proposal = proposalFixture(); proposal.sections[0].items[0].measurementStatus = 'unknown';
+  const estimate = buildEstimate(proposal, planFixture(), briefFixture(), [], draftFixture());
+  const onComplete = jest.fn();
+  render(<CompleteEstimate estimate={estimate} disabled={false} onComplete={onComplete} onRetry={jest.fn()} inputUnit={unit} />);
+  fireEvent.click(screen.getByText('Enter a known correction manually (optional)'));
+  const metric = unit === 'sqm' || unit === 'metres';
+  fireEvent.change(screen.getByLabelText(metric ? 'Width (m)' : 'Width (ft)'), { target: { value: '23' } });
+  fireEvent.change(screen.getByLabelText(metric ? 'Height (m)' : 'Height (ft)'), { target: { value: '10' } });
+  expect(screen.getByLabelText(metric ? 'Area (sq m)' : 'Area (sq ft)')).toHaveValue('230');
+  fireEvent.click(screen.getByRole('button', { name: 'Apply details' }));
+  expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ areaSqft: null, widthFt: metric ? 75.4593 : 23, heightFt: metric ? 32.8084 : 10 }));
+});
+it('clears dimensions when an area is entered directly and converts square metres to sqft', () => {
+  const proposal = proposalFixture(); proposal.sections[0].items[0].measurementStatus = 'unknown';
+  const estimate = buildEstimate(proposal, planFixture(), briefFixture(), [], draftFixture());
+  const onComplete = jest.fn();
+  render(<CompleteEstimate estimate={estimate} disabled={false} onComplete={onComplete} onRetry={jest.fn()} inputUnit="sqm" />);
+  fireEvent.click(screen.getByText('Enter a known correction manually (optional)'));
+  fireEvent.change(screen.getByLabelText('Width (m)'), { target: { value: '3' } });
+  fireEvent.change(screen.getByLabelText('Height (m)'), { target: { value: '2' } });
+  fireEvent.change(screen.getByLabelText('Area (sq m)'), { target: { value: '10' } });
+  expect(screen.getByLabelText('Width (m)')).toHaveValue('');
+  expect(screen.getByLabelText('Height (m)')).toHaveValue('');
+  fireEvent.click(screen.getByRole('button', { name: 'Apply details' }));
+  expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ widthFt: null, heightFt: null, areaSqft: 107.6391 }));
+});
+it('converts entered dimensions on a unit switch and preserves the per-sqft rate', () => {
+  const proposal = proposalFixture(); proposal.sections[0].items[0].measurementStatus = 'unknown';
+  const estimate = buildEstimate(proposal, planFixture(), briefFixture(), [], draftFixture());
+  const onComplete = jest.fn();
+  render(<CompleteEstimate estimate={estimate} disabled={false} onComplete={onComplete} onRetry={jest.fn()} />);
+  fireEvent.click(screen.getByText('Enter a known correction manually (optional)'));
+  fireEvent.change(screen.getByLabelText('Width (ft)'), { target: { value: '10' } });
+  fireEvent.change(screen.getByLabelText('Height (ft)'), { target: { value: '5' } });
+  fireEvent.change(screen.getByLabelText('Known selling rate per sqft (optional)'), { target: { value: '100' } });
+  fireEvent.change(screen.getByLabelText('Measurement unit'), { target: { value: 'metres' } });
+  expect(screen.getByLabelText('Width (m)')).toHaveValue('3.048');
+  expect(screen.getByLabelText('Height (m)')).toHaveValue('1.524');
+  expect(screen.getByLabelText('Area (sq m)')).toHaveValue('4.645152');
+  fireEvent.click(screen.getByRole('button', { name: 'Apply details' }));
+  expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ widthFt: 10, heightFt: 5, ratePerSft: 100 }));
+});
+it('requires both dimensions before saving', () => {
+  const proposal = proposalFixture(); proposal.sections[0].items[0].measurementStatus = 'unknown';
+  const estimate = buildEstimate(proposal, planFixture(), briefFixture(), [], draftFixture());
+  const onComplete = jest.fn();
+  render(<CompleteEstimate estimate={estimate} disabled={false} onComplete={onComplete} onRetry={jest.fn()} />);
+  fireEvent.click(screen.getByText('Enter a known correction manually (optional)'));
+  fireEvent.change(screen.getByLabelText('Width (ft)'), { target: { value: '23' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Apply details' }));
+  expect(screen.getByRole('alert')).toBeVisible();
+  expect(onComplete).not.toHaveBeenCalled();
 });
