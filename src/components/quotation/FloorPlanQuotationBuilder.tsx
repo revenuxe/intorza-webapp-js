@@ -1,5 +1,6 @@
 'use client';
 
+import { AI_SERVICE_ISSUE } from '@/lib/quotation-ai/service-issue';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, FileText, Loader2, LockKeyhole, Plus, Trash2, UploadCloud } from 'lucide-react';
 import { BuilderArtwork, BuilderMark, GoldCoin } from './AIBuilderVisuals';
@@ -73,7 +74,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const scrollPanel = useRef<HTMLDivElement>(null);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const busyBanner = useRef<HTMLDivElement>(null);
-  const errorBanner = useRef<HTMLParagraphElement>(null);
+  const errorBanner = useRef<HTMLDivElement>(null);
   const detailPlan = (type: typeof homeType): PlanAnalysis => {
     const bedrooms = type === 'Studio' ? 0 : Number(type[0]);
     const kinds: PlanAnalysis['rooms'][number]['kind'][] = ['living', 'kitchen', ...Array.from({ length: bedrooms }, () => 'bedroom' as const), ...Array.from({ length: Math.max(1, bedrooms) }, () => 'bathroom' as const), ...(bedrooms >= 2 ? ['dining' as const] : [])];
@@ -324,7 +325,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
           </>}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 border-t bg-background px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
-          {error && <p ref={errorBanner} tabIndex={-1} role="alert" className="w-full rounded-xl bg-destructive/10 p-3 text-sm leading-6 text-destructive outline-none">{error}</p>}
+          {error && <div ref={errorBanner} tabIndex={-1} role="alert" className="w-full rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-950 outline-none"><p className="font-semibold">{error}</p>{error === AI_SERVICE_ISSUE && <><p className="mt-1 text-amber-900/80">Your coins will not be charged for this request.</p><p className="mt-2 text-xs text-amber-900/70">Feel free to go back and try again later.</p></>}</div>}
           {busy ? <Button variant="outline" type="button" onClick={() => abort.current?.()}>Cancel request</Button> : <>
             <Button variant="outline" type="button" onClick={step === 'upload' || step === 'analysis' && mode === 'details' ? onClose : back}><ArrowLeft className="mr-1 h-4 w-4" />{step === 'upload' || step === 'analysis' && mode === 'details' ? 'Cancel' : 'Back'}</Button>
             {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'scope' ? <Button type="button" className="min-w-0 flex-1" disabled={!scopedRooms(analysis, brief).length || !brief.measurementInputUnit} onClick={() => void generate()}>Generate Quotation<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'review' ? <Button type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>

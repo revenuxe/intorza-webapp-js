@@ -6,7 +6,8 @@ import { ensureRoomWorkCoverage } from '@/lib/quotation-ai/room-work';
 import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
-import { MarketResearchError, OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
+import { AI_SERVICE_ISSUE } from '@/lib/quotation-ai/service-issue';
+import { OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
 import { OpenAIEstimateCompletion } from '@/lib/quotation-ai/estimate-completion';
 import { closeReferencePrice, matchingReferenceRate, normalizeReferenceText, referenceCity, unknownReferenceCity, referencePriceEvidence, preferredLibraryRates, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
 
@@ -33,8 +34,6 @@ async function boundedBody(request: Request, maximum: number) {
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
   let cleanup: (() => Promise<unknown>) | undefined;
-  let uploadRequest = false;
-  let coinCharge: { type: 'floor_plan' | 'ai_builder'; amount: number } | null = null;
   try {
     const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
     if (!token) return json({ error: 'Sign in to build a quotation.' }, 401);
@@ -48,15 +47,14 @@ export async function POST(request: Request) {
     if (!hasPro) return json({ error: 'Build with AI is available with an active Pro subscription. Upgrade to Pro, then use your wallet coins for each AI request.', code: 'PRO_REQUIRED', requestId }, 403);
     let env: Env = {};
     try { env = (await getCloudflareContext({ async: true })).env as unknown as Env; } catch { /* Local development. */ }
-    if (!env.QUOTATION_AI_LIMITER && process.env.NODE_ENV === 'production') return json({ error: 'AI rate limiting is not configured.' }, 503);
+    if (!env.QUOTATION_AI_LIMITER && process.env.NODE_ENV === 'production') return json({ error: AI_SERVICE_ISSUE }, 503);
     if (env.QUOTATION_AI_LIMITER && !(await env.QUOTATION_AI_LIMITER.limit({ key: `floor-plan:${user.id}` })).success) return json({ error: 'Please wait a minute before trying again.' }, 429);
     const key = env.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
     const model = env.OPENAI_FLOOR_PLAN_MODEL || process.env.OPENAI_FLOOR_PLAN_MODEL || env.OPENAI_MODEL || process.env.OPENAI_MODEL;
     const provider = new OpenAIFloorPlanProvider(key, model);
     const contentType = request.headers.get('content-type') ?? '';
-    uploadRequest = contentType.startsWith('multipart/form-data');
     if (contentType.startsWith('multipart/form-data')) {
-      if (!key || !model) return json({ error: 'Configure the server OPENAI_API_KEY and a vision-capable OPENAI_FLOOR_PLAN_MODEL.' }, 503);
+      if (!key || !model) return json({ error: AI_SERVICE_ISSUE }, 503);
       const body = await boundedBody(request, MAX_PLAN_BYTES + 65536);
       const form = await new Response(body, { headers: { 'Content-Type': contentType } }).formData();
       const entries = form.getAll('files');
@@ -67,9 +65,6 @@ export async function POST(request: Request) {
       }));
       if (new Set(files.map(file => file.name)).size !== files.length) return json({ error: 'Give each uploaded drawing a different file name.' }, 400);
       if (files.reduce((sum, file) => sum + file.bytes.length, 0) > MAX_PLAN_BYTES) return json({ error: 'Keep the total upload under 10 MB.' }, 413);
-      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: 15, p_type: 'floor_plan', p_reference: requestId, p_note: 'Floor plan analysis' });
-      if (charged.error) return json({ error: /Insufficient coins/i.test(charged.error.message) ? 'No coins left for Floor Plan Analysis. Top up your wallet to continue.' : charged.error.message, code: 'COINS_REQUIRED', requestId }, 402);
-      coinCharge = { type: 'floor_plan', amount: 15 };
       const projectId = crypto.randomUUID();
       const paths: string[] = [];
       cleanup = () => db.storage.from('quotation-floor-plans').remove(paths);
@@ -82,9 +77,12 @@ export async function POST(request: Request) {
       const analysis = await provider.analyse(files, request.signal);
       const saved = await db.from('quotation_plan_projects').insert({ id: projectId, user_id: user.id, files: paths.map((path, index) => ({ path, name: files[index].name, mime: files[index].mime })), analysis });
       if (saved.error) throw new Error('Could not save the plan analysis. Check the database migration.');
+      const response = json({ projectId, analysis });
+      request.signal.throwIfAborted();
+      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: 15, p_type: 'floor_plan', p_reference: requestId, p_note: 'Floor plan analysis' });
+      if (charged.error) return json({ error: /Insufficient coins/i.test(charged.error.message) ? 'No coins left for Floor Plan Analysis. Top up your wallet to continue.' : AI_SERVICE_ISSUE, code: 'COINS_REQUIRED', requestId }, 402);
       cleanup = undefined;
-      coinCharge = null;
-      return json({ projectId, analysis });
+      return response;
     }
     if (!contentType.startsWith('application/json')) return json({ error: 'Use JSON or a floor plan upload.' }, 415);
     const body = await boundedBody(request, 1048576);
@@ -99,7 +97,7 @@ export async function POST(request: Request) {
       if (saved.error) return json({ error: 'Could not save these measurements. Please retry.' }, 422);
       return json({ projectId: completion.data.projectId, estimate });
     }
-    if (!key || !model) return json({ error: 'Configure the server OPENAI_API_KEY and a vision-capable OPENAI_FLOOR_PLAN_MODEL.' }, 503);
+    if (!key || !model) return json({ error: AI_SERVICE_ISSUE }, 503);
     const parsed = generation.safeParse(raw);
     if (!parsed.success) return json({ error: 'Check the project details and selected rooms.' }, 400);
     const { projectId, analysis, brief, draft, regenerateRooms, action } = parsed.data;
@@ -112,11 +110,6 @@ export async function POST(request: Request) {
     }
     if (regenerateRooms && (!previousEstimate || regenerateRooms.some(name => !scopedRooms(analysis, brief).some(room => room.name === name)))) return json({ error: 'Select rooms from the current estimate to regenerate.' }, 400);
     if (action === 'retry_pricing' && (!previousEstimate || regenerateRooms)) return json({ error: 'Open an existing estimate to retry its pricing.' }, 400);
-    if (!projectId && action === 'generate' && brief.automatic) {
-      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: 10, p_type: 'ai_builder', p_reference: requestId, p_note: 'AI quotation builder' });
-      if (charged.error) return json({ error: /Insufficient coins/i.test(charged.error.message) ? 'No coins left for AI Quotation Builder. Top up your wallet to continue.' : charged.error.message, code: 'COINS_REQUIRED', requestId }, 402);
-      coinCharge = { type: 'ai_builder', amount: 10 };
-    }
     // Read the complete owner library before matching; older products must not be
     // hidden by an arbitrary first-page cap. RLS and owner filtering both apply.
     const ownerPricing = async (table: 'quotation_approved_rates' | 'item_usage_patterns') => {
@@ -249,11 +242,11 @@ export async function POST(request: Request) {
       rates.push(...cached);
       const uncached = products.filter(product => !cached.some(rate => rate.name === product.name && rate.description === product.specification));
       for (let offset = 0; offset < uncached.length; offset += 12) {
-        try {
+        {
           const research = await new OpenAIWebMarketPricing(key, env.OPENAI_MARKET_MODEL || process.env.OPENAI_MARKET_MODEL || model)
             .research({ products: uncached.slice(offset, offset + 12), location: brief.location, currency, finish: brief.finish }, request.signal);
           rates.push(...research.rates); researchLimitations.push(...research.limitations);
-        } catch (failure) { researchLimitations.push(failure instanceof MarketResearchError ? failure.message : 'Live market research was unavailable. Available historical rates are labelled; other prices remain pending.'); }
+        }
       }
       if (cached.length) researchLimitations.push('Some market evidence is cached from this project within the last 24 hours; retrieval dates are shown.');
     } else if (products.length) researchLimitations.push('Live pricing research is disabled or the project city is unknown. Enter a city or review pending rates.');
@@ -302,21 +295,17 @@ export async function POST(request: Request) {
       ? await db.from('quotation_plan_projects').update({ analysis, brief, estimate, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', user.id)
       : await db.from('quotation_plan_projects').insert({ id, user_id: user.id, analysis, brief, estimate });
     if (saved.error) throw new Error('Could not store the estimate. Your quotation has not changed.');
-    coinCharge = null;
-    return json({ projectId: id, estimate, measurementSystem: 'imperial', measurementChanged });
+    // Charge only after processing, persistence, serialization and cancellation checks succeed.
+    const response = json({ projectId: id, estimate, measurementSystem: 'imperial', measurementChanged });
+    request.signal.throwIfAborted();
+    if (!projectId && action === 'generate' && brief.automatic) {
+      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: 10, p_type: 'ai_builder', p_reference: requestId, p_note: 'AI quotation builder' });
+      if (charged.error) return json({ error: /Insufficient coins/i.test(charged.error.message) ? 'No coins left for AI Quotation Builder. Top up your wallet to continue.' : AI_SERVICE_ISSUE, code: 'COINS_REQUIRED', requestId }, 402);
+    }
+    return response;
   } catch (error) {
     if (cleanup) await cleanup().catch(() => undefined);
-    if (coinCharge) {
-      // The debit and this recovery are both owner-scoped and idempotent by request ID.
-      const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
-      if (token) {
-        const refundDb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
-        try { await refundDb.rpc('refund_failed_ai_charge', { p_reference: requestId, p_note: `${coinCharge.type} request failed; coins restored.` }); } catch { /* Preserve the original request failure if recovery is unavailable. */ }
-      }
-    }
     if (error instanceof InputError) return json({ error: error.message, requestId }, error.status);
-    if (error instanceof ProviderError) return json({ error: error.message, code: error.code, requestId }, error.status);
-    if (error instanceof SyntaxError || error instanceof z.ZodError) return json({ error: uploadRequest ? 'The floor plan response could not be validated. Review the detected rooms and try again.' : 'The quotation response could not be validated. Your floor plan is unchanged; please try again.', requestId }, 422);
-    return json({ error: error instanceof Error && error.name !== 'AbortError' && error.name !== 'TimeoutError' ? error.message : 'Analysis took too long. Please try fewer pages.', requestId }, 422);
+    return json({ error: AI_SERVICE_ISSUE, code: 'AI_SERVICE_UNAVAILABLE', requestId }, error instanceof ProviderError ? error.status : 422);
   }
 }

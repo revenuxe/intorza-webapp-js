@@ -240,14 +240,15 @@ it('uses a labelled detail-based close reference when exact pricing and market e
   expect(estimate.evidence[0].price).toMatchObject({ rate: 1400, confidence: 'low', match: { type: 'close' } });
   expect(estimate.draft.sections[0].items[0].productDetails).toBe(proposal.sections[0].items[0].description);
 });
-it('preserves an editable pending estimate when research fails', async () => {
-  research.mockRejectedValueOnce(new Error('timeout'));
-  const response = await POST(request(payload()));
-  expect(response.status).toBe(200);
-  const result = await response.json();
-  expect(result.estimate.draft.sections[0].items[0].ratePerSft).toBeNull();
-  expect(result.estimate.assumptions.join()).toContain('unavailable');
+it('does not charge or save an estimate when market research fails', async () => {
+  research.mockRejectedValueOnce(new Error('private upstream billing details'));
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), automatic: true } }));
+  expect(response.status).toBe(422);
+  expect((await response.json()).error).toBe("We're facing a technical issue. We'll be back soon.");
+  expect(insert).not.toHaveBeenCalled();
+  expect(rpc.mock.calls.some(([name]) => name === 'debit_coins')).toBe(false);
 });
+
 it('does not search when the city is unknown', async () => {
   const input = payload(); input.brief.location = 'Unknown';
   const response = await POST(request(input));
@@ -313,10 +314,33 @@ it('validates actual bytes and cleans up private uploads on analysis failure', a
   expect(response.status).toBe(422);
   expect(upload).toHaveBeenCalledWith(expect.stringMatching(/^owner\//), expect.any(Uint8Array), expect.objectContaining({ contentType: 'application/pdf' }));
   expect(remove).toHaveBeenCalledWith([expect.stringMatching(/^owner\//)]);
+  expect(rpc.mock.calls.some(([name]) => name === 'debit_coins')).toBe(false);
   expect(insert).not.toHaveBeenCalled();
 });
 it('rejects a renamed executable without storing it', async () => {
   const form = new FormData(); form.append('files', new File(['<script>bad</script>'], 'plan.png', { type: 'image/png' }));
   const response = await POST(new Request('https://app.intorza.com/api/quotation-ai/floor-plan', { method: 'POST', headers: { Authorization: 'Bearer session' }, body: form }));
   expect(response.status).toBe(422); expect(upload).not.toHaveBeenCalled();
+});
+
+it('does not charge coins or expose internal details when automatic estimation fails', async () => {
+  autoComplete.mockRejectedValueOnce(new Error('OpenAI billing exhausted: secret model'));
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), automatic: true } }));
+  const body = await response.json();
+  expect(response.status).toBe(422);
+  expect(body.error).toBe("We're facing a technical issue. We'll be back soon.");
+  expect(rpc.mock.calls.some(([name]) => name === 'debit_coins')).toBe(false);
+});
+it('charges only after a successful estimate is saved', async () => {
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), automatic: true } }));
+  expect(response.status).toBe(200);
+  const debitIndex = rpc.mock.calls.findIndex(([name]) => name === 'debit_coins');
+  expect(debitIndex).toBeGreaterThanOrEqual(0);
+  expect(rpc.mock.invocationCallOrder[debitIndex]).toBeGreaterThan(insert.mock.invocationCallOrder[0]);
+});
+it('does not charge when switching measurement settings fails', async () => {
+  metricProfile = true; measurementUpdateFails = true;
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), automatic: true } }));
+  expect(response.status).toBe(422);
+  expect(rpc.mock.calls.some(([name]) => name === 'debit_coins')).toBe(false);
 });
