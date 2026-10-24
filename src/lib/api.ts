@@ -1,3 +1,4 @@
+import { formatItemDetails, normalizeItemDetails } from './itemSpecifications';
 /**
  * Intorza API client — Supabase-backed.
  *
@@ -119,6 +120,13 @@ export const profileApi = {
 };
 
 // ---------------------- quotations (with sections + items) ----------------------
+function structuredQuotationPayload(body: Record<string, unknown>) {
+  if (!Array.isArray(body.sections)) return body;
+  return { ...body, sections: body.sections.map((section: { items?: Record<string, unknown>[] }) => ({ ...section, items: section.items?.map(item => {
+    const details = normalizeItemDetails(item.product_details as string | null, item.specifications);
+    return { ...item, product_details: details.description, specifications: details.specifications };
+  }) })) };
+}
 export const quotationsApi = {
   list: async (): Promise<Envelope<any[]>> => {
     const uid = await requireUserId();
@@ -145,7 +153,7 @@ export const quotationsApi = {
     );
     const normalized = (sections as any[]).map((s) => ({
       ...s,
-      items: (s.quotation_items || []).sort(
+      items: (s.quotation_items || []).map((item: Record<string, unknown>) => ({ ...item, product_details: formatItemDetails(item.product_details as string | null, item.specifications) })).sort(
         (a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0),
       ),
     }));
@@ -153,12 +161,12 @@ export const quotationsApi = {
   },
   create: async (body: any): Promise<Envelope<any>> => {
     await requireUserId();
-    const row = unwrap(await supabase.rpc('save_quotation', { p_id: null, p_payload: body }));
+    const row = unwrap(await supabase.rpc('save_quotation', { p_id: null, p_payload: structuredQuotationPayload(body) }));
     return { data: row };
   },
   update: async (id: string, body: any): Promise<Envelope<any>> => {
     await requireUserId();
-    const row = unwrap(await supabase.rpc('save_quotation', { p_id: id, p_payload: body }));
+    const row = unwrap(await supabase.rpc('save_quotation', { p_id: id, p_payload: structuredQuotationPayload(body) }));
     return { data: row };
   },
   remove: async (id: string): Promise<void> => {

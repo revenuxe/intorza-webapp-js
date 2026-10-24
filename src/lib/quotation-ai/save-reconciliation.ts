@@ -1,5 +1,6 @@
+import { normalizeItemDetails } from '@/lib/itemSpecifications';
 import { draftSchema, type VoiceDraft } from './domain';
-export type SavedItem = { id: string; product_name: string; product_details?: string | null; side?: string | null; width_ft?: number; height_ft?: number; sft_area?: number; rate_per_sft?: number; amount?: number; sort_order?: number };
+export type SavedItem = { id: string; specifications?: unknown; measurement_unit?: string; product_name: string; product_details?: string | null; side?: string | null; width_ft?: number; height_ft?: number; sft_area?: number; rate_per_sft?: number; amount?: number; sort_order?: number };
 export type SavedSection = { id: string; section_name: string; sort_order?: number; items: SavedItem[] };
 
 /** Fail visibly on partial/mismatched persistence; map new database identities by verified order/content. */
@@ -14,9 +15,13 @@ export function reconcileSavedQuotation(submitted: SavedSection[], persisted: Sa
     sections[section.id] = saved.id;
     section.items.forEach((item, itemIndex) => {
       const savedItem = savedItems[itemIndex];
-      for (const field of ['product_name','product_details','side'] as const) {
+      for (const field of ['product_name','side'] as const) {
         if ((item[field] ?? '') !== (savedItem[field] ?? '')) throw new Error(`Saved item details differ in “${section.section_name}”. Your editor is preserved.`);
       }
+      const expectedDetails = normalizeItemDetails(item.product_details, item.specifications);
+      const savedDetails = normalizeItemDetails(savedItem.product_details, savedItem.specifications);
+      if (JSON.stringify(expectedDetails) !== JSON.stringify(savedDetails)) throw new Error('Saved item details differ from the editor.');
+      if ((item.measurement_unit ?? 'Sq.ft') !== (savedItem.measurement_unit ?? 'Sq.ft')) throw new Error('Saved item measurement unit differs from the editor.');
       for (const field of ['width_ft','height_ft','sft_area','rate_per_sft','amount'] as const) {
         if (Math.abs(Number(item[field] ?? 0) - Number(savedItem[field] ?? 0)) > 0.0001) throw new Error(`Saved measurements or prices differ in “${section.section_name}”. Your editor is preserved.`);
       }

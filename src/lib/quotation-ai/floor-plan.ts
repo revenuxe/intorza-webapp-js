@@ -1,3 +1,4 @@
+import { itemSpecificationsSchema } from '@/lib/itemSpecifications';
 import { z } from 'zod';
 import { draftSchema, itemCalculation, quotationTotals, type VoiceDraft } from './domain';
 import { roomWorkSchema, roomWorkOptions } from './room-work';
@@ -34,6 +35,7 @@ export const briefSchema = z.object({
 export type ProjectBrief = z.infer<typeof briefSchema>;
 export const generatedSchema = z.object({
   sections: z.array(z.object({ title: label, roomName: label, items: z.array(z.object({
+    specifications: itemSpecificationsSchema.optional(), side: z.string().max(20).optional(),
     productName: label, description: z.string().max(1000), rateId: z.string().max(100).nullable(),
     quantity: dimension, measurementStatus: z.enum(['measured', 'estimated', 'unknown']),
     measurementReason: z.string().max(600),
@@ -215,7 +217,8 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
       const specification = price?.description && !normalizeReferenceText(details).includes(normalizeReferenceText(price.description))
         ? `Pricing specification: ${price.description}` : '';
       return { id, productName, productDetails: [details, specification, ...(price?.basisWarnings ?? [])].filter(Boolean).join(' ').slice(0, 1000),
-        side: '', measurementMode: dimensions ? 'dimensions' as const : 'direct_area' as const,
+        ...(item.specifications?.length ? { specifications: item.specifications } : {}),
+        side: item.side ?? '', measurementMode: dimensions ? 'dimensions' as const : 'direct_area' as const,
         widthFt: dimensions?.widthFt ?? null, heightFt: dimensions?.heightFt ?? null,
         sftArea: dimensions ? null : ceilingArea ?? autoArea ?? (item.measurementStatus === 'unknown' ? null : item.quantity), ratePerSft: price?.rate ?? null };
     }) };

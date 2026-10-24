@@ -155,3 +155,12 @@ it.each([true, false])('prints optional item specifications beneath the descript
   expect(output).toContain('Century');
   expect(output).toContain('Warranty:');
 });
+
+it.each([true, false])('exports canonical structured specifications without a legacy text suffix (simple: %s)', async useSimpleItemLayout => {
+  const pdf = await generateQuotationPDF({ ...quotationData,
+    settings: { ...getQuotationSettings(), useSimpleItemLayout, showProductDetails: true },
+    sections: [{ ...quotationData.sections[0], items: [{ ...quotationData.sections[0].items[0], productDetails: '4-door wardrobe', specifications: [{ label: 'Brand', value: 'Century' }, { label: 'Colour / Code', value: '0954' }] }] }],
+  });
+  const output = pdf.internal.pages.flat().join('\n');
+  expect(output).toContain('Century'); expect(output).toContain('0954');
+});

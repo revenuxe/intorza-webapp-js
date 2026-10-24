@@ -1,3 +1,4 @@
+import { formatItemDetails } from '@/lib/itemSpecifications';
 import { useState, useEffect } from "react";
 import { FileText, Calendar, User, Coins, ExternalLink, Save, Sparkles, Trash2, BookOpen, Check, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +40,7 @@ interface Section {
     id: string;
     product_name: string;
     product_details: string | null;
+    specifications?: unknown;
     measurement_unit: string;
     width_ft: number | null;
     height_ft: number | null;
@@ -116,7 +118,7 @@ export const QuotationsLibraryTab = () => {
     for (const section of sectionsData || []) {
       const { data: itemsData, error: itemsError } = await supabase
         .from('quotation_items')
-        .select('id, product_name, product_details, measurement_unit, width_ft, height_ft, sft_area, rate_per_sft, amount')
+        .select('id, product_name, product_details, specifications, measurement_unit, width_ft, height_ft, sft_area, rate_per_sft, amount')
         .eq('section_id', section.id)
         .order('sort_order');
 
@@ -152,7 +154,7 @@ export const QuotationsLibraryTab = () => {
           id: item.id,
           side: "",
           productName: item.product_name,
-          productDetails: item.product_details || "",
+          productDetails: formatItemDetails(item.product_details, item.specifications),
           measurementUnit: item.measurement_unit,
           widthFt: item.width_ft || 0,
           heightFt: item.height_ft || 0,
@@ -244,7 +246,7 @@ export const QuotationsLibraryTab = () => {
               .update({
                 usage_count: (existing.usage_count || 0) + 1,
                 preferred_rate: item.rate_per_sft,
-                product_details: item.product_details,
+                product_details: formatItemDetails(item.product_details, item.specifications),
                 last_used_at: new Date().toISOString(),
               })
               .eq('id', existing.id);
@@ -255,7 +257,7 @@ export const QuotationsLibraryTab = () => {
               .insert({
                 user_id: user.id,
                 product_name: item.product_name,
-                product_details: item.product_details,
+                product_details: formatItemDetails(item.product_details, item.specifications),
                 preferred_rate: item.rate_per_sft,
                 default_rate: item.rate_per_sft,
                 usage_count: 1,

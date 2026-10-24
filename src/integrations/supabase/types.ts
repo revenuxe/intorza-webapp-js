@@ -719,6 +719,7 @@ export type Database = {
           height_ft: number | null
           id: string
           notes: string | null
+          specifications: Json
           product_details: string | null
           product_name: string
           rate_per_sft: number | null
@@ -736,6 +737,7 @@ export type Database = {
           height_ft?: number | null
           id?: string
           notes?: string | null
+          specifications?: Json
           product_details?: string | null
           product_name: string
           rate_per_sft?: number | null
@@ -753,6 +755,7 @@ export type Database = {
           height_ft?: number | null
           id?: string
           notes?: string | null
+          specifications?: Json
           product_details?: string | null
           product_name?: string
           rate_per_sft?: number | null

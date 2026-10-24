@@ -37,3 +37,10 @@ describe('OpenAI quotation provider', () => {
     expect(() => createQuotationProvider({ provider: 'openai', model: 'gpt-5.4-mini' })).toThrow('OPENAI_API_KEY');
   });
 });
+
+it('captures explicitly supplied specifications as structured item fields', async () => {
+  const specifications = [{ label: 'Brand', value: 'Century' }];
+  global.fetch = jest.fn().mockResolvedValue(response(output([{ type: 'update_item', sectionId: null, itemId: 'wardrobe', title: null, fields: { ...blank, specifications } }])));
+  const result = await new OpenAIQuotationProvider('key', 'model').propose(input);
+  expect(result.operations[0]).toEqual({ type: 'update_item', itemId: 'wardrobe', fields: { specifications } });
+});

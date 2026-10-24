@@ -8,7 +8,7 @@ import { getCountryByCode } from "@/lib/countryConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -25,7 +25,7 @@ import { PDFPreviewEditor } from "@/components/PDFPreviewEditor";
 import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
 import { normalizeWarrantyInput } from "@/lib/warrantyFormatter";
 import { ClientSelector } from "@/components/quotation/ClientSelector";
-import { ProductNameInput } from "@/components/quotation/ProductNameInput";
+
 import { RoomPicker } from "@/components/quotation/RoomPicker";
 import { getRoomSuggestions } from "@/lib/roomSuggestions";
 import { QuotationTemplates } from "@/components/quotation/QuotationTemplates";
@@ -39,10 +39,10 @@ import type { PriceEvidence } from '@/lib/quotation-ai/floor-plan';
 import { reconcileSavedQuotation, remapDraftIds } from '@/lib/quotation-ai/save-reconciliation';
 import { fromQuotation, lineAmount, quotationTotals, reviewDraft, draftSchema, type VoiceDraft } from "@/lib/quotation-ai/domain";
 import { QuotationItemCard } from '@/components/quotation/QuotationItemCard';
-import { ItemSideSelector } from '@/components/quotation/ItemSideSelector';
-import { ItemSpecifications } from '@/components/quotation/ItemSpecifications';
-import { combineItemDetails, splitItemDetails } from '@/lib/itemSpecifications';
-import { ItemMeasurements } from '@/components/quotation/ItemMeasurements';
+
+import { QuotationItemFields } from '@/components/quotation/QuotationItemFields';
+import { splitItemDetails } from '@/lib/itemSpecifications';
+
 import { changeQuotationUnit, getQuotationUnit } from '@/lib/quotationUnits';
 interface LineItem {
  measurementUnit?: string;
@@ -709,7 +709,8 @@ const CreateQuotation = () => {
           id: item.id,
           gallery_image_ids: (itemImages[item.id] || []).map(image => image.id),
           product_name: item.productName || "",
-          product_details: item.productDetails ?? null,
+          product_details: splitItemDetails(item.productDetails).description,
+          specifications: splitItemDetails(item.productDetails).specifications,
           side: item.side ?? null,
           measurement_unit: getQuotationUnit(item.measurementUnit),
 
@@ -1300,7 +1301,7 @@ const CreateQuotation = () => {
             <CardContent className="min-w-0 space-y-4 px-5 sm:px-8">
               {/* Items */}
               {section.items.map((item, itemIndex) => {
-                const details = splitItemDetails(item.productDetails);
+
                 return <QuotationItemCard key={item.id} item={item} index={itemIndex} pending={isPendingAIItem(item)} activeItemId={activeItemId} collapseExceptItemId={collapseExceptItemId} onActivate={() => setActiveItemId(item.id)} currencySymbol={profile.currency_symbol} locale={profile.locale} actions={<>
                       <Button aria-label={`Add image for item ${itemIndex + 1}`} variant="ghost" size="sm" onClick={() => {
                         setImagePickerItemId(item.id);
@@ -1327,39 +1328,7 @@ const CreateQuotation = () => {
                     </div>
                   )}
 
-                  <div className={`grid gap-4 ${customizeSettings.showProductDetails ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]' : ''}`}>
-                  <div className="min-w-0 space-y-2">
-                    <Label htmlFor={`product-name-${item.id}`}>Product Name</Label>
-                    <ProductNameInput id={`product-name-${item.id}`} value={item.productName}
-                      onChange={name => updateItem(section.id, item.id, 'productName', name)} patterns={itemPatterns}
-                      onProductSelect={pattern => {
-                        if (pattern.product_details && !item.productDetails) updateItem(section.id, item.id, 'productDetails', pattern.product_details);
-                        if (pattern.preferred_rate && pattern.preferred_rate > 0 && !item.ratePerSft) updateItem(section.id, item.id, 'ratePerSft', pattern.preferred_rate);
-                      }} placeholder="e.g. Wardrobe" />
-                  </div>
-                  {customizeSettings.showProductDetails && <div className="min-w-0 space-y-2">
-                    <Label htmlFor={`product-details-${item.id}`}>Product Details</Label>
-                    <AutoGrowTextarea id={`product-details-${item.id}`} value={details.description}
-                      maxLength={Math.max(details.description.length, 1000 - (item.productDetails.length - details.description.length))}
-                      onChange={event => updateItem(section.id, item.id, 'productDetails', combineItemDetails(event.target.value, details.specifications))}
-                      placeholder="e.g. 4-door wardrobe with loft" />
-                  </div>}
-                  </div>
-                  <ItemSpecifications value={item.productDetails} onChange={value => updateItem(section.id, item.id, 'productDetails', value)} />
-                  <div className="border-t border-border/70 pt-4">
-                    <ItemMeasurements layout="product" item={item} onChange={(field, value) => updateItem(section.id, item.id, field, value)} />
-                  </div>
-                  <div className={`grid items-end gap-3 ${customizeSettings.showSideColumn ? 'grid-cols-[minmax(0,1fr)_5.5rem] sm:grid-cols-[minmax(0,1fr)_7rem]' : 'grid-cols-1'}`}>
-                    <div className="min-w-0 space-y-2">
-                      <Label htmlFor={`item-rate-${item.id}`}>Rate / {getQuotationUnit(item.measurementUnit)} ({profile.currency_symbol})</Label>
-                      <Input id={`item-rate-${item.id}`} type="number" min="0" value={item.ratePerSft || ''} onChange={event => updateItem(section.id, item.id, 'ratePerSft', parseFloat(event.target.value) || 0)} placeholder="0" step="0.01" />
-                    </div>
-                    {customizeSettings.showSideColumn && <ItemSideSelector id={`item-side-${item.id}`} value={item.side} onChange={value => updateItem(section.id, item.id, 'side', value)} />}
-                  </div>
-                  <div className="flex items-center justify-between gap-3 rounded-xl bg-primary/5 px-4 py-3">
-                    <span className="text-sm font-medium">Amount</span>
-                    <span className="text-lg font-semibold tabular-nums text-primary">{isPendingAIItem(item) ? 'Pending' : <>{profile.currency_symbol}{item.amount.toLocaleString(profile.locale, { minimumFractionDigits: 2 })}</>}</span>
-                  </div>
+                  <QuotationItemFields idPrefix={item.id} item={item} patterns={itemPatterns} pending={isPendingAIItem(item)} currencySymbol={profile.currency_symbol} locale={profile.locale} showProductDetails={customizeSettings.showProductDetails} showSideColumn={customizeSettings.showSideColumn} onChange={(field, value) => updateItem(section.id, item.id, field, value)} />
                   {Object.prototype.hasOwnProperty.call(aiPriceEvidence, item.id) && <div className="rounded-lg bg-muted/30 px-3 py-2"><EstimatePriceDetails price={aiPriceEvidence[item.id]} /><p className="mt-1 text-[11px] text-muted-foreground">Original AI price evidence. Manual rate/specification changes require your review.</p></div>}
                 </QuotationItemCard>; })}
 

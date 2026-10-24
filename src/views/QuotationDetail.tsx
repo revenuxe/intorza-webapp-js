@@ -1,4 +1,5 @@
 "use client";
+import { formatItemDetails } from '@/lib/itemSpecifications';
 import { getQuotationUnit } from '@/lib/quotationUnits';
 
 
@@ -196,7 +197,7 @@ const QuotationDetail = () => {
             
             return {
               productName: item.product_name,
-              productDetails: item.product_details,
+              productDetails: formatItemDetails(item.product_details, item.specifications),
               side: item.side,
               measurementUnit: getQuotationUnit(item.measurement_unit),
 

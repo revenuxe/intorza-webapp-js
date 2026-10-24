@@ -1,0 +1,21 @@
+import { buildEstimate, generatedSchema } from './floor-plan';
+import { fromQuotation, toQuotation } from './domain';
+import { ensureRoomWorkCoverage } from './room-work';
+import { briefFixture, draftFixture, planFixture, proposalFixture } from '@/test/floor-plan-fixtures';
+import { normalizeItemDetails } from '@/lib/itemSpecifications';
+it('preserves AI specifications through scope enforcement, draft generation and editor round trips', () => {
+  const base = proposalFixture();
+  const specifications = [{ label: 'Material', value: 'BWP Plywood' }, { label: 'Brand', value: 'Century' }];
+  const proposal = { ...base, sections: base.sections.map(section => ({ ...section, items: section.items.map(item => ({ ...item, specifications, side: 'B' })) })) };
+  const brief = { ...briefFixture(), automatic: true };
+  const covered = ensureRoomWorkCoverage(generatedSchema.parse(proposal), planFixture().rooms, brief);
+  const estimate = buildEstimate(covered, planFixture(), brief, [], draftFixture());
+  const wardrobe = estimate.draft.sections.flatMap(section => section.items).find(item => item.productName === 'Wardrobe')!;
+  expect(wardrobe.specifications).toEqual(specifications);
+  expect(wardrobe.side).toBe('B');
+  const sections = toQuotation(estimate.draft, true);
+  const editorItem = sections.flatMap(section => section.items).find(item => item.productName === 'Wardrobe')!;
+  expect(normalizeItemDetails(editorItem.productDetails).specifications).toEqual(specifications);
+  const roundTrip = fromQuotation(estimate.draft.project, sections, estimate.draft.pricing);
+  expect(roundTrip.sections.flatMap(section => section.items).find(item => item.id === wardrobe.id)?.specifications).toEqual(specifications);
+});

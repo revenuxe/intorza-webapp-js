@@ -22,3 +22,12 @@ it('refuses partial or substituted saves instead of silently replacing editor co
   const changed = fixture(); changed[6].items[3].product_details = 'Wrong template';
   expect(() => reconcileSavedQuotation(submitted, changed)).toThrow('details differ');
 });
+
+it('checks structured specifications and refuses silent metadata loss', () => {
+  const submitted = fixture();
+  submitted[0].items[0].specifications = [{ label: 'Brand', value: 'Century' }];
+  const saved = JSON.parse(JSON.stringify(submitted));
+  expect(() => reconcileSavedQuotation(submitted, saved)).not.toThrow();
+  saved[0].items[0].specifications = [];
+  expect(() => reconcileSavedQuotation(submitted, saved)).toThrow('details differ');
+});

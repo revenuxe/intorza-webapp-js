@@ -3,7 +3,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { combineItemDetails, specificationAttributes, splitItemDetails, type ItemSpecification } from '@/lib/itemSpecifications';
+import { combineItemDetails, itemSpecificationsSchema, specificationAttributes, splitItemDetails, type ItemSpecification } from '@/lib/itemSpecifications';
 
 const initialFields = (fields: ItemSpecification[]) => [...fields, ...['Material', 'Brand', 'Finish', 'Hardware'].filter(label => !fields.some(field => field.label.toLowerCase() === label.toLowerCase())).map(label => ({ label, value: '' }))];
 
@@ -26,7 +26,8 @@ export function ItemSpecifications({ value, onChange }: { value: string; onChang
   }, [value]);
   const commit = (next: ItemSpecification[]) => {
     const combined = combineItemDetails(splitItemDetails(value).description, next);
-    if (combined.length > 1000) { setError('Keep the description and specifications within 1,000 characters.'); return; }
+    const checked = itemSpecificationsSchema.safeParse(next.filter(row => row.value.trim()));
+    if (!checked.success) { setError('Use up to 20 unique specification fields, with values up to 160 characters.'); return; }
     setFields(next); setError(''); lastValue.current = combined; onChange(combined);
   };
   const add = (label: string) => {

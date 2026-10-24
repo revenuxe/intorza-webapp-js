@@ -130,7 +130,7 @@ export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, roo
       const area = task.unit !== 'sqft' ? null : work.areaSqft ?? (work.widthFt && work.heightFt ? Math.round(work.widthFt * work.heightFt * 10000) / 10000 : null);
       const details = [task.unit === 'sqft' ? '' : `Billing: ${task.unit}; price separately. No square-foot amount is assumed.`,
         work.details, answer.notes, proposed?.description, task.hint].filter(Boolean).join(' ').slice(0, 1000);
-      return { productName: task.name, description: details, rateId: task.unit === 'sqft' ? proposed?.rateId ?? null : null,
+      return { productName: task.name, description: details, ...(proposed?.specifications ? { specifications: proposed.specifications } : {}), ...(proposed?.side ? { side: proposed.side } : {}), rateId: task.unit === 'sqft' ? proposed?.rateId ?? null : null,
         quantity: area, measurementStatus: area == null ? 'unknown' as const : 'estimated' as const,
         measurementReason: area == null ? `${room.name}: ${task.hint}` : `${room.name}: confirmed work coverage ${area} sqft; verify on site.` };
     }) };

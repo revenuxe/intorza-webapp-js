@@ -1,4 +1,5 @@
-import { ItemMeasurements } from '@/components/quotation/ItemMeasurements';
+import { QuotationItemFields, type ItemField } from '@/components/quotation/QuotationItemFields';
+import { formatItemDetails } from '@/lib/itemSpecifications';
 import { getQuotationUnit } from '@/lib/quotationUnits';
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Download, Palette, Layout, Eye, RotateCcw, Check, Settings2, ArrowLeft, Sparkles, Frame, Flower2, Shapes, Crown, FileText, Wand2, CircleDot, Search, Type, Sliders, Loader2, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, MoveHorizontal, ListTree } from "lucide-react";
@@ -49,7 +50,7 @@ interface BrandColors {
 }
 
 interface PDFPreviewEditorProps {
-  onItemMeasurementChange?: (sectionIndex: number, itemIndex: number, field: 'measurementUnit' | 'widthFt' | 'heightFt' | 'sftArea' | 'ratePerSft', value: string | number) => void;
+  onItemMeasurementChange?: (sectionIndex: number, itemIndex: number, field: ItemField, value: string | number) => void;
   open: boolean;
   onClose: () => void;
   onDownload: (settings: PDFEditorSettings, terms: TermsSection[]) => void;
@@ -73,6 +74,7 @@ interface PDFPreviewEditorProps {
         productName?: string;
         product_details?: string;
         productDetails?: string;
+        specifications?: unknown;
         measurement_unit?: string;
         measurementUnit?: string;
         width_ft?: number;
@@ -381,7 +383,7 @@ export const PDFPreviewEditor = ({
           items: s.items.map(item => ({
             side: item.side || '',
             productName: item.product_name || item.productName || '',
-            productDetails: item.product_details || item.productDetails || '',
+            productDetails: formatItemDetails(item.product_details ?? item.productDetails, item.specifications),
             measurementUnit: getQuotationUnit(item.measurement_unit ?? item.measurementUnit),
 
             widthFt: item.width_ft || item.widthFt || 0,
@@ -603,7 +605,9 @@ export const PDFPreviewEditor = ({
 
         <div className="flex-1 min-h-0 overflow-auto px-4">
           <TabsContent value="content" className="mt-0">
- {onItemMeasurementChange && <div className="mb-4 space-y-4">{quotationData.sections.map((section, sectionIndex) => <div key={sectionIndex} className="space-y-3"><h3 className="text-sm font-semibold">{section.title || section.section_name || 'Items'}</h3>{section.items.map((item, itemIndex) => <div key={itemIndex} className="space-y-3 rounded-lg border p-3"><p className="text-sm font-medium">{item.productName || item.product_name || 'Item ' + (itemIndex + 1)}</p><ItemMeasurements item={{measurementUnit: item.measurementUnit ?? item.measurement_unit, widthFt: item.widthFt ?? item.width_ft ?? 0, heightFt: item.heightFt ?? item.height_ft ?? 0, sftArea: item.sftArea ?? item.sft_area ?? 0}} onChange={(field, value) => onItemMeasurementChange(sectionIndex, itemIndex, field, value)} /><label className="block space-y-2 text-sm"><span>Rate / {getQuotationUnit(item.measurementUnit ?? item.measurement_unit)}</span><Input type="number" min="0" step="any" value={item.ratePerSft ?? item.rate_per_sft ?? ''} onChange={e => onItemMeasurementChange(sectionIndex, itemIndex, 'ratePerSft', Math.max(0, Number(e.target.value) || 0))} /></label></div>)}</div>)}</div>}
+ {onItemMeasurementChange && <div className="mb-4 space-y-4">{quotationData.sections.map((section, sectionIndex) => <div key={sectionIndex} className="space-y-3"><h3 className="text-sm font-semibold">{section.title || section.section_name || 'Items'}</h3>{section.items.map((item, itemIndex) => <div key={itemIndex} className="space-y-4 rounded-lg border p-3">
+  <QuotationItemFields compact idPrefix={`preview-${sectionIndex}-${itemIndex}`} item={{ productName: item.productName ?? item.product_name ?? '', productDetails: formatItemDetails(item.productDetails ?? item.product_details, item.specifications), side: item.side ?? '', measurementUnit: item.measurementUnit ?? item.measurement_unit, widthFt: item.widthFt ?? item.width_ft ?? 0, heightFt: item.heightFt ?? item.height_ft ?? 0, sftArea: item.sftArea ?? item.sft_area ?? 0, ratePerSft: item.ratePerSft ?? item.rate_per_sft ?? 0, amount: item.amount ?? 0 }} currencySymbol={quotationData.localization?.currencySymbol} locale={quotationData.localization?.locale} showProductDetails={customizeSettings.showProductDetails} showSideColumn={customizeSettings.showSideColumn} onChange={(field, value) => onItemMeasurementChange(sectionIndex, itemIndex, field, value)} />
+</div>)}</div>)}</div>}
 
             <TermsBlockEditor
               value={termsConditions}

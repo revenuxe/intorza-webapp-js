@@ -1,3 +1,4 @@
+import { itemSpecificationsSchema, normalizeItemDetails, formatItemDetails } from '@/lib/itemSpecifications';
 import { z } from 'zod';
 
 const text = z.string().max(1000);
@@ -5,6 +6,7 @@ const id = z.string().min(1).max(100);
 const measurement = z.number().finite().positive().max(100000).nullable();
 const rate = z.number().finite().nonnegative().max(10000000).nullable();
 export const itemFields = z.object({
+  specifications: itemSpecificationsSchema.optional(),
   productName: text, productDetails: text, side: z.string().max(20),
   measurementMode: z.enum(['dimensions', 'direct_area']),
   widthFt: measurement, heightFt: measurement, sftArea: measurement, ratePerSft: rate,
@@ -133,7 +135,7 @@ export type LegacySection = { id: string; title: string; items: { id: string; pr
 export function fromQuotation(project: VoiceDraft['project'], sections: LegacySection[], pricing: VoiceDraft['pricing']): VoiceDraft {
   return draftSchema.parse({ version: 1, revision: 0, project, pricing, sections: sections.map(section => ({ ...section,
     items: section.items.filter(item => item.productName || item.productDetails || item.widthFt || item.heightFt || item.sftArea || item.ratePerSft).map(item => ({
-      id: item.id, productName: item.productName, productDetails: item.productDetails, side: item.side,
+      id: item.id, productName: item.productName, productDetails: normalizeItemDetails(item.productDetails).description, ...(normalizeItemDetails(item.productDetails).specifications.length ? { specifications: normalizeItemDetails(item.productDetails).specifications } : {}), side: item.side,
       measurementMode: (item.widthFt > 0 || item.heightFt > 0) && (!item.sftArea || Math.abs(item.widthFt * item.heightFt - item.sftArea) < 0.0001) ? 'dimensions' : 'direct_area',
       widthFt: (item.widthFt > 0 || item.heightFt > 0) && (!item.sftArea || Math.abs(item.widthFt * item.heightFt - item.sftArea) < 0.0001) ? item.widthFt || null : null,
       heightFt: (item.widthFt > 0 || item.heightFt > 0) && (!item.sftArea || Math.abs(item.widthFt * item.heightFt - item.sftArea) < 0.0001) ? item.heightFt || null : null,
@@ -146,7 +148,7 @@ export function toQuotation(draft: VoiceDraft, allowIncomplete = false): LegacyS
   if (!allowIncomplete && reviewDraft(checked).missing.length) throw new Error('Complete the required quotation details before applying.');
   return checked.sections.map(section => ({ id: section.id, title: section.title, items: section.items.map(item => {
     const { area, cents } = itemCalculation(item);
-    return { id: item.id, productName: item.productName, productDetails: item.productDetails, side: item.side,
+    return { id: item.id, productName: item.productName, productDetails: formatItemDetails(item.productDetails, item.specifications), side: item.side,
       widthFt: item.measurementMode === 'dimensions' ? item.widthFt ?? 0 : 0,
       heightFt: item.measurementMode === 'dimensions' ? item.heightFt ?? 0 : 0,
       sftArea: area ?? 0, ratePerSft: item.ratePerSft ?? 0, amount: Number(cents ?? 0n) / 100 };

@@ -1,3 +1,4 @@
+import { formatItemDetails, type ItemSpecification } from './itemSpecifications';
 import { getQuotationUnit, isAreaUnit, projectAreaSqft } from './quotationUnits';
 import { resolveCompanyAssetUrl } from '@/lib/company-assets';
 
@@ -59,6 +60,7 @@ export interface LineItem {
   side: string;
   productName: string;
   productDetails: string;
+  specifications?: ItemSpecification[];
   measurementUnit?: string;
   widthFt: number;
   heightFt: number;
@@ -780,7 +782,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       // Simple layout: Description, Quantity, Rate, Amount
       const tableBody = section.items.map(item => [
         item.productName,
-        item.productDetails || '-',
+        formatItemDetails(item.productDetails, item.specifications) || '-',
         `${item.sftArea.toFixed(2)} ${getQuotationUnit(item.measurementUnit)}`,
         fmtCurrencyLocal(item.ratePerSft),
         fmtCurrencyLocal(item.amount) 
@@ -861,7 +863,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         const row: string[] = [];
         if (showSide) row.push(item.side || '-');
         row.push(!showSizeColumns && !areaOnly ? `${item.productName}\n${item.sftArea.toFixed(2)} ${getQuotationUnit(item.measurementUnit)}` : item.productName);
-        if (showDetails) row.push(item.productDetails || '-');
+        if (showDetails) row.push(formatItemDetails(item.productDetails, item.specifications) || '-');
         if (hasAnyImages) row.push(''); // placeholder for image cell
         if (showSizeColumns) {
           row.push(isAreaUnit(item.measurementUnit) && item.widthFt ? `${item.widthFt.toFixed(2)} ${getQuotationUnit(item.measurementUnit) === 'Sq.m' ? 'm' : 'ft'}` : '-', isAreaUnit(item.measurementUnit) && item.heightFt ? `${item.heightFt.toFixed(2)} ${getQuotationUnit(item.measurementUnit) === 'Sq.m' ? 'm' : 'ft'}` : '-', `${item.sftArea.toFixed(2)} ${getQuotationUnit(item.measurementUnit)}`);
