@@ -107,10 +107,14 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
     };
     const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(position); };
     position();
+    // iOS Safari often reports the pre-keyboard visual viewport during focus,
+    // then updates it after the keyboard animation. Re-measure after that settles.
+    const settleTimers = [80, 220, 420].map(delay => window.setTimeout(schedule, delay));
     window.addEventListener('resize', schedule); window.addEventListener('scroll', schedule, true);
     window.visualViewport?.addEventListener('resize', schedule); window.visualViewport?.addEventListener('scroll', schedule);
     return () => {
       cancelAnimationFrame(frame);
+      settleTimers.forEach(window.clearTimeout);
       window.removeEventListener('resize', schedule); window.removeEventListener('scroll', schedule, true);
       window.visualViewport?.removeEventListener('resize', schedule); window.visualViewport?.removeEventListener('scroll', schedule);
     };
@@ -145,7 +149,7 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
       {open && filteredProducts.length > 0 && typeof document !== 'undefined' && createPortal(<div ref={menuRef} id={menuId} role="listbox" aria-label="Existing products" style={menuStyle} className="flex flex-col overflow-hidden rounded-xl border bg-popover p-2 shadow-xl" onMouseDown={event => event.preventDefault()}>
         <div className="flex shrink-0 items-center justify-between px-2 pb-2 text-xs text-muted-foreground"><span>Existing products</span><span>{filteredProducts.length} matches</span></div>
         <div className="min-h-0 space-y-1 overflow-y-auto overscroll-contain pr-1">{filteredProducts.map((pattern, index) => <button key={`${pattern.product_name}-${index}`} id={`${menuId}-${index}`} role="option" aria-selected={activeIndex === index} type="button" onClick={() => handleSelect(pattern)} className={cn("flex w-full items-start gap-2 rounded-lg border border-transparent p-2.5 text-left transition-colors hover:border-primary/30 hover:bg-primary/5", activeIndex === index && "border-primary/30 bg-primary/5")}>
-          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted"><Package className="h-3.5 w-3.5 text-primary" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{pattern.product_name}</span>{pattern.product_details && <span className="mt-0.5 block line-clamp-1 text-xs text-muted-foreground">{pattern.product_details}</span>}<span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">{pattern.preferred_rate && pattern.preferred_rate > 0 && <span>{symbol}{pattern.preferred_rate.toLocaleString(settings.locale)}/{areaUnit}</span>}{pattern.usage_count > 1 && <span className="inline-flex items-center gap-0.5"><TrendingUp className="h-3 w-3" />{pattern.usage_count}</span>}</span></span>{value === pattern.product_name && <Check className="mt-1 h-4 w-4 shrink-0 text-primary" />}</button>)}</div>
+          <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted"><Package className="h-3.5 w-3.5 text-primary" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{pattern.product_name}</span>{pattern.product_details && <span className="mt-0.5 block overflow-hidden text-ellipsis text-xs leading-4 text-muted-foreground" style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2 }}>{pattern.product_details}</span>}<span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">{pattern.preferred_rate && pattern.preferred_rate > 0 && <span>{symbol}{pattern.preferred_rate.toLocaleString(settings.locale)}/{areaUnit}</span>}{pattern.usage_count > 1 && <span className="inline-flex items-center gap-0.5"><TrendingUp className="h-3 w-3" />{pattern.usage_count}</span>}</span></span>{value === pattern.product_name && <Check className="mt-1 h-4 w-4 shrink-0 text-primary" />}</button>)}</div>
       </div>, document.body)}
     </div>
   );
