@@ -1254,15 +1254,15 @@ const CreateQuotation = () => {
                   <Label htmlFor="clientAddress">Client Address</Label>
                   <Input id="clientAddress" placeholder="Enter address" value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
                 </div>}
-              {customizeSettings.showDateOfProposal && <div className="space-y-2">
+              {customizeSettings.showDateOfProposal && <div className="min-w-0 space-y-2">
                   <Label htmlFor="dateOfProposal">Date of Proposal</Label>
                   <Input id="dateOfProposal" type="date" value={dateOfProposal} onChange={e => setDateOfProposal(e.target.value)} />
                 </div>}
-              {customizeSettings.showQuotationValidTill && <div className="space-y-2">
+              {customizeSettings.showQuotationValidTill && <div className="min-w-0 space-y-2">
                   <Label htmlFor="quotationValidTill">Quotation Valid Till</Label>
                   <Input id="quotationValidTill" type="date" value={quotationValidTill} onChange={e => setQuotationValidTill(e.target.value)} />
                 </div>}
-              {customizeSettings.showProjectDeadline && <div className="space-y-2">
+              {customizeSettings.showProjectDeadline && <div className="min-w-0 space-y-2">
                   <Label htmlFor="projectDeadline">Project Deadline</Label>
                   <Input id="projectDeadline" type="date" value={projectDeadline} onChange={e => setProjectDeadline(e.target.value)} />
                 </div>}
