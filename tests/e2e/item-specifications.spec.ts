@@ -43,6 +43,7 @@ test('product-first item cards keep optional specifications, pricing and respons
     const rate = await card.getByLabel('Rate / Sq.ft', { exact: false }).boundingBox();
     expect(Math.abs(side!.y - rate!.y)).toBeLessThan(2);
     expect(rate!.width).toBeGreaterThan(side!.width);
+    expect(rate!.x).toBeLessThan(side!.x);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
   await page.setViewportSize({ width: 390, height: 1000 });
