@@ -87,11 +87,20 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
       return { name: `${labels[kind]}${['bedroom', 'bathroom'].includes(kind) ? ` ${count[kind]}` : ''}`, kind, floor: '1', widthFt: null, lengthFt: null, source: 'unknown', confidence: 'medium', file: 'Home type selected', page: index + 1, notes: '' };
     }) };
   };
-  const refreshWalletBalance = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase.from('coin_wallets').select('balance').eq('user_id', user.id).maybeSingle();
-    setWalletBalance(data?.balance ?? 0);
+  const refreshWalletBalance = async (): Promise<number | null> => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) { setWalletBalance(null); return null; }
+      const { data, error: walletError } = await supabase.from('coin_wallets').select('balance').eq('user_id', user.id).maybeSingle();
+      if (walletError || !data || !Number.isInteger(data.balance)) { setWalletBalance(null); return null; }
+      setWalletBalance(data.balance);
+      return data.balance;
+    } catch { setWalletBalance(null); return null; }
+  };
+  const requireCoins = async (cost: number) => {
+    const balance = await refreshWalletBalance();
+    if (balance === null) throw new Error('Could not check your coin balance. Please retry before starting AI.');
+    if (balance < cost) throw new Error(`Insufficient coins. You need ${cost} coins; your balance is ${balance}. Top up ${cost - balance} coins to continue.`);
   };
   useEffect(() => {
     if (!mode) return;
@@ -143,12 +152,14 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   }
   async function analyse() {
     if (pending.current || !files.length) return;
-    pending.current = true; setBusy('Uploading your plans'); setError(''); setProgress(0);
+    pending.current = true; setBusy('Checking coin balance'); setError(''); setProgress(0);
     let cancelled = false;
     abort.current = () => { cancelled = true; };
     try {
+      await requireCoins(AI_COIN_COSTS.floor_plan);
       const accessToken = await token();
       if (cancelled) throw new Error('Upload cancelled.');
+      setBusy('Uploading your plans');
       const form = new FormData(); files.forEach(file => form.append('files', file));
       const result = await new Promise<{ analysis: PlanAnalysis; projectId: string }>((resolve, reject) => {
         const xhr = new XMLHttpRequest(); abort.current = () => xhr.abort();
@@ -172,6 +183,8 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     const timeout = setTimeout(() => controller.abort(), 360000);
     abort.current = () => controller.abort();
     try {
+      if (!projectId && !retryPricing) await requireCoins(AI_COIN_COSTS.ai_builder);
+      controller.signal.throwIfAborted();
       const draft = getCurrentDraft();
       if (!brief.measurementInputUnit) throw new Error('Choose Sqft, Feet, Square metres or Metres before generating.');
       if ((selected || retryPricing) && JSON.stringify(draft) !== base.current) throw new Error('The editor changed. Go Back and generate a new estimate to preserve your edits.');
@@ -327,7 +340,8 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
           </>}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 border-t bg-background px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
-          {error && <div ref={errorBanner} tabIndex={-1} role="alert" className="w-full rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-950 outline-none"><p className="font-semibold">{error}</p>{error === AI_SERVICE_ISSUE && <><p className="mt-1 text-amber-900/80">Your coins will not be charged for this request.</p><p className="mt-2 text-xs text-amber-900/70">Feel free to go back and try again later.</p></>}</div>}
+          {error && <div ref={errorBanner} tabIndex={-1} role="alert" className="w-full rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-950 outline-none"><p className="font-semibold">{error}</p>{/insufficient coins/i.test(error) && <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => window.dispatchEvent(new Event('intorza:open-wallet'))}>Top up coins</Button>}{error === AI_SERVICE_ISSUE && <><p className="mt-1 text-amber-900/80">Your coins will not be charged for this request.</p><p className="mt-2 text-xs text-amber-900/70">Feel free to go back and try again later.</p></>}</div>}
+          {!busy && walletBalance !== null && ((step === 'upload' && walletBalance < AI_COIN_COSTS.floor_plan) || (!projectId && (step === 'scope' || step === 'review') && walletBalance < AI_COIN_COSTS.ai_builder)) && !error && <div role="status" className="w-full rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">You have {walletBalance} coins. {step === 'upload' ? AI_COIN_COSTS.floor_plan : AI_COIN_COSTS.ai_builder} coins are required. <button type="button" className="font-semibold underline" onClick={() => window.dispatchEvent(new Event('intorza:open-wallet'))}>Top up coins</button></div>}
           {busy ? <Button variant="outline" type="button" onClick={() => abort.current?.()}>Cancel request</Button> : <>
             <Button variant="outline" type="button" onClick={step === 'upload' || step === 'analysis' && mode === 'details' ? onClose : back}><ArrowLeft className="mr-1 h-4 w-4" />{step === 'upload' || step === 'analysis' && mode === 'details' ? 'Cancel' : 'Back'}</Button>
             {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'scope' ? <Button type="button" className="min-w-0 flex-1" disabled={!scopedRooms(analysis, brief).length || !brief.measurementInputUnit} onClick={() => void generate()}>Generate Quotation<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'review' ? <Button type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>

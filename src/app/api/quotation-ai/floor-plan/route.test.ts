@@ -22,6 +22,8 @@ const getUser = jest.fn(); const limit = jest.fn(); const analyse = jest.fn(); c
 const upload = jest.fn(); const remove = jest.fn(); const from = jest.fn();
 const rpc = jest.fn();
 const eq = jest.fn(); const insert = jest.fn();
+let walletBalance = 60;
+let walletError = false;
 let projectExists = true;
 let referenceRows: Record<string, unknown>[] = [];
 let libraryRows: Record<string, unknown>[] = [];
@@ -34,7 +36,7 @@ function database(table: string) {
   let updatingProfile = false;
   const chain = { select: jest.fn().mockReturnThis(), eq: jest.fn(function (...args: unknown[]) { eq(table, ...args); return chain; }),
     range: jest.fn((start: number, end: number) => Promise.resolve({ ...result, data: Array.isArray(result.data) ? result.data.slice(start, end + 1) : [] })), limit: jest.fn().mockResolvedValue(result), order: jest.fn().mockReturnThis(), single: jest.fn(() => Promise.resolve(updatingProfile && measurementUpdateFails ? { data: null, error: new Error('Denied') } : result)),
-    maybeSingle: jest.fn().mockResolvedValue({ data: projectExists ? { id: 'project', estimate: storedEstimate } : null, error: null }),
+    maybeSingle: jest.fn().mockResolvedValue(table === 'coin_wallets' ? { data: walletError ? null : { balance: walletBalance }, error: walletError ? { message: 'Wallet unavailable' } : null } : { data: projectExists ? { id: 'project', estimate: storedEstimate } : null, error: null }),
     insert: jest.fn((row: unknown) => { insert(table, row); return Promise.resolve({ error: null }); }),
     update: jest.fn((body: unknown) => { if (table === 'profiles') { updatingProfile = true; profileUpdate(body); } return chain; }), then: (resolve: (value: unknown) => void) => Promise.resolve({ error: null }).then(resolve),
   };
@@ -45,7 +47,7 @@ function request(body: unknown, authenticated = true) {
 }
 const payload = () => ({ action: 'generate', projectId: null, analysis: planFixture(), brief: briefFixture(), draft: draftFixture() });
 beforeEach(() => {
-  jest.clearAllMocks(); projectExists = true; referenceRows = []; libraryRows = []; storedEstimate = null; metricProfile = false; measurementUpdateFails = false;
+  jest.clearAllMocks(); walletBalance = 60; walletError = false; projectExists = true; referenceRows = []; libraryRows = []; storedEstimate = null; metricProfile = false; measurementUpdateFails = false;
   getUser.mockResolvedValue({ data: { user: { id: 'owner' } }, error: null });
   limit.mockResolvedValue({ success: true });
   (getCloudflareContext as jest.Mock).mockResolvedValue({ env: { OPENAI_API_KEY: 'secret', OPENAI_FLOOR_PLAN_MODEL: 'configured-vision-model', QUOTATION_AI_LIMITER: { limit } } });
@@ -363,9 +365,43 @@ it('reports wallet outages as service failures instead of insufficient coins', a
 });
 
 it('charges 40 coins after successful floor-plan analysis', async () => {
+  walletBalance = 40;
   const form = new FormData();
   form.append('files', new File(['%PDF-1.7\ncontent\n%%EOF'], 'plan.pdf', { type: 'application/pdf' }));
   const response = await POST(new Request('https://app.intorza.com/api/quotation-ai/floor-plan', { method: 'POST', headers: { Authorization: 'Bearer session' }, body: form }));
   expect(response.status).toBe(200);
   expect(rpc).toHaveBeenCalledWith('debit_coins', expect.objectContaining({ p_amount: 40, p_type: 'floor_plan' }));
+});
+
+it.each([0, 5, 39])('blocks floor-plan uploads with %i coins before storage or AI', async balance => {
+  walletBalance = balance;
+  const form = new FormData(); form.append('files', new File(['%PDF-1.7\ncontent\n%%EOF'], 'plan.pdf', { type: 'application/pdf' }));
+  const response = await POST(new Request('https://app.intorza.com/api/quotation-ai/floor-plan', { method: 'POST', headers: { Authorization: 'Bearer session' }, body: form }));
+  expect(response.status).toBe(402);
+  expect(await response.json()).toMatchObject({ code: 'COINS_REQUIRED', requiredCoins: 40, balance });
+  expect(upload).not.toHaveBeenCalled(); expect(analyse).not.toHaveBeenCalled(); expect(insert).not.toHaveBeenCalled();
+  expect(rpc).not.toHaveBeenCalledWith('debit_coins', expect.anything());
+});
+it.each([0, 5, 19])('blocks new quotations with %i coins before AI or persistence', async balance => {
+  walletBalance = balance;
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(402);
+  expect(await response.json()).toMatchObject({ code: 'COINS_REQUIRED', requiredCoins: 20, balance });
+  expect(generate).not.toHaveBeenCalled(); expect(research).not.toHaveBeenCalled(); expect(autoComplete).not.toHaveBeenCalled(); expect(insert).not.toHaveBeenCalled();
+});
+it('allows a new quotation with exactly 20 coins', async () => {
+  walletBalance = 20;
+  expect((await POST(request(payload()))).status).toBe(200);
+});
+it('fails closed before AI when the wallet cannot be read', async () => {
+  walletError = true;
+  expect((await POST(request(payload()))).status).toBe(422);
+  expect(generate).not.toHaveBeenCalled(); expect(research).not.toHaveBeenCalled();
+});
+
+it('does not require more coins to continue an already-paid floor-plan project', async () => {
+  walletBalance = 0;
+  const response = await POST(request({ ...payload(), projectId: '00000000-0000-4000-8000-000000000001' }));
+  expect(response.status).toBe(200);
+  expect(rpc).not.toHaveBeenCalledWith('debit_coins', expect.anything());
 });

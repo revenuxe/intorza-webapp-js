@@ -46,6 +46,19 @@ export async function POST(request: Request) {
     const { data: hasPro, error: proError } = await db.rpc('is_pro_user', { _user_id: user.id });
     if (proError) throw new Error('Could not verify your Pro access. Please retry.');
     if (!hasPro) return json({ error: 'Build with AI is available with an active Pro subscription. Upgrade to Pro, then use your wallet coins for each AI request.', code: 'PRO_REQUIRED', requestId }, 403);
+    // Check a fresh wallet balance before any storage or paid provider work.
+    // The final atomic debit remains authoritative if another request spends coins.
+    const requireCoins = async (cost: number) => {
+      const wallet = await db.from('coin_wallets').select('balance').eq('user_id', user.id).maybeSingle();
+      if (wallet.error || !wallet.data || !Number.isInteger(wallet.data.balance)) {
+        throw new Error('Could not verify wallet balance');
+      }
+      if (wallet.data.balance < cost) return json({
+        error: `Insufficient coins. This request requires ${cost} coins; your balance is ${wallet.data.balance}. Top up ${cost - wallet.data.balance} coins to continue.`,
+        code: 'COINS_REQUIRED', requiredCoins: cost, balance: wallet.data.balance, requestId,
+      }, 402);
+      return null;
+    };
     let env: Env = {};
     try { env = (await getCloudflareContext({ async: true })).env as unknown as Env; } catch { /* Local development. */ }
     if (!env.QUOTATION_AI_LIMITER && process.env.NODE_ENV === 'production') return json({ error: AI_SERVICE_ISSUE }, 503);
@@ -56,6 +69,8 @@ export async function POST(request: Request) {
     const contentType = request.headers.get('content-type') ?? '';
     if (contentType.startsWith('multipart/form-data')) {
       if (!key || !model) return json({ error: AI_SERVICE_ISSUE }, 503);
+      const insufficient = await requireCoins(AI_COIN_COSTS.floor_plan);
+      if (insufficient) return insufficient;
       const body = await boundedBody(request, MAX_PLAN_BYTES + 65536);
       const form = await new Response(body, { headers: { 'Content-Type': contentType } }).formData();
       const entries = form.getAll('files');
@@ -114,6 +129,10 @@ export async function POST(request: Request) {
     }
     if (regenerateRooms && (!previousEstimate || regenerateRooms.some(name => !scopedRooms(analysis, brief).some(room => room.name === name)))) return json({ error: 'Select rooms from the current estimate to regenerate.' }, 400);
     if (action === 'retry_pricing' && (!previousEstimate || regenerateRooms)) return json({ error: 'Open an existing estimate to retry its pricing.' }, 400);
+    if (!projectId && action === 'generate') {
+      const insufficient = await requireCoins(AI_COIN_COSTS.ai_builder);
+      if (insufficient) return insufficient;
+    }
     // Read the complete owner library before matching; older products must not be
     // hidden by an arbitrary first-page cap. RLS and owner filtering both apply.
     const ownerPricing = async (table: 'quotation_approved_rates' | 'item_usage_patterns') => {
