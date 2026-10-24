@@ -14,12 +14,13 @@ export function ItemMeasurements({ item, onChange, layout = 'standard' }: {
   const unit = getQuotationUnit(item.measurementUnit);
   const [unitPickerOpen, setUnitPickerOpen] = useState(false);
   const area = isAreaUnit(unit);
+  const calculated = area && item.widthFt > 0 && item.heightFt > 0 && Math.abs(item.widthFt * item.heightFt - item.sftArea) < 0.0001;
   const length = unit === 'Sq.m' ? 'm' : 'ft';
- const coverageField = (<label className={`space-y-2 text-sm ${layout === 'product' ? 'col-span-2' : ''}`}><span>{area ? 'Area' : 'Quantity'} ({unit})</span><Input aria-label={(area ? 'Area' : 'Quantity') + ' (' + unit + ')'} type="number" min="0" step="any" value={item.sftArea || ''} onChange={e => onChange('sftArea', Math.max(0, Number(e.target.value) || 0))} /></label>);
+ const coverageField = (<label className={`space-y-2 text-sm ${layout === 'product' ? 'col-span-2' : ''}`}><span className="flex items-center justify-between gap-2"><span>{area ? 'Area' : 'Quantity'} ({unit})</span>{calculated && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Calculated</span>}</span><div className="relative"><Input className={calculated ? 'border-primary/20 bg-primary/5 pr-14 font-semibold text-primary' : 'pr-14'} aria-label={(area ? 'Area' : 'Quantity') + ' (' + unit + ')'} type="number" min="0" step="any" value={item.sftArea || ''} onChange={e => onChange('sftArea', Math.max(0, Number(e.target.value) || 0))} /><span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">{unit}</span></div>{calculated && <span className="block text-[11px] text-muted-foreground">Width x height. Edit area directly to replace dimensions.</span>}</label>);
  const dimensionFields = (area && (['widthFt', 'heightFt'] as const).map((field, index) => <label key={field} className="space-y-2 text-sm"><span>{index ? 'Height' : 'Width'} ({length})</span><Input aria-label={(index ? 'Height' : 'Width') + ' (' + length + ')'} type="number" min="0" step="any" value={item[field] || ''} onChange={e => onChange(field, Math.max(0, Number(e.target.value) || 0))} /></label>));
  return <div className="grid grid-cols-2 items-start gap-3">
  <div className={`space-y-2 text-sm ${layout === 'product' ? 'col-span-2' : ''}`}>
-   <span className="block text-xs font-medium text-muted-foreground">Measurement</span>
+   <span className="block text-xs font-medium text-muted-foreground">Unit / Measurement</span>
    <Popover open={unitPickerOpen} onOpenChange={setUnitPickerOpen}>
      <PopoverTrigger asChild>
        <Button type="button" variant="outline" role="combobox" aria-label="Measurement unit" aria-expanded={unitPickerOpen} className="h-10 w-full justify-between gap-2 rounded-lg border-primary/20 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 sm:text-sm">

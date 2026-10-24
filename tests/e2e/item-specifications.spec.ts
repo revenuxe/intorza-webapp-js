@@ -11,15 +11,14 @@ test('product-first item cards keep optional specifications, pricing and respons
   });
   await page.goto('/');
   await page.locator('#projectTitle').fill('Product specifications check');
-  const card = page.getByText('Item 1', { exact: true }).locator('../..');
+  const card = page.getByRole('article', { name: /^Item 1:/ });
   await card.getByLabel('Product Name', { exact: true }).fill('Wardrobe');
   await card.getByLabel('Product Details', { exact: true }).fill('4-door wardrobe with loft');
   await expect(card.getByLabel('Material', { exact: true })).toHaveCount(0);
   await card.getByRole('button', { name: 'Add specifications', exact: true }).click();
-  await card.getByRole('button', { name: 'Material', exact: true }).click();
   await card.getByLabel('Material', { exact: true }).fill('BWP Plywood');
-  await card.getByRole('button', { name: 'Brand', exact: true }).click();
   await card.getByLabel('Brand', { exact: true }).fill('Century');
+  await card.getByRole('button', { name: 'Add field', exact: true }).click();
   await card.getByRole('button', { name: 'Add custom field', exact: true }).click();
   await card.getByLabel('Custom field name').fill('Warranty');
   await card.getByRole('button', { name: 'Add field', exact: true }).click();
@@ -38,6 +37,14 @@ test('product-first item cards keep optional specifications, pricing and respons
   }
   await page.setViewportSize({ width: 390, height: 1000 });
   await card.screenshot({ path: 'test-results/product-specifications-mobile.png' });
+  await expect(card.getByText('Calculated', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Add Item to Room', exact: true }).click();
+  await expect(card.getByRole('button', { name: '1. Wardrobe' })).toHaveAttribute('aria-expanded', 'false');
+  await expect(card.getByLabel('Product Name', { exact: true })).toBeHidden();
+  await expect(page.getByRole('article', { name: /^Item 2:/ }).getByLabel('Product Name', { exact: true })).toBeVisible();
+  await card.getByRole('button', { name: '1. Wardrobe' }).click();
+  await expect(card.getByLabel('Product Details', { exact: true })).toHaveValue('4-door wardrobe with loft');
+  await expect(card.getByLabel('Warranty', { exact: true })).toHaveValue('10 years');
   await page.getByRole('button', { name: 'Save as Draft', exact: true }).click();
   await expect(page).toHaveURL(/\/auth$/);
   const pending = await page.evaluate(() => sessionStorage.getItem('pendingFormData'));

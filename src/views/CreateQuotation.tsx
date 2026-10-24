@@ -38,6 +38,8 @@ import { EstimatePriceDetails } from '@/components/quotation/EstimatePriceDetail
 import type { PriceEvidence } from '@/lib/quotation-ai/floor-plan';
 import { reconcileSavedQuotation, remapDraftIds } from '@/lib/quotation-ai/save-reconciliation';
 import { fromQuotation, lineAmount, quotationTotals, reviewDraft, draftSchema, type VoiceDraft } from "@/lib/quotation-ai/domain";
+import { QuotationItemCard } from '@/components/quotation/QuotationItemCard';
+import { ItemSideSelector } from '@/components/quotation/ItemSideSelector';
 import { ItemSpecifications } from '@/components/quotation/ItemSpecifications';
 import { combineItemDetails, splitItemDetails } from '@/lib/itemSpecifications';
 import { ItemMeasurements } from '@/components/quotation/ItemMeasurements';
@@ -70,6 +72,8 @@ const CreateQuotation = () => {
     toast, feedback, clearFeedback
   } = useInlineFeedback({ autoRevealErrors: true });
   const [isSaving, setIsSaving] = useState(false);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const newItemToFocus = useRef<string | null>(null);
   const [builderMode, setBuilderMode] = useState<BuilderMode | null>(null);
   const lastAIDraft = useRef<VoiceDraft | null>(null);
   const planProjectId = useRef<string | null>(null);
@@ -118,6 +122,11 @@ const CreateQuotation = () => {
       amount: 0
     }]
   }]);
+  useEffect(() => {
+    if (!newItemToFocus.current) return;
+    const input = document.getElementById(`product-name-${newItemToFocus.current}`);
+    if (input) { newItemToFocus.current = null; input.focus(); }
+  }, [sections]);
   const [projectTitle, setProjectTitle] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientAddress, setClientAddress] = useState("");
@@ -500,10 +509,13 @@ const CreateQuotation = () => {
     }]);
   };
   const addItemToSection = (sectionId: string) => {
+    const newItemId = crypto.randomUUID();
+    newItemToFocus.current = newItemId;
+    setActiveItemId(newItemId);
     setSections(currentSections => currentSections.map(section => section.id === sectionId ? {
       ...section,
       items: [...section.items, {
-        id: Date.now().toString(),
+        id: newItemId,
         side: "A",
         productName: "",
         productDetails: "",
@@ -1269,10 +1281,7 @@ const CreateQuotation = () => {
               {/* Items */}
               {section.items.map((item, itemIndex) => {
                 const details = splitItemDetails(item.productDetails);
-                return <div key={item.id} className="min-w-0 max-w-full p-5 sm:p-6 border border-border rounded-lg space-y-4 bg-muted/30">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-sm font-medium text-muted-foreground">Item {itemIndex + 1}</span>
-                    <div className="flex gap-1">
+                return <QuotationItemCard key={item.id} item={item} index={itemIndex} pending={isPendingAIItem(item)} activeItemId={activeItemId} onActivate={() => setActiveItemId(item.id)} currencySymbol={profile.currency_symbol} locale={profile.locale} actions={<>
                       <Button aria-label={`Add image for item ${itemIndex + 1}`} variant="ghost" size="sm" onClick={() => {
                         setImagePickerItemId(item.id);
                         setImagePickerProductName(item.productName);
@@ -1281,11 +1290,10 @@ const CreateQuotation = () => {
                         <ImageIcon className="h-4 w-4" />
                         {itemImages[item.id]?.length ? <span className="text-xs ml-1">{itemImages[item.id].length}</span> : null}
                       </Button>
-                      {section.items.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(section.id, item.id)} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
+                      {section.items.length > 1 && <Button aria-label={`Remove item ${itemIndex + 1}`} variant="ghost" size="sm" onClick={() => removeItem(section.id, item.id)} className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10">
                           <Trash2 className="h-4 w-4" />
                         </Button>}
-                    </div>
-                  </div>
+                    </>}>
                   {/* Item images preview */}
                   {itemImages[item.id]?.length > 0 && (
                     <div className="flex gap-2 flex-wrap">
@@ -1320,10 +1328,7 @@ const CreateQuotation = () => {
                     <ItemMeasurements layout="product" item={item} onChange={(field, value) => updateItem(section.id, item.id, field, value)} />
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {customizeSettings.showSideColumn && <div className="space-y-2">
-                      <Label htmlFor={`item-side-${item.id}`}>Side</Label>
-                      <Input id={`item-side-${item.id}`} value={item.side} onChange={event => updateItem(section.id, item.id, 'side', event.target.value)} placeholder="A" />
-                    </div>}
+                    {customizeSettings.showSideColumn && <ItemSideSelector id={`item-side-${item.id}`} value={item.side} onChange={value => updateItem(section.id, item.id, 'side', value)} />}
                     <div className={`space-y-2 ${customizeSettings.showSideColumn ? '' : 'sm:col-span-2'}`}>
                       <Label htmlFor={`item-rate-${item.id}`}>Rate / {getQuotationUnit(item.measurementUnit)} ({profile.currency_symbol})</Label>
                       <Input id={`item-rate-${item.id}`} type="number" min="0" value={item.ratePerSft || ''} onChange={event => updateItem(section.id, item.id, 'ratePerSft', parseFloat(event.target.value) || 0)} placeholder="0" step="0.01" />
@@ -1334,7 +1339,7 @@ const CreateQuotation = () => {
                     <span className="text-lg font-semibold tabular-nums text-primary">{isPendingAIItem(item) ? 'Pending' : <>{profile.currency_symbol}{item.amount.toLocaleString(profile.locale, { minimumFractionDigits: 2 })}</>}</span>
                   </div>
                   {Object.prototype.hasOwnProperty.call(aiPriceEvidence, item.id) && <div className="rounded-lg bg-muted/30 px-3 py-2"><EstimatePriceDetails price={aiPriceEvidence[item.id]} /><p className="mt-1 text-[11px] text-muted-foreground">Original AI price evidence. Manual rate/specification changes require your review.</p></div>}
-                </div>; })}
+                </QuotationItemCard>; })}
 
               {/* Room Subtotal */}
               <div className="flex justify-between items-center pt-4 border-t border-border">

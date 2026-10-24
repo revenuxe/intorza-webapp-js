@@ -37,3 +37,15 @@ it('excludes non-area quantities from project area and converts square metres', 
  expect(projectAreaSqft({ measurementUnit: 'Sq.m', sftArea: 2 })).toBeCloseTo(21.5278, 4);
  for (const [unit] of quotationUnits.filter(([unit]) => unit !== 'Sq.ft' && unit !== 'Sq.m')) expect(projectAreaSqft({ measurementUnit: unit, sftArea: 500 })).toBe(0);
 });
+
+it('marks derived area as calculated while keeping direct area entry editable', () => {
+  const onChange = jest.fn();
+  const view = render(<ItemMeasurements item={item} onChange={onChange} layout="product" />);
+  expect(screen.getByText('Calculated')).toBeVisible();
+  expect(screen.getByLabelText('Area (Sq.ft)')).not.toHaveAttribute('readonly');
+  fireEvent.change(screen.getByLabelText('Area (Sq.ft)'), { target: { value: '60' } });
+  expect(onChange).toHaveBeenCalledWith('sftArea', 60);
+  view.rerender(<ItemMeasurements item={{ ...item, widthFt: 0, heightFt: 0, sftArea: 60 }} onChange={onChange} layout="product" />);
+  expect(screen.queryByText('Calculated')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Area (Sq.ft)')).toHaveValue('60');
+});
