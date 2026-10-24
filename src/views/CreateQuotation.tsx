@@ -73,6 +73,7 @@ const CreateQuotation = () => {
   } = useInlineFeedback({ autoRevealErrors: true });
   const [isSaving, setIsSaving] = useState(false);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [collapseExceptItemId, setCollapseExceptItemId] = useState<string | null>(null);
   const newItemToFocus = useRef<string | null>(null);
   const [builderMode, setBuilderMode] = useState<BuilderMode | null>(null);
   const lastAIDraft = useRef<VoiceDraft | null>(null);
@@ -492,11 +493,15 @@ const CreateQuotation = () => {
     }
   };
   const addSection = () => {
-    setSections([...sections, {
-      id: Date.now().toString(),
+    const newItemId = crypto.randomUUID();
+    newItemToFocus.current = newItemId;
+    setActiveItemId(newItemId);
+    setCollapseExceptItemId(newItemId);
+    setSections(current => [...current, {
+      id: crypto.randomUUID(),
       title: "",
       items: [{
-        id: Date.now().toString(),
+        id: newItemId,
         side: "A",
         productName: "",
         productDetails: "",
@@ -512,6 +517,7 @@ const CreateQuotation = () => {
     const newItemId = crypto.randomUUID();
     newItemToFocus.current = newItemId;
     setActiveItemId(newItemId);
+    setCollapseExceptItemId(newItemId);
     setSections(currentSections => currentSections.map(section => section.id === sectionId ? {
       ...section,
       items: [...section.items, {
@@ -1281,7 +1287,7 @@ const CreateQuotation = () => {
               {/* Items */}
               {section.items.map((item, itemIndex) => {
                 const details = splitItemDetails(item.productDetails);
-                return <QuotationItemCard key={item.id} item={item} index={itemIndex} pending={isPendingAIItem(item)} activeItemId={activeItemId} onActivate={() => setActiveItemId(item.id)} currencySymbol={profile.currency_symbol} locale={profile.locale} actions={<>
+                return <QuotationItemCard key={item.id} item={item} index={itemIndex} pending={isPendingAIItem(item)} activeItemId={activeItemId} collapseExceptItemId={collapseExceptItemId} onActivate={() => setActiveItemId(item.id)} currencySymbol={profile.currency_symbol} locale={profile.locale} actions={<>
                       <Button aria-label={`Add image for item ${itemIndex + 1}`} variant="ghost" size="sm" onClick={() => {
                         setImagePickerItemId(item.id);
                         setImagePickerProductName(item.productName);

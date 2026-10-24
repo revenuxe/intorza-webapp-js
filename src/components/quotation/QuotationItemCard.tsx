@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { getQuotationUnit } from '@/lib/quotationUnits';
 
 type Item = { id: string; productName: string; measurementUnit?: string; sftArea: number; ratePerSft: number; amount: number };
-export function QuotationItemCard({ item, index, pending, activeItemId, onActivate, currencySymbol, locale, actions, children }: {
+export function QuotationItemCard({ item, index, pending, activeItemId, collapseExceptItemId = null, onActivate, currencySymbol, locale, actions, children }: {
+  collapseExceptItemId?: string | null;
   item: Item; index: number; pending: boolean; activeItemId: string | null; onActivate: () => void;
   currencySymbol: string; locale: string; actions: ReactNode; children: ReactNode;
 }) {
@@ -16,6 +17,8 @@ export function QuotationItemCard({ item, index, pending, activeItemId, onActiva
   // Close finished work when the designer moves to another item. Never close
   // an item just because its last price digit made it complete.
   useEffect(() => { if (activeItemId !== null && activeItemId !== item.id && complete) setOpen(false); }, [activeItemId, item.id, complete]);
+  // Adding a room/item collapses all previous cards, including unfinished work.
+  useEffect(() => { if (collapseExceptItemId !== null && collapseExceptItemId !== item.id) setOpen(false); }, [collapseExceptItemId, item.id]);
   const money = (value: number) => currencySymbol + value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return <article className="min-w-0 max-w-full rounded-xl border border-border bg-muted/30 p-4 sm:p-5" aria-label={`Item ${index + 1}: ${item.productName || 'New item'}`}>
     <div className="flex items-start gap-2">

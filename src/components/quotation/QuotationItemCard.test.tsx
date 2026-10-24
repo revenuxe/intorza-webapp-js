@@ -24,3 +24,17 @@ it('keeps incomplete items open when another item is activated', () => {
   render(<QuotationItemCard {...props} activeItemId="item-2" item={{ ...item, sftArea: 0 }}><input aria-label="Description" /></QuotationItemCard>);
   expect(screen.getByRole('textbox', { name: 'Description' })).toBeVisible();
 });
+
+it('collapses unfinished items when a room or item is added and preserves their inputs', () => {
+  const incomplete = { ...item, ratePerSft: 0 };
+  const view = render(<QuotationItemCard {...props} item={incomplete}><input aria-label="Description" defaultValue="Unsaved notes" /></QuotationItemCard>);
+  expect(screen.getByRole('textbox', { name: 'Description' })).toBeVisible();
+  view.rerender(<QuotationItemCard {...props} item={incomplete} collapseExceptItemId="new-item"><input aria-label="Description" defaultValue="Unsaved notes" /></QuotationItemCard>);
+  expect(screen.queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '1. Wardrobe' }));
+  expect(screen.getByRole('textbox', { name: 'Description' })).toHaveValue('Unsaved notes');
+});
+it('leaves the newly added item open', () => {
+  render(<QuotationItemCard {...props} item={{ ...item, ratePerSft: 0 }} collapseExceptItemId={item.id}><input aria-label="Description" /></QuotationItemCard>);
+  expect(screen.getByRole('textbox', { name: 'Description' })).toBeVisible();
+});
