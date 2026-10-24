@@ -74,7 +74,7 @@ const CreateQuotation = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [collapseExceptItemId, setCollapseExceptItemId] = useState<string | null>(null);
-  const newItemToFocus = useRef<string | null>(null);
+  const newItemToFocus = useRef<{ itemId: string; roomId?: string } | null>(null);
   const [builderMode, setBuilderMode] = useState<BuilderMode | null>(null);
   const lastAIDraft = useRef<VoiceDraft | null>(null);
   const planProjectId = useRef<string | null>(null);
@@ -124,9 +124,22 @@ const CreateQuotation = () => {
     }]
   }]);
   useEffect(() => {
-    if (!newItemToFocus.current) return;
-    const input = document.getElementById(`product-name-${newItemToFocus.current}`);
-    if (input) { newItemToFocus.current = null; input.focus(); }
+    const destination = newItemToFocus.current;
+    if (!destination) return;
+    // Wait for the preceding cards to collapse before measuring the new card.
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        const input = document.getElementById(destination.roomId ? `room-title-${destination.roomId}` : `product-name-${destination.itemId}`);
+        const card = document.getElementById(destination.roomId ? `quotation-room-${destination.roomId}` : `quotation-item-${destination.itemId}`);
+        if (!input || !card) return;
+        newItemToFocus.current = null;
+        input.focus({ preventScroll: true });
+        const headerHeight = document.querySelector('header')?.getBoundingClientRect().height ?? 0;
+        card.style.scrollMarginTop = `${headerHeight + 16}px`;
+        card.scrollIntoView({ block: 'start', behavior: 'instant' });
+      });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [sections]);
   const [projectTitle, setProjectTitle] = useState("");
   const [clientName, setClientName] = useState("");
@@ -494,11 +507,12 @@ const CreateQuotation = () => {
   };
   const addSection = () => {
     const newItemId = crypto.randomUUID();
-    newItemToFocus.current = newItemId;
+    const newRoomId = crypto.randomUUID();
+    newItemToFocus.current = { itemId: newItemId, roomId: newRoomId };
     setActiveItemId(newItemId);
     setCollapseExceptItemId(newItemId);
     setSections(current => [...current, {
-      id: crypto.randomUUID(),
+      id: newRoomId,
       title: "",
       items: [{
         id: newItemId,
@@ -515,7 +529,7 @@ const CreateQuotation = () => {
   };
   const addItemToSection = (sectionId: string) => {
     const newItemId = crypto.randomUUID();
-    newItemToFocus.current = newItemId;
+    newItemToFocus.current = { itemId: newItemId };
     setActiveItemId(newItemId);
     setCollapseExceptItemId(newItemId);
     setSections(currentSections => currentSections.map(section => section.id === sectionId ? {
@@ -1273,10 +1287,10 @@ const CreateQuotation = () => {
         </Card>
 
         {/* Rooms & Items */}
-        {sections.map((section, sectionIndex) => <Card key={section.id} className="min-w-0 max-w-full">
+        {sections.map((section, sectionIndex) => <Card key={section.id} id={`quotation-room-${section.id}`} className="min-w-0 max-w-full">
             <CardHeader className="px-5 sm:px-8">
               <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-3">
-                <Input aria-label={`Room title ${sectionIndex + 1}`} value={section.title} onChange={e => updateSectionTitle(section.id, e.target.value)} className="min-w-0 basis-40 flex-1 text-lg font-semibold border-none px-2 py-1 h-auto focus-visible:ring-0" placeholder="Room Title" />
+                <Input id={`room-title-${section.id}`} aria-label={`Room title ${sectionIndex + 1}`} value={section.title} onChange={e => updateSectionTitle(section.id, e.target.value)} className="min-w-0 basis-40 flex-1 text-lg font-semibold border-none px-2 py-1 h-auto focus-visible:ring-0" placeholder="Room Title" />
                 <RoomPicker value={section.title} onChange={room => selectRoom(section.id, room)} />
                 {sections.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeSection(section.id)} className="text-destructive hover:text-destructive">
                     <Trash2 className="h-4 w-4" />

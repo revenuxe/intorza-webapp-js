@@ -20,7 +20,7 @@ export function QuotationItemCard({ item, index, pending, activeItemId, collapse
   // Adding a room/item collapses all previous cards, including unfinished work.
   useEffect(() => { if (collapseExceptItemId !== null && collapseExceptItemId !== item.id) setOpen(false); }, [collapseExceptItemId, item.id]);
   const money = (value: number) => currencySymbol + value.toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return <article className="min-w-0 max-w-full rounded-xl border border-border bg-muted/30 p-4 sm:p-5" aria-label={`Item ${index + 1}: ${item.productName || 'New item'}`}>
+  return <article id={`quotation-item-${item.id}`} className="min-w-0 max-w-full rounded-xl border border-border bg-muted/30 p-4 sm:p-5" aria-label={`Item ${index + 1}: ${item.productName || 'New item'}`}>
     <div className="flex items-start gap-2">
       <button ref={toggle} type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => { setOpen(current => !current); onActivate(); }} className="flex min-w-0 flex-1 items-start gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
         <p className="min-w-0 flex-1 break-words text-sm font-semibold">{index + 1}. {item.productName || 'New item'}</p>
