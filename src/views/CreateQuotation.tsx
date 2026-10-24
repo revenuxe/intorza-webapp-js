@@ -1327,9 +1327,9 @@ const CreateQuotation = () => {
                   <div className="border-t border-border/70 pt-4">
                     <ItemMeasurements layout="product" item={item} onChange={(field, value) => updateItem(section.id, item.id, field, value)} />
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className={`grid items-end gap-3 ${customizeSettings.showSideColumn ? 'grid-cols-[5.5rem_minmax(0,1fr)] sm:grid-cols-[7rem_minmax(0,1fr)]' : 'grid-cols-1'}`}>
                     {customizeSettings.showSideColumn && <ItemSideSelector id={`item-side-${item.id}`} value={item.side} onChange={value => updateItem(section.id, item.id, 'side', value)} />}
-                    <div className={`space-y-2 ${customizeSettings.showSideColumn ? '' : 'sm:col-span-2'}`}>
+                    <div className="min-w-0 space-y-2">
                       <Label htmlFor={`item-rate-${item.id}`}>Rate / {getQuotationUnit(item.measurementUnit)} ({profile.currency_symbol})</Label>
                       <Input id={`item-rate-${item.id}`} type="number" min="0" value={item.ratePerSft || ''} onChange={event => updateItem(section.id, item.id, 'ratePerSft', parseFloat(event.target.value) || 0)} placeholder="0" step="0.01" />
                     </div>
