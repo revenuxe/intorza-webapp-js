@@ -1327,7 +1327,8 @@ const CreateQuotation = () => {
                     </div>
                   )}
 
-                  <div className="space-y-2">
+                  <div className={`grid gap-4 ${customizeSettings.showProductDetails ? 'lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]' : ''}`}>
+                  <div className="min-w-0 space-y-2">
                     <Label htmlFor={`product-name-${item.id}`}>Product Name</Label>
                     <ProductNameInput id={`product-name-${item.id}`} value={item.productName}
                       onChange={name => updateItem(section.id, item.id, 'productName', name)} patterns={itemPatterns}
@@ -1336,13 +1337,14 @@ const CreateQuotation = () => {
                         if (pattern.preferred_rate && pattern.preferred_rate > 0 && !item.ratePerSft) updateItem(section.id, item.id, 'ratePerSft', pattern.preferred_rate);
                       }} placeholder="e.g. Wardrobe" />
                   </div>
-                  {customizeSettings.showProductDetails && <div className="space-y-2">
+                  {customizeSettings.showProductDetails && <div className="min-w-0 space-y-2">
                     <Label htmlFor={`product-details-${item.id}`}>Product Details</Label>
                     <Textarea id={`product-details-${item.id}`} value={details.description}
                       maxLength={Math.max(details.description.length, 1000 - (item.productDetails.length - details.description.length))}
                       onChange={event => updateItem(section.id, item.id, 'productDetails', combineItemDetails(event.target.value, details.specifications))}
                       placeholder="e.g. 4-door wardrobe with loft" rows={2} />
                   </div>}
+                  </div>
                   <ItemSpecifications value={item.productDetails} onChange={value => updateItem(section.id, item.id, 'productDetails', value)} />
                   <div className="border-t border-border/70 pt-4">
                     <ItemMeasurements layout="product" item={item} onChange={(field, value) => updateItem(section.id, item.id, field, value)} />

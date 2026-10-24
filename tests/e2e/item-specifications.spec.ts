@@ -33,6 +33,12 @@ test('product-first item cards keep optional specifications, pricing and respons
     const selectors = [card.getByLabel('Product Name', { exact: true }), card.getByLabel('Product Details', { exact: true }), card.getByLabel('Material', { exact: true }), card.getByRole('combobox', { name: 'Measurement unit' }), card.getByLabel('Width (ft)', { exact: true }), card.getByLabel('Area (Sq.ft)', { exact: true }), card.getByLabel('Side', { exact: true }), card.getByLabel('Rate / Sq.ft', { exact: false })];
     const positions = await Promise.all(selectors.map(locator => locator.boundingBox()));
     for (let index = 1; index < positions.length; index++) expect(positions[index]!.y).toBeGreaterThanOrEqual(positions[index - 1]!.y);
+    if (width >= 1024) {
+      expect(Math.abs(positions[0]!.y - positions[1]!.y)).toBeLessThan(2);
+      expect(positions[1]!.width).toBeGreaterThan(positions[0]!.width);
+    } else {
+      expect(positions[1]!.y).toBeGreaterThan(positions[0]!.y + positions[0]!.height);
+    }
     const side = await card.getByLabel('Side', { exact: true }).boundingBox();
     const rate = await card.getByLabel('Rate / Sq.ft', { exact: false }).boundingBox();
     expect(Math.abs(side!.y - rate!.y)).toBeLessThan(2);
