@@ -13,6 +13,7 @@ interface ItemPattern {
 }
 
 interface ProductNameInputProps {
+  id?: string;
   value: string;
   onChange: (name: string) => void;
   onProductSelect?: (pattern: ItemPattern) => void;
@@ -24,6 +25,7 @@ interface ProductNameInputProps {
 }
 
 export const ProductNameInput: React.FC<ProductNameInputProps> = ({
+  id,
   value,
   onChange,
   onProductSelect,
@@ -103,6 +105,7 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
   return (
     <div ref={containerRef} className="relative">
       <Input
+        id={id}
         ref={inputRef}
         value={inputValue}
         onChange={handleInputChange}

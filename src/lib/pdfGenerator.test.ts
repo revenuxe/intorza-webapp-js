@@ -1,3 +1,4 @@
+import { combineItemDetails } from './itemSpecifications';
 import { getQuotationSettings } from '@/components/CustomizeFieldsDrawer';
 import { TextDecoder, TextEncoder } from 'node:util';
 import { defaultEditorSettings } from './pdfThemes';
@@ -138,4 +139,19 @@ it.each([
   expect(itemText).toContain('4.00 Nos');
   expect(itemText).toContain('1.00 L.S.');
 
+});
+
+it.each([true, false])('prints optional item specifications beneath the description (simple layout: %s)', async useSimpleItemLayout => {
+  const productDetails = combineItemDetails('4-door wardrobe with loft', [
+    { label: 'Material', value: 'BWP Plywood' }, { label: 'Brand', value: 'Century' }, { label: 'Warranty', value: '10 years' },
+  ]);
+  const pdf = await generateQuotationPDF({ ...quotationData,
+    settings: { ...getQuotationSettings(), useSimpleItemLayout, showProductDetails: true },
+    sections: [{ ...quotationData.sections[0], items: [{ ...quotationData.sections[0].items[0], productDetails }] }],
+  });
+  const output = pdf.internal.pages.flat().join('\n');
+  expect(output).toContain('Specifications:');
+  expect(output).toContain('Material:');
+  expect(output).toContain('Century');
+  expect(output).toContain('Warranty:');
 });
