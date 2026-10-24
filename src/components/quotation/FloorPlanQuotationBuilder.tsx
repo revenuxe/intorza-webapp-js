@@ -1,5 +1,7 @@
 'use client';
 
+import { AI_COIN_COSTS } from '@/lib/ai-coin-costs';
+
 import { AI_SERVICE_ISSUE } from '@/lib/quotation-ai/service-issue';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, FileText, Loader2, LockKeyhole, Plus, Trash2, UploadCloud } from 'lucide-react';
@@ -31,8 +33,8 @@ type Props = {
 };
 type Step = 'upload' | 'analysis' | 'scope' | 'work' | 'design' | 'finish' | 'budget' | 'details' | 'review' | 'estimate';
 const emptyAnalysis: PlanAnalysis = { propertyType: 'Residential interior', floors: null, units: 'Not supplied', scale: 'Not supplied', rooms: [], warnings: ['No floor plan supplied. Work measurements require confirmation.'] };
-// Presentation values requested for this design. No wallet or credit deduction is implemented.
-const creditDisplay = { upload: 15, details: 10 } as const;
+// Keep displayed prices aligned with the AI endpoint.
+const creditDisplay = { upload: AI_COIN_COSTS.floor_plan, details: AI_COIN_COSTS.ai_builder } as const;
 const scopes = [{ value: 'complete', title: 'Full Interior', detail: 'Cabinetry, ceiling and wall painting across your plan' }, { value: 'modular', title: 'Modular interiors', detail: 'Room-specific cabinetry and storage' }, { value: 'kitchen', title: 'Kitchen', detail: 'Only kitchens detected in your plan' }, { value: 'bedrooms', title: 'Bedrooms', detail: 'Bedroom interiors in your plan' }, { value: 'kitchen-wardrobes', title: 'Kitchen & wardrobes', detail: 'Kitchen cabinetry and bedroom storage' }, { value: 'living-bedrooms', title: 'Living room & bedrooms', detail: 'Focus on everyday spaces' }, { value: 'selected', title: 'Choose specific rooms', detail: 'Include only the spaces you need' }] as const;
 const titles: Record<Step, string> = { upload: 'Upload your floor plan', analysis: 'Your property analysis', scope: 'What would you like to design?', work: 'Confirm the work in each room', design: 'Set your design direction', finish: 'Choose your finish level', budget: 'Do you have a target budget?', details: 'Who is this project for?', review: 'Ready to build your estimate', estimate: 'Your quotation is ready to review' };
 function FilePreview({ file }: { file: File }) {
@@ -254,10 +256,10 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
           <DialogDescription className="text-sm leading-6">Upload a plan or start with your project details.</DialogDescription>
         </DialogHeader>
         <div className="grid min-w-0 grid-cols-2 gap-2.5 pt-1 sm:gap-3" aria-label="AI quotation tools">
-          {[{ mode: 'upload' as const, title: 'Floor Plan Analysis', description: 'Your drawing. A clear, room-by-room estimate.', action: 'Upload Floor Plan', credits: creditDisplay.upload },
-            { mode: 'details' as const, title: 'AI Quotation Builder', description: 'No drawing? Start with your project details.', action: 'Generate Quotation', credits: creditDisplay.details }].map(card => <button key={card.mode} type="button" aria-label={card.action} onClick={() => start(card.mode)} className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card text-left transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+          {[{ mode: 'upload' as const, title: 'Floor Plan Analysis', description: 'Plan analysis and its quotation. Charged after successful analysis.', action: 'Upload Floor Plan', credits: creditDisplay.upload },
+            { mode: 'details' as const, title: 'AI Quotation Builder', description: 'Start with project details. Charged after successful generation.', action: 'Generate Quotation', credits: creditDisplay.details }].map(card => <button key={card.mode} type="button" aria-label={card.action} onClick={() => start(card.mode)} className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-card text-left transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
               <span className={`block h-28 w-full border-b sm:h-36 ${card.mode === 'upload' ? 'bg-[#F8F1E9]' : 'bg-[#EEF2ED]'}`}><BuilderArtwork kind={card.mode} /></span>
-              <span className="flex flex-1 flex-col p-3 sm:p-4"><span className="mb-2 flex items-center gap-1 text-[11px] font-medium text-amber-800 dark:text-amber-300"><GoldCoin className="h-3.5 w-3.5" />{card.credits} credits</span><span className="break-words text-sm font-semibold leading-5 sm:text-base">{card.title}</span>
+              <span className="flex flex-1 flex-col p-3 sm:p-4"><span className="mb-2 flex items-center gap-1 text-[11px] font-medium text-amber-800 dark:text-amber-300"><GoldCoin className="h-3.5 w-3.5" />{card.credits} coins</span><span className="break-words text-sm font-semibold leading-5 sm:text-base">{card.title}</span>
               <span className="mb-5 mt-1.5 break-words text-xs leading-5 text-muted-foreground">{card.description}</span>
               <span className="mt-auto flex w-full items-center justify-between gap-1 text-xs font-semibold text-primary"><span>{card.mode === 'upload' ? 'Upload plan' : 'Start building'}</span><ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span></span>
             </button>)}
@@ -282,7 +284,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
               <p className="mt-4 text-[11px] leading-5 text-muted-foreground">PDF, JPG, PNG or WEBP<br />Up to 3 files · 10 MB total</p>
             </div>
             {files.map((file, index) => <div key={`${file.name}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl border p-3"><FilePreview file={file} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{file.name}</p><p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB · {file.name.split('.').pop()?.toUpperCase()}</p></div><Button type="button" size="icon" variant="ghost" aria-label={`Remove ${file.name}`} disabled={!!busy} onClick={() => setFiles(current => current.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button></div>)}
-            <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground"><span className="flex items-center gap-1.5"><LockKeyhole className="h-3.5 w-3.5 shrink-0" />Private & secure</span><span className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300"><GoldCoin className="h-3.5 w-3.5" />{creditDisplay.upload} credits</span></div>
+            <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground"><span className="flex items-center gap-1.5"><LockKeyhole className="h-3.5 w-3.5 shrink-0" />Private & secure</span><span className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300"><GoldCoin className="h-3.5 w-3.5" />{creditDisplay.upload} coins</span></div>
             <details className="text-xs leading-5 text-muted-foreground"><summary className="cursor-pointer">What makes a good upload?</summary><p className="mt-2">Use a clear drawing with readable room labels and dimensions. Multi-page PDFs are supported. You can check and correct every room after analysis.</p></details>
           </>}
           {step === 'analysis' && mode === 'details' ? <>

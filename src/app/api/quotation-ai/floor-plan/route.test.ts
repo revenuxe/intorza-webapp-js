@@ -344,3 +344,28 @@ it('does not charge when switching measurement settings fails', async () => {
   expect(response.status).toBe(422);
   expect(rpc.mock.calls.some(([name]) => name === 'debit_coins')).toBe(false);
 });
+
+it('charges 20 coins for a new quotation even without automatic mode', async () => {
+  expect((await POST(request(payload()))).status).toBe(200);
+  expect(rpc).toHaveBeenCalledWith('debit_coins', expect.objectContaining({ p_amount: 20, p_type: 'ai_builder' }));
+});
+it('returns an actionable insufficient-balance error', async () => {
+  rpc.mockImplementation(async name => name === 'debit_coins' ? { data: null, error: { message: 'Insufficient coins' } } : { data: true, error: null });
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(402);
+  expect(await response.json()).toMatchObject({ code: 'COINS_REQUIRED', error: expect.stringContaining('20 coins') });
+});
+it('reports wallet outages as service failures instead of insufficient coins', async () => {
+  rpc.mockImplementation(async name => name === 'debit_coins' ? { data: null, error: { message: 'Database unavailable' } } : { data: true, error: null });
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({ error: "We're facing a technical issue. We'll be back soon." });
+});
+
+it('charges 40 coins after successful floor-plan analysis', async () => {
+  const form = new FormData();
+  form.append('files', new File(['%PDF-1.7\ncontent\n%%EOF'], 'plan.pdf', { type: 'application/pdf' }));
+  const response = await POST(new Request('https://app.intorza.com/api/quotation-ai/floor-plan', { method: 'POST', headers: { Authorization: 'Bearer session' }, body: form }));
+  expect(response.status).toBe(200);
+  expect(rpc).toHaveBeenCalledWith('debit_coins', expect.objectContaining({ p_amount: 40, p_type: 'floor_plan' }));
+});

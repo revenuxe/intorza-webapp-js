@@ -1,3 +1,4 @@
+import { AI_COIN_COSTS } from '@/lib/ai-coin-costs';
 import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { z } from 'zod';
@@ -79,8 +80,11 @@ export async function POST(request: Request) {
       if (saved.error) throw new Error('Could not save the plan analysis. Check the database migration.');
       const response = json({ projectId, analysis });
       request.signal.throwIfAborted();
-      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: 15, p_type: 'floor_plan', p_reference: requestId, p_note: 'Floor plan analysis' });
-      if (charged.error) return json({ error: /Insufficient coins/i.test(charged.error.message) ? 'No coins left for Floor Plan Analysis. Top up your wallet to continue.' : AI_SERVICE_ISSUE, code: 'COINS_REQUIRED', requestId }, 402);
+      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: AI_COIN_COSTS.floor_plan, p_type: 'floor_plan', p_reference: requestId, p_note: 'Floor plan analysis' });
+      if (charged.error) {
+        if (!/Insufficient coins/i.test(charged.error.message)) throw new Error('Wallet charge failed');
+        return json({ error: `Insufficient coins. Floor Plan Analysis requires ${AI_COIN_COSTS.floor_plan} coins. Top up your wallet to continue.`, code: 'COINS_REQUIRED', requestId }, 402);
+      }
       cleanup = undefined;
       return response;
     }
@@ -298,9 +302,12 @@ export async function POST(request: Request) {
     // Charge only after processing, persistence, serialization and cancellation checks succeed.
     const response = json({ projectId: id, estimate, measurementSystem: 'imperial', measurementChanged });
     request.signal.throwIfAborted();
-    if (!projectId && action === 'generate' && brief.automatic) {
-      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: 10, p_type: 'ai_builder', p_reference: requestId, p_note: 'AI quotation builder' });
-      if (charged.error) return json({ error: /Insufficient coins/i.test(charged.error.message) ? 'No coins left for AI Quotation Builder. Top up your wallet to continue.' : AI_SERVICE_ISSUE, code: 'COINS_REQUIRED', requestId }, 402);
+    if (!projectId && action === 'generate') {
+      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: AI_COIN_COSTS.ai_builder, p_type: 'ai_builder', p_reference: requestId, p_note: 'AI quotation builder' });
+      if (charged.error) {
+        if (!/Insufficient coins/i.test(charged.error.message)) throw new Error('Wallet charge failed');
+        return json({ error: `Insufficient coins. AI Quotation Builder requires ${AI_COIN_COSTS.ai_builder} coins. Top up your wallet to continue.`, code: 'COINS_REQUIRED', requestId }, 402);
+      }
     }
     return response;
   } catch (error) {
