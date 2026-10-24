@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef } from 'react';
+import { productMenuPosition } from '@/lib/productMenuPosition';
 import { createPortal } from 'react-dom';
 import { Input } from '@/components/ui/input';
 import { Check, Package, TrendingUp } from 'lucide-react';
@@ -39,6 +40,9 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = React.useId();
+  const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
   
@@ -77,7 +81,7 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
   const handleBlur = (e: React.FocusEvent) => {
     // Delay close to allow click on dropdown items
     setTimeout(() => {
-      if (!containerRef.current?.contains(document.activeElement)) {
+      if (!containerRef.current?.contains(document.activeElement) && !menuRef.current?.contains(document.activeElement)) {
         setOpen(false);
       }
     }, 150);
@@ -85,27 +89,51 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
 
   // Sync external value changes
   React.useEffect(() => {
-    if (value !== inputValue) {
-      setInputValue(value);
-    }
+    setInputValue(value);
   }, [value]);
 
+  React.useEffect(() => { setActiveIndex(-1); }, [inputValue]);
   React.useLayoutEffect(() => {
     if (!open) return;
+    let frame = 0;
     const position = () => {
       const rect = inputRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setMenuStyle({ position: 'fixed', top: Math.min(rect.bottom + 6, window.innerHeight - 120), left: Math.max(8, rect.left), width: Math.min(Math.max(rect.width, 280), window.innerWidth - Math.max(16, rect.left + 8)), zIndex: 100 });
+      const viewport = window.visualViewport;
+      setMenuStyle(productMenuPosition(rect, {
+        top: viewport?.offsetTop ?? 0, left: viewport?.offsetLeft ?? 0,
+        width: viewport?.width ?? window.innerWidth, height: viewport?.height ?? window.innerHeight,
+      }, document.querySelector('header')?.getBoundingClientRect().bottom ?? 0));
     };
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(position); };
     position();
-    window.addEventListener('resize', position); window.addEventListener('scroll', position, true);
-    return () => { window.removeEventListener('resize', position); window.removeEventListener('scroll', position, true); };
-  }, [open]);
+    window.addEventListener('resize', schedule); window.addEventListener('scroll', schedule, true);
+    window.visualViewport?.addEventListener('resize', schedule); window.visualViewport?.addEventListener('scroll', schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', schedule); window.removeEventListener('scroll', schedule, true);
+      window.visualViewport?.removeEventListener('resize', schedule); window.visualViewport?.removeEventListener('scroll', schedule);
+    };
+  }, [open, filteredProducts.length]);
 
   return (
     <div ref={containerRef} className="relative">
       <Input
         id={id}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open && filteredProducts.length > 0 && menuStyle.visibility === 'visible'}
+        aria-controls={open && filteredProducts.length > 0 ? menuId : undefined}
+        aria-activedescendant={activeIndex >= 0 ? `${menuId}-${activeIndex}` : undefined}
+        onKeyDown={event => {
+          if (event.key === 'Escape') { setOpen(false); setActiveIndex(-1); }
+          if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && filteredProducts.length) {
+            event.preventDefault(); setOpen(true);
+            const next = event.key === 'ArrowDown' ? Math.min(activeIndex + 1, filteredProducts.length - 1) : Math.max(activeIndex - 1, 0);
+            setActiveIndex(next); document.getElementById(`${menuId}-${next}`)?.scrollIntoView({ block: 'nearest' });
+          }
+          if (event.key === 'Enter' && open && activeIndex >= 0 && filteredProducts[activeIndex]) { event.preventDefault(); handleSelect(filteredProducts[activeIndex]); }
+        }}
         ref={inputRef}
         value={inputValue}
         onChange={handleInputChange}
@@ -114,9 +142,9 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
         placeholder={placeholder}
         className={className}
       />
-      {open && filteredProducts.length > 0 && typeof document !== 'undefined' && createPortal(<div style={menuStyle} className="rounded-xl border bg-popover p-2 shadow-xl" onMouseDown={event => event.preventDefault()}>
-        <div className="flex items-center justify-between px-2 pb-2 text-xs text-muted-foreground"><span>Existing products</span><span>{filteredProducts.length} matches</span></div>
-        <div className="max-h-72 space-y-1 overflow-y-auto overscroll-contain pr-1">{filteredProducts.map((pattern, index) => <button key={`${pattern.product_name}-${index}`} type="button" onClick={() => handleSelect(pattern)} className="flex w-full items-start gap-2 rounded-lg border border-transparent p-2.5 text-left transition-colors hover:border-primary/30 hover:bg-primary/5">
+      {open && filteredProducts.length > 0 && typeof document !== 'undefined' && createPortal(<div ref={menuRef} id={menuId} role="listbox" aria-label="Existing products" style={menuStyle} className="flex flex-col overflow-hidden rounded-xl border bg-popover p-2 shadow-xl" onMouseDown={event => event.preventDefault()}>
+        <div className="flex shrink-0 items-center justify-between px-2 pb-2 text-xs text-muted-foreground"><span>Existing products</span><span>{filteredProducts.length} matches</span></div>
+        <div className="min-h-0 space-y-1 overflow-y-auto overscroll-contain pr-1">{filteredProducts.map((pattern, index) => <button key={`${pattern.product_name}-${index}`} id={`${menuId}-${index}`} role="option" aria-selected={activeIndex === index} type="button" onClick={() => handleSelect(pattern)} className={cn("flex w-full items-start gap-2 rounded-lg border border-transparent p-2.5 text-left transition-colors hover:border-primary/30 hover:bg-primary/5", activeIndex === index && "border-primary/30 bg-primary/5")}>
           <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted"><Package className="h-3.5 w-3.5 text-primary" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{pattern.product_name}</span>{pattern.product_details && <span className="mt-0.5 block line-clamp-1 text-xs text-muted-foreground">{pattern.product_details}</span>}<span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">{pattern.preferred_rate && pattern.preferred_rate > 0 && <span>{symbol}{pattern.preferred_rate.toLocaleString(settings.locale)}/{areaUnit}</span>}{pattern.usage_count > 1 && <span className="inline-flex items-center gap-0.5"><TrendingUp className="h-3 w-3" />{pattern.usage_count}</span>}</span></span>{value === pattern.product_name && <Check className="mt-1 h-4 w-4 shrink-0 text-primary" />}</button>)}</div>
       </div>, document.body)}
     </div>
