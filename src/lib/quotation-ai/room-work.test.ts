@@ -1,5 +1,5 @@
 import { defaultRoomWork, ensureRoomWorkCoverage, roomWorkOptions } from './room-work';
-import { buildEstimate, generatedSchema, preserveRefinedItems, scopedRooms } from './floor-plan';
+import { buildEstimate, generatedSchema, preserveRefinedItems, resolveFinishTier, scopedRooms } from './floor-plan';
 import { appendFloorPlanEstimate } from './apply-estimate';
 import { fromQuotation } from './domain';
 import { completeEstimate } from './floor-plan';
@@ -13,6 +13,13 @@ it('offers work specific to detected room types and filters kitchen/bedroom-only
   const plan = { ...planFixture(), rooms: [room, { ...room, name: 'Kitchen', kind: 'kitchen' as const }] };
   expect(scopedRooms(plan, { scope: 'kitchen', roomNames: ['Bedroom','Kitchen'] }).map(room => room.name)).toEqual(['Kitchen']);
   expect(scopedRooms(plan, { scope: 'bedrooms', roomNames: ['Bedroom','Kitchen'] }).map(room => room.name)).toEqual(['Bedroom']);
+});
+it('resolves recommended finish against the budget and known estimate without changing explicit tiers', () => {
+  expect(resolveFinishTier('Recommend', null, null)).toBe('Standard');
+  expect(resolveFinishTier('Recommend', 70000, 100000)).toBe('Basic');
+  expect(resolveFinishTier('Recommend', 200000, 100000)).toBe('Premium');
+  expect(resolveFinishTier('Recommend', 100000, 100000)).toBe('Standard');
+  expect(resolveFinishTier('Luxury', 1, 100000)).toBe('Luxury');
 });
 it('fills every selected work field when AI returns only one item, preserving unknowns and user details', () => {
   const plan = planFixture(), brief = { ...briefFixture(), roomWork: [defaultRoomWork(plan.rooms[0], 'complete')] };
@@ -97,7 +104,17 @@ it('keeps automatic kitchen scope to quotation-supported cabinetry instead of ge
   const brief = { ...briefFixture(), scope: 'modular' as const, automatic: true, roomNames: ['Kitchen'] };
   const proposal = generatedSchema.parse({ sections: [{ ...proposalFixture().sections[0], title: 'Kitchen', roomName: 'Kitchen', items: [{ ...proposalFixture().sections[0].items[0], productName: 'Kitchen base cabinets' }] }], assumptions: [] });
   const result = ensureRoomWorkCoverage(proposal, plan.rooms, brief);
-  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Kitchen base cabinets', 'Kitchen wall cabinets', 'Loft storage']);
+  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Kitchen base cabinets', 'Kitchen wall cabinets', 'Kitchen countertop', 'Loft storage']);
+});
+it('keeps modular kitchen countertop and backsplash choices and includes countertop in automatic kitchen scope', () => {
+  const plan = planFixture(); plan.rooms[0] = { ...plan.rooms[0], name: 'Kitchen', kind: 'kitchen' };
+  const options = roomWorkOptions(plan.rooms[0], 'modular');
+  expect(options.map(option => option.key)).toContain('countertop');
+  expect(options.map(option => option.key)).toContain('backsplash');
+  const brief = { ...briefFixture(), scope: 'modular' as const, automatic: true, roomNames: ['Kitchen'] };
+  const result = ensureRoomWorkCoverage({ sections: [], assumptions: [] }, plan.rooms, brief);
+  expect(result.sections[0].items.map(item => item.productName)).toContain('Kitchen countertop');
+  expect(result.sections[0].items.map(item => item.productName)).not.toContain('Kitchen backsplash');
 });
 it('completes unknown work using direct sqft and transfers no feet dimensions to the quotation', () => {
   const proposal = proposalFixture(); proposal.sections[0].items[0].measurementStatus = 'unknown';

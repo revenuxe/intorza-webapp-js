@@ -52,7 +52,7 @@ export function roomWorkOptions(room: Room, scope: ProjectBrief['scope']): WorkO
     case 'balcony': options = [option('utility_storage', 'Balcony storage', 'Confirm weather exposure and storage front dimensions.'), painting]; break;
     default: options = [option('storage', 'Room storage', 'Describe the intended storage and its front dimensions.', true), ceiling, painting];
   }
-  if (scope === 'modular') return options.filter(item => !['ceiling','painting','plumbing','countertop','backsplash','tile_work','mirror'].includes(item.key));
+  if (scope === 'modular') return options.filter(item => !['ceiling','painting','plumbing','tile_work','mirror'].includes(item.key));
   if (scope === 'kitchen-wardrobes') return room.kind === 'bedroom'
     ? options.filter(item => ['wardrobe','loft'].includes(item.key))
     : options.filter(item => !['ceiling','painting','plumbing'].includes(item.key));
@@ -75,7 +75,7 @@ function automaticRoomWork(room: Room, scope: ProjectBrief['scope'], extras: str
   // Scope defines the baseline: modular cabinetry versus full interiors.
   // Other optional trades require explicit selection.
   const core: Record<Room['kind'], string[]> = {
-    kitchen: ['base_cabinets', 'wall_cabinets', 'loft'], bedroom: ['wardrobe', 'loft'], living: ['tv_unit'],
+    kitchen: ['base_cabinets', 'wall_cabinets', 'countertop', 'loft'], bedroom: ['wardrobe', 'loft'], living: ['tv_unit'],
     dining: ['crockery_unit'], study: ['study_storage'], bathroom: ['vanity'], utility: ['utility_storage'],
     balcony: [], other: [],
   };

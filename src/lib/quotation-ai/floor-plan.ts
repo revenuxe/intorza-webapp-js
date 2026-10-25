@@ -20,12 +20,27 @@ export const analysisSchema = z.object({
   rooms: z.array(roomSchema).min(1).max(40), warnings: z.array(z.string().max(600)).max(20),
 }).strict();
 export type PlanAnalysis = z.infer<typeof analysisSchema>;
+export const kitchenPreferencesSchema = z.object({
+  layout: z.enum(['straight','l_shape','u_shape','parallel','island','unknown']).optional(),
+  carcass: z.enum(['bwr_plywood','marine_plywood','hdhmr','unknown']).optional(),
+  shutter: z.enum(['laminate','acrylic','membrane','pu','veneer','unknown']).optional(),
+  hardware: z.enum(['standard','soft_close','premium_branded','unknown']).optional(),
+  countertop: z.enum(['granite','quartz','solid_surface','unknown']).optional(),
+  appliances: z.string().trim().max(600).optional(),
+}).strict();
+export const resolveFinishTier = (finish: 'Basic' | 'Standard' | 'Premium' | 'Luxury' | 'Recommend', budget: number | null, estimatedTotal: number | null): 'Basic' | 'Standard' | 'Premium' | 'Luxury' => {
+  if (finish !== 'Recommend') return finish;
+  if (!budget || !estimatedTotal || estimatedTotal <= 0) return 'Standard';
+  const ratio = budget / estimatedTotal;
+  return ratio < 0.8 ? 'Basic' : ratio > 1.5 ? 'Premium' : 'Standard';
+};
 export const briefSchema = z.object({
   scope: z.enum(['complete', 'modular', 'kitchen', 'bedrooms', 'kitchen-wardrobes', 'living-bedrooms', 'selected']),
-  roomNames: z.array(label).min(1).max(40), finish: z.enum(['Budget-friendly', 'Standard', 'Premium', 'Luxury', 'Recommend']),
+  roomNames: z.array(label).min(1).max(40), finish: z.enum(['Basic', 'Standard', 'Premium', 'Luxury', 'Recommend']),
   budget: z.number().finite().positive().max(1000000000).nullable(),
   clientName: z.string().trim().max(150), location: label, address: z.string().max(1000),
   roomWork: z.array(roomWorkSchema).max(40).optional(),
+  kitchenPreferences: kitchenPreferencesSchema.optional(),
   automatic: z.boolean().optional(),
   requestNotes: z.string().trim().max(600).optional(),
   quoteExtras: z.array(z.string().trim().min(1).max(50)).max(20).optional(),

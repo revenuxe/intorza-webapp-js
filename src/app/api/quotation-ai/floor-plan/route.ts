@@ -2,7 +2,7 @@ import { AI_COIN_COSTS } from '@/lib/ai-coin-costs';
 import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { z } from 'zod';
-import { analysisSchema, briefSchema, buildEstimate, completeEstimate, estimateCompletionSchema, generatedSchema, mergeRoomEstimates, preserveRefinedItems, detectPlanType, MAX_PLAN_BYTES, MAX_PLAN_FILES, scopedRooms, type Estimate, type PriceEvidence } from '@/lib/quotation-ai/floor-plan';
+import { analysisSchema, briefSchema, buildEstimate, completeEstimate, estimateCompletionSchema, generatedSchema, mergeRoomEstimates, preserveRefinedItems, detectPlanType, MAX_PLAN_BYTES, MAX_PLAN_FILES, resolveFinishTier, scopedRooms, type Estimate, type PriceEvidence } from '@/lib/quotation-ai/floor-plan';
 import { ensureRoomWorkCoverage } from '@/lib/quotation-ai/room-work';
 import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
@@ -195,7 +195,7 @@ export async function POST(request: Request) {
         || !Number.isFinite(Date.parse(row.last_used_at || row.updated_at)) || Date.parse(row.last_used_at || row.updated_at) > Date.now() || Date.now() - Date.parse(row.last_used_at || row.updated_at) > 90 * 86400000) continue;
       rates.push({ id: row.id, name: row.product_name.slice(0, 150), description: (row.product_details || '').slice(0, 1000), rate, unit: 'sqft', source: 'historical', currency, location: '', verifiedAt: row.last_used_at || row.updated_at, sourceUrl: null, inclusions: 'Historical rate; specifications, location, GST and inclusions require review.' });
     }
-    const requestedBrief = regenerateRooms ? { ...brief, roomNames: regenerateRooms } : brief;
+    const requestedBrief = { ...(regenerateRooms ? { ...brief, roomNames: regenerateRooms } : brief), finish: resolveFinishTier(brief.finish, brief.budget, previousEstimate?.totals.total ?? null) };
     if (action !== 'retry_pricing') ensureRoomWorkCoverage({ sections: [], assumptions: [] }, scopedRooms(analysis, requestedBrief), requestedBrief);
     // Bound context cost. Full evidence remains server-side; the model only needs matching specifications and IDs.
     const relevanceTerms = normalizeReferenceText([
