@@ -60,7 +60,6 @@ export function applyCompletion(previous: Estimate, raw: unknown, brief: Project
         inclusions: `AI-estimated installed selling allowance, GST excluded. ${suggestion.pricingAssumption}`.slice(0, 600),
         basisWarnings: ['AI allowance, not a retrieved competitor price or supplier quote. Confirm before committing to supply.'],
       };
-      item.productDetails = `${item.productDetails.slice(0, 820)} AI-estimated rate allowance; installed, GST excluded. Review before final confirmation.`;
     }
   }
   return completeEstimate({ ...previous, draft, evidence,

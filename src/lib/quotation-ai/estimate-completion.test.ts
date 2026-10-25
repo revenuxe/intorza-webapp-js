@@ -14,6 +14,7 @@ it('finishes missing rates and dimensions with labelled allowances and exact tot
   expect(result.incomplete).toBe(false);
   expect(toQuotation(result.draft, true)[0].items[0]).toMatchObject({ widthFt: 8, heightFt: 7, sftArea: 56, ratePerSft: 1200, amount: 67200 });
   expect(result.evidence[0].price).toMatchObject({ source: 'ai_estimate', sourceUrl: null, confidence: 'low', range: { low: 1000, high: 1500 } });
+  expect(toQuotation(result.draft, true)[0].items[0].productDetails).not.toMatch(/AI-estimated rate allowance|GST excluded|Review before final confirmation/i);
   expect(result.totals.total).toBe(75331.2);
   expect(JSON.stringify(previous)).toBe(snapshot);
 });
