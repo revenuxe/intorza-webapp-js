@@ -181,7 +181,8 @@ it('calculates a live-style base unit reference through measurement completion a
   const exported = toQuotation(estimate.draft)[0].items[0];
   expect(exported).toMatchObject({ sftArea: 56.16, widthFt: 0, heightFt: 0, ratePerSft: 1200, amount: 67392 });
   expect(exported.productDetails).toContain('retain sink clearance');
-  expect(exported.productDetails).toContain('Source tax treatment: unknown');
+  expect(exported.productDetails).not.toContain('Source tax treatment');
+  expect(estimate.evidence[0].price.basisWarnings).toContain('Source tax treatment: unknown. The reference rate is reused unchanged; confirm tax before applying the quotation\'s GST to avoid double counting.');
   expect(estimate.evidence[0].price.source).toBe('admin_reference');
 });
 it('rejects a model-selected price ID for an incompatible material', async () => {

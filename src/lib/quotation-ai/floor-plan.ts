@@ -229,9 +229,7 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
         row.quantityStatus = 'estimated'; row.reason = automaticAllowance!.reason;
       }
       const details = conciseProductDetails(item.description, productName);
-      const specification = price?.description && !normalizeReferenceText(details).includes(normalizeReferenceText(price.description))
-        ? `Pricing specification: ${price.description}` : '';
-      return { id, productName, productDetails: [details, specification, ...(price?.basisWarnings ?? [])].filter(Boolean).join(' ').slice(0, 1000),
+      return { id, productName, productDetails: details.slice(0, 300),
         ...(item.specifications?.length ? { specifications: item.specifications } : {}),
         side: item.side ?? '', measurementMode: dimensions ? 'dimensions' as const : 'direct_area' as const,
         widthFt: dimensions?.widthFt ?? null, heightFt: dimensions?.heightFt ?? null,
