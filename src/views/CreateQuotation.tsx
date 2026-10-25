@@ -667,6 +667,7 @@ const CreateQuotation = () => {
     quotationSaveInProgress.current = true;
     setIsSaving(true);
     clearFeedback();
+    let savedQuotationId: string | null = null;
     try {
       const draftClientName = clientName.trim() || 'Client to be confirmed';
       const draftProjectTitle = projectTitle.trim() || 'AI quotation draft';
@@ -698,8 +699,6 @@ const CreateQuotation = () => {
       } = await supabase.auth.getUser();
       if (!user) throw new Error('No user found');
       
-      let savedQuotationId: string | null = null;
-
       // Build the quotation payload for the Supabase API.
       const payloadSections = sections.map((section, sIdx) => ({
         id: section.id,
@@ -909,10 +908,19 @@ const CreateQuotation = () => {
       return savedQuotationId;
     } catch (error) {
       console.error('Error saving quotation:', error);
+      const message = error instanceof Error ? error.message : '';
+      const saved = !!savedQuotationId;
+      const safeMessage = /invalid item specifications/i.test(message)
+        ? 'Some product specifications could not be saved. Review the item details and try again.'
+        : /not authenticated|no user found/i.test(message)
+          ? 'Your sign-in may have expired. Sign in again; your quotation is still in the editor.'
+          : /invalid input syntax|invalid uuid|invalid.*quotation/i.test(message)
+            ? 'Some quotation details are invalid. Check the client, dates, and item details, then try again.'
+            : message.slice(0, 220) || 'The save request could not be completed. Your editor is preserved.';
       toast({
-        title: "Save failed",
-        description: "Failed to save quotation. Please try again.",
-        variant: "destructive"
+        title: saved ? 'Quotation saved; follow-up failed' : 'Save failed',
+        description: saved ? `Your draft was saved, but a verification or AI-linking step failed. You can find it in My Quotations. ${safeMessage}` : safeMessage,
+        variant: saved ? "default" : "destructive"
       });
       return null;
     } finally {

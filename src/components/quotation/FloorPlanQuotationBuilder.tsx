@@ -69,6 +69,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const [busy, setBusy] = useState('');
   const [measurementChanged, setMeasurementChanged] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [operationProgress, setOperationProgress] = useState(0);
   const [error, setError] = useState('');
   const [invalidWorkKey, setInvalidWorkKey] = useState('');
   const [validationAttempt, setValidationAttempt] = useState(0);
@@ -112,6 +113,14 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const requiredCoins = mode === 'upload' && step === 'upload' ? AI_COIN_COSTS.floor_plan : mode === 'details' && !projectId ? AI_COIN_COSTS.ai_builder : 0;
   const coinsReady = requiredCoins === 0 || (!walletChecking && walletBalance !== null && walletBalance >= requiredCoins);
   useEffect(() => { topUpShown.current = false; setTopUpOpen(false); }, [mode]);
+  useEffect(() => {
+    if (!busy) { setOperationProgress(0); return; }
+    const initial = busy.includes('Checking coin') ? 4 : busy.includes('Uploading') ? 10
+      : busy.includes('Analysing') ? 24 : busy.includes('Updating') ? 30 : 16;
+    setOperationProgress(initial);
+    const timer = setInterval(() => setOperationProgress(value => Math.min(94, value + Math.max(1, Math.ceil((94 - value) * 0.035)))), 700);
+    return () => clearInterval(timer);
+  }, [busy]);
   useEffect(() => {
     if (!mode || walletChecking || walletBalance === null || !requiredCoins) return;
     if (walletBalance >= requiredCoins) { setTopUpOpen(false); setError(current => /insufficient coins/i.test(current) ? '' : current); return; }
@@ -303,7 +312,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
           <DialogDescription className="text-sm leading-6">{step === 'upload' ? 'Add your drawing. Review the rooms. Build your estimate.' : step === 'analysis' && mode === 'details' ? 'Choose your home size, then explain exactly what the customer needs.' : step === 'estimate' ? 'AI-generated estimate — review required. You control what is saved and shared.' : 'Choose the scope, explain the requirements, and get an editable quotation.'}</DialogDescription>
           {step !== 'upload' && mode !== 'upload' && <div className="!mt-4 flex gap-1.5" aria-label={`Step ${groups + 1} of 4`}>{['Property', 'Scope', 'Client', 'Review'].map((name, index) => <div key={name} className="min-w-0 flex-1"><div className={`h-1 rounded-full ${index <= groups ? 'bg-primary' : 'bg-muted'}`} /><span className="mt-1 block text-[11px] text-muted-foreground">{name}</span></div>)}</div>}
         </DialogHeader>
-        {busy && <div ref={busyBanner} tabIndex={-1} role="status" aria-live="polite" className="shrink-0 space-y-2 border-b bg-primary/5 px-5 py-3 outline-none sm:px-6"><div className="flex items-center gap-2 text-sm font-medium"><Loader2 className="h-4 w-4 shrink-0 animate-spin" />{busy}</div>{step === 'upload' && <progress aria-label="Upload progress" value={progress} max={100} className="h-1.5 w-full accent-primary" />}</div>}
+        {busy && <div ref={busyBanner} tabIndex={-1} role="status" aria-live="polite" className="shrink-0 space-y-2 border-b bg-primary/5 px-5 py-3 outline-none sm:px-6"><div className="flex items-center justify-between gap-3 text-sm font-medium"><span className="flex min-w-0 items-center gap-2"><Loader2 className="h-4 w-4 shrink-0 animate-spin" /><span className="truncate">{busy}</span></span><span className="shrink-0 tabular-nums">{busy === 'Uploading your plans' ? progress : operationProgress}%</span></div><progress aria-label={busy === 'Uploading your plans' ? 'Upload progress' : 'Estimated completion'} aria-valuetext={busy === 'Uploading your plans' ? `${progress}% uploaded` : `Estimated ${operationProgress}% complete`} value={busy === 'Uploading your plans' ? progress : operationProgress} max={100} className="h-1.5 w-full accent-primary" />{busy !== 'Uploading your plans' && <p className="text-[10px] text-muted-foreground">Estimated progress; the final steps run on the server.</p>}</div>}
         <div ref={scrollPanel} role="region" aria-label="Quotation step content" aria-busy={!!busy} inert={!!busy} className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5 [overflow-wrap:anywhere] sm:px-6">
           {step === 'upload' && <>
             <div className={`rounded-2xl border border-dashed px-4 py-6 text-center sm:py-8 ${dragging ? 'border-primary bg-primary/5' : 'border-primary/25 bg-primary/[0.025]'}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); if (!busy && coinsReady) selectFiles(Array.from(event.dataTransfer.files)); }}>
