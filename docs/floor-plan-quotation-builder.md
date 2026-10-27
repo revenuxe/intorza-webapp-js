@@ -145,6 +145,26 @@ My Library → Items has an explicit approval panel; historic patterns are never
 silently promoted to approved rates. Approved rates exclude GST; inclusions and verification
 date are recorded. Deactivation preserves historical evidence.
 
+### Free-text requirements and exclusions (October 27, 2026)
+
+When typed/transcribed requirements or room notes are present, the server
+interprets explicit exclusions with constrained room names and supported work
+keys before generating or researching prices. It understands coordinated
+negation, common ceiling typos, room-specific exceptions and paraphrases.
+Clear global negatives also have a conservative deterministic backup; style
+preferences and nuanced room/exception language are left to interpretation.
+Client-supplied interpretations are discarded and recomputed from current notes.
+
+Exclusions override default work, optional extras and older checklists. They
+are enforced while assembling items, building the estimate, preserving older
+items, merging regenerated rooms, retrying prices and transferring the result
+into the editor. Empty rooms after exclusions remain unpriced rather than
+having default work restored; a request with no remaining work is rejected.
+The estimate shows a collapsed summary of applied exclusions, and the saved
+AI brief retains the interpretation for the admin popup. No SQL migration is
+required. An interpretation failure stops generation rather than silently
+discarding the customer's requirements.
+
 ### Empty-catalogue pricing
 
 Finish-aware pricing (October 27, 2026): Basic, Standard, Premium and Luxury

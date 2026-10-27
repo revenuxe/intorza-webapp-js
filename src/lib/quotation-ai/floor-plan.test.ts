@@ -49,6 +49,17 @@ describe('floor plan quotation boundary', () => {
     const priced = buildEstimate(proposal(), plan, { ...brief, finish: 'Luxury' }, [{ ...rate, finishTier: 'Luxury', rate: 3200 }], fixture());
     expect(priced.draft.sections[0].items[0].ratePerSft).toBe(3200);
   });
+  it('removes excluded work from the priced total and evidence, not only from the display', () => {
+    const raw = proposal();
+    raw.sections[0].items.push({ ...raw.sections[0].items[0], productName: 'Wall painting', rateId: 'painting' });
+    const rates = [rate, { ...rate, id: 'painting', name: 'Wall painting', rate: 65 }];
+    const before = buildEstimate(raw, plan, brief, rates, fixture());
+    const after = buildEstimate(raw, plan, { ...brief, requestNotes: 'No wall painting.' }, rates, fixture());
+    expect(before.totals.subtotal).toBe(70840);
+    expect(after.totals.subtotal).toBe(67200);
+    expect(after.evidence).toHaveLength(1);
+    expect(after.draft.sections[0].items).toHaveLength(1);
+  });
   it('keeps unknown quantities and missing, mismatched or non-sqft rates pending', () => {
     const raw = proposal(); raw.sections[0].items[0].measurementStatus = 'unknown';
     const estimate = buildEstimate(raw, plan, brief, [{ ...rate, unit: 'piece' }], fixture());

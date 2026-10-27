@@ -4,6 +4,7 @@ import { draftSchema, itemCalculation, quotationTotals, type VoiceDraft } from '
 import { roomWorkSchema, roomWorkOptions } from './room-work';
 import { normalizeReferenceText, referenceProduct } from './reference-pricing';
 import { rateSupportsFinishTier, type FinishTier } from './finish-tier';
+import { excludedWork, exclusionsForBrief, workExclusionSchema } from './requirements';
 
 export const MAX_PLAN_BYTES = 10 * 1024 * 1024;
 export const MAX_PLAN_FILES = 3;
@@ -36,6 +37,7 @@ export const resolveFinishTier = (finish: 'Basic' | 'Standard' | 'Premium' | 'Lu
   return ratio < 0.8 ? 'Basic' : ratio > 1.5 ? 'Premium' : 'Standard';
 };
 export const briefSchema = z.object({
+  workExclusions: z.array(workExclusionSchema).max(40).optional(),
   scope: z.enum(['complete', 'modular', 'kitchen', 'bedrooms', 'kitchen-wardrobes', 'living-bedrooms', 'selected']),
   roomNames: z.array(label).min(1).max(40), finish: z.enum(['Basic', 'Standard', 'Premium', 'Luxury', 'Recommend']),
   budget: z.number().finite().positive().max(1000000000).nullable(),
@@ -55,7 +57,7 @@ export const generatedSchema = z.object({
     productName: label, description: z.string().max(1000), rateId: z.string().max(100).nullable(),
     quantity: dimension, measurementStatus: z.enum(['measured', 'estimated', 'unknown']),
     measurementReason: z.string().max(600),
-  }).strict()).min(1).max(20) }).strict()).min(1).max(40),
+  }).strict()).max(20) }).strict()).min(1).max(40),
   assumptions: z.array(z.string().max(600)).max(20),
 }).strict();
 export type PriceEvidence = {
@@ -187,11 +189,12 @@ export function automaticWorkFaceAllowance(room: PlanAnalysis['rooms'][number], 
 export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: ProjectBrief, rates: PriceEvidence[], base: VoiceDraft) {
   const proposal = generatedSchema.parse(raw);
   const allowed = new Set(scopedRooms(analysis, brief).map(room => room.name));
+  const workExclusions = exclusionsForBrief(brief, analysis.rooms);
   const evidence: { itemId: string; quantityStatus: string; reason: string; price: PriceEvidence | null }[] = [];
   const seen = new Set<string>();
   const sections = proposal.sections.map(section => {
     if (!allowed.has(section.roomName)) throw new Error('The proposal includes a room outside your selected scope.');
-    return { id: crypto.randomUUID(), title: section.title, items: section.items.map(item => {
+    return { id: crypto.randomUUID(), title: section.title, items: section.items.filter(item => !excludedWork(item.productName, section.roomName, workExclusions)).map(item => {
       const key = `${section.roomName}:${normalizeReferenceText(item.productName)}`.toLowerCase();
       if (seen.has(key)) throw new Error('The proposal contains a duplicate item. Please regenerate.');
       seen.add(key);
@@ -243,7 +246,7 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
     project: { ...base.project, projectTitle: base.project.projectTitle || `${brief.finish} Interior Estimate`, clientName: brief.clientName, clientAddress: brief.address, placeOfProject: brief.location, projectType: analysis.propertyType }, sections });
   const items = draft.sections.flatMap(section => section.items);
   const amounts = items.map(item => Number(itemCalculation(item).cents ?? 0n) / 100);
-  return { finishTier: resolveFinishTier(brief.finish, brief.budget, null), draft, evidence, scopeGaps: [...allowed].filter(name => !proposal.sections.some(section => section.roomName === name)), roomSections: draft.sections.map((section, index) => ({ sectionId: section.id, roomName: proposal.sections[index].roomName })), totals: quotationTotals(amounts, draft.pricing),
+  return { workExclusions, finishTier: resolveFinishTier(brief.finish, brief.budget, null), draft, evidence, scopeGaps: [...allowed].filter(name => !proposal.sections.some(section => section.roomName === name)), roomSections: draft.sections.map((section, index) => ({ sectionId: section.id, roomName: proposal.sections[index].roomName })), totals: quotationTotals(amounts, draft.pricing),
     incomplete: items.some(item => itemCalculation(item).area == null || item.ratePerSft == null),
     assumptions: [...analysis.warnings, ...proposal.assumptions,
       ...(brief.budget != null && quotationTotals(amounts, draft.pricing).total > brief.budget ? ['The priced items exceed your target budget. Review the scope or finish before finalizing.'] : []),
@@ -276,6 +279,7 @@ export function preserveRefinedItems(previous: Estimate, next: Estimate, brief: 
     // A confirmed checklist explicitly defines additions/removals. Older
     // estimates without that checklist retain unmatched rows during refinement.
     if (!brief.roomWork?.some(answer => answer.roomName === roomName)) for (const old of oldItems) {
+      if (excludedWork(old.productName, roomName, next.workExclusions)) continue;
       if (section.items.some(item => item.id === old.id)) continue;
       section.items.push({ ...old });
       const row = previous.evidence.find(row => row.itemId === old.id);
@@ -299,6 +303,8 @@ export function mergeRoomEstimates(previous: Estimate, next: Estimate, roomNames
   const mapping = z.array(z.object({ sectionId: z.string(), roomName: label }).strict()).max(80).parse(previous.roomSections);
   const priorEvidence = z.array(z.object({ itemId: z.string(), quantityStatus: z.string().max(30), reason: z.string().max(600), price: z.object({ id: z.string() }).passthrough().nullable() }).strict()).max(600).parse(previous.evidence);
   const retained = previousDraft.sections.filter(section => !mapping.some(row => row.sectionId === section.id && roomNames.includes(row.roomName)));
+  for (const section of retained) section.items = section.items.filter(item => !excludedWork(item.productName,
+    mapping.find(row => row.sectionId === section.id)?.roomName ?? section.title, next.workExclusions));
   const retainedIds = new Set(retained.flatMap(section => section.items.map(item => item.id)));
   const evidence = priorEvidence.filter(row => retainedIds.has(row.itemId)).map(row => {
     const item = retained.flatMap(section => section.items).find(item => item.id === row.itemId)!;

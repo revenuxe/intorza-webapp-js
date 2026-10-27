@@ -32,6 +32,10 @@ export function QuotationAIBadge({ selections, quotationNumber }: { selections: 
     if (items.length) rows.push([text(room.roomName) || 'Room work', items.join(', ')]);
   }
   const design = object(brief.design);
+  if (Array.isArray(brief.workExclusions)) for (const entry of brief.workExclusions) {
+    const row = object(entry);
+    if (Array.isArray(row.workKeys)) rows.push([`Excluded · ${text(row.roomName)}`, row.workKeys.map(value => label(text(value))).filter(Boolean).join(', ')]);
+  }
   if (typeof design.coordinatedLook === 'boolean') rows.push(['Finishes', design.coordinatedLook ? 'Coordinated look' : 'Room-specific finishes']);
   if (typeof design.retainExisting === 'boolean') rows.push(['Existing items', design.retainExisting ? 'Retain where possible' : 'New interior work']);
   rows.push(['Design notes', text(design.notes)], ['Requirements', text(brief.requestNotes)]);

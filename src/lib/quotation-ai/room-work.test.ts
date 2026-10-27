@@ -5,6 +5,27 @@ import { fromQuotation } from './domain';
 import { completeEstimate } from './floor-plan';
 import { planFixture, briefFixture, draftFixture, proposalFixture } from '@/test/floor-plan-fixtures';
 
+it('never restores explicitly excluded work while refining an older estimate', () => {
+  const proposal = proposalFixture();
+  proposal.sections[0].items.push({ ...proposal.sections[0].items[0], productName: 'Wall painting' }, { ...proposal.sections[0].items[0], productName: 'False ceiling' });
+  const previous = buildEstimate(proposal, planFixture(), briefFixture(), [], draftFixture());
+  const brief = { ...briefFixture(), requestNotes: 'No wall painting or seling.' };
+  const next = buildEstimate(proposalFixture(), planFixture(), brief, [], draftFixture());
+  const refined = preserveRefinedItems(previous, next, brief);
+  expect(refined.draft.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe']);
+  const applied = appendFloorPlanEstimate(previous.draft, next.draft, next.workExclusions);
+  const names = applied.draft.sections.flatMap(section => section.items).map(item => item.productName);
+  expect(names).not.toContain('Wall painting');
+  expect(names).not.toContain('False ceiling');
+});
+
+it('lets interpreted room exclusions override earlier checklist selections', () => {
+  const plan = planFixture();
+  const brief = { ...briefFixture(), roomWork: [defaultRoomWork(plan.rooms[0], 'complete')], workExclusions: [{ roomName: 'Bedroom', workKeys: ['painting','ceiling'] as ('painting'|'ceiling')[] }] };
+  const result = ensureRoomWorkCoverage(generatedSchema.parse(proposalFixture()), plan.rooms, brief);
+  expect(result.sections[0].items.map(item => item.productName)).toEqual(['Wardrobe']);
+});
+
 it('offers work specific to detected room types and filters kitchen/bedroom-only scopes', () => {
   const room = planFixture().rooms[0];
   expect(roomWorkOptions(room, 'bedrooms').map(option => option.key)).toContain('wardrobe');

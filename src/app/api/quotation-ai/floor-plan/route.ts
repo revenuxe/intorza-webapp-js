@@ -3,7 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { z } from 'zod';
 import { analysisSchema, briefSchema, buildEstimate, completeEstimate, estimateCompletionSchema, generatedSchema, mergeRoomEstimates, preserveRefinedItems, detectPlanType, MAX_PLAN_BYTES, MAX_PLAN_FILES, resolveFinishTier, scopedRooms, type Estimate, type PriceEvidence } from '@/lib/quotation-ai/floor-plan';
-import { ensureRoomWorkCoverage } from '@/lib/quotation-ai/room-work';
+import { ensureRoomWorkCoverage, roomWorkOptions } from '@/lib/quotation-ai/room-work';
+import { excludedWork, explicitNoteExclusions, mergeExclusions, requirementsSchema } from '@/lib/quotation-ai/requirements';
 import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
@@ -196,6 +197,19 @@ export async function POST(request: Request) {
         || !Number.isFinite(Date.parse(row.last_used_at || row.updated_at)) || Date.parse(row.last_used_at || row.updated_at) > Date.now() || Date.now() - Date.parse(row.last_used_at || row.updated_at) > 90 * 86400000) continue;
       rates.push({ id: row.id, name: row.product_name.slice(0, 150), description: (row.product_details || '').slice(0, 1000), rate, unit: 'sqft', source: 'historical', currency, location: '', verifiedAt: row.last_used_at || row.updated_at, sourceUrl: null, inclusions: 'Historical rate; specifications, location, GST and inclusions require review.' });
     }
+    const requirementNotes = [brief.requestNotes, brief.design?.notes].filter(Boolean).join('. ');
+    // Recompute server-side from the actual notes, never trust stale/client-supplied decisions.
+    brief.workExclusions = [];
+    if (requirementNotes.trim() || brief.roomWork?.some(room => room.notes.trim())) {
+      const rooms = scopedRooms(analysis, brief);
+      const interpreted = requirementsSchema.parse(await provider.requirements({
+        requestNotes: brief.requestNotes ?? '', designNotes: brief.design?.notes ?? '',
+        roomNotes: brief.roomWork?.map(room => ({ roomName: room.roomName, notes: room.notes })) ?? [],
+        rooms: rooms.map(room => ({ name: room.name, kind: room.kind, work: roomWorkOptions(room, brief.scope).map(option => ({ key: option.key, name: option.name })) })),
+      }, request.signal));
+      if (interpreted.exclusions.some(row => !rooms.some(room => room.name === row.roomName))) throw new InputError('Could not match your requirements to the selected rooms. Check the room names in your note.', 422);
+      brief.workExclusions = mergeExclusions(interpreted.exclusions, explicitNoteExclusions(requirementNotes, rooms));
+    }
     const requestedBrief = { ...(regenerateRooms ? { ...brief, roomNames: regenerateRooms } : brief), finish: resolveFinishTier(brief.finish, brief.budget, previousEstimate?.totals.total ?? null) };
     if (regenerateRooms && (previousEstimate?.finishTier ?? 'Standard') !== requestedBrief.finish) {
       return json({ error: 'The finish level changed. Go Back and generate the full estimate so every room uses the selected finish level.' }, 400);
@@ -253,6 +267,7 @@ export async function POST(request: Request) {
     // Match against the complete catalogue even when an item was outside the
     // bounded model context. Never swap material variants based on name alone.
     for (const section of proposal.sections) for (const item of section.items) {
+      if (excludedWork(item.productName, section.roomName, brief.workExclusions)) { item.rateId = null; continue; }
       if (/Billing: (piece|lump_sum); price separately/i.test(item.description)) { item.rateId = null; continue; }
       // Validate the requested specification server-side, even if the model
       // supplied a real catalogue ID belonging to a different material variant.
@@ -264,7 +279,7 @@ export async function POST(request: Request) {
         if (close) { rates.push(close); approvedIds.add(close.id); item.rateId = close.id; }
       }
     }
-    const products = [...new Map(proposal.sections.flatMap(section => section.items).filter(item => !approvedIds.has(item.rateId) && !/Billing: (piece|lump_sum); price separately/i.test(item.description))
+    const products = [...new Map(proposal.sections.flatMap(section => section.items.filter(item => !excludedWork(item.productName, section.roomName, brief.workExclusions))).filter(item => !approvedIds.has(item.rateId) && !/Billing: (piece|lump_sum); price separately/i.test(item.description))
       .map(item => [JSON.stringify([item.productName.trim().toLowerCase(), pricingSpecification(item).trim().toLowerCase()]), { name: item.productName, specification: pricingSpecification(item),
         ...(action === 'retry_pricing' ? { heightFt: previousEstimate.draft.sections.flatMap(section => section.items).find(row => row.productName === item.productName && row.productDetails === item.description)?.heightFt ?? undefined } : {}),
       }])).values()];
@@ -298,14 +313,15 @@ export async function POST(request: Request) {
     }
     let estimate = buildEstimate(proposal, analysis, requestedBrief, rates, draft);
     if (previousEstimate && action !== 'retry_pricing') estimate = preserveRefinedItems(previousEstimate, estimate, requestedBrief);
+    if (!estimate.draft.sections.some(section => section.items.length)) throw new InputError('Your requirements leave no quotation work. Include at least one item or update the selected rooms.', 400);
     if (action === 'retry_pricing') {
       // Keep stable identities and explicit manual rates/dimensions; only retry non-manual pricing.
       estimate.draft.sections.forEach((section, sectionIndex) => {
         const oldSection = previousEstimate.draft.sections[sectionIndex];
         const generatedSectionId = section.id; section.id = oldSection.id;
         estimate.roomSections.find(row => row.sectionId === generatedSectionId)!.sectionId = oldSection.id;
-        section.items.forEach((item, itemIndex) => {
-          const oldItem = oldSection.items[itemIndex];
+        section.items.forEach((item) => {
+          const oldItem = oldSection.items.find(old => old.productName === item.productName)!;
           const row = estimate.evidence.find(row => row.itemId === item.id)!; row.itemId = oldItem.id; item.id = oldItem.id;
           const oldEvidence = previousEstimate.evidence.find(row => row.itemId === oldItem.id);
           if (oldEvidence?.price?.source === 'manual') { item.ratePerSft = oldItem.ratePerSft; row.price = oldEvidence.price; }

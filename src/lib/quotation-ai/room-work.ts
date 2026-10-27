@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { normalizeReferenceText, referenceProduct } from './reference-pricing';
 import type { PlanAnalysis, ProjectBrief, generatedSchema } from './floor-plan';
+import { excludedWork, exclusionsForBrief } from './requirements';
 
 const size = z.number().finite().positive().max(100000).nullable();
 export const roomWorkSchema = z.object({
@@ -70,7 +71,8 @@ export function defaultRoomWork(room: Room, scope: ProjectBrief['scope']): RoomW
   })) };
 }
 
-function automaticRoomWork(room: Room, scope: ProjectBrief['scope'], extras: string[] = [], notes = '') {
+function automaticRoomWork(room: Room, brief: ProjectBrief) {
+  const scope = brief.scope, extras = brief.quoteExtras ?? [];
   const answer = defaultRoomWork(room, scope);
   // Scope defines the baseline: modular cabinetry versus full interiors.
   // Other optional trades require explicit selection.
@@ -81,8 +83,7 @@ function automaticRoomWork(room: Room, scope: ProjectBrief['scope'], extras: str
   };
   const available = new Set(roomWorkOptions(room, scope).map(item => item.key));
   const fullInterior = scope === 'complete' ? ['ceiling', 'painting'] : [];
-  const excluded = (key: string) => (key === 'painting' && /\b(?:no|exclude|skip|without)\s+(?:wall\s+)?paint(?:ing)?\b/i.test(notes))
-    || (key === 'ceiling' && /\b(?:no|exclude|skip|without)\s+(?:false\s+)?ceiling\b/i.test(notes));
+  const excluded = (key: string) => excludedWork(key, room.name, exclusionsForBrief(brief, [room]));
   const selected = new Set([...core[room.kind], ...fullInterior, ...extras].filter(key => available.has(key) && !excluded(key)));
   const items = answer.items.filter(item => selected.has(item.key));
   for (const key of selected) if (!items.some(item => item.key === key)) items.push({ key, widthFt: null, heightFt: null, areaSqft: null, details: '' });
@@ -91,20 +92,20 @@ function automaticRoomWork(room: Room, scope: ProjectBrief['scope'], extras: str
 
 /** Every confirmed work field survives sparse AI output, including unpriced work. */
 export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, rooms: Room[], brief: ProjectBrief) {
+  const exclusions = exclusionsForBrief(brief, rooms);
   if (!brief.roomWork?.length) {
     if (!brief.automatic) return raw;
     // Automatic mode: keep the AI's room-specific proposal and supplement any
     // omitted essential work, without forcing the user through a checklist.
     const baseline = ensureRoomWorkCoverage({ sections: [], assumptions: [] }, rooms,
-      { ...brief, roomWork: rooms.map(room => automaticRoomWork(room, brief.scope, brief.quoteExtras, brief.requestNotes)) });
+      { ...brief, roomWork: rooms.map(room => automaticRoomWork(room, brief)) });
     return { ...raw, sections: rooms.map(room => {
       const options = roomWorkOptions(room, brief.scope);
       const proposed = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items).flatMap(item => {
         const task = options.find(option => normalizeReferenceText(option.key) === normalizeReferenceText(item.productName)
           || referenceProduct(option.name) === referenceProduct(item.productName));
         if (!task) return [];
-        if (task.key === 'painting' && /\b(?:no|exclude|skip|without)\s+(?:wall\s+)?paint(?:ing)?\b/i.test(brief.requestNotes || '')) return [];
-        if (task.key === 'ceiling' && /\b(?:no|exclude|skip|without)\s+(?:false\s+)?ceiling\b/i.test(brief.requestNotes || '')) return [];
+        if (excludedWork(task.key, room.name, exclusions)) return [];
         return [{ ...item, productName: task.name }];
       });
       const essentials = baseline.sections.find(section => section.roomName === room.name)!.items;
@@ -118,12 +119,13 @@ export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, roo
     if (!answer) throw new Error(`Confirm the work required in ${room.name} before generating.`);
     const options = roomWorkOptions(room, brief.scope);
     if (answer.decisions) for (const option of options) {
+      if (excludedWork(option.key, room.name, exclusions)) continue;
       if (answer.decisions[option.key] == null) throw new Error(`Confirm whether ${room.name} needs ${option.name.toLowerCase()}.`);
       if (answer.items.some(item => item.key === option.key) !== answer.decisions[option.key]) throw new Error(`The work choices for ${room.name} changed. Review its yes/no answers.`);
     }
     if (new Set(answer.items.map(item => item.key)).size !== answer.items.length) throw new Error(`Duplicate work choices in ${room.name}.`);
     const generated = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items);
-    return { title: room.name, roomName: room.name, items: answer.items.map(work => {
+    return { title: room.name, roomName: room.name, items: answer.items.filter(work => !excludedWork(work.key, room.name, exclusions)).map(work => {
       const task = options.find(item => item.key === work.key);
       if (!task) throw new Error(`That work choice is not available for ${room.name} in this scope.`);
       const proposed = generated.find(item => item.productName.trim().toLowerCase() === task.name.toLowerCase());

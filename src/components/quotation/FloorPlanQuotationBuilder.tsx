@@ -27,7 +27,7 @@ export type BuilderMode = 'upload' | 'details';
 type Props = {
   mode: BuilderMode | null; onStart: (mode: BuilderMode) => void; onClose: () => void;
   getCurrentDraft: () => VoiceDraft;
-  onApply: (draft: VoiceDraft, base: string, projectId: string, saveDraft?: boolean, evidence?: Estimate['evidence']) => void;
+  onApply: (draft: VoiceDraft, base: string, projectId: string, saveDraft?: boolean, evidence?: Estimate['evidence'], exclusions?: Estimate['workExclusions']) => void;
   clients: { id: string; name: string; address: string | null }[];
   onMeasurementSystemChange?: () => void;
 };
@@ -226,7 +226,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
       // the regular quotation editor immediately; the plan project itself is already
       // saved by the API and is linked when the draft save completes.
       if (!selected && !retryPricing && !body.estimate.scopeGaps?.length) {
-        onApply(body.estimate.draft, base.current, body.projectId, true, body.estimate.evidence);
+        onApply(body.estimate.draft, base.current, body.projectId, true, body.estimate.evidence, body.estimate.workExclusions);
         setAutoSaved(true);
       }
     } catch (failure) { const message = failure instanceof Error ? failure.message : 'Could not generate an estimate.'; setError(message); if (/no coins left|insufficient coins|COINS_REQUIRED/i.test(message)) { setTopUpOpen(true); void refreshWalletBalance(); } }
@@ -377,8 +377,8 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
             <Button variant="outline" type="button" onClick={step === 'upload' || step === 'analysis' && mode === 'details' ? onClose : back}><ArrowLeft className="mr-1 h-4 w-4" />{step === 'upload' || step === 'analysis' && mode === 'details' ? 'Cancel' : 'Back'}</Button>
             {step === 'upload' ? <Button type="button" className="min-w-0 flex-1" disabled={!files.length || !coinsReady} onClick={() => void analyse()}>Analyse Floor Plan</Button> : step === 'scope' ? <Button type="button" className="min-w-0 flex-1" disabled={!coinsReady || !scopedRooms(analysis, brief).length || !brief.measurementInputUnit} onClick={() => void generate()}>Generate Quotation<ArrowRight className="ml-2 h-4 w-4" /></Button> : step === 'review' ? <Button disabled={!coinsReady} type="button" className="min-w-0 flex-1" onClick={() => void generate()}>Generate Quotation</Button> : step === 'estimate' ? <>
             {autoSaved ? <Button type="button" className="min-w-0 flex-1" onClick={onClose}>Open quotation</Button> : <>
-              <Button type="button" variant="outline" className="min-w-0 flex-1" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, false, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not apply the estimate.'); } }}>Edit Quotation</Button>
-              <Button type="button" className="w-full sm:w-auto" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, true, estimate.evidence); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not save the estimate.'); } }}>Save as Draft</Button>
+              <Button type="button" variant="outline" className="min-w-0 flex-1" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, false, estimate.evidence, estimate.workExclusions); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not apply the estimate.'); } }}>Edit Quotation</Button>
+              <Button type="button" className="w-full sm:w-auto" disabled={!!estimate?.scopeGaps?.length} onClick={() => { try { if (estimate && projectId) { onApply(estimate.draft, base.current, projectId, true, estimate.evidence, estimate.workExclusions); onClose(); } } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not save the estimate.'); } }}>Save as Draft</Button>
             </>}
             </> : <Button type="button" className="min-w-0 flex-1" disabled={!coinsReady} onClick={next}>Continue<ArrowRight className="ml-1 h-4 w-4" /></Button>}
           </>}

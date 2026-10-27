@@ -18,6 +18,7 @@ jest.mock('@/lib/quotation-ai/market-pricing', () => ({ ...jest.requireActual('@
 jest.mock('@/lib/quotation-ai/estimate-completion', () => ({ ...jest.requireActual('@/lib/quotation-ai/estimate-completion'), OpenAIEstimateCompletion: jest.fn() }));
 const autoComplete = jest.fn();
 const research = jest.fn();
+const interpretRequirements = jest.fn();
 const getUser = jest.fn(); const limit = jest.fn(); const analyse = jest.fn(); const generate = jest.fn();
 const upload = jest.fn(); const remove = jest.fn(); const from = jest.fn();
 const rpc = jest.fn();
@@ -46,6 +47,55 @@ function request(body: unknown, authenticated = true) {
   return new Request('https://app.intorza.com/api/quotation-ai/floor-plan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: 'Bearer session' } : {}) }, body: JSON.stringify(body) });
 }
 const payload = () => ({ action: 'generate', projectId: null, analysis: planFixture(), brief: briefFixture(), draft: draftFixture() });
+it.each(['No wall painting or false ceiling.', 'No wall painting and no seling.'])('enforces notes over defaults and unwanted model output: %s', requestNotes => {
+  return (async () => {
+    const proposal = proposalFixture();
+    proposal.sections[0].items.push({ ...proposal.sections[0].items[0], productName: 'Wall painting' }, { ...proposal.sections[0].items[0], productName: 'False ceiling' });
+    generate.mockResolvedValueOnce(proposal);
+    const response = await POST(request({ ...payload(), brief: { ...briefFixture(), automatic: true, quoteExtras: ['painting','ceiling'], requestNotes } }));
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(interpretRequirements).toHaveBeenCalledWith(expect.objectContaining({ requestNotes }), expect.anything());
+    expect(result.estimate.draft.sections[0].items.map((item: { productName: string }) => item.productName)).toEqual(['Wardrobe', 'Loft storage']);
+    expect(result.estimate.workExclusions[0].workKeys).toEqual(expect.arrayContaining(['painting','ceiling']));
+    expect(research.mock.calls.flatMap(([input]) => input.products).map(product => product.name)).not.toEqual(expect.arrayContaining(['Wall painting','False ceiling']));
+  })();
+});
+
+it('applies semantic requirements and keeps room-specific exceptions local', async () => {
+  const plan = planFixture();
+  plan.rooms.push({ ...plan.rooms[0], name: 'Kitchen', kind: 'kitchen' });
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [{ roomName: 'Bedroom', workKeys: ['painting'] }] });
+  generate.mockResolvedValueOnce({ ...proposalFixture(), sections: [...proposalFixture().sections, { title: 'Kitchen', roomName: 'Kitchen', items: [{ ...proposalFixture().sections[0].items[0], productName: 'Kitchen base cabinets' }] }] });
+  const response = await POST(request({ ...payload(), analysis: plan, brief: { ...briefFixture(), automatic: true, roomNames: ['Bedroom','Kitchen'], requestNotes: 'Leave the existing walls as they are except in the kitchen.' } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.draft.sections[0].items.some((item: { productName: string }) => item.productName === 'Wall painting')).toBe(false);
+  expect(result.estimate.draft.sections[1].items.some((item: { productName: string }) => item.productName === 'Wall painting')).toBe(true);
+});
+
+it('removes excluded work during pricing retry without mismatching retained item identities', async () => {
+  const proposal = proposalFixture();
+  proposal.sections[0].items.unshift({ ...proposal.sections[0].items[0], productName: 'Wall painting' });
+  storedEstimate = buildEstimate(proposal, planFixture(), briefFixture(), [], draftFixture());
+  const wardrobeId = storedEstimate.draft.sections[0].items[1].id;
+  const response = await POST(request({ ...payload(), action: 'retry_pricing', projectId: '11111111-1111-4111-8111-111111111111', brief: { ...briefFixture(), requestNotes: 'No wall painting.' } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.draft.sections[0].items).toHaveLength(1);
+  expect(result.estimate.draft.sections[0].items[0]).toMatchObject({ id: wardrobeId, productName: 'Wardrobe' });
+  expect(result.estimate.evidence).toHaveLength(1);
+});
+
+it('allows rooms with no remaining work after exclusions without restoring defaults or failing the whole quote', async () => {
+  const plan = planFixture();
+  plan.rooms.push({ ...plan.rooms[0], name: 'Balcony', kind: 'balcony' });
+  const response = await POST(request({ ...payload(), analysis: plan, brief: { ...briefFixture(), automatic: true, roomNames: ['Bedroom','Balcony'], requestNotes: 'No ceiling or painting.' } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.draft.sections.find((section: { title: string }) => section.title === 'Balcony').items).toHaveLength(0);
+  expect(result.estimate.scopeGaps).toEqual([]);
+});
 it.each(['Basic', 'Premium', 'Luxury'] as const)('searches for %s pricing when only ungraded library rates exist', async finish => {
   libraryRows = [{ id: 'standard-only', product_name: 'Wardrobe', product_details: '18mm plywood', preferred_rate: 1200, country_code: 'IN', updated_at: new Date().toISOString() }];
   research.mockImplementationOnce(async (input) => ({ rates: input.products.map((product: { name: string; specification: string }) => ({
@@ -108,7 +158,8 @@ beforeEach(() => {
   from.mockImplementation(database);
   rpc.mockResolvedValue({ data: 45, error: null });
   (createClient as jest.Mock).mockReturnValue({ auth: { getUser }, from, rpc, storage: { from: () => ({ upload, remove }) } });
-  (OpenAIFloorPlanProvider as jest.Mock).mockReturnValue({ analyse, generate });
+  (OpenAIFloorPlanProvider as jest.Mock).mockReturnValue({ analyse, generate, requirements: interpretRequirements });
+  interpretRequirements.mockResolvedValue({ exclusions: [] });
   (OpenAIWebMarketPricing as jest.Mock).mockReturnValue({ research });
   (OpenAIEstimateCompletion as jest.Mock).mockReturnValue({ complete: autoComplete });
   autoComplete.mockImplementation(async estimate => estimate);

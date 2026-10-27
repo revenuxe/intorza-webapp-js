@@ -43,6 +43,14 @@ it('passes structured modular kitchen preferences into estimate generation', asy
   expect(body.input[0].content[0].text).toContain('"layout":"l_shape"');
   expect(body.input[0].content[0].text).toContain('Keep sink and hob in place.');
 });
+it('interprets free-text exclusions with constrained room names and work keys', async () => {
+  (global.fetch as jest.Mock).mockResolvedValue(complete({ exclusions: [{ roomName: 'Bedroom', workKeys: ['ceiling','painting'] }] }));
+  const result = await new OpenAIFloorPlanProvider('secret', 'configured-model').requirements({ requestNotes: 'No seling or wall painting', rooms: [{ name: 'Bedroom', work: ['ceiling','painting'] }] }, new AbortController().signal);
+  expect(result.exclusions[0].workKeys).toEqual(['ceiling','painting']);
+  const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+  expect(body.instructions).toContain('room-specific exceptions');
+  expect(body.instructions).toContain('no dark paint');
+});
 it('instructs quotation extraction to keep fixed packages out of sqft pricing', async () => {
   const extraction = { location: 'Bengaluru', currency: 'INR', priceDate: '2026-10-01', projectType: 'Apartment', limitations: [], items: [{ section: 'Kitchen', productName: 'Accessories', material: '', specification: '', unit: 'lump_sum', quantity: 1, rate: 20000, tax: 'unknown', installationIncluded: false, page: 1, notes: '' }] };
   (global.fetch as jest.Mock).mockResolvedValue(complete(extraction));

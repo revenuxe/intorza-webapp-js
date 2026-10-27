@@ -1204,10 +1204,10 @@ const CreateQuotation = () => {
           clients={clients}
           onMeasurementSystemChange={() => setProfile(current => ({ ...current, measurement_system: 'imperial' }))}
           onClose={() => setBuilderMode(null)}
-          onApply={(draft, base, projectId, saveDraft, evidence) => {
+          onApply={(draft, base, projectId, saveDraft, evidence, exclusions) => {
             const existing = getAIDraft();
             if (JSON.stringify(existing) !== base) throw new Error('Your quotation changed while the estimate was being prepared. Go Back and regenerate to preserve your edits.');
-            const { draft: combined, sections: nextSections } = appendFloorPlanEstimate(existing, draft);
+            const { draft: combined, sections: nextSections } = appendFloorPlanEstimate(existing, draft, exclusions);
             lastAIDraft.current = combined;
             planProjectId.current = projectId;
             setAIPriceEvidence(current => ({ ...current, ...Object.fromEntries((evidence ?? []).map(row => [row.itemId, row.price])) }));
