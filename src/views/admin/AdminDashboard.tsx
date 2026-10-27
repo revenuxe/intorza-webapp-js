@@ -21,6 +21,7 @@ import { TechStackDialog } from "@/components/TechStackDialog";
 import { AITrainingPanel } from '@/components/admin/AITrainingPanel';
 import { AdminUserDirectory } from '@/components/admin/AdminUserDirectory';
 import { CoinWalletAdminPanel } from '@/components/admin/CoinWalletAdminPanel';
+import { QuotationAIBadge, type AISelections } from '@/components/admin/QuotationAIBadge';
 
 interface User {
   id: string;
@@ -46,6 +47,7 @@ interface Feedback {
 }
 
 interface Quotation {
+  aiSelections?: AISelections;
   id: string;
   quotation_number: string;
   client_name: string;
@@ -173,6 +175,9 @@ const AdminDashboard = () => {
         loadQuotations();
         loadStats();
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotation_plan_projects' }, () => {
+        loadQuotations();
+      })
       .subscribe();
     channels.push(quotationsChannel);
 
@@ -299,7 +304,12 @@ const AdminDashboard = () => {
         .limit(100);
 
       if (error) throw error;
-      
+
+      const aiResult = data?.length
+        ? await supabase.rpc('admin_quotation_ai_selections', { p_quotation_ids: data.map(q => q.id) })
+        : { data: [], error: null };
+      recordLoadResult('Quote AI selections', Boolean(aiResult.error));
+      const aiByQuotation = new Map((aiResult.data || []).map(row => [row.quotation_id, row]));
       const quotationsWithEmail = await Promise.all((data || []).map(async (q) => {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -307,7 +317,7 @@ const AdminDashboard = () => {
           .eq('id', q.user_id)
           .single();
         if (profileError) throw profileError;
-        return { ...q, user_email: profile?.email || 'Unknown' };
+        return { ...q, user_email: profile?.email || 'Unknown', aiSelections: aiByQuotation.get(q.id) };
       }));
 
       setQuotations(quotationsWithEmail);
@@ -954,7 +964,7 @@ const AdminDashboard = () => {
                       ) : (
                         quotations.map((q) => (
                           <TableRow key={q.id}>
-                            <TableCell className="font-medium">{q.quotation_number}</TableCell>
+                            <TableCell className="font-medium"><div className="flex items-center gap-2"><span>{q.quotation_number}</span>{q.aiSelections && <QuotationAIBadge selections={q.aiSelections} quotationNumber={q.quotation_number} />}</div></TableCell>
                             <TableCell>{q.client_name}</TableCell>
                             <TableCell>{q.project_name}</TableCell>
                             <TableCell className="tabular-nums">{formatCurrency(q.grand_total || 0)}</TableCell>

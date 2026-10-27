@@ -13,11 +13,13 @@ const useAuthSession = () => {
 
   useEffect(() => {
     let mounted = true;
+    let authEventReceived = false;
 
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
+        authEventReceived = true;
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -26,7 +28,8 @@ const useAuthSession = () => {
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
+      // A login/logout event is newer than this startup snapshot.
+      if (!mounted || authEventReceived) return;
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

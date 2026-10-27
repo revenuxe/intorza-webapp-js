@@ -1,5 +1,36 @@
 # Supabase integration
 
+## Admin AI quotation selections
+
+`20261027120000_admin_quotation_ai_selections` adds an authenticated,
+admin-checked batch RPC (maximum 100 quote IDs). It returns saved builder
+choices for linked AI estimates, checks matching quotation ownership, and
+filters rooms to the selected scope. It does not expose plan files or estimates
+or broaden the table's owner-only policies. The admin Quotes table displays a
+clickable AI badge for these records, with a compact, scrollable selections popup.
+Manual quotes and older quotes without a linked AI project are not inferred
+from project names. Missing metadata is shown as not recorded.
+
+Verify database boundaries with `supabase/checks/admin-quotation-ai-selections.sql`;
+all synthetic fixtures roll back. Frontend changes require app deployment.
+
+## Verification on October 27, 2026
+
+The CLI link and browser configuration match `gclsgkhtwqurniitfeir`.
+Live Auth settings enable email and Google. All 38 public tables have RLS
+enabled; core quotation RPCs exist. Company assets, room photos, training
+documents, and floor plans use private buckets; gallery images remain public.
+Anonymous requests to seven sensitive tables are denied. These checks do not
+replace signed-in end-to-end or OAuth callback testing.
+
+The online check now verifies the Data API with a zero-row request, accepting
+the database's intentional anonymous permission denial. The schema root
+requires a secret key and is unsuitable for browser-key health checks.
+The atomic-save check uses a draft to respect Pro-only delivery and passes
+nested saves, gallery references, preserved IDs, rollback, and tenant denial.
+Auth initialization now ignores stale startup sessions after newer auth events.
+Legacy migration history still differs; bulk migration push remains unsuitable.
+
 ## Structure
 
 - `src/config/resolve-public-supabase.mjs`: build-time public configuration

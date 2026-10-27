@@ -13,7 +13,7 @@ declare
   gid uuid;
   failed boolean := false;
 begin
-  q := public.save_quotation(null, '{"quotation_number":"INTEGRATION-ROLLBACK","project_name":"Integration test","client_name":"Synthetic client","sections":[{"section_name":"Kitchen","items":[{"product_name":"Cabinet","amount":100}]}]}'::jsonb);
+  q := public.save_quotation(null, '{"quotation_number":"INTEGRATION-ROLLBACK","status":"draft","project_name":"Integration test","client_name":"Synthetic client","sections":[{"section_name":"Kitchen","items":[{"product_name":"Cabinet","amount":100}]}]}'::jsonb);
   qid := (q->>'id')::uuid;
   select id into sid from public.quotation_sections where quotation_id = qid;
   select id into iid from public.quotation_items where section_id = sid;

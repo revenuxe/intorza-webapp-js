@@ -1657,6 +1657,10 @@ export type Database = {
       }
     }
     Functions: {
+      admin_quotation_ai_selections: {
+        Args: { p_quotation_ids: string[] }
+        Returns: { quotation_id: string; brief: Json | null; property_type: string | null }[]
+      }
       admin_payment_history: { Args: { p_user: string; p_page?: number }; Returns: Json }
       admin_wallet_directory: { Args: { p_search?: string; p_page?: number }; Returns: Json }
       admin_user_directory: { Args: { p_search?: string; p_status?: string; p_page?: number; p_sort?: string }; Returns: Json }
