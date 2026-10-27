@@ -8,5 +8,6 @@ export function EstimatePriceDetails({ price }: { price: PriceEvidence | null })
     <p>{price.inclusions}</p>
     {!!price.basisWarnings?.length && <div className="mt-2 rounded-lg bg-amber-50 p-2 text-amber-900 dark:bg-amber-950 dark:text-amber-100"><p className="font-medium">Provisional price · assumptions to review</p>{price.basisWarnings.map((warning, index) => <p key={index}>{warning}</p>)}</div>}
     {price.sources?.filter(source => /^https:\/\//i.test(source.url)).map(source => <div key={source.url} className="mt-2 border-l pl-2"><a href={source.url} target="_blank" rel="noopener noreferrer" className="underline text-primary">{source.name}</a><p>Published {source.publishedDate || 'date unknown'} · Retrieved {source.retrievedAt.slice(0, 10)}</p><p>{source.specification}</p><p>“{source.quote}”</p></div>)}
+    {price.finishTier && <p className="mt-1 font-medium">Pricing finish tier: {price.finishTier}</p>}
   </details>;
 }

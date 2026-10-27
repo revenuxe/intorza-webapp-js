@@ -10,6 +10,8 @@ import { ProviderError } from '@/lib/quotation-ai/provider';
 import { AI_SERVICE_ISSUE } from '@/lib/quotation-ai/service-issue';
 import { OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
 import { OpenAIEstimateCompletion } from '@/lib/quotation-ai/estimate-completion';
+import { finishTierGuidance, rateSupportsFinishTier, tierPricingSpecification } from '@/lib/quotation-ai/finish-tier';
+import { formatItemDetails } from '@/lib/itemSpecifications';
 import { closeReferencePrice, matchingReferenceRate, normalizeReferenceText, referenceCity, unknownReferenceCity, referencePriceEvidence, preferredLibraryRates, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
 
 export const dynamic = 'force-dynamic';
@@ -188,7 +190,6 @@ export async function POST(request: Request) {
     rates.push(...referencePriceEvidence(references.data, currency, brief.location, true)
       .filter(row => !rates.some(rate => rate.source === 'approved' && normalizeReferenceText(rate.name) === normalizeReferenceText(row.name)
         && normalizeReferenceText(rate.description) === normalizeReferenceText(row.description))));
-    const approvedIds = new Set(rates.map(rate => rate.id));
     for (const row of history.data ?? []) {
       const rate = row.preferred_rate ?? row.default_rate;
       if (rate == null || rate <= 0 || rate > 10000000 || row.country_code !== profile.data?.country_code || rates.some(item => item.name.toLowerCase() === row.product_name.toLowerCase())
@@ -196,6 +197,16 @@ export async function POST(request: Request) {
       rates.push({ id: row.id, name: row.product_name.slice(0, 150), description: (row.product_details || '').slice(0, 1000), rate, unit: 'sqft', source: 'historical', currency, location: '', verifiedAt: row.last_used_at || row.updated_at, sourceUrl: null, inclusions: 'Historical rate; specifications, location, GST and inclusions require review.' });
     }
     const requestedBrief = { ...(regenerateRooms ? { ...brief, roomNames: regenerateRooms } : brief), finish: resolveFinishTier(brief.finish, brief.budget, previousEstimate?.totals.total ?? null) };
+    if (regenerateRooms && (previousEstimate?.finishTier ?? 'Standard') !== requestedBrief.finish) {
+      return json({ error: 'The finish level changed. Go Back and generate the full estimate so every room uses the selected finish level.' }, 400);
+    }
+    const pricingSpecification = (item: z.infer<typeof generatedSchema>['sections'][number]['items'][number]) =>
+      tierPricingSpecification(formatItemDetails(item.description, item.specifications).slice(0, 1000), requestedBrief.finish);
+    // A generic/Standard rate must not satisfy Basic, Premium or Luxury before
+    // live research gets a chance to find the selected specification tier.
+    const excludedRates = rates.filter(rate => !rateSupportsFinishTier(rate, requestedBrief.finish));
+    rates.splice(0, rates.length, ...rates.filter(rate => rateSupportsFinishTier(rate, requestedBrief.finish)).map(rate => ({ ...rate, finishTier: requestedBrief.finish })));
+    const approvedIds = new Set(rates.map(rate => rate.id));
     if (action !== 'retry_pricing') ensureRoomWorkCoverage({ sections: [], assumptions: [] }, scopedRooms(analysis, requestedBrief), requestedBrief);
     // Bound context cost. Full evidence remains server-side; the model only needs matching specifications and IDs.
     const relevanceTerms = normalizeReferenceText([
@@ -225,6 +236,7 @@ export async function POST(request: Request) {
         const group = await Promise.all(batches.slice(index, index + 2).map(batch => provider.generate({
           rooms: batch, property: analysis.propertyType,
           brief: { ...requestedBrief, roomNames: batch.map(room => room.name), roomWork: requestedBrief.roomWork?.filter(answer => batch.some(room => room.name === answer.roomName)) },
+          finishGuidance: finishTierGuidance[requestedBrief.finish],
           rates: rateContext, reviewedPatterns: [...patternContext].sort((a, b) => {
             const relevance = (row: typeof a) => relevanceTerms.reduce((sum, term) => sum + (normalizeReferenceText(`${row.product} ${row.material} ${row.specification}`).includes(term) ? 1 : 0), 0);
             return relevance(b) - relevance(a);
@@ -236,6 +248,7 @@ export async function POST(request: Request) {
     })();
     if (action !== 'retry_pricing') proposal = generatedSchema.parse(ensureRoomWorkCoverage(proposal, scopedRooms(analysis, requestedBrief), requestedBrief));
     const researchLimitations: string[] = [];
+    if (excludedRates.length) researchLimitations.push(`Catalogue rates without a compatible ${requestedBrief.finish} finish tier were excluded; unmatched items require tier-specific market evidence or labelled AI allowances.`);
     if (references.error) researchLimitations.push('The admin reference library is unavailable; business and market pricing were used where possible.');
     // Match against the complete catalogue even when an item was outside the
     // bounded model context. Never swap material variants based on name alone.
@@ -244,15 +257,15 @@ export async function POST(request: Request) {
       // Validate the requested specification server-side, even if the model
       // supplied a real catalogue ID belonging to a different material variant.
       item.rateId = null;
-      const match = matchingReferenceRate(rates, item.productName, item.description);
+      const match = matchingReferenceRate(rates, item.productName, pricingSpecification(item));
       if (match) item.rateId = match.id;
       else {
-        const close = closeReferencePrice(rates, item.productName, item.description, currency, brief.location);
+        const close = closeReferencePrice(rates, item.productName, pricingSpecification(item), currency, brief.location);
         if (close) { rates.push(close); approvedIds.add(close.id); item.rateId = close.id; }
       }
     }
     const products = [...new Map(proposal.sections.flatMap(section => section.items).filter(item => !approvedIds.has(item.rateId) && !/Billing: (piece|lump_sum); price separately/i.test(item.description))
-      .map(item => [JSON.stringify([item.productName.trim().toLowerCase(), item.description.trim().toLowerCase()]), { name: item.productName, specification: item.description,
+      .map(item => [JSON.stringify([item.productName.trim().toLowerCase(), pricingSpecification(item).trim().toLowerCase()]), { name: item.productName, specification: pricingSpecification(item),
         ...(action === 'retry_pricing' ? { heightFt: previousEstimate.draft.sections.flatMap(section => section.items).find(row => row.productName === item.productName && row.productDetails === item.description)?.heightFt ?? undefined } : {}),
       }])).values()];
     const enabled = (env.QUOTATION_MARKET_RESEARCH || process.env.QUOTATION_MARKET_RESEARCH || 'openai') === 'openai';
@@ -260,6 +273,7 @@ export async function POST(request: Request) {
       // Cache only this owner's previously saved evidence, at most 24h, with identical specification/currency/city.
       const cached = (action === 'retry_pricing' ? [] : previousEstimate?.evidence ?? []).flatMap(row => row.price?.source === 'market_estimate' ? [row.price] : [])
         .filter(rate => rate.currency === currency && rate.location.toLowerCase() === brief.location.toLowerCase()
+          && rateSupportsFinishTier(rate, requestedBrief.finish)
           && Number.isFinite(Date.parse(rate.verifiedAt)) && Date.now() >= Date.parse(rate.verifiedAt) && Date.now() - Date.parse(rate.verifiedAt) < 86400000
           && products.some(product => product.name === rate.name && product.specification === rate.description));
       rates.push(...cached);
@@ -268,17 +282,17 @@ export async function POST(request: Request) {
         {
           const research = await new OpenAIWebMarketPricing(key, env.OPENAI_MARKET_MODEL || process.env.OPENAI_MARKET_MODEL || model)
             .research({ products: uncached.slice(offset, offset + 12), location: brief.location, currency, finish: requestedBrief.finish }, request.signal);
-          rates.push(...research.rates); researchLimitations.push(...research.limitations);
+          rates.push(...research.rates.filter(rate => rateSupportsFinishTier(rate, requestedBrief.finish))); researchLimitations.push(...research.limitations);
         }
       }
       if (cached.length) researchLimitations.push('Some market evidence is cached from this project within the last 24 hours; retrieval dates are shown.');
     } else if (products.length) researchLimitations.push('Live pricing research is disabled or the project city is unknown. Enter a city or review pending rates.');
     for (const section of proposal.sections) for (const item of section.items) {
       if (approvedIds.has(item.rateId)) continue;
-      const researched = rates.find(rate => rate.source === 'market_estimate' && rate.name === item.productName && rate.description === item.description);
+      const researched = rates.find(rate => rate.source === 'market_estimate' && rate.name === item.productName && rate.description === pricingSpecification(item));
       if (researched) item.rateId = researched.id;
       else if (!/Billing: (piece|lump_sum); price separately/i.test(item.description)) {
-        const close = closeReferencePrice(rates, item.productName, item.description, currency, brief.location);
+        const close = closeReferencePrice(rates, item.productName, pricingSpecification(item), currency, brief.location);
         if (close) { rates.push(close); item.rateId = close.id; }
       }
     }
@@ -306,7 +320,7 @@ export async function POST(request: Request) {
     // requiring the customer to research trade prices or fill a second form.
     if (brief.automatic || action === 'retry_pricing') {
       estimate = await new OpenAIEstimateCompletion(key, env.OPENAI_ESTIMATE_MODEL || process.env.OPENAI_ESTIMATE_MODEL || 'gpt-6-astra')
-        .complete(estimate, analysis, brief, rates, currency, request.signal);
+        .complete(estimate, analysis, requestedBrief, rates, currency, request.signal);
     }
     for (const section of estimate.draft.sections) for (const item of section.items) {
       const evidence = estimate.evidence.find(row => row.itemId === item.id);

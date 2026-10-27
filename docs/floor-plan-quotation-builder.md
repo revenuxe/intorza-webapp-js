@@ -147,6 +147,21 @@ date are recorded. Deactivation preserves historical evidence.
 
 ### Empty-catalogue pricing
 
+Finish-aware pricing (October 27, 2026): Basic, Standard, Premium and Luxury
+are separate quality constraints. Untagged catalogue rates remain usable for
+Standard; other tiers require an explicit matching tier in the reference.
+Missing compatible rates trigger city/currency/specification-specific web
+research. Non-Standard observations require a matching finish tier and
+source-supported tier compatibility. Generic or different-tier prices are
+rejected rather than multiplied. Search/cache identities include the tier and
+structured item specifications. Existing manual rates remain user-controlled.
+
+The estimate and price evidence record their finish tier. If no comparable
+source exists, automatic completion may use a labelled AI allowance for that
+tier, with assumptions and a range; it is never presented as a retrieved price.
+Retrying pricing rechecks tier compatibility. Changing tier during a partial
+room regeneration requires regenerating the full estimate to avoid mixing tiers.
+
 `market-pricing.ts` defines a research-provider interface and an OpenAI web-search
 implementation, using the existing server-only key. Optional `OPENAI_MARKET_MODEL`
 overrides the floor-plan/text model; it must support the Responses `web_search` tool.

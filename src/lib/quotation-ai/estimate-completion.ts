@@ -54,6 +54,7 @@ export function applyCompletion(previous: Estimate, raw: unknown, brief: Project
     if (item.ratePerSft == null) {
       item.ratePerSft = suggestion.ratePerSqft;
       row.price = { id: `ai-allowance-${item.id}`, name: item.productName, description: item.productDetails,
+        finishTier: brief.finish === 'Recommend' ? 'Standard' : brief.finish,
         rate: suggestion.ratePerSqft, unit: 'sqft', source: 'ai_estimate', currency, location: brief.location,
         verifiedAt: new Date().toISOString(), sourceUrl: null, confidence: 'low',
         range: { low: suggestion.low, high: suggestion.high },

@@ -37,8 +37,17 @@ describe('floor plan quotation boundary', () => {
     const estimate = buildEstimate(proposal(), plan, brief, [rate], base);
     expect(estimate.totals).toEqual({ subtotal: 67200, discount: 3360, tax: 11491.2, total: 75331.2 });
     expect(estimate.draft.sections[0].items[0].productDetails).toContain('Proposed wardrobe');
-    expect(estimate.draft.sections[0].items[0].productDetails).toContain('Approved specification');
+    expect(estimate.draft.sections[0].items[0].productDetails).not.toContain('Approved specification');
+    expect(estimate.evidence[0].price?.description).toContain('Approved specification');
     expect(JSON.stringify(base)).toBe(snapshot);
+  });
+  it('rejects a Standard price ID in a Luxury estimate even if a caller bypasses matching', () => {
+    const result = buildEstimate(proposal(), plan, { ...brief, finish: 'Luxury' }, [rate], fixture());
+    expect(result.draft.sections[0].items[0].ratePerSft).toBeNull();
+    expect(result.evidence[0].price).toBeNull();
+    expect(result.finishTier).toBe('Luxury');
+    const priced = buildEstimate(proposal(), plan, { ...brief, finish: 'Luxury' }, [{ ...rate, finishTier: 'Luxury', rate: 3200 }], fixture());
+    expect(priced.draft.sections[0].items[0].ratePerSft).toBe(3200);
   });
   it('keeps unknown quantities and missing, mismatched or non-sqft rates pending', () => {
     const raw = proposal(); raw.sections[0].items[0].measurementStatus = 'unknown';

@@ -4,6 +4,14 @@ const now = new Date('2026-10-15T00:00:00Z');
 const input: ResearchInput = { products: [{ name: 'Wardrobe', specification: 'Laminate wardrobe installed' }], location: 'Bengaluru', currency: 'INR', finish: 'Standard' };
 const sample = (url = 'https://supplier.example/wardrobe', low = 1000, high = 1400) => ({ productName: 'Wardrobe', specification: 'Laminate wardrobe installed', low, high, unit: 'sqft', currency: 'INR', location: 'Bengaluru', sourceUrl: url, sourceName: 'Supplier', publishedDate: '2026-10-01', tax: 'excluded', sellingRate: true, installationIncluded: true, comparable: true, inclusions: 'Hardware and installation included', quote: 'Installed wardrobe rate 1000–1400 per sqft excluding GST' });
 const resolve = (rows: unknown[], urls = ['https://supplier.example/wardrobe']) => resolveMarketEvidence({ observations: rows, limitations: [] }, urls, input, now);
+it.each(['Basic', 'Premium', 'Luxury'])('requires source-supported %s evidence instead of generic or different-tier prices', finish => {
+  const selected = { ...input, finish };
+  for (const row of [sample(), { ...sample(), finishTier: 'Standard', tierSupported: true }, { ...sample(), finishTier: finish, tierSupported: false }]) {
+    expect(resolveMarketEvidence({ observations: [row], limitations: [] }, [sample().sourceUrl], selected, now).rates).toHaveLength(0);
+  }
+  const result = resolveMarketEvidence({ observations: [{ ...sample(), finishTier: finish, tierSupported: true }], limitations: [] }, [sample().sourceUrl], selected, now);
+  expect(result.rates[0]).toMatchObject({ finishTier: finish, source: 'market_estimate' });
+});
 it('prices an empty catalogue with retrieved evidence and a deterministic representative rate', () => {
   const other = 'https://contractor.example/wardrobe';
   const result = resolve([sample(), sample(other, 1200, 1600)], ['https://supplier.example/wardrobe', other]);

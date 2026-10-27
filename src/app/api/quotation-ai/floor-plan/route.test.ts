@@ -46,6 +46,60 @@ function request(body: unknown, authenticated = true) {
   return new Request('https://app.intorza.com/api/quotation-ai/floor-plan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: 'Bearer session' } : {}) }, body: JSON.stringify(body) });
 }
 const payload = () => ({ action: 'generate', projectId: null, analysis: planFixture(), brief: briefFixture(), draft: draftFixture() });
+it.each(['Basic', 'Premium', 'Luxury'] as const)('searches for %s pricing when only ungraded library rates exist', async finish => {
+  libraryRows = [{ id: 'standard-only', product_name: 'Wardrobe', product_details: '18mm plywood', preferred_rate: 1200, country_code: 'IN', updated_at: new Date().toISOString() }];
+  research.mockImplementationOnce(async (input) => ({ rates: input.products.map((product: { name: string; specification: string }) => ({
+    id: 'tier-market', name: product.name, description: product.specification, rate: finish === 'Luxury' ? 3500 : 1800,
+    unit: 'sqft', source: 'market_estimate', finishTier: finish, currency: 'INR', location: 'Bengaluru', verifiedAt: new Date().toISOString(),
+    sourceUrl: 'https://supplier.example/tier-rates', inclusions: 'Installed, excluding GST',
+  })), limitations: [] }));
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), finish } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(research).toHaveBeenCalledWith(expect.objectContaining({ finish, products: [expect.objectContaining({ specification: expect.stringContaining(`Requested finish tier: ${finish}`) })] }), expect.anything());
+  expect(result.estimate.finishTier).toBe(finish);
+  expect(result.estimate.draft.sections[0].items[0].ratePerSft).toBe(finish === 'Luxury' ? 3500 : 1800);
+  expect(result.estimate.evidence[0].price).toMatchObject({ source: 'market_estimate', finishTier: finish });
+  expect(result.estimate.assumptions.join(' ')).toContain('excluded');
+});
+
+it('does not fall back to a Standard close-match rate after Luxury search finds no sources', async () => {
+  referenceRows = [{ id: 'standard', section: 'Bedroom', product_name: 'Wardrobe', material: 'Laminate', specification: 'Standard finish', unit: 'sqft', recent_rate: 1400, recent_low: 1200, recent_high: 1600, recent_source_count: 5, source_count: 5, tax: 'excluded', installation_included: true, location: 'Bengaluru', currency: 'INR', price_date: new Date().toISOString(), project_type: 'Apartment' }];
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), finish: 'Luxury', automatic: true } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(research).toHaveBeenCalledWith(expect.objectContaining({ finish: 'Luxury' }), expect.anything());
+  expect(result.estimate.evidence.every((row: { price: unknown }) => row.price === null)).toBe(true);
+  expect(autoComplete).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ finish: 'Luxury' }), [], 'INR', expect.anything());
+});
+
+it('keeps an explicitly Luxury library rate unchanged when it matches the requested tier', async () => {
+  libraryRows = [{ id: 'luxury', product_name: 'Wardrobe', product_details: 'Luxury bespoke veneer finish', preferred_rate: 3200, country_code: 'IN', updated_at: new Date().toISOString() }];
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), finish: 'Luxury' } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.draft.sections[0].items[0].ratePerSft).toBe(3200);
+  expect(research).not.toHaveBeenCalled();
+});
+
+it('researches Luxury again on retry instead of locking the old Standard catalogue rate', async () => {
+  storedEstimate = buildEstimate(proposalFixture(), planFixture(), briefFixture(), [], draftFixture());
+  storedEstimate.draft.sections[0].items[0].ratePerSft = 1200;
+  storedEstimate.evidence[0].price = { id: 'old-standard', name: 'Wardrobe', description: 'Proposed wardrobe', rate: 1200, unit: 'sqft', source: 'market_estimate', finishTier: 'Standard', currency: 'INR', location: 'Bengaluru', verifiedAt: new Date().toISOString(), sourceUrl: 'https://supplier.example/standard', inclusions: '' };
+  const response = await POST(request({ ...payload(), action: 'retry_pricing', projectId: '11111111-1111-4111-8111-111111111111', brief: { ...briefFixture(), finish: 'Luxury' } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(research).toHaveBeenCalledWith(expect.objectContaining({ finish: 'Luxury' }), expect.anything());
+  expect(result.estimate.draft.sections[0].items[0].ratePerSft).toBeNull();
+});
+
+it('requires full regeneration when changing finish tier during partial-room regeneration', async () => {
+  storedEstimate = buildEstimate(proposalFixture(), planFixture(), briefFixture(), [], draftFixture());
+  const response = await POST(request({ ...payload(), projectId: '11111111-1111-4111-8111-111111111111', regenerateRooms: ['Bedroom'], brief: { ...briefFixture(), finish: 'Luxury' } }));
+  expect(response.status).toBe(400);
+  expect((await response.json()).error).toContain('full estimate');
+  expect(generate).not.toHaveBeenCalled();
+});
 beforeEach(() => {
   jest.clearAllMocks(); walletBalance = 60; walletError = false; projectExists = true; referenceRows = []; libraryRows = []; storedEstimate = null; metricProfile = false; measurementUpdateFails = false;
   getUser.mockResolvedValue({ data: { user: { id: 'owner' } }, error: null });
