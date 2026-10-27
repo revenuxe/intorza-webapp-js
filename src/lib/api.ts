@@ -159,14 +159,20 @@ export const quotationsApi = {
     }));
     return { data: { ...(row as any), sections: normalized } };
   },
-  create: async (body: any): Promise<Envelope<any>> => {
+  create: async (body: any, aiProjectId?: string | null): Promise<Envelope<any>> => {
     await requireUserId();
-    const row = unwrap(await supabase.rpc('save_quotation', { p_id: null, p_payload: structuredQuotationPayload(body) }));
+    const payload = structuredQuotationPayload(body);
+    const row = unwrap(await (aiProjectId
+      ? supabase.rpc('save_ai_quotation', { p_id: null, p_payload: payload, p_project_id: aiProjectId })
+      : supabase.rpc('save_quotation', { p_id: null, p_payload: payload })));
     return { data: row };
   },
-  update: async (id: string, body: any): Promise<Envelope<any>> => {
+  update: async (id: string, body: any, aiProjectId?: string | null): Promise<Envelope<any>> => {
     await requireUserId();
-    const row = unwrap(await supabase.rpc('save_quotation', { p_id: id, p_payload: structuredQuotationPayload(body) }));
+    const payload = structuredQuotationPayload(body);
+    const row = unwrap(await (aiProjectId
+      ? supabase.rpc('save_ai_quotation', { p_id: id, p_payload: payload, p_project_id: aiProjectId })
+      : supabase.rpc('save_quotation', { p_id: id, p_payload: payload })));
     return { data: row };
   },
   remove: async (id: string): Promise<void> => {

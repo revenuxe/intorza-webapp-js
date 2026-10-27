@@ -1657,6 +1657,10 @@ export type Database = {
       }
     }
     Functions: {
+      save_ai_quotation: {
+        Args: { p_id: string | null; p_payload: Json; p_project_id: string }
+        Returns: Json
+      }
       admin_quotation_ai_selections: {
         Args: { p_quotation_ids: string[] }
         Returns: { quotation_id: string; brief: Json | null; property_type: string | null }[]

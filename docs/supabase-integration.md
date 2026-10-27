@@ -2,6 +2,15 @@
 
 ## Admin AI quotation selections
 
+`20261027140000_atomic_ai_quotation_link` repairs two historical links using
+unique same-owner matches of complete ordered room/product/side/dimension/rate
+lists and a bounded creation window. It never infers provenance from titles.
+Unmatched estimates remain unlinked. New AI saves use `save_ai_quotation`, a
+security-invoker wrapper that saves the quotation and AI link atomically under
+the owner's RLS, before frontend identity reconciliation. Foreign projects and
+reassignment to another quotation are rejected. Verify with
+`supabase/checks/atomic-ai-quotation-link.sql` (rolled-back synthetic fixtures).
+
 `20261027120000_admin_quotation_ai_selections` adds an authenticated,
 admin-checked batch RPC (maximum 100 quote IDs). It returns saved builder
 choices for linked AI estimates, checks matching quotation ownership, and

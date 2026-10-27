@@ -745,14 +745,14 @@ const CreateQuotation = () => {
 
       const existingId = quotationId || savedQuotationIdRef.current;
       if (existingId) {
-        const { data: updated } = await quotationsApi.update(existingId, basePayload);
+        const { data: updated } = await quotationsApi.update(existingId, basePayload, planProjectId.current);
         savedQuotationId = updated?.id || existingId;
       } else {
         const quotationNumber = `QT-${Date.now()}`;
         const { data: created } = await quotationsApi.create({
           ...basePayload,
           quotation_number: quotationNumber,
-        });
+        }, planProjectId.current);
         savedQuotationId = created?.id ?? null;
         savedQuotationIdRef.current = savedQuotationId;
       }
