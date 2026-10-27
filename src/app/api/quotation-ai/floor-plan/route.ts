@@ -267,7 +267,7 @@ export async function POST(request: Request) {
       for (let offset = 0; offset < uncached.length; offset += 12) {
         {
           const research = await new OpenAIWebMarketPricing(key, env.OPENAI_MARKET_MODEL || process.env.OPENAI_MARKET_MODEL || model)
-            .research({ products: uncached.slice(offset, offset + 12), location: brief.location, currency, finish: brief.finish }, request.signal);
+            .research({ products: uncached.slice(offset, offset + 12), location: brief.location, currency, finish: requestedBrief.finish }, request.signal);
           rates.push(...research.rates); researchLimitations.push(...research.limitations);
         }
       }
