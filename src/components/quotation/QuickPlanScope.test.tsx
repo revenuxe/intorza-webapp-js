@@ -27,6 +27,7 @@ it('collects kitchen preferences in the post-analysis flow and keeps them in the
     return <><QuickPlanScope analysis={analysis} brief={brief} onChange={setBrief} onRoomChange={() => undefined} /><output>{JSON.stringify(brief.kitchenPreferences)}</output></>;
   }
   render(<Harness />);
+  fireEvent.click(screen.getByText('Modular kitchen preferences', { selector: 'summary span' }));
   fireEvent.change(screen.getByLabelText('Kitchen layout'), { target: { value: 'l_shape' } });
   fireEvent.change(screen.getByLabelText('Kitchen carcass'), { target: { value: 'bwr_plywood' } });
   fireEvent.change(screen.getByLabelText('Kitchen appliance details'), { target: { value: 'Keep sink and hob in place.' } });

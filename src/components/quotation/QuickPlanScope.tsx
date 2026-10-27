@@ -50,7 +50,9 @@ export function QuickPlanScope({ analysis, brief, onChange, onRoomChange }: { an
         </button>;
       })}</div>
     </fieldset>
-    {hasKitchen && <fieldset className="space-y-3 rounded-xl border bg-card p-3.5"><legend className="px-1 text-sm font-semibold">Modular kitchen preferences <span className="font-normal text-muted-foreground">· optional</span></legend><p className="text-xs leading-5 text-muted-foreground">Help the estimate choose a suitable kitchen design. Select “Not sure” to let the AI leave this open; confirm measurements and clearances on site.</p>
+    {hasKitchen && <details className="group/kitchen rounded-xl border bg-card p-3.5">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-details-marker]:hidden"><span>Modular kitchen preferences <span className="font-normal text-muted-foreground">· optional</span></span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open/kitchen:rotate-180" aria-hidden="true" /></summary>
+      <fieldset className="mt-3 space-y-3"><legend className="sr-only">Modular kitchen preferences</legend><p className="text-xs leading-5 text-muted-foreground">Help the estimate choose a suitable kitchen design. Select “Not sure” to let the AI leave this open; confirm measurements and clearances on site.</p>
       <div className="grid grid-cols-2 gap-2">{([
         ['layout','Layout',[['unknown','Not sure'],['straight','Straight'],['l_shape','L-shaped'],['u_shape','U-shaped'],['parallel','Parallel'],['island','Island / peninsula']]],
         ['carcass','Carcass',[['unknown','Not sure'],['bwr_plywood','BWR plywood'],['marine_plywood','Marine plywood'],['hdhmr','HDHMR']]],
@@ -59,7 +61,8 @@ export function QuickPlanScope({ analysis, brief, onChange, onRoomChange }: { an
         ['countertop','Countertop',[['unknown','Not sure'],['granite','Granite'],['quartz','Quartz'],['solid_surface','Solid surface']]],
       ] as const).map(([key,label,choices]) => <label key={key} className="space-y-1 text-xs">{label}<select aria-label={`Kitchen ${label.toLowerCase()}`} value={brief.kitchenPreferences?.[key] ?? 'unknown'} className="h-10 w-full rounded-md border bg-background px-2 text-sm" onChange={event => onChange({ ...brief, kitchenPreferences: { ...brief.kitchenPreferences, [key]: event.target.value } })}>{choices.map(([value,title]) => <option key={value} value={value}>{title}</option>)}</select></label>)}</div>
       <label className="block space-y-1 text-xs">Appliances, sink, hob or chimney details<Input aria-label="Kitchen appliance details" value={brief.kitchenPreferences?.appliances ?? ''} maxLength={600} placeholder="e.g. keep sink and hob positions; chimney above hob" onChange={event => onChange({ ...brief, kitchenPreferences: { ...brief.kitchenPreferences, appliances: event.target.value } })} /></label>
-    </fieldset>}
+      </fieldset>
+    </details>}
     <fieldset className="rounded-xl border bg-card p-3.5">
       <legend className="px-1 text-sm font-semibold">Material & finish level</legend>
       <p className="mb-3 text-xs leading-5 text-muted-foreground">Choose the quality level for your quotation. AI uses this to guide material specifications, hardware, finishes and comparable pricing.</p>
