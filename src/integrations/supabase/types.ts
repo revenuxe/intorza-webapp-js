@@ -1657,6 +1657,8 @@ export type Database = {
       }
     }
     Functions: {
+      get_quotation_coin_delivery: { Args: { p_project_id: string }; Returns: Json }
+      confirm_quotation_coin_delivery: { Args: { p_project_id: string }; Returns: Json }
       save_ai_quotation: {
         Args: { p_id: string | null; p_payload: Json; p_project_id: string }
         Returns: Json

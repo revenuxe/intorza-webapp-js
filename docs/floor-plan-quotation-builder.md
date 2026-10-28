@@ -1,5 +1,28 @@
 # AI floor plan quotation builder
 
+## Coin charging after displayed pricing (October 28, 2026)
+
+Analysis never deducts coins. A balance check still runs before AI work. New
+floor-plan quotations cost 40 coins; details-only quotations cost 20. Generation
+and persistence return a billing receipt without debiting. Once the completed
+price is visible in the active estimate screen, the browser acknowledges delivery
+after display frames. The server verifies ownership and stored readiness, then
+atomically debits and records a project-specific receipt. Incomplete estimates,
+failed generation, cancelled requests and unseen results cannot initiate that
+confirmation. Confirmation retries, including lost responses, use the same
+project and cannot debit twice. A failed confirmation leaves the displayed price
+available with a separate retry action; it never claims that no debit happened
+when the result of a network request is unknown.
+
+`20261028120000_charge_ai_after_price_delivery` also makes old cached-build
+analysis/generation debit calls no-ops. Existing projects keep their entitlement
+so the rollout cannot charge them a second time; historical payments are mapped
+only where timestamps identify one unambiguous ledger/project pair. No existing
+customer wallet balances are changed by this migration. Verify with
+`supabase/checks/quotation-price-delivery.sql` and `ai-coin-prices.sql`; synthetic
+wallet changes roll back. The browser acknowledgement is a delivery signal,
+not proof a human read or accepted the estimate.
+
 ## Simplified upload path
 
 Before generation, the upload path now asks which measurement input unit to use:
@@ -91,10 +114,9 @@ No CAD upload formats are advertised.
 
 Templates and Customize share a mobile row; the AI action has its own full-width row.
 On larger screens all three actions share a row with a wider AI button. Custom SVG
-plan/document illustrations and gold coins identify the two workflows. The requested
-60-coin display and 15/10-credit labels are presentation values only: there is no wallet,
-credit ledger, balance lookup or deduction. They must be connected to server-owned
-accounting before being treated as spendable account credits. The upload screen keeps
+plan/document illustrations and gold coins identify the two workflows. The wallet
+display uses the authenticated account balance. Pricing is enforced by server-owned
+wallet accounting and a delivery receipt, as described above. The upload screen keeps
 tips collapsed, and room details can be expanded individually.
 
 One vision request analyses the document(s), including PDF pages. Results preserve

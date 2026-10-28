@@ -1,5 +1,20 @@
 # Supabase integration
 
+## Deferred AI coin billing
+
+`20261028120000_charge_ai_after_price_delivery` introduces owner-readable,
+immutable delivery receipts and authenticated status/confirmation RPCs. Only
+confirmation of a stored, complete priced estimate may trigger an AI debit.
+Project locks, wallet locks and stable ledger references serialize duplicates.
+Legacy debit calls are no-ops outside the validated delivery transaction;
+admin debit permissions and fixed AI prices remain enforced. Existing projects
+are grandfathered to avoid double charging; customer balances are unchanged.
+`20261028123000_protect_project_billing_epoch` prevents owner CRUD from
+backdating new projects to impersonate a grandfathered project.
+See `supabase/checks/quotation-price-delivery.sql` for rollback-only financial
+and ownership checks. The application confirms only after the price is visible;
+analysis/generation requests never charge coins themselves.
+
 ## Admin AI quotation selections
 
 `20261027140000_atomic_ai_quotation_link` repairs two historical links using

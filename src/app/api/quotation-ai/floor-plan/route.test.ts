@@ -31,6 +31,14 @@ let libraryRows: Record<string, unknown>[] = [];
 let storedEstimate: Estimate | null = null;
 let metricProfile = false;
 let measurementUpdateFails = false;
+let projectPaid = false;
+let projectCost = 20;
+const defaultRpc = async (name: string, args: { p_project_id?: string } = {}) => ({ data:
+  name === 'get_quotation_coin_delivery' ? { projectId: args.p_project_id, amount: projectCost, paid: projectPaid, ready: true }
+    : name === 'confirm_quotation_coin_delivery' ? { projectId: args.p_project_id, amount: projectCost, paid: true, balance: 40 }
+      : name === 'is_pro_user' ? true : 45,
+  error: null,
+});
 const profileUpdate = jest.fn();
 function database(table: string) {
   const result = { data: table === 'profiles' ? { id: 'owner', currency_code: 'INR', country_code: 'IN', measurement_system: metricProfile ? 'metric' : 'imperial' } : table === 'ai_reference_price_catalogue' ? referenceRows : table === 'item_usage_patterns' ? libraryRows : [], error: null };
@@ -250,11 +258,12 @@ it('requires full regeneration when changing finish tier during partial-room reg
 });
 beforeEach(() => {
   jest.clearAllMocks(); walletBalance = 60; walletError = false; projectExists = true; referenceRows = []; libraryRows = []; storedEstimate = null; metricProfile = false; measurementUpdateFails = false;
+  projectPaid = false; projectCost = 20;
   getUser.mockResolvedValue({ data: { user: { id: 'owner' } }, error: null });
   limit.mockResolvedValue({ success: true });
   (getCloudflareContext as jest.Mock).mockResolvedValue({ env: { OPENAI_API_KEY: 'secret', OPENAI_FLOOR_PLAN_MODEL: 'configured-vision-model', QUOTATION_AI_LIMITER: { limit } } });
   from.mockImplementation(database);
-  rpc.mockResolvedValue({ data: 45, error: null });
+  rpc.mockImplementation(defaultRpc);
   (createClient as jest.Mock).mockReturnValue({ auth: { getUser }, from, rpc, storage: { from: () => ({ upload, remove }) } });
   (OpenAIFloorPlanProvider as jest.Mock).mockReturnValue({ analyse, generate, requirements: interpretRequirements });
   interpretRequirements.mockResolvedValue({ exclusions: [] });
@@ -537,12 +546,14 @@ it('does not charge coins or expose internal details when automatic estimation f
   expect(body.error).toBe("We're facing a technical issue. We'll be back soon.");
   expect(rpc.mock.calls.some(([name]) => name === 'debit_coins')).toBe(false);
 });
-it('charges only after a successful estimate is saved', async () => {
+it('returns a delivery receipt after saving the estimate without deducting coins before display', async () => {
   const response = await POST(request({ ...payload(), brief: { ...briefFixture(), automatic: true } }));
   expect(response.status).toBe(200);
-  const debitIndex = rpc.mock.calls.findIndex(([name]) => name === 'debit_coins');
-  expect(debitIndex).toBeGreaterThanOrEqual(0);
-  expect(rpc.mock.invocationCallOrder[debitIndex]).toBeGreaterThan(insert.mock.invocationCallOrder[0]);
+  expect(await response.json()).toMatchObject({ delivery: { amount: 20, paid: false, ready: true } });
+  expect(rpc).not.toHaveBeenCalledWith('debit_coins', expect.anything());
+  expect(rpc).not.toHaveBeenCalledWith('confirm_quotation_coin_delivery', expect.anything());
+  const statusIndex = rpc.mock.calls.findIndex(([name]) => name === 'get_quotation_coin_delivery');
+  expect(rpc.mock.invocationCallOrder[statusIndex]).toBeGreaterThan(insert.mock.invocationCallOrder[0]);
 });
 it('does not charge when switching measurement settings fails', async () => {
   metricProfile = true; measurementUpdateFails = true;
@@ -551,30 +562,34 @@ it('does not charge when switching measurement settings fails', async () => {
   expect(rpc.mock.calls.some(([name]) => name === 'debit_coins')).toBe(false);
 });
 
-it('charges 20 coins for a new quotation even without automatic mode', async () => {
-  expect((await POST(request(payload()))).status).toBe(200);
-  expect(rpc).toHaveBeenCalledWith('debit_coins', expect.objectContaining({ p_amount: 20, p_type: 'ai_builder' }));
-});
-it('returns an actionable insufficient-balance error', async () => {
-  rpc.mockImplementation(async name => name === 'debit_coins' ? { data: null, error: { message: 'Insufficient coins' } } : { data: true, error: null });
+it('does not deduct coins during generation even without automatic mode', async () => {
   const response = await POST(request(payload()));
+  expect(response.status).toBe(200);
+  expect((await response.json()).delivery.amount).toBe(20);
+  expect(rpc).not.toHaveBeenCalledWith('debit_coins', expect.anything());
+});
+it('keeps delivery confirmation separate and returns an actionable insufficient-balance error', async () => {
+  rpc.mockImplementation(async (name, args) => name === 'confirm_quotation_coin_delivery' ? { data: null, error: { message: 'Insufficient coins' } } : defaultRpc(name,args));
+  const response = await POST(request({ action: 'confirm_delivery', projectId: '11111111-1111-4111-8111-111111111111' }));
   expect(response.status).toBe(402);
-  expect(await response.json()).toMatchObject({ code: 'COINS_REQUIRED', error: expect.stringContaining('20 coins') });
+  expect(await response.json()).toMatchObject({ code: 'COINS_REQUIRED', error: expect.stringContaining('price is ready') });
+  expect(generate).not.toHaveBeenCalled();
 });
 it('reports wallet outages as service failures instead of insufficient coins', async () => {
-  rpc.mockImplementation(async name => name === 'debit_coins' ? { data: null, error: { message: 'Database unavailable' } } : { data: true, error: null });
-  const response = await POST(request(payload()));
-  expect(response.status).toBe(422);
-  expect(await response.json()).toMatchObject({ error: "We're facing a technical issue. We'll be back soon." });
+  rpc.mockImplementation(async (name,args) => name === 'confirm_quotation_coin_delivery' ? { data: null, error: { message: 'Database unavailable' } } : defaultRpc(name,args));
+  const response = await POST(request({ action: 'confirm_delivery', projectId: '11111111-1111-4111-8111-111111111111' }));
+  expect(response.status).toBe(503);
+  expect(await response.json()).toMatchObject({ code: 'COIN_CONFIRMATION_PENDING', error: expect.stringContaining('price is ready') });
 });
 
-it('charges 40 coins after successful floor-plan analysis', async () => {
+it('does not deduct coins after successful floor-plan analysis', async () => {
   walletBalance = 40;
   const form = new FormData();
   form.append('files', new File(['%PDF-1.7\ncontent\n%%EOF'], 'plan.pdf', { type: 'application/pdf' }));
   const response = await POST(new Request('https://app.intorza.com/api/quotation-ai/floor-plan', { method: 'POST', headers: { Authorization: 'Bearer session' }, body: form }));
   expect(response.status).toBe(200);
-  expect(rpc).toHaveBeenCalledWith('debit_coins', expect.objectContaining({ p_amount: 40, p_type: 'floor_plan' }));
+  expect(rpc).not.toHaveBeenCalledWith('debit_coins', expect.anything());
+  expect(rpc).not.toHaveBeenCalledWith('confirm_quotation_coin_delivery', expect.anything());
 });
 
 it.each([0, 5, 39])('blocks floor-plan uploads with %i coins before storage or AI', async balance => {
@@ -604,8 +619,25 @@ it('fails closed before AI when the wallet cannot be read', async () => {
 });
 
 it('does not require more coins to continue an already-paid floor-plan project', async () => {
+  projectPaid = true;
   walletBalance = 0;
   const response = await POST(request({ ...payload(), projectId: '00000000-0000-4000-8000-000000000001' }));
   expect(response.status).toBe(200);
   expect(rpc).not.toHaveBeenCalledWith('debit_coins', expect.anything());
+});
+
+it('uses the same project receipt when delivery confirmation is retried', async () => {
+  const payload = { action: 'confirm_delivery', projectId: '11111111-1111-4111-8111-111111111111' };
+  expect((await POST(request(payload))).status).toBe(200);
+  expect((await POST(request(payload))).status).toBe(200);
+  expect(rpc.mock.calls.filter(([name]) => name === 'confirm_quotation_coin_delivery').map(([, args]) => args)).toEqual([{ p_project_id: payload.projectId }, { p_project_id: payload.projectId }]);
+  expect(generate).not.toHaveBeenCalled();
+});
+
+it('checks the final 40-coin fee before generating an unpaid uploaded plan, without deducting it', async () => {
+  walletBalance=39; projectCost=40;
+  const response=await POST(request({ ...payload(),projectId:'11111111-1111-4111-8111-111111111111' }));
+  expect(response.status).toBe(402);
+  expect(generate).not.toHaveBeenCalled();
+  expect(rpc).not.toHaveBeenCalledWith('confirm_quotation_coin_delivery',expect.anything());
 });

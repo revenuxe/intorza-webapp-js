@@ -1,4 +1,5 @@
 import { AI_COIN_COSTS } from '@/lib/ai-coin-costs';
+import { quotationDeliverySchema, quotationDeliveryConfirmationSchema, type QuotationDelivery } from '@/lib/quotation-ai/delivery';
 import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { z } from 'zod';
@@ -47,6 +48,11 @@ export async function POST(request: Request) {
     });
     const { data: { user }, error } = await db.auth.getUser(token);
     if (error || !user) return json({ error: 'Please sign in again.' }, 401);
+    const readDelivery = async (projectId: string) => {
+      const result = await db.rpc('get_quotation_coin_delivery', { p_project_id: projectId });
+      if (result.error) throw new Error('Could not verify quotation billing status');
+      return quotationDeliverySchema.parse(result.data);
+    };
     const { data: hasPro, error: proError } = await db.rpc('is_pro_user', { _user_id: user.id });
     if (proError) throw new Error('Could not verify your Pro access. Please retry.');
     if (!hasPro) return json({ error: 'Build with AI is available with an active Pro subscription. Upgrade to Pro, then use your wallet coins for each AI request.', code: 'PRO_REQUIRED', requestId }, 403);
@@ -99,17 +105,24 @@ export async function POST(request: Request) {
       if (saved.error) throw new Error('Could not save the plan analysis. Check the database migration.');
       const response = json({ projectId, analysis });
       request.signal.throwIfAborted();
-      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: AI_COIN_COSTS.floor_plan, p_type: 'floor_plan', p_reference: requestId, p_note: 'Floor plan analysis' });
-      if (charged.error) {
-        if (!/Insufficient coins/i.test(charged.error.message)) throw new Error('Wallet charge failed');
-        return json({ error: `Insufficient coins. Floor Plan Analysis requires ${AI_COIN_COSTS.floor_plan} coins. Top up your wallet to continue.`, code: 'COINS_REQUIRED', requestId }, 402);
-      }
       cleanup = undefined;
       return response;
     }
     if (!contentType.startsWith('application/json')) return json({ error: 'Use JSON or a floor plan upload.' }, 415);
     const body = await boundedBody(request, 1048576);
     const raw = JSON.parse(await body.text());
+    if (raw.action === 'confirm_delivery') {
+      stage = 'delivery';
+      const confirmation = z.object({ action: z.literal('confirm_delivery'), projectId: z.string().uuid() }).strict().safeParse(raw);
+      if (!confirmation.success) return json({ error: 'Invalid quotation receipt.', requestId }, 400);
+      const confirmed = await db.rpc('confirm_quotation_coin_delivery', { p_project_id: confirmation.data.projectId });
+      if (confirmed.error) {
+        const insufficient = /Insufficient coins/i.test(confirmed.error.message);
+        return json({ error: insufficient ? 'Your price is ready, but your coin balance is insufficient. Top up and retry coin confirmation.' : 'Your price is ready. Coin confirmation could not be verified; retry confirmation without generating again.',
+          code: insufficient ? 'COINS_REQUIRED' : 'COIN_CONFIRMATION_PENDING', requestId }, insufficient ? 402 : 503);
+      }
+      return json(quotationDeliveryConfirmationSchema.parse(confirmed.data));
+    }
     if (raw.action === 'complete') {
       const completion = estimateCompletionSchema.safeParse(raw);
       if (!completion.success) return json({ error: 'Enter positive sizes and a valid rate.' }, 400);
@@ -118,23 +131,25 @@ export async function POST(request: Request) {
       const estimate = completeEstimate(stored.data.estimate as Estimate, completion.data.changes);
       const saved = await db.from('quotation_plan_projects').update({ estimate, updated_at: new Date().toISOString() }).eq('id', completion.data.projectId).eq('user_id', user.id);
       if (saved.error) return json({ error: 'Could not save these measurements. Please retry.' }, 422);
-      return json({ projectId: completion.data.projectId, estimate });
+      return json({ projectId: completion.data.projectId, estimate, delivery: await readDelivery(completion.data.projectId) });
     }
     if (!key || !model) return json({ error: AI_SERVICE_ISSUE }, 503);
     const parsed = generation.safeParse(raw);
     if (!parsed.success) return json({ error: 'Check the project details and selected rooms.' }, 400);
     const { projectId, analysis, brief, draft, regenerateRooms, action } = parsed.data;
     let previousEstimate: Estimate | null = null;
+    let currentDelivery: QuotationDelivery | null = null;
     if (!scopedRooms(analysis, brief).length) return json({ error: 'Select at least one room for this scope.' }, 400);
     if (projectId) {
       const existing = await db.from('quotation_plan_projects').select('id,estimate').eq('id', projectId).eq('user_id', user.id).maybeSingle();
       if (existing.error || !existing.data) return json({ error: 'This floor plan is not available to your account.' }, 403);
       previousEstimate = (existing.data as { estimate: Estimate | null }).estimate;
+      currentDelivery = await readDelivery(projectId);
     }
     if (regenerateRooms && (!previousEstimate || regenerateRooms.some(name => !scopedRooms(analysis, brief).some(room => room.name === name)))) return json({ error: 'Select rooms from the current estimate to regenerate.' }, 400);
     if (action === 'retry_pricing' && (!previousEstimate || regenerateRooms)) return json({ error: 'Open an existing estimate to retry its pricing.' }, 400);
-    if (!projectId && action === 'generate') {
-      const insufficient = await requireCoins(AI_COIN_COSTS.ai_builder);
+    if (!currentDelivery?.paid) {
+      const insufficient = await requireCoins(currentDelivery?.amount ?? AI_COIN_COSTS.ai_builder);
       if (insufficient) return insufficient;
     }
     // Read the complete owner library before matching; older products must not be
@@ -385,16 +400,10 @@ export async function POST(request: Request) {
       ? await db.from('quotation_plan_projects').update({ analysis, brief, estimate, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', user.id)
       : await db.from('quotation_plan_projects').insert({ id, user_id: user.id, analysis, brief, estimate });
     if (saved.error) throw new Error('Could not store the estimate. Your quotation has not changed.');
-    // Charge only after processing, persistence, serialization and cancellation checks succeed.
-    const response = json({ projectId: id, estimate, measurementSystem: 'imperial', measurementChanged });
+    // Return pricing without a debit. The visible-price acknowledgement is the
+    // only path allowed to confirm a coin charge.
+    const response = json({ projectId: id, estimate, delivery: await readDelivery(id), measurementSystem: 'imperial', measurementChanged });
     request.signal.throwIfAborted();
-    if (!projectId && action === 'generate') {
-      const charged = await db.rpc('debit_coins', { p_user: user.id, p_amount: AI_COIN_COSTS.ai_builder, p_type: 'ai_builder', p_reference: requestId, p_note: 'AI quotation builder' });
-      if (charged.error) {
-        if (!/Insufficient coins/i.test(charged.error.message)) throw new Error('Wallet charge failed');
-        return json({ error: `Insufficient coins. AI Quotation Builder requires ${AI_COIN_COSTS.ai_builder} coins. Top up your wallet to continue.`, code: 'COINS_REQUIRED', requestId }, 402);
-      }
-    }
     return response;
   } catch (error) {
     if (cleanup) await cleanup().catch(() => undefined);

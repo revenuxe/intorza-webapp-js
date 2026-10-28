@@ -1,6 +1,8 @@
 'use client';
 
 import { AI_COIN_COSTS } from '@/lib/ai-coin-costs';
+import { useQuotationDelivery } from '@/hooks/useQuotationDelivery';
+import type { QuotationDelivery } from '@/lib/quotation-ai/delivery';
 
 import { AI_SERVICE_ISSUE } from '@/lib/quotation-ai/service-issue';
 import { useEffect, useRef, useState } from 'react';
@@ -57,6 +59,8 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const [brief, setBrief] = useState<ProjectBrief>({ scope: 'complete', roomNames: [], finish: 'Standard', budget: null, clientName: '', location: '', address: '' });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const [receipt, setReceipt] = useState<QuotationDelivery | null>(null);
+  const [priceVisible, setPriceVisible] = useState(false);
   const [walletChecking, setWalletChecking] = useState(true);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const topUpShown = useRef(false);
@@ -79,6 +83,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
   const abort = useRef<(() => void) | null>(null);
   const pending = useRef(false);
   const scrollPanel = useRef<HTMLDivElement>(null);
+  const priceLabel = useRef<HTMLParagraphElement>(null);
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const busyBanner = useRef<HTMLDivElement>(null);
   const errorBanner = useRef<HTMLDivElement>(null);
@@ -110,7 +115,22 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     if (balance === null) throw new Error('Could not check your coin balance. Please retry before starting AI.');
     if (balance < cost) { setTopUpOpen(true); throw new Error(`Insufficient coins. You need ${cost} coins; your balance is ${balance}. Top up ${cost - balance} coins to continue.`); }
   };
-  const requiredCoins = mode === 'upload' && step === 'upload' ? AI_COIN_COSTS.floor_plan : mode === 'details' && !projectId ? AI_COIN_COSTS.ai_builder : 0;
+  useEffect(() => {
+    setPriceVisible(false);
+    if (!mode || step !== 'estimate' || !estimate || busy || !priceLabel.current) return;
+    let intersects = false;
+    const update = () => setPriceVisible(intersects && document.visibilityState === 'visible');
+    if (typeof IntersectionObserver === 'undefined') { setPriceVisible(document.visibilityState === 'visible'); return; }
+    const observer = new IntersectionObserver(entries => { intersects = entries.some(entry => entry.isIntersecting); update(); }, { root: scrollPanel.current });
+    observer.observe(priceLabel.current);
+    document.addEventListener('visibilitychange', update);
+    return () => { observer.disconnect(); document.removeEventListener('visibilitychange', update); };
+  }, [mode, step, estimate, busy]);
+  const delivery = useQuotationDelivery({ receipt, visible: priceVisible && mode !== null && step === 'estimate' && !!estimate && !estimate.incomplete && !estimate.scopeGaps?.length && Number.isFinite(estimate.totals?.total) && !busy, token,
+    onConfirmed: balance => { setWalletBalance(balance); window.dispatchEvent(new Event('intorza:wallet-changed')); },
+  });
+  const deliveryPaid = Boolean(receipt && (receipt.paid || delivery.state === 'confirmed'));
+  const requiredCoins = deliveryPaid ? 0 : mode === 'upload' ? AI_COIN_COSTS.floor_plan : mode === 'details' ? AI_COIN_COSTS.ai_builder : 0;
   const coinsReady = requiredCoins === 0 || (!walletChecking && walletBalance !== null && walletBalance >= requiredCoins);
   useEffect(() => { topUpShown.current = false; setTopUpOpen(false); }, [mode]);
   useEffect(() => {
@@ -160,7 +180,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     let draft: VoiceDraft;
     try { draft = getCurrentDraft(); } catch { onStart(next); return; }
     setBrief({ scope: 'complete', roomNames: [], finish: 'Standard', budget: null, clientName: draft.project.clientName, location: draft.project.placeOfProject, address: draft.project.clientAddress });
-    setFiles([]); setAnalysis(emptyAnalysis); setProjectId(null); setEstimate(null); setAutoSaved(false); setRegenerateRooms([]); setError(''); setWholePlan(null); setMeasurementChanged(false);
+    setFiles([]); setAnalysis(emptyAnalysis); setProjectId(null); setEstimate(null); setReceipt(null); setAutoSaved(false); setRegenerateRooms([]); setError(''); setWholePlan(null); setMeasurementChanged(false);
     setStep(next === 'upload' ? 'upload' : 'analysis'); onStart(next);
   };
   function selectFiles(incoming: File[]) {
@@ -208,7 +228,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     const timeout = setTimeout(() => controller.abort(), 360000);
     abort.current = () => controller.abort();
     try {
-      if (!projectId && !retryPricing) await requireCoins(AI_COIN_COSTS.ai_builder);
+      if (!deliveryPaid) await requireCoins(mode === 'upload' ? AI_COIN_COSTS.floor_plan : AI_COIN_COSTS.ai_builder);
       controller.signal.throwIfAborted();
       const draft = getCurrentDraft();
       if (!brief.measurementInputUnit) throw new Error('Choose Sqft, Feet, Square metres or Metres before generating.');
@@ -221,7 +241,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
       if (!response.ok) throw new Error(`${body.error || 'Could not generate an estimate.'}${body.requestId ? ` (Reference: ${String(body.requestId).slice(0, 8)})` : ''}`);
       if (body.measurementSystem === 'imperial') onMeasurementSystemChange?.();
       if (body.measurementChanged) setMeasurementChanged(true);
-      setEstimate(body.estimate); setProjectId(body.projectId); setRegenerateRooms([]); setStep('estimate'); void refreshWalletBalance();
+      setEstimate(body.estimate); setReceipt(body.delivery ?? null); setProjectId(body.projectId); setRegenerateRooms([]); setStep('estimate'); void refreshWalletBalance();
       // A completed estimate must survive a refresh or an accidental close. Store it in
       // the regular quotation editor immediately; the plan project itself is already
       // saved by the API and is linked when the draft save completes.
@@ -241,7 +261,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
       const response = await fetch('/api/quotation-ai/floor-plan', { method: 'POST', signal: controller.signal,
         headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'complete', projectId, changes: [change] }) });
       const body = await response.json(); if (!response.ok) throw new Error(body.error || 'Could not update these details.');
-      setEstimate(body.estimate);
+      setEstimate(body.estimate); setReceipt(body.delivery ?? null);
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update these details.'); }
     finally { clearTimeout(timeout); pending.current = false; setBusy(''); abort.current = null; }
   }
@@ -322,7 +342,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
               <p className="mt-4 text-[11px] leading-5 text-muted-foreground">PDF, JPG, PNG or WEBP<br />Up to 3 files · 10 MB total</p>
             </div>
             {files.map((file, index) => <div key={`${file.name}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl border p-3"><FilePreview file={file} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{file.name}</p><p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB · {file.name.split('.').pop()?.toUpperCase()}</p></div><Button type="button" size="icon" variant="ghost" aria-label={`Remove ${file.name}`} disabled={!!busy} onClick={() => setFiles(current => current.filter((_, i) => i !== index))}><Trash2 className="h-4 w-4" /></Button></div>)}
-            <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground"><span className="flex items-center gap-1.5"><LockKeyhole className="h-3.5 w-3.5 shrink-0" />Private & secure</span><span className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300"><GoldCoin className="h-3.5 w-3.5" />{creditDisplay.upload} coins</span></div>
+            <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground"><span className="flex items-center gap-1.5"><LockKeyhole className="h-3.5 w-3.5 shrink-0" />Private & secure</span><span className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300"><GoldCoin className="h-3.5 w-3.5" />{creditDisplay.upload} coins after pricing · analysis has no charge</span></div>
             <details className="text-xs leading-5 text-muted-foreground"><summary className="cursor-pointer">What makes a good upload?</summary><p className="mt-2">Use a clear drawing with readable room labels and dimensions. Multi-page PDFs are supported. You can check and correct every room after analysis.</p></details>
           </>}
           {step === 'analysis' && mode === 'details' ? <>
@@ -363,15 +383,18 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
             <div className="rounded-xl border p-3 text-xs leading-5"><p className="font-medium">{estimate.draft.sections.length} sections · {estimate.draft.sections.reduce((count, section) => count + section.items.length, 0)} items</p><p className="text-muted-foreground">All listed sections and items will be added to your quotation. Existing work stays in the editor.</p>{!!estimate.scopeGaps?.length && <div className="mt-2 space-y-2 text-amber-800 dark:text-amber-300"><p>Selected rooms not yet included: {estimate.scopeGaps.join(', ')}. Generate these rooms or update your scope before applying this estimate.</p><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" disabled={!!busy} onClick={() => void generate(estimate.scopeGaps)}>Generate missing rooms</Button><Button type="button" size="sm" variant="ghost" disabled={!!busy} onClick={() => setStep('scope')}>Change scope</Button></div></div>}</div>
             <CompleteEstimate estimate={estimate} disabled={!!busy} inputUnit={brief.measurementInputUnit} onComplete={complete} onRetry={() => void generate(undefined, true)} />
             {estimate.assumptions.some(note => /Pricing search|Live market research|no recent comparable|conflict|city is unknown/.test(note)) && <details className="min-w-0 rounded-xl border p-3 text-xs leading-5"><summary className="cursor-pointer font-medium">Why some prices are missing</summary><ul className="mt-2 list-disc space-y-1 pl-4">{estimate.assumptions.filter(note => /Pricing search|Live market research|no recent comparable|conflict|city is unknown/.test(note)).map((note, index) => <li key={index}>{note}</li>)}</ul></details>}
-            <div className="rounded-xl bg-primary/5 p-4"><p className="text-xs font-medium text-primary">AI-generated estimate · rates and measurements require review</p><p className="mt-1 text-2xl font-semibold">{estimate.incomplete && estimate.totals.total === 0 ? 'Estimate pending' : estimate.totals.total.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-xs font-normal text-muted-foreground">{estimate.evidence.find(item => item.price)?.price?.currency || ''}</span></p><p className="mt-1 text-xs text-muted-foreground">{estimate.incomplete ? 'Partial total: excludes items with missing quantity or rate.' : 'Includes your existing tax and discount settings.'}</p></div>
+            <div className="rounded-xl bg-primary/5 p-4"><p className="text-xs font-medium text-primary">AI-generated estimate · rates and measurements require review</p><p ref={priceLabel} className="mt-1 text-2xl font-semibold">{estimate.incomplete && estimate.totals.total === 0 ? 'Estimate pending' : estimate.totals.total.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-xs font-normal text-muted-foreground">{estimate.evidence.find(item => item.price)?.price?.currency || ''}</span></p><p className="mt-1 text-xs text-muted-foreground">{estimate.incomplete ? 'Partial total: excludes items with missing quantity or rate.' : 'Includes your existing tax and discount settings.'}</p></div>
             <FloorPlanEstimateOverview estimate={estimate} inputUnit={brief.measurementInputUnit} />
+            {receipt && <div role={delivery.state === 'error' ? 'alert' : 'status'} className="rounded-xl border bg-muted/30 p-3 text-xs leading-5">
+              {delivery.state === 'error' ? <><p>Your quotation price is ready. {delivery.error}</p><Button type="button" variant="outline" size="sm" className="mt-2" onClick={delivery.retry}>Retry coin confirmation</Button>{/insufficient/i.test(delivery.error) && <Button type="button" variant="ghost" size="sm" onClick={() => window.dispatchEvent(new Event('intorza:open-wallet'))}>Top up coins</Button>}</> : deliveryPaid ? receipt.amount > 0 ? `${receipt.amount} coins recorded once for this quotation. No extra coins for retries.` : 'No additional coins required for this existing project.' : receipt.ready ? `Your price is ready. Confirming ${receipt.amount} coins…` : 'This price is provisional. Coins are charged only when the completed quotation price is displayed.'}
+            </div>}
             <details className="rounded-xl border p-3 text-xs leading-5"><summary className="cursor-pointer font-medium">Assumptions & exclusions</summary><ul className="mt-2 list-disc space-y-1 pl-4">{estimate.assumptions.map((assumption, index) => <li key={index}>{assumption}</li>)}</ul></details>
             <details className="rounded-xl border p-3 text-sm"><summary className="cursor-pointer font-medium">Refine this estimate</summary><fieldset className="mt-3 space-y-2"><legend className="mb-2 text-xs text-muted-foreground">Select rooms to regenerate. Other rooms stay in this estimate.</legend>{[...new Set(estimate.roomSections.map(row => row.roomName))].map(name => <label key={name} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={regenerateRooms.includes(name)} onChange={event => setRegenerateRooms(current => event.target.checked ? [...current, name] : current.filter(room => room !== name))} />{name}</label>)}</fieldset><div className="mt-3 flex flex-wrap gap-2"><Button type="button" size="sm" variant="outline" disabled={!regenerateRooms.length || !!busy} onClick={() => void generate(regenerateRooms)}>Regenerate selected items</Button><Button type="button" size="sm" variant="ghost" disabled={!!busy} onClick={() => setStep('details')}>Edit Project Details</Button></div></details>
             <p className="text-xs text-muted-foreground">{autoSaved ? 'This estimate is being saved to My Quotations as a draft. Open the editor to adjust products, measurements and rates.' : 'Open the editor to adjust products, measurements and rates, then save it as a draft.'}</p>
           </>}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2 border-t bg-background px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
-          {error && <div ref={errorBanner} tabIndex={-1} role="alert" className="w-full rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-950 outline-none"><p className="font-semibold">{error}</p>{/insufficient coins/i.test(error) && <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => window.dispatchEvent(new Event('intorza:open-wallet'))}>Top up coins</Button>}{error === AI_SERVICE_ISSUE && <><p className="mt-1 text-amber-900/80">Your coins will not be charged for this request.</p><p className="mt-2 text-xs text-amber-900/70">Feel free to go back and try again later.</p></>}</div>}
+          {error && <div ref={errorBanner} tabIndex={-1} role="alert" className="w-full rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-950 outline-none"><p className="font-semibold">{error}</p>{/insufficient coins/i.test(error) && <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => window.dispatchEvent(new Event('intorza:open-wallet'))}>Top up coins</Button>}{error.startsWith(AI_SERVICE_ISSUE) && <><p className="mt-1 text-amber-900/80">Coins are charged only after a completed quotation price is displayed.</p><p className="mt-2 text-xs text-amber-900/70">Feel free to go back and try again later.</p></>}</div>}
           {!busy && requiredCoins > 0 && !coinsReady && <div role="status" className="flex w-full items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"><span>{walletChecking ? 'Checking your coin balance...' : walletBalance === null ? 'Could not verify your coin balance.' : `You have ${walletBalance} coins. ${requiredCoins} coins are required.`}</span><Button type="button" variant="outline" size="sm" disabled={walletChecking} onClick={() => walletBalance === null ? void refreshWalletBalance() : setTopUpOpen(true)}>{walletBalance === null ? 'Retry balance check' : 'View top-up'}</Button></div>}
           {busy ? <Button variant="outline" type="button" onClick={() => abort.current?.()}>Cancel request</Button> : <>
             <Button variant="outline" type="button" onClick={step === 'upload' || step === 'analysis' && mode === 'details' ? onClose : back}><ArrowLeft className="mr-1 h-4 w-4" />{step === 'upload' || step === 'analysis' && mode === 'details' ? 'Cancel' : 'Back'}</Button>
@@ -387,7 +410,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
     </Dialog>
     <Dialog open={topUpOpen && mode !== null && isPro && !walletChecking && walletBalance !== null && requiredCoins > 0} onOpenChange={setTopUpOpen}>
       <DialogContent className="max-w-sm rounded-2xl">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><GoldCoin />Top up to use AI</DialogTitle><DialogDescription>{requiredCoins === AI_COIN_COSTS.floor_plan ? 'Floor plan analysis' : 'AI quotation generation'} needs {requiredCoins} coins. Add coins to unlock this feature.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><GoldCoin />Top up to use AI</DialogTitle><DialogDescription>Your quotation needs {requiredCoins} coins. Analysis does not deduct coins; payment is confirmed after the completed price is displayed.</DialogDescription></DialogHeader>
         <dl className="space-y-3 rounded-xl bg-muted/50 p-4 text-sm"><div className="flex justify-between"><dt>Your balance</dt><dd className="font-semibold">{walletBalance ?? '-'} coins</dd></div><div className="flex justify-between"><dt>Required</dt><dd className="font-semibold">{requiredCoins} coins</dd></div><div className="flex justify-between border-t pt-3"><dt>Coins to add</dt><dd className="font-semibold text-primary">{Math.max(0, requiredCoins - (walletBalance ?? 0))} coins</dd></div></dl>
         <p className="text-xs text-muted-foreground">Your progress is kept. AI actions unlock after your updated balance is verified.</p>
         <Button type="button" className="w-full" onClick={() => { setTopUpOpen(false); window.dispatchEvent(new Event('intorza:open-wallet')); }}>Top up coins</Button>
