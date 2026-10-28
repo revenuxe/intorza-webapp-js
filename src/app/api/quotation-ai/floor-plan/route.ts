@@ -245,7 +245,11 @@ export async function POST(request: Request) {
       if (interpreted.roomRequirements.some(row => !selectedRooms.some(room => room.name === row.roomName))) throw new InputError('Your note requests work outside the selected rooms. Select those rooms or name the intended rooms in your note.', 422);
       brief.requirements = interpreted;
       if (interpreted.finishTier) brief.finish = interpreted.finishTier;
-      brief.workExclusions = mergeExclusions(interpreted.exclusions, explicitNoteExclusions(brief.requestNotes?.trim() ? brief.requestNotes : brief.design?.notes ?? '', selectedRooms));
+      brief.workExclusions = mergeExclusions(
+        interpreted.exclusions,
+        explicitNoteExclusions(brief.requestNotes?.trim() ? brief.requestNotes : brief.design?.notes ?? '', selectedRooms),
+        explicitNoteExclusions(understood.correctedText, selectedRooms),
+      );
     }
     const requestedBrief = { ...(regenerateRooms ? { ...brief, roomNames: regenerateRooms } : brief), finish: resolveFinishTier(brief.finish, brief.budget, previousEstimate?.totals.total ?? null) };
     stage = 'generation';

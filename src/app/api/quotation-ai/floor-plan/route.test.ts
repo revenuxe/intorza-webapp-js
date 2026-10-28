@@ -107,6 +107,20 @@ it('understands spelling before extracting requirements and preserves the origin
   expect(estimate.finishTier).toBe('Luxury');
   expect(rpc).not.toHaveBeenCalledWith('confirm_quotation_coin_delivery', expect.anything());
 });
+it('enforces corrected-note exclusions even when structured extraction misses them', async () => {
+  understandNotes.mockResolvedValueOnce({ correctedText: 'No parking work. No wall painting or false ceiling.', reviewNotes: [] });
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [] });
+  const proposal = proposalFixture();
+  proposal.sections[0].items.push(...['Wall painting','False ceiling'].map(productName => ({ ...proposal.sections[0].items[0], productName })));
+  generate.mockResolvedValueOnce(proposal);
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), requestNotes: 'no parking no wall pianitinhgb no wallseiling' } }));
+  expect(response.status).toBe(200);
+  const estimate = (await response.json()).estimate;
+  expect(estimate.workExclusions).toEqual([{ roomName: 'Bedroom', workKeys: expect.arrayContaining(['painting','ceiling']) }]);
+  const products = estimate.draft.sections.flatMap((section: { items: { productName: string }[] }) => section.items.map(item => item.productName));
+  expect(products).not.toContain('Wall painting');
+  expect(products).not.toContain('False ceiling');
+});
 it('classifies invalid AI requirements output as an upstream failure and logs no customer note values', async () => {
   interpretRequirements.mockResolvedValueOnce({ exclusions: [], finishTier: 'not-a-tier' });
   const response = await POST(request({ ...payload(), brief: { ...briefFixture(), requestNotes: 'Private customer note, never log this.' } }));

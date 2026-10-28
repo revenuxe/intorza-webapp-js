@@ -59,7 +59,7 @@ it('preserves the interpreted material details and gives item/room quality prece
   expect(requestedWork('Bedroom', requirements)).toEqual(['study_storage','wardrobe']);
 });
 
-it.each(['No false ceiling or wall painting.', 'No wall painting and no seling.', 'No wall painting, and no wallseiling and no unncerrasry thing in quoatation.', "I don't need wall painting or ceiling.", 'Wall painting and ceiling not required.'])('recognises clear exclusion lists: %s', notes => {
+it.each(['No false ceiling or wall painting.', 'No wall painting and no seling.', 'No wall painting, and no wallseiling and no unncerrasry thing in quoatation.', "I don't need wall painting or ceiling.", 'Wall painting and ceiling not required.', 'd0ont include wall painting, parkling thing, and wall ceiling in quotation', 'dont include wall paining and seiling'])('recognises clear exclusion lists: %s', notes => {
   const result = explicitNoteExclusions(notes, rooms);
   for (const room of rooms) {
     expect(excludedWork('Wall painting', room.name, result)).toBe(true);

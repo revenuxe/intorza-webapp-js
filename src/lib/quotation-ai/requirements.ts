@@ -146,7 +146,7 @@ export function requirementsSource(brief: { requestNotes?: string; design?: { no
 
 const aliases: Partial<Record<typeof workKeys[number], RegExp>> = {
   ceiling: /\b(?:(?:false|wall)\s*)?(?:ceilings?|cieling|seiling|seling|ceeling)\b/i,
-  painting: /\b(?:(?:wall|walls)\s+)?(?:painting|paint|paintng|repainting)\b/i,
+  painting: /\b(?:(?:wall|walls)\s+)?(?:painting|paining|paint|paintng|repainting)\b/i,
   wardrobe: /\b(?:wardrobes?|cupboards?)\b/i, loft: /\bloft(?:s| storage)?\b/i,
   flooring: /\bfloor(?:ing| tiles?)\b/i, electrical: /\b(?:electrical|electric points?|lighting)\b/i,
   plumbing: /\bplumbing\b/i, wall_panelling: /\bwall panell?ing\b/i,
@@ -169,6 +169,7 @@ export function excludedWork(product: string, roomName: string, exclusions: Work
 /** Conservative backup for clear negatives, including coordinated lists/typos.
  * Nuanced exceptions and room-specific language are interpreted by the model. */
 export function explicitNoteExclusions(notes: string, rooms: { name?: string; kind?: string }[]): WorkExclusion[] {
+  notes = notes.replace(/\bd(?:0o|o)n['’]?t\b/gi, "don't");
   if (/\b(?:actually|instead|changed? my mind|after all|except|unless|only)\b/i.test(notes)) return [];
   const found = new Map<string, Set<typeof workKeys[number]>>();
   const clauses = notes.replace(/[’‘]/g, "'").toLowerCase().split(/[.!?;\n]+|\bbut\b|\bhowever\b/);
