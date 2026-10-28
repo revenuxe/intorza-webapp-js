@@ -52,6 +52,15 @@ it('interprets free-text exclusions with constrained room names and work keys', 
   expect(body.instructions).toContain('room-specific exceptions');
   expect(body.instructions).toContain('no dark paint');
 });
+it('repairs the observed empty global exclusion label and constrains future provider output', async () => {
+  (fetch as jest.Mock).mockResolvedValueOnce(complete({ exclusions: [{ roomName: '', workKeys: ['painting','ceiling'] }] }))
+    .mockResolvedValueOnce(complete({ exclusions: [{ roomName: 'All rooms', workKeys: ['painting','ceiling'] }] }));
+  const result = await new OpenAIFloorPlanProvider('secret','configured-model').requirements({ requestNotes: 'no wall painting, and no wallseiling and no unncerrasry thing in quoatation' }, new AbortController().signal);
+  expect(result.exclusions).toEqual([{ roomName: 'All rooms', workKeys: ['painting','ceiling'] }]);
+  const body = JSON.parse((fetch as jest.Mock).mock.calls[0][1].body);
+  expect(body.text.format.schema.properties.exclusions.items.properties.roomName).toMatchObject({ minLength: 1, maxLength: 150 });
+  expect(body.instructions).toContain('set roomName to "All rooms"');
+});
 it('accepts a requirements response with empty item placeholders while preserving the supplied exclusions', async () => {
   (global.fetch as jest.Mock).mockResolvedValue(complete({ exclusions:[{roomName:'Bedroom',workKeys:['painting','ceiling']}],roomRequirements:[{roomName:'Bedroom',includedWorkKeys:['wardrobe'],items:[{workKey:'wardrobe',details:'',finishTier:null}]}],reviewNotes:[''] }));
   const result=await new OpenAIFloorPlanProvider('secret','configured-model').requirements({requestNotes:'No wall painting, and no wallseiling and no unncerrasry thing in quoatation.',rooms:[{name:'Bedroom'}]},new AbortController().signal);
