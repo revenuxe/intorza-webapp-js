@@ -12,6 +12,7 @@ it('corrects informal notes with AI while preserving negation, specifications an
   expect(JSON.parse(body.input[0].content[0].text).originalNotes).toBe(note);
   expect(body.instructions).toContain('Preserve exact brand names, product codes, numbers and room labels');
   expect(body.instructions).toContain('rather than choosing a new scope or specification');
+  expect(body.instructions).toContain('never expand it into exclusions of unnamed work categories');
 });
 it('skips empty notes and rejects malformed corrections instead of proceeding with guessed requirements', async () => {
   const provider = new OpenAIFloorPlanProvider('secret','configured-model');
