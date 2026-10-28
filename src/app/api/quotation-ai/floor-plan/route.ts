@@ -4,7 +4,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { z } from 'zod';
 import { analysisSchema, briefSchema, buildEstimate, completeEstimate, estimateCompletionSchema, generatedSchema, mergeRoomEstimates, preserveRefinedItems, detectPlanType, MAX_PLAN_BYTES, MAX_PLAN_FILES, resolveFinishTier, scopedRooms, type Estimate, type PriceEvidence } from '@/lib/quotation-ai/floor-plan';
 import { ensureRoomWorkCoverage, roomWorkOptions } from '@/lib/quotation-ai/room-work';
-import { excludedWork, explicitNoteExclusions, mergeExclusions, requirementsSchema } from '@/lib/quotation-ai/requirements';
+import { excludedWork, explicitNoteExclusions, itemFinishTier, itemRequirements, mergeExclusions, requirementsSchema, requirementsSource } from '@/lib/quotation-ai/requirements';
 import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
@@ -200,26 +200,38 @@ export async function POST(request: Request) {
     const requirementNotes = [brief.requestNotes, brief.design?.notes].filter(Boolean).join('. ');
     // Recompute server-side from the actual notes, never trust stale/client-supplied decisions.
     brief.workExclusions = [];
+    delete brief.requirements;
     if (requirementNotes.trim() || brief.roomWork?.some(room => room.notes.trim())) {
-      const rooms = scopedRooms(analysis, brief);
+      const rooms = analysis.rooms;
       const interpreted = requirementsSchema.parse(await provider.requirements({
         requestNotes: brief.requestNotes ?? '', designNotes: brief.design?.notes ?? '',
         roomNotes: brief.roomWork?.map(room => ({ roomName: room.roomName, notes: room.notes })) ?? [],
-        rooms: rooms.map(room => ({ name: room.name, kind: room.kind, work: roomWorkOptions(room, brief.scope).map(option => ({ key: option.key, name: option.name })) })),
+        selectedDefaults: { scope: brief.scope, roomNames: brief.roomNames, finish: brief.finish, kitchenPreferences: brief.kitchenPreferences, design: brief.design },
+        rooms: rooms.map(room => ({ name: room.name, kind: room.kind, work: roomWorkOptions(room, 'complete').map(option => ({ key: option.key, name: option.name })) })),
       }, request.signal));
-      if (interpreted.exclusions.some(row => !rooms.some(room => room.name === row.roomName))) throw new InputError('Could not match your requirements to the selected rooms. Check the room names in your note.', 422);
-      brief.workExclusions = mergeExclusions(interpreted.exclusions, explicitNoteExclusions(requirementNotes, rooms));
+      if (interpreted.roomNames.some(name => !rooms.some(room => room.name === name))) throw new InputError('A room in your requirements is not available in this plan. Check its name or update the plan.', 422);
+      if (interpreted.scope) brief.scope = interpreted.scope;
+      if (interpreted.roomNames.length) brief.roomNames = [...new Set(interpreted.roomNames)];
+      else if (interpreted.scope) brief.roomNames = rooms.map(room => room.name);
+      const selectedRooms = scopedRooms(analysis, brief);
+      if (!selectedRooms.length) throw new InputError('Your requirements leave no selected rooms. Check the requested scope and room names.', 400);
+      if ([...interpreted.exclusions, ...interpreted.roomRequirements].some(row => !selectedRooms.some(room => room.name === row.roomName))) throw new InputError('Could not match your requirements to the selected rooms. Check the room names in your note.', 422);
+      brief.requirements = interpreted;
+      if (interpreted.finishTier) brief.finish = interpreted.finishTier;
+      brief.workExclusions = mergeExclusions(interpreted.exclusions, explicitNoteExclusions(brief.requestNotes?.trim() ? brief.requestNotes : brief.design?.notes ?? '', selectedRooms));
     }
     const requestedBrief = { ...(regenerateRooms ? { ...brief, roomNames: regenerateRooms } : brief), finish: resolveFinishTier(brief.finish, brief.budget, previousEstimate?.totals.total ?? null) };
-    if (regenerateRooms && (previousEstimate?.finishTier ?? 'Standard') !== requestedBrief.finish) {
-      return json({ error: 'The finish level changed. Go Back and generate the full estimate so every room uses the selected finish level.' }, 400);
+    if (regenerateRooms && ((previousEstimate?.finishTier ?? 'Standard') !== requestedBrief.finish || (previousEstimate?.requirementsSource ?? '') !== requirementsSource(brief))) {
+      return json({ error: 'The finish level or project requirements changed. Go Back and generate the full estimate so every room follows your current brief.' }, 400);
     }
-    const pricingSpecification = (item: z.infer<typeof generatedSchema>['sections'][number]['items'][number]) =>
-      tierPricingSpecification(formatItemDetails(item.description, item.specifications).slice(0, 1000), requestedBrief.finish);
+    const tierForItem = (name: string, roomName: string) => itemFinishTier(name, roomName, brief.requirements, requestedBrief.finish);
+    const pricingSpecification = (item: z.infer<typeof generatedSchema>['sections'][number]['items'][number], roomName: string) =>
+      tierPricingSpecification(formatItemDetails(item.description, item.specifications).slice(0, 1000), tierForItem(item.productName, roomName));
     // A generic/Standard rate must not satisfy Basic, Premium or Luxury before
     // live research gets a chance to find the selected specification tier.
-    const excludedRates = rates.filter(rate => !rateSupportsFinishTier(rate, requestedBrief.finish));
-    rates.splice(0, rates.length, ...rates.filter(rate => rateSupportsFinishTier(rate, requestedBrief.finish)).map(rate => ({ ...rate, finishTier: requestedBrief.finish })));
+    const requiredTiers = [...new Set([requestedBrief.finish, ...(brief.requirements?.roomRequirements ?? []).flatMap(room => [room.finishTier, ...room.items.map(item => item.finishTier)]).filter(Boolean)])];
+    const excludedRates = rates.filter(rate => !requiredTiers.some(tier => rateSupportsFinishTier(rate, tier)));
+    rates.splice(0, rates.length, ...rates.filter(rate => requiredTiers.some(tier => rateSupportsFinishTier(rate, tier))).map(rate => ({ ...rate, finishTier: requiredTiers.find(tier => rateSupportsFinishTier(rate, tier)) })));
     const approvedIds = new Set(rates.map(rate => rate.id));
     if (action !== 'retry_pricing') ensureRoomWorkCoverage({ sections: [], assumptions: [] }, scopedRooms(analysis, requestedBrief), requestedBrief);
     // Bound context cost. Full evidence remains server-side; the model only needs matching specifications and IDs.
@@ -230,7 +242,7 @@ export async function POST(request: Request) {
     const score = (row: PriceEvidence) => (row.source === 'approved' ? 1000 : row.source === 'admin_reference' ? 100 : 0)
       + relevanceTerms.reduce((sum, term) => sum + (normalizeReferenceText(`${row.name} ${row.description}`).includes(term) ? 1 : 0), 0);
     const rankedRates = [...rates].sort((a, b) => score(b) - score(a));
-    const rateContext = rankedRates.slice(0, 60).map(({ id, name, description, unit, source }) => ({ id, name, description: description.slice(0, 400), unit, source }));
+    const rateContext = rankedRates.slice(0, 60).map(({ id, name, description, unit, source, finishTier }) => ({ id, name, description: description.slice(0, 400), unit, source, finishTier }));
     let proposal = action === 'retry_pricing' ? generatedSchema.parse({
       sections: draftSchema.parse(previousEstimate.draft).sections.map(section => ({ title: section.title,
         roomName: previousEstimate.roomSections.find(row => row.sectionId === section.id)?.roomName,
@@ -261,6 +273,14 @@ export async function POST(request: Request) {
       return generatedSchema.parse({ sections: results.flatMap(result => result.sections), assumptions: [...new Set(results.flatMap(result => result.assumptions))].slice(0, 20) });
     })();
     if (action !== 'retry_pricing') proposal = generatedSchema.parse(ensureRoomWorkCoverage(proposal, scopedRooms(analysis, requestedBrief), requestedBrief));
+    // Keep explicit item requests authoritative even during a pricing-only retry.
+    for (const section of proposal.sections) for (const item of section.items) {
+      const requirement = itemRequirements(item.productName, section.roomName, brief.requirements);
+      if (requirement) {
+        item.description = `${/Billing: (piece|lump_sum); price separately/i.test(item.description) ? item.description.match(/Billing: (?:piece|lump_sum); price separately[^.]*\./)?.[0] ?? '' : ''} User requirement: ${requirement}`.trim().slice(0, 1000);
+        item.specifications = [];
+      }
+    }
     const researchLimitations: string[] = [];
     if (excludedRates.length) researchLimitations.push(`Catalogue rates without a compatible ${requestedBrief.finish} finish tier were excluded; unmatched items require tier-specific market evidence or labelled AI allowances.`);
     if (references.error) researchLimitations.push('The admin reference library is unavailable; business and market pricing were used where possible.');
@@ -272,42 +292,45 @@ export async function POST(request: Request) {
       // Validate the requested specification server-side, even if the model
       // supplied a real catalogue ID belonging to a different material variant.
       item.rateId = null;
-      const match = matchingReferenceRate(rates, item.productName, pricingSpecification(item));
+      const customised = Boolean(itemRequirements(item.productName, section.roomName, brief.requirements));
+      const tierRates = rates.filter(rate => rateSupportsFinishTier(rate, tierForItem(item.productName, section.roomName)));
+      const eligible = customised ? tierRates.filter(rate => normalizeReferenceText(rate.description) === normalizeReferenceText(pricingSpecification(item, section.roomName))) : tierRates;
+      const match = matchingReferenceRate(eligible, item.productName, pricingSpecification(item, section.roomName));
       if (match) item.rateId = match.id;
       else {
-        const close = closeReferencePrice(rates, item.productName, pricingSpecification(item), currency, brief.location);
+        const close = customised ? undefined : closeReferencePrice(tierRates, item.productName, pricingSpecification(item, section.roomName), currency, brief.location);
         if (close) { rates.push(close); approvedIds.add(close.id); item.rateId = close.id; }
       }
     }
-    const products = [...new Map(proposal.sections.flatMap(section => section.items.filter(item => !excludedWork(item.productName, section.roomName, brief.workExclusions))).filter(item => !approvedIds.has(item.rateId) && !/Billing: (piece|lump_sum); price separately/i.test(item.description))
-      .map(item => [JSON.stringify([item.productName.trim().toLowerCase(), pricingSpecification(item).trim().toLowerCase()]), { name: item.productName, specification: pricingSpecification(item),
+    const products = [...new Map(proposal.sections.flatMap(section => section.items.filter(item => !excludedWork(item.productName, section.roomName, brief.workExclusions) && !approvedIds.has(item.rateId) && !/Billing: (piece|lump_sum); price separately/i.test(item.description))
+      .map(item => [JSON.stringify([item.productName.trim().toLowerCase(), pricingSpecification(item, section.roomName).trim().toLowerCase()]), { name: item.productName, specification: pricingSpecification(item, section.roomName), finishTier: tierForItem(item.productName, section.roomName),
         ...(action === 'retry_pricing' ? { heightFt: previousEstimate.draft.sections.flatMap(section => section.items).find(row => row.productName === item.productName && row.productDetails === item.description)?.heightFt ?? undefined } : {}),
-      }])).values()];
+      }] as const))).values()];
     const enabled = (env.QUOTATION_MARKET_RESEARCH || process.env.QUOTATION_MARKET_RESEARCH || 'openai') === 'openai';
     if (products.length && enabled && !/^(unknown|not set|n\/a|none)$/i.test(brief.location.trim())) {
       // Cache only this owner's previously saved evidence, at most 24h, with identical specification/currency/city.
       const cached = (action === 'retry_pricing' ? [] : previousEstimate?.evidence ?? []).flatMap(row => row.price?.source === 'market_estimate' ? [row.price] : [])
         .filter(rate => rate.currency === currency && rate.location.toLowerCase() === brief.location.toLowerCase()
-          && rateSupportsFinishTier(rate, requestedBrief.finish)
           && Number.isFinite(Date.parse(rate.verifiedAt)) && Date.now() >= Date.parse(rate.verifiedAt) && Date.now() - Date.parse(rate.verifiedAt) < 86400000
-          && products.some(product => product.name === rate.name && product.specification === rate.description));
+          && products.some(product => product.name === rate.name && product.specification === rate.description && rateSupportsFinishTier(rate, product.finishTier)));
       rates.push(...cached);
       const uncached = products.filter(product => !cached.some(rate => rate.name === product.name && rate.description === product.specification));
-      for (let offset = 0; offset < uncached.length; offset += 12) {
-        {
+      for (const finishTier of new Set(uncached.map(product => product.finishTier))) {
+        const tierProducts = uncached.filter(product => product.finishTier === finishTier);
+        for (let offset = 0; offset < tierProducts.length; offset += 12) {
           const research = await new OpenAIWebMarketPricing(key, env.OPENAI_MARKET_MODEL || process.env.OPENAI_MARKET_MODEL || model)
-            .research({ products: uncached.slice(offset, offset + 12), location: brief.location, currency, finish: requestedBrief.finish }, request.signal);
-          rates.push(...research.rates.filter(rate => rateSupportsFinishTier(rate, requestedBrief.finish))); researchLimitations.push(...research.limitations);
+            .research({ products: tierProducts.slice(offset, offset + 12), location: brief.location, currency, finish: finishTier }, request.signal);
+          rates.push(...research.rates.filter(rate => rateSupportsFinishTier(rate, finishTier))); researchLimitations.push(...research.limitations);
         }
       }
       if (cached.length) researchLimitations.push('Some market evidence is cached from this project within the last 24 hours; retrieval dates are shown.');
     } else if (products.length) researchLimitations.push('Live pricing research is disabled or the project city is unknown. Enter a city or review pending rates.');
     for (const section of proposal.sections) for (const item of section.items) {
       if (approvedIds.has(item.rateId)) continue;
-      const researched = rates.find(rate => rate.source === 'market_estimate' && rate.name === item.productName && rate.description === pricingSpecification(item));
+      const researched = rates.find(rate => rate.source === 'market_estimate' && rate.name === item.productName && rate.description === pricingSpecification(item, section.roomName) && rateSupportsFinishTier(rate, tierForItem(item.productName, section.roomName)));
       if (researched) item.rateId = researched.id;
-      else if (!/Billing: (piece|lump_sum); price separately/i.test(item.description)) {
-        const close = closeReferencePrice(rates, item.productName, pricingSpecification(item), currency, brief.location);
+      else if (!itemRequirements(item.productName, section.roomName, brief.requirements) && !/Billing: (piece|lump_sum); price separately/i.test(item.description)) {
+        const close = closeReferencePrice(rates.filter(rate => rateSupportsFinishTier(rate, tierForItem(item.productName, section.roomName))), item.productName, pricingSpecification(item, section.roomName), currency, brief.location);
         if (close) { rates.push(close); item.rateId = close.id; }
       }
     }
@@ -324,7 +347,9 @@ export async function POST(request: Request) {
           const oldItem = oldSection.items.find(old => old.productName === item.productName)!;
           const row = estimate.evidence.find(row => row.itemId === item.id)!; row.itemId = oldItem.id; item.id = oldItem.id;
           const oldEvidence = previousEstimate.evidence.find(row => row.itemId === oldItem.id);
-          if (oldEvidence?.price?.source === 'manual') { item.ratePerSft = oldItem.ratePerSft; row.price = oldEvidence.price; }
+          const roomName = previousEstimate.roomSections.find(mapping => mapping.sectionId === oldSection.id)?.roomName ?? section.title;
+          const unchangedTier = itemFinishTier(oldItem.productName, roomName, previousEstimate.requirements, previousEstimate.finishTier ?? 'Standard') === tierForItem(item.productName, roomName);
+          if (oldEvidence?.price?.source === 'manual' && unchangedTier && !itemRequirements(item.productName, roomName, brief.requirements)) { item.ratePerSft = oldItem.ratePerSft; row.price = oldEvidence.price; }
           if (oldItem.measurementMode === 'dimensions') { item.measurementMode = 'dimensions'; item.widthFt = oldItem.widthFt; item.heightFt = oldItem.heightFt; item.sftArea = null; if (oldEvidence) { row.quantityStatus = oldEvidence.quantityStatus; row.reason = oldEvidence.reason; } }
         });
       });

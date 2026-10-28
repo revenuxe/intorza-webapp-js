@@ -147,6 +147,23 @@ date are recorded. Deactivation preserves historical evidence.
 
 ### Free-text requirements and exclusions (October 27, 2026)
 
+October 28 update: "Explain it your way" is the primary design brief for
+positive requirements as well as exclusions. Interpretation captures overall,
+room and item finish tiers; explicit scope/room changes; requested inclusions; exact materials, hardware,
+colours and detailing; and design direction. Explicit note requirements
+override selector defaults and earlier checklists. Only stated intent is
+extracted; defaults are used where notes are silent. Unsupported requests are
+retained as review notes instead of being silently discarded or billed as sqft.
+
+Custom item instructions replace conflicting generic descriptions/specifications
+and are included in pricing search/cache identities. Generic or close catalogue
+matches cannot satisfy a custom specification without an exact match. Research
+is grouped by the requested item/room tier, allowing mixed-quality rooms.
+Fallback pricing receives the primary brief and excludes incompatible references.
+Changes to the brief require full regeneration rather than updating a subset of
+rooms under inconsistent requirements. The estimate exposes a collapsed
+"Your brief, prioritised" summary and retains the interpretation for admin review.
+
 When typed/transcribed requirements or room notes are present, the server
 interprets explicit exclusions with constrained room names and supported work
 keys before generating or researching prices. It understands coordinated

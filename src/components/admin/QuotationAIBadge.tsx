@@ -32,6 +32,8 @@ export function QuotationAIBadge({ selections, quotationNumber }: { selections: 
     if (items.length) rows.push([text(room.roomName) || 'Room work', items.join(', ')]);
   }
   const design = object(brief.design);
+  const requirements = object(brief.requirements);
+  rows.push(['Primary brief', text(requirements.designDirection)]);
   if (Array.isArray(brief.workExclusions)) for (const entry of brief.workExclusions) {
     const row = object(entry);
     if (Array.isArray(row.workKeys)) rows.push([`Excluded · ${text(row.roomName)}`, row.workKeys.map(value => label(text(value))).filter(Boolean).join(', ')]);

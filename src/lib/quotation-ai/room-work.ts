@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { normalizeReferenceText, referenceProduct } from './reference-pricing';
 import type { PlanAnalysis, ProjectBrief, generatedSchema } from './floor-plan';
-import { excludedWork, exclusionsForBrief } from './requirements';
+import { excludedWork, exclusionsForBrief, itemRequirements, requestedWork } from './requirements';
 
 const size = z.number().finite().positive().max(100000).nullable();
 export const roomWorkSchema = z.object({
@@ -81,13 +81,19 @@ function automaticRoomWork(room: Room, brief: ProjectBrief) {
     dining: ['crockery_unit'], study: ['study_storage'], bathroom: ['vanity'], utility: ['utility_storage'],
     balcony: [], other: [],
   };
-  const available = new Set(roomWorkOptions(room, scope).map(item => item.key));
+  const available = new Set(workOptionsForBrief(room, brief).map(item => item.key));
   const fullInterior = scope === 'complete' ? ['ceiling', 'painting'] : [];
   const excluded = (key: string) => excludedWork(key, room.name, exclusionsForBrief(brief, [room]));
-  const selected = new Set([...core[room.kind], ...fullInterior, ...extras].filter(key => available.has(key) && !excluded(key)));
+  const selected = new Set([...core[room.kind], ...fullInterior, ...extras, ...requestedWork(room.name, brief.requirements)].filter(key => available.has(key) && !excluded(key)));
   const items = answer.items.filter(item => selected.has(item.key));
   for (const key of selected) if (!items.some(item => item.key === key)) items.push({ key, widthFt: null, heightFt: null, areaSqft: null, details: '' });
   return { ...answer, items };
+}
+
+function workOptionsForBrief(room: Room, brief: ProjectBrief) {
+  const options = roomWorkOptions(room, brief.scope);
+  const requested = new Set<string>(requestedWork(room.name, brief.requirements));
+  return [...options, ...roomWorkOptions(room, 'complete').filter(option => requested.has(option.key) && !options.some(existing => existing.key === option.key))];
 }
 
 /** Every confirmed work field survives sparse AI output, including unpriced work. */
@@ -100,13 +106,14 @@ export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, roo
     const baseline = ensureRoomWorkCoverage({ sections: [], assumptions: [] }, rooms,
       { ...brief, roomWork: rooms.map(room => automaticRoomWork(room, brief)) });
     return { ...raw, sections: rooms.map(room => {
-      const options = roomWorkOptions(room, brief.scope);
+      const options = workOptionsForBrief(room, brief);
       const proposed = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items).flatMap(item => {
         const task = options.find(option => normalizeReferenceText(option.key) === normalizeReferenceText(item.productName)
           || referenceProduct(option.name) === referenceProduct(item.productName));
         if (!task) return [];
         if (excludedWork(task.key, room.name, exclusions)) return [];
-        return [{ ...item, productName: task.name }];
+        const requirement = itemRequirements(task.name, room.name, brief.requirements);
+        return [{ ...item, productName: task.name, ...(requirement ? { description: `User requirement: ${requirement}. ${task.hint}`.slice(0, 1000), specifications: [] } : {}) }];
       });
       const essentials = baseline.sections.find(section => section.roomName === room.name)!.items;
       const items: z.infer<typeof generatedSchema>['sections'][number]['items'] = [...proposed];
@@ -117,22 +124,28 @@ export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, roo
   const sections = rooms.map(room => {
     const answer = brief.roomWork?.find(row => row.roomName === room.name);
     if (!answer) throw new Error(`Confirm the work required in ${room.name} before generating.`);
-    const options = roomWorkOptions(room, brief.scope);
+    const options = workOptionsForBrief(room, brief);
+    const requested = requestedWork(room.name, brief.requirements);
     if (answer.decisions) for (const option of options) {
       if (excludedWork(option.key, room.name, exclusions)) continue;
+      if (requested.some(key => key === option.key)) continue;
       if (answer.decisions[option.key] == null) throw new Error(`Confirm whether ${room.name} needs ${option.name.toLowerCase()}.`);
       if (answer.items.some(item => item.key === option.key) !== answer.decisions[option.key]) throw new Error(`The work choices for ${room.name} changed. Review its yes/no answers.`);
     }
     if (new Set(answer.items.map(item => item.key)).size !== answer.items.length) throw new Error(`Duplicate work choices in ${room.name}.`);
     const generated = raw.sections.filter(section => section.roomName === room.name).flatMap(section => section.items);
-    return { title: room.name, roomName: room.name, items: answer.items.filter(work => !excludedWork(work.key, room.name, exclusions)).map(work => {
+    const chosen = [...answer.items];
+    for (const key of requested) if (options.some(option => option.key === key) && !chosen.some(item => item.key === key)) chosen.push({ key, widthFt: null, heightFt: null, areaSqft: null, details: '' });
+    return { title: room.name, roomName: room.name, items: chosen.filter(work => !excludedWork(work.key, room.name, exclusions)).map(work => {
       const task = options.find(item => item.key === work.key);
       if (!task) throw new Error(`That work choice is not available for ${room.name} in this scope.`);
       const proposed = generated.find(item => item.productName.trim().toLowerCase() === task.name.toLowerCase());
+      const requirement = itemRequirements(task.name, room.name, brief.requirements);
       const area = task.unit !== 'sqft' ? null : work.areaSqft ?? (work.widthFt && work.heightFt ? Math.round(work.widthFt * work.heightFt * 10000) / 10000 : null);
       const details = [task.unit === 'sqft' ? '' : `Billing: ${task.unit}; price separately. No square-foot amount is assumed.`,
-        work.details, answer.notes, proposed?.description, task.hint].filter(Boolean).join(' ').slice(0, 1000);
-      return { productName: task.name, description: details, ...(proposed?.specifications ? { specifications: proposed.specifications } : {}), ...(proposed?.side ? { side: proposed.side } : {}), rateId: task.unit === 'sqft' ? proposed?.rateId ?? null : null,
+        requirement ? `User requirement: ${requirement}` : '',
+        ...(requirement ? [] : [work.details, answer.notes, proposed?.description]), task.hint].filter(Boolean).join(' ').slice(0, 1000);
+      return { productName: task.name, description: details, ...(!requirement && proposed?.specifications ? { specifications: proposed.specifications } : {}), ...(proposed?.side ? { side: proposed.side } : {}), rateId: task.unit === 'sqft' ? proposed?.rateId ?? null : null,
         quantity: area, measurementStatus: area == null ? 'unknown' as const : 'estimated' as const,
         measurementReason: area == null ? `${room.name}: ${task.hint}` : `${room.name}: confirmed work coverage ${area} sqft; verify on site.` };
     }) };

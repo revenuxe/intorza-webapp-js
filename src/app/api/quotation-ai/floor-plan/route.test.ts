@@ -47,6 +47,58 @@ function request(body: unknown, authenticated = true) {
   return new Request('https://app.intorza.com/api/quotation-ai/floor-plan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: 'Bearer session' } : {}) }, body: JSON.stringify(body) });
 }
 const payload = () => ({ action: 'generate', projectId: null, analysis: planFixture(), brief: briefFixture(), draft: draftFixture() });
+it('prioritises an explicit Luxury brief over the Standard selector and carries custom details to search', async () => {
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [], finishTier: 'Luxury', designDirection: 'Warm minimalist luxury with walnut veneer and Blum hardware.', roomRequirements: [{ roomName: 'Bedroom', items: [{ workKey: 'wardrobe', details: 'Walnut veneer, Blum soft-close hardware, warm minimalist detailing.' }] }] });
+  libraryRows = [{ id: 'standard', product_name: 'Wardrobe', product_details: 'Laminate', preferred_rate: 1200, country_code: 'IN', updated_at: new Date().toISOString() }];
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), automatic: true, requestNotes: 'I want luxury walnut veneer wardrobes with Blum soft-close hardware in a warm minimalist style.' } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.finishTier).toBe('Luxury');
+  expect(generate).toHaveBeenCalledWith(expect.objectContaining({ brief: expect.objectContaining({ finish: 'Luxury', requirements: expect.objectContaining({ designDirection: expect.stringContaining('walnut') }) }) }), expect.anything());
+  expect(research).toHaveBeenCalledWith(expect.objectContaining({ finish: 'Luxury', products: expect.arrayContaining([expect.objectContaining({ name: 'Wardrobe', specification: expect.stringContaining('Blum soft-close') })]) }), expect.anything());
+  expect(result.estimate.draft.sections[0].items[0].productDetails).toContain('Walnut veneer');
+  expect(result.estimate.draft.sections[0].items[0].ratePerSft).not.toBe(1200);
+});
+
+it('researches the actual material requirement instead of substituting same-tier kitchen controls or catalogue prices', async () => {
+  const analysis = planFixture(); analysis.rooms[0] = { ...analysis.rooms[0], name: 'Kitchen', kind: 'kitchen' };
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [], designDirection: 'Marine plywood kitchen with Blum hardware.', roomRequirements: [{ roomName: 'Kitchen', items: [{ workKey: 'base_cabinets', details: 'Marine plywood carcass with Blum hardware and matte walnut finish.' }] }] });
+  libraryRows = [{ id: 'generic', product_name: 'Kitchen base cabinets', product_details: '18mm MDF', preferred_rate: 1400, country_code: 'IN', updated_at: new Date().toISOString() }];
+  generate.mockResolvedValueOnce({ sections: [{ title: 'Kitchen', roomName: 'Kitchen', items: [{ ...proposalFixture().sections[0].items[0], productName: 'Kitchen base cabinets', description: '18mm MDF with standard hardware', specifications: [{ label: 'Material', value: 'MDF' }] }] }], assumptions: [] });
+  const response = await POST(request({ ...payload(), analysis, brief: { ...briefFixture(), roomNames: ['Kitchen'], automatic: true, kitchenPreferences: { carcass: 'hdhmr' }, requestNotes: 'Use marine plywood and Blum hardware, not the default kitchen material.' } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  const cabinet = result.estimate.draft.sections[0].items.find((item: { productName: string }) => item.productName === 'Kitchen base cabinets');
+  expect(cabinet.productDetails).toContain('Marine plywood');
+  expect(cabinet.productDetails).not.toContain('MDF');
+  expect(cabinet.ratePerSft).not.toBe(1400);
+  expect(research.mock.calls.flatMap(([input]) => input.products).find(product => product.name === 'Kitchen base cabinets').specification).toContain('Blum hardware');
+});
+
+it('researches and applies different finish tiers for different rooms described in the primary brief', async () => {
+  const analysis = planFixture(); analysis.rooms = [{ ...analysis.rooms[0], name: 'Master bedroom' }, { ...analysis.rooms[0], name: 'Guest bedroom' }];
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [], designDirection: 'Luxury master bedroom and Basic guest bedroom.', roomRequirements: [{ roomName: 'Master bedroom', finishTier: 'Luxury' }, { roomName: 'Guest bedroom', finishTier: 'Basic' }] });
+  generate.mockResolvedValueOnce({ sections: analysis.rooms.map(room => ({ title: room.name, roomName: room.name, items: proposalFixture().sections[0].items })), assumptions: [] });
+  research.mockImplementationOnce(async input => ({ rates: input.products.map((product: { name: string; specification: string }) => ({ id: `market-${input.finish}`, name: product.name, description: product.specification, source: 'market_estimate', finishTier: input.finish, rate: 3500, unit: 'sqft', currency: 'INR', location: 'Bengaluru', verifiedAt: new Date().toISOString(), sourceUrl: 'https://supplier.example/luxury', inclusions: '' })), limitations: [] }));
+  research.mockImplementationOnce(async input => ({ rates: input.products.map((product: { name: string; specification: string }) => ({ id: `market-${input.finish}`, name: product.name, description: product.specification, source: 'market_estimate', finishTier: input.finish, rate: 900, unit: 'sqft', currency: 'INR', location: 'Bengaluru', verifiedAt: new Date().toISOString(), sourceUrl: 'https://supplier.example/basic', inclusions: '' })), limitations: [] }));
+  const response = await POST(request({ ...payload(), analysis, brief: { ...briefFixture(), roomNames: analysis.rooms.map(room => room.name), requestNotes: 'Luxury master bedroom, but keep the guest bedroom Basic.' } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(research.mock.calls.map(([input]) => input.finish)).toEqual(['Luxury','Basic']);
+  expect(result.estimate.draft.sections.map((section: { items: { ratePerSft: number }[] }) => section.items[0].ratePerSft)).toEqual([3500,900]);
+  expect(result.estimate.evidence.map((row: { price: { finishTier: string } }) => row.price.finishTier)).toEqual(['Luxury','Basic']);
+});
+
+it('lets an explicit whole-home request override a kitchen-only scope default using rooms from the plan', async () => {
+  const analysis = planFixture(); analysis.rooms.push({ ...analysis.rooms[0], name: 'Kitchen', kind: 'kitchen' });
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [], scope: 'complete', designDirection: 'Full-home interior.', roomNames: [] });
+  generate.mockResolvedValueOnce({ sections: analysis.rooms.map(room => ({ title: room.name, roomName: room.name, items: [{ ...proposalFixture().sections[0].items[0], productName: room.kind === 'kitchen' ? 'Kitchen base cabinets' : 'Wardrobe' }] })), assumptions: [] });
+  const response = await POST(request({ ...payload(), analysis, brief: { ...briefFixture(), automatic: true, scope: 'kitchen', roomNames: ['Kitchen'], requestNotes: 'Please do the full home interior, not just the kitchen.' } }));
+  expect(response.status).toBe(200);
+  const result = await response.json();
+  expect(result.estimate.draft.sections.map((section: { title: string }) => section.title)).toEqual(['Bedroom','Kitchen']);
+  expect(generate).toHaveBeenCalledWith(expect.objectContaining({ brief: expect.objectContaining({ scope: 'complete', roomNames: ['Bedroom','Kitchen'] }) }), expect.anything());
+});
 it.each(['No wall painting or false ceiling.', 'No wall painting and no seling.'])('enforces notes over defaults and unwanted model output: %s', requestNotes => {
   return (async () => {
     const proposal = proposalFixture();

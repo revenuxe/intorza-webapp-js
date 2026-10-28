@@ -4,7 +4,7 @@ import { draftSchema, itemCalculation, quotationTotals, type VoiceDraft } from '
 import { roomWorkSchema, roomWorkOptions } from './room-work';
 import { normalizeReferenceText, referenceProduct } from './reference-pricing';
 import { rateSupportsFinishTier, type FinishTier } from './finish-tier';
-import { excludedWork, exclusionsForBrief, workExclusionSchema } from './requirements';
+import { excludedWork, exclusionsForBrief, itemFinishTier, itemRequirements, requirementsSchema, requirementsSource, workExclusionSchema } from './requirements';
 
 export const MAX_PLAN_BYTES = 10 * 1024 * 1024;
 export const MAX_PLAN_FILES = 3;
@@ -37,6 +37,7 @@ export const resolveFinishTier = (finish: 'Basic' | 'Standard' | 'Premium' | 'Lu
   return ratio < 0.8 ? 'Basic' : ratio > 1.5 ? 'Premium' : 'Standard';
 };
 export const briefSchema = z.object({
+  requirements: requirementsSchema.optional(),
   workExclusions: z.array(workExclusionSchema).max(40).optional(),
   scope: z.enum(['complete', 'modular', 'kitchen', 'bedrooms', 'kitchen-wardrobes', 'living-bedrooms', 'selected']),
   roomNames: z.array(label).min(1).max(40), finish: z.enum(['Basic', 'Standard', 'Premium', 'Luxury', 'Recommend']),
@@ -199,7 +200,7 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
       if (seen.has(key)) throw new Error('The proposal contains a duplicate item. Please regenerate.');
       seen.add(key);
       const price = rates.find(rate => rate.id === item.rateId && rate.unit === 'sqft'
-        && rateSupportsFinishTier(rate, resolveFinishTier(brief.finish, brief.budget, null))
+        && rateSupportsFinishTier(rate, itemFinishTier(item.productName, section.roomName, brief.requirements, resolveFinishTier(brief.finish, brief.budget, null)))
         && !/Billing: (piece|lump_sum); price separately/i.test(item.description)
         && referenceProduct(rate.name) === referenceProduct(item.productName)
         && Number.isFinite(rate.rate) && rate.rate >= 0 && rate.rate <= 10000000) ?? null;
@@ -234,8 +235,9 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
         const row = evidence[evidence.length - 1];
         row.quantityStatus = 'estimated'; row.reason = automaticAllowance!.reason;
       }
-      const details = conciseProductDetails(item.description, productName);
-      return { id, productName, productDetails: details.slice(0, 300),
+      const customRequirement = itemRequirements(productName, section.roomName, brief.requirements);
+      const details = customRequirement ? item.description : conciseProductDetails(item.description, productName);
+      return { id, productName, productDetails: details.slice(0, customRequirement ? 1000 : 300),
         ...(item.specifications?.length ? { specifications: item.specifications } : {}),
         side: item.side ?? '', measurementMode: dimensions ? 'dimensions' as const : 'direct_area' as const,
         widthFt: dimensions?.widthFt ?? null, heightFt: dimensions?.heightFt ?? null,
@@ -246,9 +248,9 @@ export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: Proje
     project: { ...base.project, projectTitle: base.project.projectTitle || `${brief.finish} Interior Estimate`, clientName: brief.clientName, clientAddress: brief.address, placeOfProject: brief.location, projectType: analysis.propertyType }, sections });
   const items = draft.sections.flatMap(section => section.items);
   const amounts = items.map(item => Number(itemCalculation(item).cents ?? 0n) / 100);
-  return { workExclusions, finishTier: resolveFinishTier(brief.finish, brief.budget, null), draft, evidence, scopeGaps: [...allowed].filter(name => !proposal.sections.some(section => section.roomName === name)), roomSections: draft.sections.map((section, index) => ({ sectionId: section.id, roomName: proposal.sections[index].roomName })), totals: quotationTotals(amounts, draft.pricing),
+  return { requirementsSource: requirementsSource(brief), requirements: brief.requirements ?? null, workExclusions, finishTier: resolveFinishTier(brief.finish, brief.budget, null), draft, evidence, scopeGaps: [...allowed].filter(name => !proposal.sections.some(section => section.roomName === name)), roomSections: draft.sections.map((section, index) => ({ sectionId: section.id, roomName: proposal.sections[index].roomName })), totals: quotationTotals(amounts, draft.pricing),
     incomplete: items.some(item => itemCalculation(item).area == null || item.ratePerSft == null),
-    assumptions: [...analysis.warnings, ...proposal.assumptions,
+    assumptions: [...analysis.warnings, ...proposal.assumptions, ...(brief.requirements?.reviewNotes ?? []),
       ...(brief.budget != null && quotationTotals(amounts, draft.pricing).total > brief.budget ? ['The priced items exceed your target budget. Review the scope or finish before finalizing.'] : []),
       'Room floor area is not cabinetry or wall-work area. All proposed work quantities require review.',
       'Square-foot work uses the existing editor calculation. Selected piece/package services remain listed with separate pricing pending and are excluded from provisional totals.',
@@ -270,7 +272,8 @@ export function preserveRefinedItems(previous: Estimate, next: Estimate, brief: 
       const row = evidence.find(row => row.itemId === item.id)!;
       const oldEvidence = previous.evidence.find(row => row.itemId === old.id);
       row.itemId = old.id; item.id = old.id;
-      if (oldEvidence?.price?.source === 'manual') { item.ratePerSft = old.ratePerSft; row.price = oldEvidence.price; }
+      const unchangedTier = itemFinishTier(old.productName, roomName, previous.requirements, previous.finishTier ?? 'Standard') === itemFinishTier(item.productName, roomName, brief.requirements, next.finishTier);
+      if (oldEvidence?.price?.source === 'manual' && unchangedTier && !itemRequirements(item.productName, roomName, brief.requirements)) { item.ratePerSft = old.ratePerSft; row.price = oldEvidence.price; }
       if (oldEvidence?.quantityStatus === 'user_entered' && row.quantityStatus !== 'user_entered') {
         item.measurementMode = old.measurementMode; item.widthFt = old.widthFt; item.heightFt = old.heightFt; item.sftArea = old.sftArea;
         row.quantityStatus = oldEvidence.quantityStatus; row.reason = oldEvidence.reason;
@@ -284,7 +287,7 @@ export function preserveRefinedItems(previous: Estimate, next: Estimate, brief: 
       section.items.push({ ...old });
       const row = previous.evidence.find(row => row.itemId === old.id);
       if (row) {
-        const compatible = !row.price || rateSupportsFinishTier(row.price, next.finishTier);
+        const compatible = !row.price || rateSupportsFinishTier(row.price, itemFinishTier(old.productName, roomName, brief.requirements, next.finishTier));
         if (!compatible) section.items[section.items.length - 1].ratePerSft = null;
         evidence.push({ ...row, price: compatible ? row.price : null });
       }
@@ -308,9 +311,11 @@ export function mergeRoomEstimates(previous: Estimate, next: Estimate, roomNames
   const retainedIds = new Set(retained.flatMap(section => section.items.map(item => item.id)));
   const evidence = priorEvidence.filter(row => retainedIds.has(row.itemId)).map(row => {
     const item = retained.flatMap(section => section.items).find(item => item.id === row.itemId)!;
-    const price = row.price?.source === 'manual' || (row.price?.source === 'ai_estimate' && rateSupportsFinishTier(row.price as PriceEvidence, next.finishTier)) ? row.price as PriceEvidence
+    const roomName = mapping.find(row => retained.some(section => section.id === row.sectionId && section.items.some(candidate => candidate.id === item.id)))?.roomName ?? '';
+    const tier = itemFinishTier(item.productName, roomName, next.requirements, next.finishTier);
+    const price = row.price?.source === 'manual' || (row.price?.source === 'ai_estimate' && rateSupportsFinishTier(row.price as PriceEvidence, tier)) ? row.price as PriceEvidence
       : rates.find(rate => rate.id === row.price?.id && rate.unit === 'sqft' && rate.name.toLowerCase() === item.productName.toLowerCase()
-        && rateSupportsFinishTier(rate, next.finishTier)) ?? null;
+        && rateSupportsFinishTier(rate, tier)) ?? null;
     item.ratePerSft = price?.rate ?? null;
     return { itemId: row.itemId, quantityStatus: row.quantityStatus, reason: row.reason, price };
   });

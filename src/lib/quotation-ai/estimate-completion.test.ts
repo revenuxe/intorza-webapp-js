@@ -3,8 +3,22 @@ import { applyCompletion, completionItems, OpenAIEstimateCompletion } from './es
 import { buildEstimate } from './floor-plan';
 import { toQuotation } from './domain';
 import { briefFixture, draftFixture, planFixture, proposalFixture } from '@/test/floor-plan-fixtures';
+import { requirementsSchema } from './requirements';
 
 const estimate = () => buildEstimate(proposalFixture(), planFixture(), briefFixture(), [], draftFixture());
+it('keeps primary custom requirements and room-level quality in fallback pricing without incompatible reference rates', async () => {
+  const previous = estimate();
+  const requirements = requirementsSchema.parse({ exclusions: [], designDirection: 'Luxury walnut wardrobe with Blum hardware.', roomRequirements: [{ roomName: 'Bedroom', finishTier: 'Luxury', items: [{ workKey: 'wardrobe', details: 'Walnut veneer and Blum hardware.' }] }] });
+  const brief = { ...briefFixture(), requirements };
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify({ items: [suggestion(previous.draft.sections[0].items[0].id)] }) }] }] }) });
+  const rate = { id: 'standard', name: 'Wardrobe', description: 'Standard laminate', rate: 1200, unit: 'sqft', source: 'approved' as const, currency: 'INR', location: 'Bengaluru', verifiedAt: new Date().toISOString(), sourceUrl: null, inclusions: '' };
+  const result = await new OpenAIEstimateCompletion('secret', 'model').complete(previous, planFixture(), brief, [rate], 'INR', new AbortController().signal);
+  const input = JSON.parse(JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body).input);
+  expect(input.primaryRequirements.designDirection).toContain('Blum');
+  expect(input.items[0].finishTier).toBe('Luxury');
+  expect(input.referenceRates).toEqual([]);
+  expect(result.evidence[0].price?.finishTier).toBe('Luxury');
+});
 const suggestion = (itemId: string) => ({ itemId, widthFt: 8, heightFt: 7, ratePerSqft: 1200, low: 1000, high: 1500,
   measurementAssumption: 'Proposed 8 ft front with 7 ft shutters; verify clearances.', pricingAssumption: 'Laminate cabinetry with standard hardware and installation; excludes GST.' });
 

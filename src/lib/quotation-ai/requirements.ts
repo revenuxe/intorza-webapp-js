@@ -1,9 +1,48 @@
 import { z } from 'zod';
+import type { FinishTier } from './finish-tier';
+const tierSchema = z.enum(['Basic','Standard','Premium','Luxury']).nullable();
 
 export const workKeys = ['base_cabinets','wall_cabinets','countertop','backsplash','tall_cabinets','wardrobe','loft','bed_back','study_storage','ceiling','painting','tv_unit','wall_panelling','shoe_storage','pooja_unit','vanity','mirror','tile_work','plumbing','bookshelf','utility_storage','crockery_unit','partition','storage','flooring','electrical'] as const;
 export const workExclusionSchema = z.object({ roomName: z.string().trim().min(1).max(150), workKeys: z.array(z.enum(workKeys)).max(26) }).strict();
-export const requirementsSchema = z.object({ exclusions: z.array(workExclusionSchema).max(40) }).strict();
+export const roomRequirementSchema = z.object({
+  roomName: z.string().trim().min(1).max(150),
+  finishTier: tierSchema.optional().default(null),
+  includedWorkKeys: z.array(z.enum(workKeys)).max(26).optional().default([]),
+  items: z.array(z.object({ workKey: z.enum(workKeys), details: z.string().trim().min(1).max(600), finishTier: tierSchema.optional().default(null) }).strict()).max(26).optional().default([]),
+}).strict();
+export const requirementsSchema = z.object({
+  exclusions: z.array(workExclusionSchema).max(40),
+  scope: z.enum(['complete','modular','kitchen','bedrooms','kitchen-wardrobes','living-bedrooms','selected']).nullable().optional().default(null),
+  roomNames: z.array(z.string().trim().min(1).max(150)).max(40).optional().default([]),
+  finishTier: z.enum(['Basic','Standard','Premium','Luxury']).nullable().optional().default(null),
+  designDirection: z.string().trim().max(1200).optional().default(''),
+  roomRequirements: z.array(roomRequirementSchema).max(40).optional().default([]),
+  reviewNotes: z.array(z.string().trim().min(1).max(600)).max(10).optional().default([]),
+}).strict();
+export type ProjectRequirements = z.infer<typeof requirementsSchema>;
 export type WorkExclusion = z.infer<typeof workExclusionSchema>;
+
+export function requestedWork(roomName: string, requirements?: ProjectRequirements) {
+  return [...new Set((requirements?.roomRequirements ?? []).filter(row => row.roomName === roomName)
+    .flatMap(row => [...(row.includedWorkKeys ?? []), ...(row.items ?? []).map(item => item.workKey)]))];
+}
+
+export function itemRequirements(product: string, roomName: string, requirements?: ProjectRequirements) {
+  return (requirements?.roomRequirements ?? []).filter(row => row.roomName === roomName).flatMap(row => row.items ?? [])
+    .filter(item => excludedWork(product, roomName, [{ roomName, workKeys: [item.workKey] }])).map(item => item.details).join(' ').slice(0, 600);
+}
+
+export function itemFinishTier(product: string, roomName: string, requirements: ProjectRequirements | undefined, fallback: FinishTier): FinishTier {
+  const room = requirements?.roomRequirements?.find(row => row.roomName === roomName);
+  const item = room?.items?.find(row => excludedWork(product, roomName, [{ roomName, workKeys: [row.workKey] }]));
+  return item?.finishTier ?? room?.finishTier ?? fallback;
+}
+
+export function requirementsSource(brief: { requestNotes?: string; design?: { notes?: string }; roomWork?: { roomName?: string; notes?: string }[] }) {
+  const roomNotes = (brief.roomWork ?? []).filter(room => room.notes?.trim()).map(room => ({ roomName: room.roomName, notes: room.notes.trim() }));
+  if (!brief.requestNotes?.trim() && !brief.design?.notes?.trim() && !roomNotes.length) return '';
+  return JSON.stringify({ notes: brief.requestNotes?.trim() ?? '', design: brief.design?.notes?.trim() ?? '', roomNotes });
+}
 
 const aliases: Partial<Record<typeof workKeys[number], RegExp>> = {
   ceiling: /\b(?:false\s+)?(?:ceilings?|cieling|seiling|seling|ceeling)\b/i,
@@ -60,5 +99,6 @@ export function mergeExclusions(...groups: WorkExclusion[][]): WorkExclusion[] {
 }
 
 export function exclusionsForBrief(brief: { workExclusions?: WorkExclusion[]; requestNotes?: string; design?: { notes?: string } }, rooms: { name?: string; kind?: string }[]) {
-  return mergeExclusions(brief.workExclusions ?? [], explicitNoteExclusions([brief.requestNotes, brief.design?.notes].filter(Boolean).join('. '), rooms));
+  const primaryNotes = brief.requestNotes?.trim() ? brief.requestNotes : brief.design?.notes ?? '';
+  return mergeExclusions(brief.workExclusions ?? [], explicitNoteExclusions(primaryNotes, rooms));
 }

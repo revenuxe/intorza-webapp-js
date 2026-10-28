@@ -4,6 +4,16 @@ import { appendFloorPlanEstimate } from './apply-estimate';
 import { fromQuotation } from './domain';
 import { completeEstimate } from './floor-plan';
 import { planFixture, briefFixture, draftFixture, proposalFixture } from '@/test/floor-plan-fixtures';
+import { requirementsSchema } from './requirements';
+
+it('includes explicitly requested work even when scope defaults and sparse AI output omit it', () => {
+  const plan = planFixture(); plan.rooms[0] = { ...plan.rooms[0], name: 'Living', kind: 'living' };
+  const requirements = requirementsSchema.parse({ exclusions: [], roomRequirements: [{ roomName: 'Living', includedWorkKeys: ['painting','pooja_unit'], items: [{ workKey: 'pooja_unit', details: 'Compact walnut pooja unit with brass detailing.' }] }] });
+  const brief = { ...briefFixture(), scope: 'modular' as const, roomNames: ['Living'], automatic: true, requirements };
+  const result = ensureRoomWorkCoverage({ sections: [], assumptions: [] }, plan.rooms, brief);
+  expect(result.sections[0].items.map(item => item.productName)).toEqual(expect.arrayContaining(['TV unit','Wall painting','Pooja unit']));
+  expect(result.sections[0].items.find(item => item.productName === 'Pooja unit').description).toContain('brass detailing');
+});
 
 it('never restores explicitly excluded work while refining an older estimate', () => {
   const proposal = proposalFixture();

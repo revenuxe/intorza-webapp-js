@@ -39,7 +39,8 @@ it('passes structured modular kitchen preferences into estimate generation', asy
   const context = { brief: { kitchenPreferences: { layout: 'l_shape', carcass: 'bwr_plywood', shutter: 'laminate', hardware: 'soft_close', countertop: 'granite', appliances: 'Keep sink and hob in place.' } } };
   await new OpenAIFloorPlanProvider('secret', 'configured-model').generate(context, new AbortController().signal);
   const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
-  expect(body.instructions).toContain('follow brief.kitchenPreferences');
+  expect(body.instructions).toContain('follow the primary notes and brief.requirements');
+  expect(body.instructions).toContain('use brief.kitchenPreferences only where the primary brief is silent');
   expect(body.input[0].content[0].text).toContain('"layout":"l_shape"');
   expect(body.input[0].content[0].text).toContain('Keep sink and hob in place.');
 });
