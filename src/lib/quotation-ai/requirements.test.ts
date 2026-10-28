@@ -35,6 +35,17 @@ it('expands explicit room groups and refuses ambiguous or invented rooms', () =>
   expect(() => resolveRequirementsRooms(requirementsSchema.parse({ exclusions: [], roomNames: ['Bedroom'] }), planRooms)).toThrow('more than one');
   expect(() => resolveRequirementsRooms(requirementsSchema.parse({ exclusions: [], roomNames: ['Gym'] }), planRooms)).toThrow('could not be matched');
 });
+it('accepts omissions in absent spaces while retaining real exclusions and rejecting ambiguous rooms', () => {
+  const result = resolveRequirementsRooms(requirementsSchema.parse({ exclusions: [
+    { roomName: 'Parking', workKeys: ['flooring','painting'] },
+    { roomName: 'All rooms', workKeys: ['painting'] },
+  ] }), rooms);
+  expect(result.exclusions).toEqual(rooms.map(room => ({ roomName: room.name, workKeys: ['painting'] })));
+  expect(() => resolveRequirementsRooms(requirementsSchema.parse({ exclusions: [{ roomName: 'Bedroom', workKeys: ['painting'] }] }), [
+    { name: 'Bedroom 1', kind: 'bedroom' }, { name: 'Bedroom 2', kind: 'bedroom' },
+  ])).toThrow('more than one');
+  expect(() => resolveRequirementsRooms(requirementsSchema.parse({ exclusions: [], roomRequirements: [{ roomName: 'Parking', includedWorkKeys: ['flooring'] }] }), rooms)).toThrow('could not be matched');
+});
 it('does not let older design notes contradict the primary Explain it your way brief', () => {
   const exclusions = exclusionsForBrief({ requestNotes: 'Include wall painting.', design: { notes: 'No wall painting.' } }, rooms);
   expect(excludedWork('Wall painting', 'Bedroom', exclusions)).toBe(false);

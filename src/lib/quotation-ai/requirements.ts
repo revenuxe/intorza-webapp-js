@@ -103,7 +103,15 @@ export function resolveRequirementsRooms(requirements: ProjectRequirements, room
   return {
     ...requirements,
     roomNames: [...new Set(requirements.roomNames.flatMap(resolve))],
-    exclusions: mergeExclusions(requirements.exclusions.flatMap(row => resolve(row.roomName).map(roomName => ({ ...row, roomName })))),
+    exclusions: mergeExclusions(requirements.exclusions.flatMap(row => {
+      try { return resolve(row.roomName).map(roomName => ({ ...row, roomName })); }
+      catch (error) {
+        // An omission in an absent space is already satisfied: generation is
+        // restricted to plan rooms. Positive work and ambiguous labels still fail.
+        if (error instanceof RequirementsRoomError && error.code === 'AI_ROOM_NOT_FOUND') return [];
+        throw error;
+      }
+    })),
     roomRequirements: requirements.roomRequirements.flatMap(row => resolve(row.roomName).map(roomName => ({ ...row, roomName }))),
   };
 }
