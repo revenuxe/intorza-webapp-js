@@ -3,6 +3,23 @@ import { OpenAIFloorPlanProvider } from './floor-plan-provider';
 import { planFixture, proposalFixture } from '@/test/floor-plan-fixtures';
 beforeEach(() => { global.fetch = jest.fn(); });
 const complete = (value: unknown) => ({ ok: true, json: async () => ({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(value) }] }] }) });
+it('corrects informal notes with AI while preserving negation, specifications and uncertainty', async () => {
+  (fetch as jest.Mock).mockResolvedValue(complete({ correctedText: 'Luxury wardrobe with Blum hardware. No wall painting. No dark paint in the kitchen.', reviewNotes: ['Confirm unclear finish wording.'] }));
+  const note = 'luxry wardrob Blum no wall pianitinhgb no dark paint kitchen';
+  const result = await new OpenAIFloorPlanProvider('secret','configured-model').understandNotes(note, [{ name: 'Kitchen', kind: 'kitchen' }], new AbortController().signal);
+  expect(result.correctedText).toContain('No dark paint');
+  const body = JSON.parse((fetch as jest.Mock).mock.calls[0][1].body);
+  expect(JSON.parse(body.input[0].content[0].text).originalNotes).toBe(note);
+  expect(body.instructions).toContain('Preserve exact brand names, product codes, numbers and room labels');
+  expect(body.instructions).toContain('rather than choosing a new scope or specification');
+});
+it('skips empty notes and rejects malformed corrections instead of proceeding with guessed requirements', async () => {
+  const provider = new OpenAIFloorPlanProvider('secret','configured-model');
+  expect(await provider.understandNotes(' ', [], new AbortController().signal)).toEqual({ correctedText: '', reviewNotes: [] });
+  expect(fetch).not.toHaveBeenCalled();
+  (fetch as jest.Mock).mockResolvedValue(complete({ correctedText: '', reviewNotes: [] }));
+  await expect(provider.understandNotes('Specific requirements', [], new AbortController().signal)).rejects.toThrow();
+});
 it('uses the configured vision model with PDF inputs and clears inferred dimensions', async () => {
   const plan = planFixture(); plan.rooms[0].source = 'inferred';
   (global.fetch as jest.Mock).mockResolvedValue(complete(plan));

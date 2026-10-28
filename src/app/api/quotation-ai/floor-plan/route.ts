@@ -220,12 +220,16 @@ export async function POST(request: Request) {
     if (requirementNotes.trim() || brief.roomWork?.some(room => room.notes.trim())) {
       stage = 'requirements';
       const rooms = analysis.rooms;
+      // Preserve the original note for editing/audit; interpret the conservative
+      // spelling correction before applying any scope, quality or price defaults.
+      const understood = await provider.understandNotes(brief.requestNotes ?? '', rooms, request.signal);
       const interpreted = resolveRequirementsRooms(requirementsSchema.parse(await provider.requirements({
-        requestNotes: brief.requestNotes ?? '', designNotes: brief.design?.notes ?? '',
+        requestNotes: understood.correctedText, originalRequestNotes: brief.requestNotes ?? '', interpretationReviewNotes: understood.reviewNotes, designNotes: brief.design?.notes ?? '',
         roomNotes: brief.roomWork?.map(room => ({ roomName: room.roomName, notes: room.notes })) ?? [],
         selectedDefaults: { scope: brief.scope, roomNames: brief.roomNames, finish: brief.finish, kitchenPreferences: brief.kitchenPreferences, design: brief.design },
         rooms: rooms.map(room => ({ name: room.name, kind: room.kind, work: roomWorkOptions(room, 'complete').map(option => ({ key: option.key, name: option.name })) })),
       }, request.signal)), rooms);
+      interpreted.reviewNotes = [...new Set([...understood.reviewNotes, ...interpreted.reviewNotes])].slice(0, 10);
       if (interpreted.roomNames.some(name => !rooms.some(room => room.name === name))) throw new InputError('A room in your requirements is not available in this plan. Check its name or update the plan.', 422);
       if (interpreted.scope) brief.scope = interpreted.scope;
       if (interpreted.roomNames.length) {

@@ -19,6 +19,7 @@ jest.mock('@/lib/quotation-ai/estimate-completion', () => ({ ...jest.requireActu
 const autoComplete = jest.fn();
 const research = jest.fn();
 const interpretRequirements = jest.fn();
+const understandNotes = jest.fn();
 const getUser = jest.fn(); const limit = jest.fn(); const analyse = jest.fn(); const generate = jest.fn();
 const upload = jest.fn(); const remove = jest.fn(); const from = jest.fn();
 const rpc = jest.fn();
@@ -93,6 +94,19 @@ it('lets explicit note-selected rooms override a conflicting scope filter instea
   expect((await response.json()).estimate.draft.sections.map((section: { title: string }) => section.title)).toEqual(['Bedroom']);
 });
 
+it('understands spelling before extracting requirements and preserves the original note and uncertainties', async () => {
+  const note = 'luxry wardrob no wall pianitinhgb';
+  understandNotes.mockResolvedValueOnce({ correctedText: 'Luxury wardrobe. No wall painting.', reviewNotes: ['Confirm the unclear hardware preference.'] });
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [{ roomName: 'All rooms', workKeys: ['painting'] }], finishTier: 'Luxury' });
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), requestNotes: note } }));
+  expect(response.status).toBe(200);
+  expect(interpretRequirements).toHaveBeenCalledWith(expect.objectContaining({ requestNotes: 'Luxury wardrobe. No wall painting.', originalRequestNotes: note }), expect.anything());
+  expect(understandNotes.mock.invocationCallOrder[0]).toBeLessThan(interpretRequirements.mock.invocationCallOrder[0]);
+  const estimate = (await response.json()).estimate;
+  expect(estimate.requirements.reviewNotes).toContain('Confirm the unclear hardware preference.');
+  expect(estimate.finishTier).toBe('Luxury');
+  expect(rpc).not.toHaveBeenCalledWith('confirm_quotation_coin_delivery', expect.anything());
+});
 it('classifies invalid AI requirements output as an upstream failure and logs no customer note values', async () => {
   interpretRequirements.mockResolvedValueOnce({ exclusions: [], finishTier: 'not-a-tier' });
   const response = await POST(request({ ...payload(), brief: { ...briefFixture(), requestNotes: 'Private customer note, never log this.' } }));
@@ -265,7 +279,8 @@ beforeEach(() => {
   from.mockImplementation(database);
   rpc.mockImplementation(defaultRpc);
   (createClient as jest.Mock).mockReturnValue({ auth: { getUser }, from, rpc, storage: { from: () => ({ upload, remove }) } });
-  (OpenAIFloorPlanProvider as jest.Mock).mockReturnValue({ analyse, generate, requirements: interpretRequirements });
+  (OpenAIFloorPlanProvider as jest.Mock).mockReturnValue({ analyse, generate, requirements: interpretRequirements, understandNotes });
+  understandNotes.mockImplementation(async (notes: string) => ({ correctedText: notes, reviewNotes: [] }));
   interpretRequirements.mockResolvedValue({ exclusions: [] });
   (OpenAIWebMarketPricing as jest.Mock).mockReturnValue({ research });
   (OpenAIEstimateCompletion as jest.Mock).mockReturnValue({ complete: autoComplete });
