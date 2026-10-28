@@ -147,6 +147,17 @@ date are recorded. Deactivation preserves historical evidence.
 
 ### Free-text requirements and exclusions (October 27, 2026)
 
+Room-resolution hardening (October 28): AI references are matched to canonical
+plan labels using normalized case/spacing/punctuation, explicit groups and
+unique combined-space names (for example, Dining in Living & Dining, or
+Utility in Kitchen + Utility). Ambiguous bedrooms and unknown rooms still
+return actionable errors; the implementation never guesses a different room.
+Global exclusions for unselected rooms do not reject a scoped quotation.
+Explicit room selections in the primary brief override a conflicting scope
+filter. Failed requests include a stage, error code and request reference;
+invalid requirements output is classified as an upstream failure. Server logs
+retain classifications/schema paths without customer notes or credentials.
+
 October 28 update: "Explain it your way" is the primary design brief for
 positive requirements as well as exclusions. Interpretation captures overall,
 room and item finish tiers; explicit scope/room changes; requested inclusions; exact materials, hardware,

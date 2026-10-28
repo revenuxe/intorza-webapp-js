@@ -4,7 +4,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { z } from 'zod';
 import { analysisSchema, briefSchema, buildEstimate, completeEstimate, estimateCompletionSchema, generatedSchema, mergeRoomEstimates, preserveRefinedItems, detectPlanType, MAX_PLAN_BYTES, MAX_PLAN_FILES, resolveFinishTier, scopedRooms, type Estimate, type PriceEvidence } from '@/lib/quotation-ai/floor-plan';
 import { ensureRoomWorkCoverage, roomWorkOptions } from '@/lib/quotation-ai/room-work';
-import { excludedWork, explicitNoteExclusions, itemFinishTier, itemRequirements, mergeExclusions, requirementsSchema, requirementsSource } from '@/lib/quotation-ai/requirements';
+import { excludedWork, explicitNoteExclusions, itemFinishTier, itemRequirements, mergeExclusions, requirementsSchema, requirementsSource, RequirementsRoomError, resolveRequirementsRooms } from '@/lib/quotation-ai/requirements';
 import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 type Env = { OPENAI_API_KEY?: string; OPENAI_MODEL?: string; OPENAI_FLOOR_PLAN_MODEL?: string; OPENAI_MARKET_MODEL?: string; OPENAI_ESTIMATE_MODEL?: string; QUOTATION_MARKET_RESEARCH?: string; QUOTATION_AI_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> } };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } });
 const generation = z.object({ action: z.enum(['generate','retry_pricing']), projectId: z.string().uuid().nullable(), analysis: analysisSchema, brief: briefSchema, draft: draftSchema, regenerateRooms: z.array(z.string().min(1).max(150)).min(1).max(40).optional() }).strict();
-class InputError extends Error { constructor(message: string, public status: number) { super(message); } }
+class InputError extends Error { constructor(message: string, public status: number, public code = 'AI_INPUT_INVALID') { super(message); } }
 // Bound bodies while streaming, including chunked requests without Content-Length.
 async function boundedBody(request: Request, maximum: number) {
   const reader = request.body?.getReader();
@@ -38,6 +38,7 @@ async function boundedBody(request: Request, maximum: number) {
 export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
   let cleanup: (() => Promise<unknown>) | undefined;
+  let stage = 'initialization';
   try {
     const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
     if (!token) return json({ error: 'Sign in to build a quotation.' }, 401);
@@ -202,25 +203,33 @@ export async function POST(request: Request) {
     brief.workExclusions = [];
     delete brief.requirements;
     if (requirementNotes.trim() || brief.roomWork?.some(room => room.notes.trim())) {
+      stage = 'requirements';
       const rooms = analysis.rooms;
-      const interpreted = requirementsSchema.parse(await provider.requirements({
+      const interpreted = resolveRequirementsRooms(requirementsSchema.parse(await provider.requirements({
         requestNotes: brief.requestNotes ?? '', designNotes: brief.design?.notes ?? '',
         roomNotes: brief.roomWork?.map(room => ({ roomName: room.roomName, notes: room.notes })) ?? [],
         selectedDefaults: { scope: brief.scope, roomNames: brief.roomNames, finish: brief.finish, kitchenPreferences: brief.kitchenPreferences, design: brief.design },
         rooms: rooms.map(room => ({ name: room.name, kind: room.kind, work: roomWorkOptions(room, 'complete').map(option => ({ key: option.key, name: option.name })) })),
-      }, request.signal));
+      }, request.signal)), rooms);
       if (interpreted.roomNames.some(name => !rooms.some(room => room.name === name))) throw new InputError('A room in your requirements is not available in this plan. Check its name or update the plan.', 422);
       if (interpreted.scope) brief.scope = interpreted.scope;
-      if (interpreted.roomNames.length) brief.roomNames = [...new Set(interpreted.roomNames)];
+      if (interpreted.roomNames.length) {
+        brief.roomNames = [...new Set(interpreted.roomNames)];
+        if (!interpreted.scope && scopedRooms(analysis, brief).length !== brief.roomNames.length) brief.scope = 'selected';
+      }
       else if (interpreted.scope) brief.roomNames = rooms.map(room => room.name);
       const selectedRooms = scopedRooms(analysis, brief);
       if (!selectedRooms.length) throw new InputError('Your requirements leave no selected rooms. Check the requested scope and room names.', 400);
-      if ([...interpreted.exclusions, ...interpreted.roomRequirements].some(row => !selectedRooms.some(room => room.name === row.roomName))) throw new InputError('Could not match your requirements to the selected rooms. Check the room names in your note.', 422);
+      // Excluding work in an unselected room is already satisfied. It must not
+      // reject a kitchen-only quote when the AI applies a global exclusion.
+      interpreted.exclusions = interpreted.exclusions.filter(row => selectedRooms.some(room => room.name === row.roomName));
+      if (interpreted.roomRequirements.some(row => !selectedRooms.some(room => room.name === row.roomName))) throw new InputError('Your note requests work outside the selected rooms. Select those rooms or name the intended rooms in your note.', 422);
       brief.requirements = interpreted;
       if (interpreted.finishTier) brief.finish = interpreted.finishTier;
       brief.workExclusions = mergeExclusions(interpreted.exclusions, explicitNoteExclusions(brief.requestNotes?.trim() ? brief.requestNotes : brief.design?.notes ?? '', selectedRooms));
     }
     const requestedBrief = { ...(regenerateRooms ? { ...brief, roomNames: regenerateRooms } : brief), finish: resolveFinishTier(brief.finish, brief.budget, previousEstimate?.totals.total ?? null) };
+    stage = 'generation';
     if (regenerateRooms && ((previousEstimate?.finishTier ?? 'Standard') !== requestedBrief.finish || (previousEstimate?.requirementsSource ?? '') !== requirementsSource(brief))) {
       return json({ error: 'The finish level or project requirements changed. Go Back and generate the full estimate so every room follows your current brief.' }, 400);
     }
@@ -307,6 +316,7 @@ export async function POST(request: Request) {
         ...(action === 'retry_pricing' ? { heightFt: previousEstimate.draft.sections.flatMap(section => section.items).find(row => row.productName === item.productName && row.productDetails === item.description)?.heightFt ?? undefined } : {}),
       }] as const))).values()];
     const enabled = (env.QUOTATION_MARKET_RESEARCH || process.env.QUOTATION_MARKET_RESEARCH || 'openai') === 'openai';
+    stage = 'pricing';
     if (products.length && enabled && !/^(unknown|not set|n\/a|none)$/i.test(brief.location.trim())) {
       // Cache only this owner's previously saved evidence, at most 24h, with identical specification/currency/city.
       const cached = (action === 'retry_pricing' ? [] : previousEstimate?.evidence ?? []).flatMap(row => row.price?.source === 'market_estimate' ? [row.price] : [])
@@ -360,6 +370,7 @@ export async function POST(request: Request) {
     // Complete provisional prices and work dimensions automatically instead of
     // requiring the customer to research trade prices or fill a second form.
     if (brief.automatic || action === 'retry_pricing') {
+      stage = 'completion';
       estimate = await new OpenAIEstimateCompletion(key, env.OPENAI_ESTIMATE_MODEL || process.env.OPENAI_ESTIMATE_MODEL || 'gpt-6-astra')
         .complete(estimate, analysis, requestedBrief, rates, currency, request.signal);
     }
@@ -369,6 +380,7 @@ export async function POST(request: Request) {
     }
     estimate.scopeGaps = scopedRooms(analysis, brief).map(room => room.name).filter(name => !estimate.roomSections.some(row => row.roomName === name));
     const id = projectId || crypto.randomUUID();
+    stage = 'persistence';
     const saved = projectId
       ? await db.from('quotation_plan_projects').update({ analysis, brief, estimate, updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', user.id)
       : await db.from('quotation_plan_projects').insert({ id, user_id: user.id, analysis, brief, estimate });
@@ -386,7 +398,15 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     if (cleanup) await cleanup().catch(() => undefined);
-    if (error instanceof InputError) return json({ error: error.message, requestId }, error.status);
-    return json({ error: AI_SERVICE_ISSUE, code: 'AI_SERVICE_UNAVAILABLE', requestId }, error instanceof ProviderError ? error.status : 422);
+    if (error instanceof RequirementsRoomError) return json({ error: error.message, code: error.code, stage, requestId }, 422);
+    if (error instanceof InputError) return json({ error: error.message, code: error.code, stage, requestId }, error.status);
+    const code = error instanceof z.ZodError ? 'AI_INVALID_OUTPUT' : error instanceof ProviderError ? error.code : 'AI_SERVICE_UNAVAILABLE';
+    // Log only classifications and schema paths, never project notes, credentials
+    // or complete upstream errors. The reference links browser and server logs.
+    console.error('floor_plan_failed', { requestId, stage, code,
+      ...(error instanceof z.ZodError ? { issues: error.issues.slice(0, 8).map(issue => ({ path: issue.path.join('.'), code: issue.code })) } : {}),
+    });
+    if (stage === 'requirements' && error instanceof z.ZodError) return json({ error: 'The AI could not interpret your project requirements reliably. Please retry; your plan and notes are preserved.', code, stage, requestId }, 502);
+    return json({ error: AI_SERVICE_ISSUE, code, stage, requestId }, error instanceof ProviderError ? error.status : 422);
   }
 }

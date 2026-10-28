@@ -22,6 +22,53 @@ export const requirementsSchema = z.object({
 export type ProjectRequirements = z.infer<typeof requirementsSchema>;
 export type WorkExclusion = z.infer<typeof workExclusionSchema>;
 
+export class RequirementsRoomError extends Error {
+  constructor(public roomLabel: string, public code: 'AI_ROOM_NOT_FOUND' | 'AI_ROOM_AMBIGUOUS') {
+    super(code === 'AI_ROOM_AMBIGUOUS'
+      ? `The room "${roomLabel}" matches more than one plan room. Use its full plan label in your requirements.`
+      : `The room "${roomLabel}" could not be matched to this plan. Use the room label shown in the plan review.`);
+  }
+}
+
+const roomLabelKey = (value: string) => value.normalize('NFKC').toLowerCase().replace(/bed\s*room/g, 'bedroom')
+  .replace(/([a-z])([0-9])/g, '$1 $2').replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\b(?:and|room|area|space)\b/g, ' ').trim().replace(/\s+/g, ' ');
+
+/** Resolve only exact normalized labels or explicit groups; never guess one of
+ * multiple bedrooms or invent a room not present in the customer's plan. */
+export function resolveRequirementsRooms(requirements: ProjectRequirements, rooms: { name?: string; kind?: string }[]): ProjectRequirements {
+  const resolve = (label: string): string[] => {
+    const key = roomLabelKey(label);
+    const exact = rooms.filter(room => roomLabelKey(room.name) === key);
+    if (exact.length === 1) return [exact[0].name];
+    if (exact.length > 1) throw new RequirementsRoomError(label, 'AI_ROOM_AMBIGUOUS');
+    if (/^(?:all|everywhere)$|^(?:(?:all|every|entire|whole) (?:the )?)?(?:rooms|spaces|home|house|apartment|property)$/.test(key)) return rooms.map(room => room.name);
+    const group = key.replace(/^(?:all|every|the) /, '');
+    const kinds: Record<string, string> = { bedrooms: 'bedroom', kitchens: 'kitchen', bathrooms: 'bathroom', balconies: 'balcony', 'living rooms': 'living', 'dining rooms': 'dining' };
+    const kind = kinds[group];
+    if (kind) {
+      const matches = rooms.filter(room => room.kind === kind);
+      if (matches.length) return matches.map(room => room.name);
+    }
+    const targetWords = key.split(' ');
+    const named = rooms.filter(room => {
+      const words = new Set(roomLabelKey(room.name).split(' '));
+      return targetWords.every(word => words.has(word));
+    });
+    if (named.length === 1) return [named[0].name];
+    if (named.length > 1) throw new RequirementsRoomError(label, 'AI_ROOM_AMBIGUOUS');
+    const singular: Record<string, string> = { bedroom: 'bedroom', kitchen: 'kitchen', bathroom: 'bathroom', restroom: 'bathroom', toilet: 'bathroom', wc: 'bathroom', balcony: 'balcony', living: 'living', hall: 'living', dining: 'dining', study: 'study', utility: 'utility' };
+    const matches = rooms.filter(room => room.kind === singular[group]);
+    if (matches.length === 1) return [matches[0].name];
+    throw new RequirementsRoomError(label, matches.length > 1 ? 'AI_ROOM_AMBIGUOUS' : 'AI_ROOM_NOT_FOUND');
+  };
+  return {
+    ...requirements,
+    roomNames: [...new Set(requirements.roomNames.flatMap(resolve))],
+    exclusions: mergeExclusions(requirements.exclusions.flatMap(row => resolve(row.roomName).map(roomName => ({ ...row, roomName })))),
+    roomRequirements: requirements.roomRequirements.flatMap(row => resolve(row.roomName).map(roomName => ({ ...row, roomName }))),
+  };
+}
+
 export function requestedWork(roomName: string, requirements?: ProjectRequirements) {
   return [...new Set((requirements?.roomRequirements ?? []).filter(row => row.roomName === roomName)
     .flatMap(row => [...(row.includedWorkKeys ?? []), ...(row.items ?? []).map(item => item.workKey)]))];
@@ -33,9 +80,15 @@ export function itemRequirements(product: string, roomName: string, requirements
 }
 
 export function itemFinishTier(product: string, roomName: string, requirements: ProjectRequirements | undefined, fallback: FinishTier): FinishTier {
-  const room = requirements?.roomRequirements?.find(row => row.roomName === roomName);
-  const item = room?.items?.find(row => excludedWork(product, roomName, [{ roomName, workKeys: [row.workKey] }]));
-  return item?.finishTier ?? room?.finishTier ?? fallback;
+  const rooms = (requirements?.roomRequirements ?? []).filter(row => row.roomName === roomName);
+  for (const room of rooms) {
+    const item = room.items?.find(row => excludedWork(product, roomName, [{ roomName, workKeys: [row.workKey] }]));
+    if (item) return item.finishTier ?? room.finishTier ?? fallback;
+  }
+  const requested = rooms.find(room => excludedWork(product, roomName, [{ roomName, workKeys: room.includedWorkKeys ?? [] }]));
+  if (requested?.finishTier) return requested.finishTier;
+  const tiers = [...new Set(rooms.map(room => room.finishTier).filter(Boolean))];
+  return tiers.length === 1 ? tiers[0] : fallback;
 }
 
 export function requirementsSource(brief: { requestNotes?: string; design?: { notes?: string }; roomWork?: { roomName?: string; notes?: string }[] }) {

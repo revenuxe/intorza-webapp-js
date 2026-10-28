@@ -190,7 +190,7 @@ export function automaticWorkFaceAllowance(room: PlanAnalysis['rooms'][number], 
 export function buildEstimate(raw: unknown, analysis: PlanAnalysis, brief: ProjectBrief, rates: PriceEvidence[], base: VoiceDraft) {
   const proposal = generatedSchema.parse(raw);
   const allowed = new Set(scopedRooms(analysis, brief).map(room => room.name));
-  const workExclusions = exclusionsForBrief(brief, analysis.rooms);
+  const workExclusions = exclusionsForBrief(brief, scopedRooms(analysis, brief));
   const evidence: { itemId: string; quantityStatus: string; reason: string; price: PriceEvidence | null }[] = [];
   const seen = new Set<string>();
   const sections = proposal.sections.map(section => {

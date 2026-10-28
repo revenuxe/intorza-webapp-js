@@ -47,6 +47,52 @@ function request(body: unknown, authenticated = true) {
   return new Request('https://app.intorza.com/api/quotation-ai/floor-plan', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(authenticated ? { Authorization: 'Bearer session' } : {}) }, body: JSON.stringify(body) });
 }
 const payload = () => ({ action: 'generate', projectId: null, analysis: planFixture(), brief: briefFixture(), draft: draftFixture() });
+const errorLog = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+afterAll(() => errorLog.mockRestore());
+
+it('accepts AI labels for separate parts of combined plan spaces instead of returning 422', async () => {
+  const analysis = planFixture();
+  analysis.rooms = [{ ...analysis.rooms[0], name: 'Living & Dining', kind: 'living' }, { ...analysis.rooms[0], name: 'Kitchen + Utility', kind: 'kitchen' }];
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [{ roomName: 'Dining', workKeys: ['painting'] }, { roomName: 'Utility', workKeys: ['painting'] }], roomNames: ['Living and Dining room','Kitchen and Utility'] });
+  generate.mockResolvedValueOnce({ sections: analysis.rooms.map(room => ({ title: room.name, roomName: room.name, items: [{ ...proposalFixture().sections[0].items[0], productName: room.kind === 'kitchen' ? 'Kitchen base cabinets' : 'TV unit' }] })), assumptions: [] });
+  const response = await POST(request({ ...payload(), analysis, brief: { ...briefFixture(), automatic: true, roomNames: analysis.rooms.map(room => room.name), requestNotes: 'No painting in the dining or utility spaces.' } }));
+  expect(response.status).toBe(200);
+  expect((await response.json()).estimate.workExclusions.map((row: { roomName: string }) => row.roomName)).toEqual(['Living & Dining','Kitchen + Utility']);
+});
+
+it('does not reject a global exclusion for an unselected room when generating kitchen-only work', async () => {
+  const analysis = planFixture(); analysis.rooms.push({ ...analysis.rooms[0], name: 'Kitchen', kind: 'kitchen' });
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [{ roomName: 'All rooms', workKeys: ['painting'] }] });
+  const response = await POST(request({ ...payload(), analysis, brief: { ...briefFixture(), scope: 'kitchen', roomNames: ['Kitchen'], automatic: true, requestNotes: 'No painting.' } }));
+  expect(response.status).toBe(200);
+  expect((await response.json()).estimate.workExclusions).toEqual([{ roomName: 'Kitchen', workKeys: ['painting'] }]);
+});
+
+it('returns an actionable room error and reference for a genuinely ambiguous requirement', async () => {
+  const analysis = planFixture(); analysis.rooms = [{ ...analysis.rooms[0], name: 'Bedroom 1' }, { ...analysis.rooms[0], name: 'Bedroom 2' }];
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [], roomRequirements: [{ roomName: 'Bedroom', includedWorkKeys: ['wardrobe'] }] });
+  const response = await POST(request({ ...payload(), analysis, brief: { ...briefFixture(), roomNames: ['Bedroom 1','Bedroom 2'], requestNotes: 'A wardrobe in the bedroom.' } }));
+  expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({ code: 'AI_ROOM_AMBIGUOUS', stage: 'requirements', requestId: expect.any(String) });
+  expect(generate).not.toHaveBeenCalled();
+});
+
+it('lets explicit note-selected rooms override a conflicting scope filter instead of producing 422', async () => {
+  const analysis = planFixture(); analysis.rooms.push({ ...analysis.rooms[0], name: 'Kitchen', kind: 'kitchen' });
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [], roomNames: ['bedroom'], roomRequirements: [{ roomName: 'Bedroom', includedWorkKeys: ['wardrobe'] }] });
+  const response = await POST(request({ ...payload(), analysis, brief: { ...briefFixture(), scope: 'kitchen', roomNames: ['Kitchen'], automatic: true, requestNotes: 'Instead, do the bedroom wardrobe.' } }));
+  expect(response.status).toBe(200);
+  expect((await response.json()).estimate.draft.sections.map((section: { title: string }) => section.title)).toEqual(['Bedroom']);
+});
+
+it('classifies invalid AI requirements output as an upstream failure and logs no customer note values', async () => {
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [], finishTier: 'not-a-tier' });
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), requestNotes: 'Private customer note, never log this.' } }));
+  expect(response.status).toBe(502);
+  expect(await response.json()).toMatchObject({ code: 'AI_INVALID_OUTPUT', stage: 'requirements', requestId: expect.any(String) });
+  expect(JSON.stringify(errorLog.mock.calls)).not.toContain('Private customer note');
+  expect(rpc).not.toHaveBeenCalledWith('debit_coins', expect.anything());
+});
 it('prioritises an explicit Luxury brief over the Standard selector and carries custom details to search', async () => {
   interpretRequirements.mockResolvedValueOnce({ exclusions: [], finishTier: 'Luxury', designDirection: 'Warm minimalist luxury with walnut veneer and Blum hardware.', roomRequirements: [{ roomName: 'Bedroom', items: [{ workKey: 'wardrobe', details: 'Walnut veneer, Blum soft-close hardware, warm minimalist detailing.' }] }] });
   libraryRows = [{ id: 'standard', product_name: 'Wardrobe', product_details: 'Laminate', preferred_rate: 1200, country_code: 'IN', updated_at: new Date().toISOString() }];

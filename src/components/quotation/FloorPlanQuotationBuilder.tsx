@@ -218,7 +218,7 @@ export function FloorPlanQuotationBuilder({ mode, onStart, onClose, getCurrentDr
         headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: retryPricing ? 'retry_pricing' : 'generate', projectId, analysis, brief: { ...brief, automatic: true, location: brief.location.trim() || 'Unknown', roomWork: undefined }, draft, ...(selected ? { regenerateRooms: selected } : {}) }) });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error || 'Could not generate an estimate.');
+      if (!response.ok) throw new Error(`${body.error || 'Could not generate an estimate.'}${body.requestId ? ` (Reference: ${String(body.requestId).slice(0, 8)})` : ''}`);
       if (body.measurementSystem === 'imperial') onMeasurementSystemChange?.();
       if (body.measurementChanged) setMeasurementChanged(true);
       setEstimate(body.estimate); setProjectId(body.projectId); setRegenerateRooms([]); setStep('estimate'); void refreshWalletBalance();
