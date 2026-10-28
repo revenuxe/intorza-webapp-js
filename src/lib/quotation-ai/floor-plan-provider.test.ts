@@ -52,6 +52,39 @@ it('interprets free-text exclusions with constrained room names and work keys', 
   expect(body.instructions).toContain('room-specific exceptions');
   expect(body.instructions).toContain('no dark paint');
 });
+it('accepts a requirements response with empty item placeholders while preserving the supplied exclusions', async () => {
+  (global.fetch as jest.Mock).mockResolvedValue(complete({ exclusions:[{roomName:'Bedroom',workKeys:['painting','ceiling']}],roomRequirements:[{roomName:'Bedroom',includedWorkKeys:['wardrobe'],items:[{workKey:'wardrobe',details:'',finishTier:null}]}],reviewNotes:[''] }));
+  const result=await new OpenAIFloorPlanProvider('secret','configured-model').requirements({requestNotes:'No wall painting, and no wallseiling and no unncerrasry thing in quoatation.',rooms:[{name:'Bedroom'}]},new AbortController().signal);
+  expect(result.exclusions[0].workKeys).toEqual(['painting','ceiling']);
+  expect(result.roomRequirements[0].includedWorkKeys).toEqual(['wardrobe']);
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+it('repairs invalid requirements once using the original note and preserves custom specifications', async () => {
+  (global.fetch as jest.Mock).mockResolvedValueOnce(complete({exclusions:[],designDirection:'Long description. '.repeat(100)}))
+    .mockResolvedValueOnce(complete({exclusions:[{roomName:'Bedroom',workKeys:['painting','ceiling']}],roomRequirements:[{roomName:'Bedroom',items:[{workKey:'wardrobe',details:'Marine plywood with Blum hardware.'}]}]}));
+  const note='Marine plywood and Blum hardware. No painting or wallseiling.';
+  const result=await new OpenAIFloorPlanProvider('secret','configured-model').requirements({requestNotes:note,rooms:[{name:'Bedroom'}]},new AbortController().signal);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  const retry=JSON.parse((fetch as jest.Mock).mock.calls[1][1].body);
+  const input=JSON.parse(retry.input[0].content[0].text);
+  expect(input.originalContext.requestNotes).toBe(note);
+  expect(input.validationCorrection.issues).toEqual(expect.arrayContaining([expect.objectContaining({path:'designDirection',code:'too_big'})]));
+  expect(result.roomRequirements[0].items[0].details).toContain('Blum hardware');
+  expect(result.exclusions[0].workKeys).toEqual(['painting','ceiling']);
+});
+it('re-interprets ambiguous blank optional work instead of guessing unnecessary additions', async () => {
+  (fetch as jest.Mock).mockResolvedValueOnce(complete({exclusions:[],roomRequirements:[{roomName:'Bedroom',items:[{workKey:'electrical',details:'',finishTier:null}]}]}))
+    .mockResolvedValueOnce(complete({exclusions:[{roomName:'Bedroom',workKeys:['painting','ceiling']}],roomRequirements:[]}));
+  const result=await new OpenAIFloorPlanProvider('secret','configured-model').requirements({requestNotes:'No wall painting and no wallseiling and no unnecessary things.'},new AbortController().signal);
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(result.roomRequirements).toEqual([]);
+  expect(result.exclusions[0].workKeys).toEqual(['painting','ceiling']);
+});
+it('stops after one unsuccessful repair instead of generating a default quote from malformed requirements', async () => {
+  (fetch as jest.Mock).mockResolvedValue(complete({exclusions:[],finishTier:'unsupported-tier'}));
+  await expect(new OpenAIFloorPlanProvider('secret','configured-model').requirements({requestNotes:'Specific customer requirements.'},new AbortController().signal)).rejects.toThrow();
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
 it('instructs quotation extraction to keep fixed packages out of sqft pricing', async () => {
   const extraction = { location: 'Bengaluru', currency: 'INR', priceDate: '2026-10-01', projectType: 'Apartment', limitations: [], items: [{ section: 'Kitchen', productName: 'Accessories', material: '', specification: '', unit: 'lump_sum', quantity: 1, rate: 20000, tax: 'unknown', installationIncluded: false, page: 1, notes: '' }] };
   (global.fetch as jest.Mock).mockResolvedValue(complete(extraction));

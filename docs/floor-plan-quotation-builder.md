@@ -169,6 +169,16 @@ date are recorded. Deactivation preserves historical evidence.
 
 ### Free-text requirements and exclusions (October 27, 2026)
 
+Requirements-output recovery (October 28): the model must not emit empty
+item/detail placeholders. The validator removes redundant blank detail rows
+only when inclusion is already explicit, preserves an explicit quality-only
+item, and ignores empty review-note placeholders. Meaningful or ambiguous
+invalid output is re-interpreted once from the original customer brief with
+the schema failure paths. Instructions are never silently truncated or replaced
+by default scope. A second invalid interpretation stops generation before any
+coin confirmation. The spelling `wallseiling` is recognised as ceiling in a
+clear exclusion alongside wall painting.
+
 Room-resolution hardening (October 28): AI references are matched to canonical
 plan labels using normalized case/spacing/punctuation, explicit groups and
 unique combined-space names (for example, Dining in Living & Dining, or

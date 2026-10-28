@@ -153,7 +153,7 @@ it('lets an explicit whole-home request override a kitchen-only scope default us
   expect(result.estimate.draft.sections.map((section: { title: string }) => section.title)).toEqual(['Bedroom','Kitchen']);
   expect(generate).toHaveBeenCalledWith(expect.objectContaining({ brief: expect.objectContaining({ scope: 'complete', roomNames: ['Bedroom','Kitchen'] }) }), expect.anything());
 });
-it.each(['No wall painting or false ceiling.', 'No wall painting and no seling.'])('enforces notes over defaults and unwanted model output: %s', requestNotes => {
+it.each(['No wall painting or false ceiling.', 'No wall painting and no seling.', 'No wall painting, and no wallseiling and no unncerrasry thing in quoatation.'])('enforces notes over defaults and unwanted model output: %s', requestNotes => {
   return (async () => {
     const proposal = proposalFixture();
     proposal.sections[0].items.push({ ...proposal.sections[0].items[0], productName: 'Wall painting' }, { ...proposal.sections[0].items[0], productName: 'False ceiling' });

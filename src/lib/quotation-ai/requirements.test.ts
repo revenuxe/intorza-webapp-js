@@ -1,5 +1,28 @@
-import { excludedWork, exclusionsForBrief, explicitNoteExclusions, itemFinishTier, itemRequirements, mergeExclusions, requestedWork, requirementsSchema, resolveRequirementsRooms } from './requirements';
+import { excludedWork, exclusionsForBrief, explicitNoteExclusions, itemFinishTier, itemRequirements, mergeExclusions, normalizeRequirementsOutput, requestedWork, requirementsSchema, resolveRequirementsRooms } from './requirements';
 const rooms = [{ name: 'Bedroom', kind: 'bedroom' }, { name: 'Kitchen', kind: 'kitchen' }];
+it('repairs empty detail placeholders without losing inclusions, exclusions or mutating the response', () => {
+  const raw = { exclusions: [{ roomName: 'Bedroom', workKeys: ['painting','ceiling'] }], reviewNotes: [''], roomRequirements: [{ roomName: 'Bedroom', includedWorkKeys: ['wardrobe'], items: [{ workKey: 'wardrobe', details: '', finishTier: null }] }] };
+  const snapshot = JSON.stringify(raw);
+  expect(() => requirementsSchema.parse(raw)).toThrow();
+  const result = requirementsSchema.parse(normalizeRequirementsOutput(raw));
+  expect(requestedWork('Bedroom',result)).toEqual(['wardrobe']);
+  expect(result.roomRequirements[0].items).toEqual([]);
+  expect(result.reviewNotes).toEqual([]);
+  expect(excludedWork('Wall painting','Bedroom',result.exclusions)).toBe(true);
+  expect(excludedWork('False ceiling','Bedroom',result.exclusions)).toBe(true);
+  expect(JSON.stringify(raw)).toBe(snapshot);
+});
+it('retains an explicit item quality level when its material description is empty', () => {
+  const result=requirementsSchema.parse(normalizeRequirementsOutput({ exclusions:[],roomRequirements:[{roomName:'Bedroom',items:[{workKey:'wardrobe',details:' ',finishTier:' luxury '}]}] }));
+  expect(itemFinishTier('Wardrobe','Bedroom',result,'Standard')).toBe('Luxury');
+  expect(itemRequirements('Wardrobe','Bedroom',result)).toBe('Luxury finish tier requested.');
+});
+it('keeps invalid meaningful fields and overlong instructions for repair rather than silently discarding them', () => {
+  expect(() => requirementsSchema.parse(normalizeRequirementsOutput({ exclusions:[],roomRequirements:[{roomName:'Bedroom',items:[{workKey:'wardrobe',details:'',material:'Marine plywood'}]}] }))).toThrow();
+  const text='Specific requested finish. '.repeat(70);
+  expect((normalizeRequirementsOutput({exclusions:[],designDirection:text}) as {designDirection:string}).designDirection).toBe(text);
+  expect(() => requirementsSchema.parse(normalizeRequirementsOutput({exclusions:[],designDirection:text}))).toThrow();
+});
 it('matches formatting differences, combined-space labels and unique room-kind aliases', () => {
   const planRooms = [{ name: 'Bedroom 1', kind: 'bedroom' }, { name: 'Living & Dining', kind: 'living' }, { name: 'Kitchen + Utility', kind: 'kitchen' }, { name: 'Toilet', kind: 'bathroom' }];
   const result = resolveRequirementsRooms(requirementsSchema.parse({ exclusions: [{ roomName: 'Dining', workKeys: ['painting'] }], roomNames: ['bedroom1','Living and Dining room','Utility','Bathroom'] }), planRooms);
@@ -25,7 +48,7 @@ it('preserves the interpreted material details and gives item/room quality prece
   expect(requestedWork('Bedroom', requirements)).toEqual(['study_storage','wardrobe']);
 });
 
-it.each(['No false ceiling or wall painting.', 'No wall painting and no seling.', "I don't need wall painting or ceiling.", 'Wall painting and ceiling not required.'])('recognises clear exclusion lists: %s', notes => {
+it.each(['No false ceiling or wall painting.', 'No wall painting and no seling.', 'No wall painting, and no wallseiling and no unncerrasry thing in quoatation.', "I don't need wall painting or ceiling.", 'Wall painting and ceiling not required.'])('recognises clear exclusion lists: %s', notes => {
   const result = explicitNoteExclusions(notes, rooms);
   for (const room of rooms) {
     expect(excludedWork('Wall painting', room.name, result)).toBe(true);

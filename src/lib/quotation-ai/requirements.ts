@@ -22,6 +22,45 @@ export const requirementsSchema = z.object({
 export type ProjectRequirements = z.infer<typeof requirementsSchema>;
 export type WorkExclusion = z.infer<typeof workExclusionSchema>;
 
+/** Repair representational differences, never truncate meaningful instructions.
+ * Remove empty details only when inclusion or quality is explicit elsewhere.
+ * Ambiguous placeholders require re-interpretation, never guessed additions. */
+export function normalizeRequirementsOutput(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw;
+  const value = { ...raw } as Record<string, unknown>;
+  const tier = (input: unknown) => {
+    if (typeof input !== 'string') return input;
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    return ['Basic','Standard','Premium','Luxury'].find(name => name.toLowerCase() === trimmed.toLowerCase()) ?? trimmed;
+  };
+  if ('finishTier' in value) value.finishTier = tier(value.finishTier);
+  if (typeof value.scope === 'string') value.scope = value.scope.trim().toLowerCase().replace(/_/g, '-') || null;
+  if (Array.isArray(value.reviewNotes)) value.reviewNotes = value.reviewNotes.filter(note => typeof note !== 'string' || note.trim().length > 0);
+  if (Array.isArray(value.roomRequirements)) value.roomRequirements = value.roomRequirements.map(rawRoom => {
+    if (!rawRoom || typeof rawRoom !== 'object' || Array.isArray(rawRoom)) return rawRoom;
+    const room = { ...rawRoom } as Record<string, unknown>;
+    if ('finishTier' in room) room.finishTier = tier(room.finishTier);
+    const included = room.includedWorkKeys === undefined ? [] : Array.isArray(room.includedWorkKeys) ? [...room.includedWorkKeys] : room.includedWorkKeys;
+    if (Array.isArray(room.items) && Array.isArray(included)) {
+      const items: unknown[] = [];
+      for (const rawItem of room.items) {
+        if (!rawItem || typeof rawItem !== 'object' || Array.isArray(rawItem)) { items.push(rawItem); continue; }
+        const item = { ...rawItem } as Record<string, unknown>;
+        if ('finishTier' in item) item.finishTier = tier(item.finishTier);
+        if (Object.keys(item).every(key => ['workKey','details','finishTier'].includes(key)) && typeof item.details === 'string' && !item.details.trim() && typeof item.workKey === 'string') {
+          if (item.finishTier) items.push({ ...item, details: `${item.finishTier} finish tier requested.` });
+          else if (!included.includes(item.workKey)) items.push(item);
+        } else items.push(item);
+      }
+      room.items = items;
+      room.includedWorkKeys = [...new Set(included)];
+    }
+    return room;
+  });
+  return value;
+}
+
 export class RequirementsRoomError extends Error {
   constructor(public roomLabel: string, public code: 'AI_ROOM_NOT_FOUND' | 'AI_ROOM_AMBIGUOUS') {
     super(code === 'AI_ROOM_AMBIGUOUS'
@@ -98,7 +137,7 @@ export function requirementsSource(brief: { requestNotes?: string; design?: { no
 }
 
 const aliases: Partial<Record<typeof workKeys[number], RegExp>> = {
-  ceiling: /\b(?:false\s+)?(?:ceilings?|cieling|seiling|seling|ceeling)\b/i,
+  ceiling: /\b(?:(?:false|wall)\s*)?(?:ceilings?|cieling|seiling|seling|ceeling)\b/i,
   painting: /\b(?:(?:wall|walls)\s+)?(?:painting|paint|paintng|repainting)\b/i,
   wardrobe: /\b(?:wardrobes?|cupboards?)\b/i, loft: /\bloft(?:s| storage)?\b/i,
   flooring: /\bfloor(?:ing| tiles?)\b/i, electrical: /\b(?:electrical|electric points?|lighting)\b/i,
