@@ -3,7 +3,7 @@ import View from "@/views/admin/AdminDashboard";
 
 export const metadata: Metadata = {
   title: "Admin Dashboard",
-  alternates: { canonical: "https://admin.intorza.com/admin/dashboard" },
+  alternates: { canonical: "https://admin.intorza.com/dashboard" },
 };
 
 export default function Page() {

@@ -12,13 +12,17 @@ import { toast } from 'sonner';
 export function WelcomeCoinsDialog() {
   const { user } = useAuth();
   const pathname = usePathname();
+  const [separatePortal, setSeparatePortal] = useState<boolean | null>(null);
+  useEffect(() => {
+    setSeparatePortal(['team.intorza.com', 'admin.intorza.com'].includes(window.location.hostname));
+  }, []);
   const metadata = user?.user_metadata;
   const isTeamAccount = metadata?.is_team_member === true
     || metadata?.is_team_member === 'true'
     || Boolean(metadata?.join_company_id);
   const isAdminPage = pathname === '/admin' || pathname?.startsWith('/admin/');
   const isTeamPage = pathname === '/team' || pathname?.startsWith('/team/');
-  if (!user || isTeamAccount || isTeamPage || isAdminPage) return null;
+  if (separatePortal !== false || !user || isTeamAccount || isTeamPage || isAdminPage) return null;
   return <WelcomeCoinsContent key={user.id} />;
 }
 

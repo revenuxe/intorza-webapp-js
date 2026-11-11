@@ -110,9 +110,9 @@ Implementation reference: [OpenNext Cloudflare setup](https://opennext.js.org/cl
 
 Production uses one Worker with three custom domains. The quotation workspace stays
 on https://app.intorza.com. Team registrations and sign-in use
-https://team.intorza.com/team/login and /team/signup; approved members use
-/team/dashboard. Admins use https://admin.intorza.com/admin/login and
-/admin/dashboard. The root of each portal redirects to its own login.
+https://team.intorza.com/login and /signup; approved members use
+/dashboard. Admins use https://admin.intorza.com/login and
+/dashboard. The root of each portal redirects to its own login.
 
 The Worker redirects legacy app-domain team/admin links to their dedicated domain.
 Team and admin hosts do not serve quotation pages. Team browser sessions are
@@ -124,4 +124,9 @@ The existing Turnstile widget must allow team.intorza.com and admin.intorza.com,
 and Supabase auth redirect URLs must include the team login callback. Localhost
 and preview hosts retain same-origin paths. The owner Team management page /team
 remains part of the quotation workspace. Assigned measurements use
-/team/dashboard/measurements/:id without the quotation sidebar or pricing action.
+/dashboard/measurements/:id without the quotation sidebar or pricing action.
+
+Portal hosts use hostname-scoped Next.js rewrites to serve clean /login and
+/dashboard URLs. Legacy /team/... and /admin/... URLs redirect to the clean
+URLs on their dedicated hosts. Internal route directories retain their prefixes
+so local development and the quotation owner Team management page stay distinct.

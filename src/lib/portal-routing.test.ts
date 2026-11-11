@@ -2,13 +2,15 @@
 import { portalHref, routePortalRequest } from './portal-routing.mjs';
 
 it.each([
-  ['https://team.intorza.com/', 'https://team.intorza.com/team/login'],
-  ['https://admin.intorza.com/', 'https://admin.intorza.com/admin/login'],
-  ['https://app.intorza.com/team/signup', 'https://team.intorza.com/team/signup'],
-  ['https://app.intorza.com/admin/dashboard', 'https://admin.intorza.com/admin/dashboard'],
-  ['https://team.intorza.com/quotations?x=1', 'https://team.intorza.com/team/dashboard?x=1'],
-  ['https://team.intorza.com/quotations/file.pdf', 'https://team.intorza.com/team/dashboard'],
-  ['https://admin.intorza.com/quotations', 'https://admin.intorza.com/admin/dashboard'],
+  ['https://team.intorza.com/', 'https://team.intorza.com/login'],
+  ['https://team.intorza.com/team/login?from=old', 'https://team.intorza.com/login?from=old'],
+  ['https://admin.intorza.com/admin/dashboard', 'https://admin.intorza.com/dashboard'],
+  ['https://admin.intorza.com/', 'https://admin.intorza.com/login'],
+  ['https://app.intorza.com/team/signup', 'https://team.intorza.com/signup'],
+  ['https://app.intorza.com/admin/dashboard', 'https://admin.intorza.com/dashboard'],
+  ['https://team.intorza.com/quotations?x=1', 'https://team.intorza.com/dashboard?x=1'],
+  ['https://team.intorza.com/quotations/file.pdf', 'https://team.intorza.com/dashboard'],
+  ['https://admin.intorza.com/quotations', 'https://admin.intorza.com/dashboard'],
 ])('routes %s to its portal', (url, expected) => {
   const response = routePortalRequest(new Request(url));
   expect(response?.status).toBe(307);
@@ -17,9 +19,9 @@ it.each([
 });
 
 it.each([
-  'https://team.intorza.com/team/login',
-  'https://team.intorza.com/team/dashboard/measurements/123',
-  'https://admin.intorza.com/admin/dashboard',
+  'https://team.intorza.com/login',
+  'https://team.intorza.com/dashboard/measurements/123',
+  'https://admin.intorza.com/dashboard',
   'https://admin.intorza.com/api/admin/ai/training',
   'https://app.intorza.com/team',
   'https://app.intorza.com/quotations',
@@ -38,9 +40,12 @@ it('does not serve quotation APIs from the team or admin portal', () => {
 });
 
 it('uses full cross-origin navigation in production and local paths in development', () => {
-  expect(portalHref('/team/login', 'app.intorza.com')).toBe('https://team.intorza.com/team/login');
-  expect(portalHref('/admin/login', 'app.intorza.com')).toBe('https://admin.intorza.com/admin/login');
-  expect(portalHref('/team/dashboard', 'team.intorza.com')).toBe('/team/dashboard');
+  expect(portalHref('/team/login', 'app.intorza.com')).toBe('https://team.intorza.com/login');
+  expect(portalHref('/admin/login', 'app.intorza.com')).toBe('https://admin.intorza.com/login');
+  expect(portalHref('/team/dashboard', 'team.intorza.com')).toBe('/dashboard');
   expect(portalHref('/team/login', 'localhost')).toBe('/team/login');
+  expect(portalHref('/dashboard', 'team.intorza.com')).toBe('/dashboard');
+  expect(portalHref('/admin/pdf-qa', 'admin.intorza.com')).toBe('/pdf-qa');
+  expect(portalHref('/team/signup?code=ABC', 'app.intorza.com')).toBe('https://team.intorza.com/signup?code=ABC');
   expect(portalHref('/team', 'app.intorza.com')).toBe('/team');
 });

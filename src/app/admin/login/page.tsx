@@ -3,7 +3,7 @@ import View from "@/views/admin/AdminLogin";
 
 export const metadata: Metadata = {
   title: "Admin Login",
-  alternates: { canonical: "https://admin.intorza.com/admin/login" },
+  alternates: { canonical: "https://admin.intorza.com/login" },
 };
 
 export default function Page() {

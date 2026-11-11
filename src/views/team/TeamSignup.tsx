@@ -5,6 +5,7 @@ import { ProfessionPicker } from '@/components/ProfessionPicker';
 
 import { useState, useRef, useEffect } from "react";
 import { AuthCaptcha, requireAuthCaptcha, type AuthCaptchaHandle } from '@/components/AuthCaptcha';
+import { portalHref } from '@/lib/portal-routing.mjs';
 import { useNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -110,7 +111,7 @@ const TeamSignup = () => {
             join_phone: formData.phone,
             join_work_type: formData.work_type,
           },
-          emailRedirectTo: window.location.origin + '/team/login',
+          emailRedirectTo: new URL(portalHref('/team/login', window.location.hostname), window.location.origin).href,
         },
       });
 
