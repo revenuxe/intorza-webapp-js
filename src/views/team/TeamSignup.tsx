@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { AuthCaptcha, requireAuthCaptcha, type AuthCaptchaHandle } from '@/components/AuthCaptcha';
 import { useNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,16 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, Search, Building2, CheckCircle2, MapPin, User, Hash } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Hash } from "lucide-react";
 import intorzaLogo from "@/assets/intorza-logo.webp";
 import { trackMetaEvent } from '@/lib/meta-pixel';
 
 interface Company {
   id: string;
   company_name: string;
-  full_name: string | null;
-  country_name: string | null;
-  org_code: string | null;
 }
 
 const workTypes = [
@@ -39,9 +36,8 @@ const TeamSignup = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'org' | 'details' | 'success'>('org');
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchMode, setSearchMode] = useState<'name' | 'code'>('name');
+  const [orgCode, setOrgCode] = useState('');
+  const [checkingCode, setCheckingCode] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -52,51 +48,36 @@ const TeamSignup = () => {
     work_type: 'other',
   });
 
-  useEffect(() => {
-    fetchCompanies();
-  }, []);
-
-  const fetchCompanies = async () => {
-    const { data, error } = await supabase
-      .from('companies_public')
-      .select('id, company_name, country_name, org_code')
-      .not('company_name', 'is', null)
-      .neq('company_name', '');
-    
-    if (!error && data) {
-      setCompanies(data.map(d => ({
-        id: d.id,
-        company_name: d.company_name || '',
-        full_name: null,
-        country_name: d.country_name || null,
-        org_code: d.org_code || null,
-      })));
+  const handleVerifyOrgCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = orgCode.trim().toUpperCase();
+    if (!code) { toast.error("Please enter your organization code"); return; }
+    setCheckingCode(true);
+    try {
+      const { data, error } = await supabase
+        .from('companies_public')
+        .select('id, company_name')
+        .eq('org_code', code)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data?.company_name) {
+        toast.error("Organization code not found. Check the code with your organization.");
+        return;
+      }
+      setSelectedCompany({ id: data.id, company_name: data.company_name });
+      setStep('details');
+    } catch {
+      toast.error("Unable to verify organization code. Please try again.");
+    } finally {
+      setCheckingCode(false);
     }
-  };
-
-  const filteredCompanies = companies.filter(c => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return true;
-    if (searchMode === 'code') {
-      return c.org_code?.toLowerCase().includes(q);
-    }
-    return (
-      c.company_name?.toLowerCase().includes(q) ||
-      c.full_name?.toLowerCase().includes(q) ||
-      c.country_name?.toLowerCase().includes(q)
-    );
-  });
-
-  const handleSelectOrg = (company: Company) => {
-    setSelectedCompany(company);
-    setStep('details');
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedCompany) {
-      toast.error("Please select an organization");
+      toast.error("Please enter a valid organization code");
       return;
     }
 
@@ -190,91 +171,33 @@ const TeamSignup = () => {
               </div>
               <CardTitle className="text-xl">Join an Organization</CardTitle>
               <CardDescription>
-                Search by company name, location, or org code
+                Enter the organization code shared by your organization.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Search mode toggle */}
-              <div className="flex gap-1 p-1 bg-muted rounded-xl">
-                <button
-                  onClick={() => { setSearchMode('name'); setSearchQuery(''); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
-                    searchMode === 'name'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground'
-                  }`}
-                >
-                  <Search className="h-3.5 w-3.5" />
-                  Name / Location
-                </button>
-                <button
-                  onClick={() => { setSearchMode('code'); setSearchQuery(''); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
-                    searchMode === 'code'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground'
-                  }`}
-                >
-                  <Hash className="h-3.5 w-3.5" />
-                  Org Code
-                </button>
-              </div>
-
-              <div className="relative">
-                {searchMode === 'code' ? (
-                  <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                )}
-                <Input
-                  placeholder={searchMode === 'code' ? 'Enter organization code...' : 'Search company or location...'}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 rounded-xl"
-                />
-              </div>
-
-              <div className="max-h-72 overflow-y-auto space-y-2">
-                {filteredCompanies.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    {searchQuery ? 'No organizations found' : 'No organizations available'}
-                  </p>
-                ) : (
-                  filteredCompanies.map((company) => (
-                    <button
-                      key={company.id}
-                      onClick={() => handleSelectOrg(company)}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl border hover:bg-accent/50 transition-colors text-left"
-                    >
-                      <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                        <Building2 className="h-5 w-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{company.company_name}</p>
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                          {company.full_name && (
-                            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                              <User className="h-3 w-3" />
-                              {company.full_name}
-                            </span>
-                          )}
-                          {company.country_name && (
-                            <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                              <MapPin className="h-3 w-3" />
-                              {company.country_name}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {company.org_code && (
-                        <span className="shrink-0 text-[10px] font-mono bg-muted px-2 py-1 rounded-lg text-muted-foreground">
-                          {company.org_code}
-                        </span>
-                      )}
-                    </button>
-                  ))
-                )}
-              </div>
+            <CardContent>
+              <form onSubmit={handleVerifyOrgCode} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="org-code">Organization code *</Label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="org-code"
+                      required
+                      value={orgCode}
+                      onChange={(e) => setOrgCode(e.target.value.toUpperCase())}
+                      placeholder="Enter organization code"
+                      autoCapitalize="characters"
+                      autoComplete="off"
+                      spellCheck={false}
+                      disabled={checkingCode}
+                      className="pl-9 rounded-xl"
+                    />
+                  </div>
+                </div>
+                <Button type="submit" className="w-full rounded-xl" disabled={checkingCode || !orgCode.trim()}>
+                  {checkingCode ? 'Checking code...' : 'Continue'}
+                </Button>
+              </form>
             </CardContent>
           </Card>
         )}
@@ -288,9 +211,7 @@ const TeamSignup = () => {
               <CardTitle className="text-xl">Create Your Account</CardTitle>
               <CardDescription>
                 Joining <span className="font-semibold text-foreground">{selectedCompany?.company_name}</span>
-                {selectedCompany?.full_name && (
-                  <span className="text-xs block mt-0.5">by {selectedCompany.full_name}</span>
-                )}
+
               </CardDescription>
             </CardHeader>
             <CardContent>

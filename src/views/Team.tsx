@@ -793,7 +793,7 @@ const Team = () => {
             <div className="text-center py-10">
               <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-sm text-muted-foreground">No team members yet</p>
-              <p className="mt-2 text-xs text-muted-foreground">Team members can create an account, select your organization, and request to join. Review their requests in Approvals.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Team members can create an account, enter your organization code, and request to join. Review their requests in Approvals.</p>
               <Button size="sm" onClick={() => navigate('/team/login')} className="mt-3 rounded-xl text-xs">
                 <LogIn className="h-3.5 w-3.5 mr-1.5" />Team / Login
               </Button>

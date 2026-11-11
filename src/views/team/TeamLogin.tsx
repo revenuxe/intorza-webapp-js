@@ -130,7 +130,7 @@ const TeamLogin = () => {
             </div>
             <CardTitle>Team Member Login</CardTitle>
             <CardDescription>
-              Sign in to your team account. New here? Create an account, select your organization, and request approval.
+              Sign in to your team account. New here? Create an account, enter your organization code, and request approval.
             </CardDescription>
           </CardHeader>
           <CardContent>
