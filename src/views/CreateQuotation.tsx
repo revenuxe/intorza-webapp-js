@@ -1,4 +1,5 @@
 "use client";
+import { ProjectTypePicker } from "@/components/quotation/ProjectTypePicker";
 import { getDraftReference, clearDraftReference } from "@/lib/draft-quotation-reference";
 
 
@@ -1310,7 +1311,7 @@ const CreateQuotation = () => {
                 </div>}
               {customizeSettings.showProjectType && <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="projectType">Project Type</Label>
-                  <Input id="projectType" value={projectType} onChange={e => setProjectType(e.target.value)} placeholder="e.g., Residential - 2BHK RENOVATION" />
+                  <ProjectTypePicker id="projectType" value={projectType} onChange={setProjectType} />
                 </div>}
               {!profile.logo_url && <div className="space-y-2 md:col-span-2 p-3 bg-muted/30 rounded-lg">
                   <p className="text-sm text-muted-foreground">
