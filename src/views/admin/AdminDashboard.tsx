@@ -21,7 +21,7 @@ import { TechStackDialog } from "@/components/TechStackDialog";
 import { AITrainingPanel } from '@/components/admin/AITrainingPanel';
 import { AdminUserDirectory } from '@/components/admin/AdminUserDirectory';
 import { CoinWalletAdminPanel } from '@/components/admin/CoinWalletAdminPanel';
-import { QuotationAIBadge, type AISelections } from '@/components/admin/QuotationAIBadge';
+import { AdminQuotes } from '@/components/admin/AdminQuotes';
 
 interface User {
   id: string;
@@ -42,18 +42,6 @@ interface Feedback {
   message: string | null;
   trigger_action: string;
   feedback_type: string;
-  created_at: string;
-  user_email?: string;
-}
-
-interface Quotation {
-  aiSelections?: AISelections;
-  id: string;
-  quotation_number: string;
-  client_name: string;
-  project_name: string;
-  grand_total: number;
-  status: string;
   created_at: string;
   user_email?: string;
 }
@@ -123,7 +111,7 @@ const AdminDashboard = () => {
   };
   const [users, setUsers] = useState<User[]>([]);
   const [feedback, setFeedback] = useState<Feedback[]>([]);
-  const [quotations, setQuotations] = useState<Quotation[]>([]);
+  const [quoteRefresh, setQuoteRefresh] = useState(0);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [siteMeasurements, setSiteMeasurements] = useState<SiteMeasurement[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -295,38 +283,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const loadQuotations = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('quotations')
-        .select('id, quotation_number, client_name, project_name, grand_total, status, created_at, user_id')
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (error) throw error;
-
-      const aiResult = data?.length
-        ? await supabase.rpc('admin_quotation_ai_selections', { p_quotation_ids: data.map(q => q.id) })
-        : { data: [], error: null };
-      recordLoadResult('Quote AI selections', Boolean(aiResult.error));
-      const aiByQuotation = new Map((aiResult.data || []).map(row => [row.quotation_id, row]));
-      const quotationsWithEmail = await Promise.all((data || []).map(async (q) => {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('id', q.user_id)
-          .single();
-        if (profileError) throw profileError;
-        return { ...q, user_email: profile?.email || 'Unknown', aiSelections: aiByQuotation.get(q.id) };
-      }));
-
-      setQuotations(quotationsWithEmail);
-      recordLoadResult('Quotes', false);
-    } catch (error) {
-      console.error('Error loading quotations:', error);
-      recordLoadResult('Quotes', true);
-    }
-  };
+  const loadQuotations = async () => { setQuoteRefresh(value => value + 1); };
 
   const loadInvoices = async () => {
     try {
@@ -935,50 +892,7 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="quotations" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quotations Overview</CardTitle>
-                <CardDescription>Latest 100 quotations. This overview is not the complete quotation history.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Quote #</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Project</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>User</TableHead>
-                        <TableHead>Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {quotations.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                            No quotations found
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        quotations.map((q) => (
-                          <TableRow key={q.id}>
-                            <TableCell className="font-medium"><div className="flex items-center gap-2"><span>{q.quotation_number}</span>{q.aiSelections && <QuotationAIBadge selections={q.aiSelections} quotationNumber={q.quotation_number} />}</div></TableCell>
-                            <TableCell>{q.client_name}</TableCell>
-                            <TableCell>{q.project_name}</TableCell>
-                            <TableCell className="tabular-nums">{formatCurrency(q.grand_total || 0)}</TableCell>
-                            <TableCell>{getStatusBadge(q.status || 'pending')}</TableCell>
-                            <TableCell className="text-xs">{q.user_email}</TableCell>
-                            <TableCell>{format(new Date(q.created_at), 'dd MMM yyyy')}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+            <AdminQuotes refreshVersion={quoteRefresh} formatCurrency={formatCurrency} />
           </TabsContent>
 
           <TabsContent value="invoices" className="space-y-4">
