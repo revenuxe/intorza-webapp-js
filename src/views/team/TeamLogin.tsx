@@ -54,7 +54,7 @@ const TeamLogin = () => {
     setLoading(true);
 
     try {
-      // Login with credentials provided by employer
+      // Sign in with the team member account.
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
@@ -130,7 +130,7 @@ const TeamLogin = () => {
             </div>
             <CardTitle>Team Member Login</CardTitle>
             <CardDescription>
-              Sign in with credentials provided by your employer
+              Sign in to your team account. New here? Create an account, select your organization, and request approval.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -167,7 +167,7 @@ const TeamLogin = () => {
                 onClick={() => navigate('/team/signup')}
                 className="text-primary font-medium hover:underline"
               >
-                Sign up here
+                Create account & request to join
               </button>
             </p>
           </CardContent>

@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Navigation, Calendar, ChevronRight, CheckCircle, XCircle, FileQuestion, AlertCircle, Hash, Copy, RefreshCw, ListTodo, BarChart3, MessageSquare, Target, TrendingUp, Award, Building2, ArrowUpRight } from "lucide-react";
+import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Navigation, Calendar, ChevronRight, CheckCircle, XCircle, FileQuestion, AlertCircle, Hash, Copy, RefreshCw, ListTodo, BarChart3, MessageSquare, Target, TrendingUp, Award, Building2, ArrowUpRight, LogIn } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useFeedback } from "@/components/FeedbackProvider";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -143,10 +143,8 @@ const Team = () => {
     name: '',
     phone: '',
     work_type: 'labour',
-    project_id: '',
-    password: '',
   });
-  const [creatingAuth, setCreatingAuth] = useState(false);
+  const [savingMember, setSavingMember] = useState(false);
 
   // Team form
   const [teamForm, setTeamForm] = useState({
@@ -289,8 +287,7 @@ const Team = () => {
     setQuotations((data || []) as Quotation[]);
   };
 
-  // team_members and team_project_assignments stay on Supabase for now — see
-  // note on handleApproveRequest about create-team-member-auth.
+  // Team membership and project assignments are stored in Supabase.
   const fetchTeamMembers = async () => {
     if (!user) return;
 
@@ -376,12 +373,6 @@ const Team = () => {
     return `${hours}h ${minutes}m`;
   };
 
-  const generateEmail = (name: string) => {
-    const cleanCompany = (companyName || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return `${cleanCompany}.${cleanName}@intorza.com`;
-  };
-
   // Org code handlers
   const generateUniqueCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -420,83 +411,26 @@ const Team = () => {
     }
   };
 
-  const handleAddMember = async () => {
-    if (!user) { toast.error("Please login first"); return; }
-    if (!memberForm.name) { toast.error("Name is required"); return; }
-    if (!editingMember && !memberForm.password) { toast.error("Password is required for new members"); return; }
-    if (!editingMember && memberForm.password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
-
-    const generatedEmail = generateEmail(memberForm.name);
-    setCreatingAuth(true);
-
+  const handleUpdateMember = async () => {
+    if (!user || !editingMember) return;
+    if (!memberForm.name.trim()) { toast.error("Name is required"); return; }
+    setSavingMember(true);
     try {
-      if (editingMember) {
-        const { error } = await supabase
-          .from('team_members')
-          .update({
-            name: memberForm.name,
-            email: generatedEmail,
-            phone: memberForm.phone || null,
-            work_type: memberForm.work_type as any,
-          })
-          .eq('id', editingMember.id);
-
-        if (error) throw error;
-        toast.success("Team member updated");
-      } else {
-        const { data: newMember, error } = await supabase
-          .from('team_members')
-          .insert({
-            company_id: user.id,
-            name: memberForm.name,
-            email: generatedEmail,
-            phone: memberForm.phone || null,
-            work_type: memberForm.work_type as any,
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        const { data: session } = await supabase.auth.getSession();
-        const response = await supabase.functions.invoke('create-team-member-auth', {
-          body: {
-            email: generatedEmail,
-            password: memberForm.password,
-            name: memberForm.name,
-            phone: memberForm.phone,
-            work_type: memberForm.work_type,
-            company_id: user.id,
-            team_member_id: newMember.id,
-          },
-        });
-
-        if (response.error) {
-          await supabase.from('team_members').delete().eq('id', newMember.id);
-          throw new Error(response.error.message || 'Failed to create login account');
-        }
-
-        if (memberForm.project_id && newMember) {
-          await supabase
-            .from('team_project_assignments')
-            .insert({
-              team_member_id: newMember.id,
-              quotation_id: memberForm.project_id,
-            });
-        }
-
-        toast.success("Team member added with login credentials");
-        trackAction('team_member_added');
-      }
-
+      const { error } = await supabase.from('team_members').update({
+        name: memberForm.name.trim(),
+        phone: memberForm.phone || null,
+        work_type: memberForm.work_type as any,
+      }).eq('id', editingMember.id);
+      if (error) throw error;
+      toast.success("Team member updated");
       setMemberDialogOpen(false);
       setEditingMember(null);
-      setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '', password: '' });
+      setMemberForm({ name: '', phone: '', work_type: 'labour' });
       fetchTeamMembers();
     } catch (error: any) {
-      toast.error(error.message || "Error saving team member");
+      toast.error(error.message || "Error updating team member");
     } finally {
-      setCreatingAuth(false);
+      setSavingMember(false);
     }
   };
 
@@ -597,7 +531,7 @@ const Team = () => {
 
   const handleEditMember = (member: TeamMember) => {
     setEditingMember(member);
-    setMemberForm({ name: member.name, phone: member.phone || '', work_type: member.work_type, project_id: '', password: '' });
+    setMemberForm({ name: member.name, phone: member.phone || '', work_type: member.work_type });
     setMemberDialogOpen(true);
   };
 
@@ -681,9 +615,9 @@ const Team = () => {
             <FolderPlus className="mr-2 h-4 w-4" />
             Create team
           </Button>
-          <Button className="h-11 rounded-xl px-3 sm:px-4" onClick={() => { setEditingMember(null); setMemberDialogOpen(true); }}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add member
+          <Button className="h-11 rounded-xl px-3 sm:px-4" onClick={() => navigate('/team/login')}>
+            <LogIn className="mr-2 h-4 w-4" />
+            Team / Login
           </Button>
         </div>
       </header>
@@ -859,8 +793,9 @@ const Team = () => {
             <div className="text-center py-10">
               <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-sm text-muted-foreground">No team members yet</p>
-              <Button size="sm" onClick={() => setMemberDialogOpen(true)} className="mt-3 rounded-xl text-xs">
-                <UserPlus className="h-3.5 w-3.5 mr-1.5" />Add First Member
+              <p className="mt-2 text-xs text-muted-foreground">Team members can create an account, select your organization, and request to join. Review their requests in Approvals.</p>
+              <Button size="sm" onClick={() => navigate('/team/login')} className="mt-3 rounded-xl text-xs">
+                <LogIn className="h-3.5 w-3.5 mr-1.5" />Team / Login
               </Button>
             </div>
           ) : (
@@ -1051,7 +986,7 @@ const Team = () => {
                 </div>
               );
             })}
-            {teamMembers.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Add members to see performance</p>}
+            {teamMembers.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Approve team join requests to see performance</p>}
           </div>
         </TabsContent>
 
@@ -1107,22 +1042,20 @@ const Team = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Add/Edit Member Dialog */}
+      {/* Edit Member Dialog */}
       <Dialog open={memberDialogOpen} onOpenChange={(open) => {
         setMemberDialogOpen(open);
-        if (!open) { setEditingMember(null); setMemberForm({ name: '', phone: '', work_type: 'labour', project_id: '', password: '' }); }
+        if (!open) { setEditingMember(null); setMemberForm({ name: '', phone: '', work_type: 'labour' }); }
       }}>
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-base">{editingMember ? 'Edit' : 'Add'} Team Member</DialogTitle>
+            <DialogTitle className="text-base">Edit Team Member</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs">Full Name *</Label>
               <Input value={memberForm.name} onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} placeholder="Enter full name" className="rounded-xl h-9" />
-              {memberForm.name && companyName && (
-                <p className="text-[10px] text-muted-foreground">Email: <span className="font-medium text-foreground">{generateEmail(memberForm.name)}</span></p>
-              )}
+
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Phone</Label>
@@ -1139,29 +1072,12 @@ const Team = () => {
                 </SelectContent>
               </Select>
             </div>
-            {!editingMember && (
-              <>
-                <div className="space-y-1">
-                  <Label className="text-xs">Login Password *</Label>
-                  <Input type="password" value={memberForm.password} onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })} placeholder="Min 6 characters" className="rounded-xl h-9" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Assign to Project</Label>
-                  <Select value={memberForm.project_id || "none"} onValueChange={(v) => setMemberForm({ ...memberForm, project_id: v === "none" ? "" : v })}>
-                    <SelectTrigger className="rounded-xl h-9"><SelectValue placeholder="Select project" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No project</SelectItem>
-                      {quotations.map((q) => (<SelectItem key={q.id} value={q.id}>{q.project_name} - {q.client_name}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMemberDialogOpen(false)} className="rounded-xl h-9 text-xs">Cancel</Button>
-            <Button onClick={handleAddMember} disabled={creatingAuth} className="rounded-xl h-9 text-xs">
-              {creatingAuth ? 'Creating...' : editingMember ? 'Update' : 'Add'}
+            <Button onClick={handleUpdateMember} disabled={savingMember} className="rounded-xl h-9 text-xs">
+              {savingMember ? 'Saving...' : 'Update'}
             </Button>
           </DialogFooter>
         </DialogContent>
