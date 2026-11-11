@@ -8,7 +8,7 @@ it('searches project types and returns the selected type', async () => {
   const change = jest.fn(); render(<ProjectTypePicker value="" onChange={change} />);
   expect(screen.getByRole('combobox')).toHaveTextContent('Choose Type');
   fireEvent.click(screen.getByRole('combobox'));
-  fireEvent.change(screen.getByPlaceholderText('Search project types...'), { target: { value: 'hospital' } });
+  fireEvent.change(screen.getByPlaceholderText('Search or type a project type...'), { target: { value: 'hospital' } });
   await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(1));
   fireEvent.click(screen.getByRole('option', { name: 'Hospitality' }));
   expect(change).toHaveBeenCalledWith('Hospitality');

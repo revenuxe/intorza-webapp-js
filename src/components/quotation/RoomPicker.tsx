@@ -1,35 +1,11 @@
 "use client";
-
-import { useState } from 'react';
 import { Check, ChevronDown, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { ROOM_SUGGESTIONS, getRoomSuggestions } from '@/lib/roomSuggestions';
+import { TypeChoicePicker } from './TypeChoicePicker';
 
 export function RoomPicker({ value, onChange }: { value: string; onChange: (room: string) => void }) {
-  const [open, setOpen] = useState(false);
-  return <Popover open={open} onOpenChange={setOpen}>
-    <PopoverTrigger asChild>
-      <Button type="button" variant="outline" role="combobox" aria-label="Select room" aria-expanded={open} className="h-9 shrink-0 gap-2 rounded-lg border-primary/20 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 sm:text-sm">
-        <span>Select room</span><ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
-      </Button>
-    </PopoverTrigger>
-    <PopoverContent align="end" className="w-[min(340px,calc(100vw-2rem))] overflow-hidden rounded-xl p-0 shadow-lg">
-      <Command>
-        <CommandInput placeholder="Search rooms…" />
-        <CommandList>
-          <CommandEmpty>No rooms found. You can type a custom room title.</CommandEmpty>
-          <CommandGroup heading="Rooms & spaces">
-            {Object.entries(ROOM_SUGGESTIONS).map(([room, items]) => <CommandItem key={room} value={room} onSelect={() => { onChange(room); setOpen(false); }} className="gap-2 py-3">
-              <Check className={`h-4 w-4 shrink-0 ${value.trim().toLowerCase() === room.toLowerCase() ? 'opacity-100' : 'opacity-0'}`} />
-              <span className="flex-1">{room}</span><span className="text-xs text-muted-foreground">{items.length} essentials</span>
-            </CommandItem>)}
-          </CommandGroup>
-        </CommandList>
-      </Command>
-    </PopoverContent>
-  </Popover>;
+ return <TypeChoicePicker value={value} onChange={onChange} options={Object.entries(ROOM_SUGGESTIONS).map(([room,items])=>({value:room,detail:items.length+' essentials'}))} label="Select room" heading="Rooms & spaces" searchPlaceholder="Search or type a room name..." trigger={open=><Button type="button" variant="outline" role="combobox" aria-label="Select room" aria-expanded={open} className="h-11 shrink-0 gap-2 rounded-lg border-primary/20 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 sm:text-sm"><span>Select room</span><ChevronDown className="h-4 w-4" /></Button>} />;
 }
 
 export function RoomItemSuggestions({ room, selectedItems, onAdd }: { room: string; selectedItems: string[]; onAdd: (name: string) => void }) {
