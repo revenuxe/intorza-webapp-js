@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { AuthCaptcha, requireAuthCaptcha, type AuthCaptchaHandle } from '@/components/AuthCaptcha';
 import { useNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowLeft, CheckCircle2, Hash } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Hash, Building2, ChevronRight } from "lucide-react";
 import intorzaLogo from "@/assets/intorza-logo.webp";
 import { trackMetaEvent } from '@/lib/meta-pixel';
 
@@ -38,6 +38,8 @@ const TeamSignup = () => {
   const [step, setStep] = useState<'org' | 'details' | 'success'>('org');
   const [orgCode, setOrgCode] = useState('');
   const [checkingCode, setCheckingCode] = useState(false);
+  const [matchedCompany, setMatchedCompany] = useState<Company | null>(null);
+  const [codeError, setCodeError] = useState('');
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -48,30 +50,35 @@ const TeamSignup = () => {
     work_type: 'other',
   });
 
-  const handleVerifyOrgCode = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
     const code = orgCode.trim().toUpperCase();
-    if (!code) { toast.error("Please enter your organization code"); return; }
-    setCheckingCode(true);
-    try {
-      const { data, error } = await supabase
-        .from('companies_public')
-        .select('id, company_name')
-        .eq('org_code', code)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data?.company_name) {
-        toast.error("Organization code not found. Check the code with your organization.");
-        return;
+    let cancelled = false;
+    setMatchedCompany(null);
+    setCodeError('');
+    setCheckingCode(Boolean(code));
+    if (!code) return;
+    const timer = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('companies_public')
+          .select('id, company_name')
+          .eq('org_code', code)
+          .maybeSingle();
+        if (cancelled) return;
+        if (error) throw error;
+        if (!data?.company_name) {
+          setCodeError('No organization found. Check the code with your organization.');
+          return;
+        }
+        setMatchedCompany({ id: data.id, company_name: data.company_name });
+      } catch {
+        if (!cancelled) setCodeError('Unable to check the code. Please try again.');
+      } finally {
+        if (!cancelled) setCheckingCode(false);
       }
-      setSelectedCompany({ id: data.id, company_name: data.company_name });
-      setStep('details');
-    } catch {
-      toast.error("Unable to verify organization code. Please try again.");
-    } finally {
-      setCheckingCode(false);
-    }
-  };
+    }, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [orgCode]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,7 +182,7 @@ const TeamSignup = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleVerifyOrgCode} className="space-y-4">
+              <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="org-code">Organization code *</Label>
                   <div className="relative">
@@ -184,7 +191,13 @@ const TeamSignup = () => {
                       id="org-code"
                       required
                       value={orgCode}
-                      onChange={(e) => setOrgCode(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        setOrgCode(e.target.value.toUpperCase());
+                        setMatchedCompany(null);
+                        setSelectedCompany(null);
+                        setCodeError('');
+                        setCheckingCode(Boolean(e.target.value.trim()));
+                      }}
                       placeholder="Enter organization code"
                       autoCapitalize="characters"
                       autoComplete="off"
@@ -194,10 +207,28 @@ const TeamSignup = () => {
                     />
                   </div>
                 </div>
-                <Button type="submit" className="w-full rounded-xl" disabled={checkingCode || !orgCode.trim()}>
-                  {checkingCode ? 'Checking code...' : 'Continue'}
-                </Button>
-              </form>
+                <div aria-live="polite">
+                  {checkingCode && <p className="text-sm text-muted-foreground">Checking code...</p>}
+                  {codeError && <p className="text-sm text-destructive">{codeError}</p>}
+                  {matchedCompany && !checkingCode && (
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Select your organization to continue.</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCompany(matchedCompany);
+                          setStep('details');
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <Building2 className="h-5 w-5 shrink-0 text-primary" />
+                        <span className="min-w-0 flex-1 break-words font-semibold">{matchedCompany.company_name}</span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
