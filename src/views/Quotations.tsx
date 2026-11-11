@@ -192,13 +192,10 @@ const Quotations = () => {
             <h1 className="text-2xl md:text-3xl font-bold text-foreground">My Quotations</h1>
             <p className="text-sm text-muted-foreground mt-1">View and manage all your quotations</p>
           </div>
-          <Button onClick={() => navigate('/')}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Quotation
-          </Button>
+
         </div>
 
-        <div className="space-y-2"><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input type="search" aria-label="Search quotations" placeholder="Search name or QNO reference..." value={search} onChange={event => setSearch(event.target.value)} className="h-12 rounded-xl pl-10 pr-12" />{search && <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-lg"><X className="h-4 w-4" /></button>}</div>{!loading && <p aria-live="polite" className="text-xs text-muted-foreground">{filteredQuotations.length} of {quotations.length} quotations</p>}</div>
+        <div className="space-y-2"><div className="flex items-center gap-2 sm:gap-3"><div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input type="search" aria-label="Search quotations" placeholder="Search name or QNO..." value={search} onChange={event => setSearch(event.target.value)} className="h-12 rounded-xl pl-10 pr-12" />{search && <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-lg"><X className="h-4 w-4" /></button>}</div><Button onClick={() => navigate('/')} className="h-12 shrink-0 gap-1.5 rounded-xl px-3 text-xs sm:gap-2 sm:px-5 sm:text-sm"><Plus className="h-4 w-4 shrink-0" aria-hidden="true" />New Quotation</Button></div>{!loading && <p aria-live="polite" className="text-xs text-muted-foreground">{filteredQuotations.length} of {quotations.length} quotations</p>}</div>
         {loading ? (
           <ListSkeleton count={4} />
         ) : quotations.length === 0 ? (
