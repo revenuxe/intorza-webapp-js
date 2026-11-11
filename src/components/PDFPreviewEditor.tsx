@@ -56,6 +56,7 @@ interface PDFPreviewEditorProps {
   onDownload: (settings: PDFEditorSettings, terms: TermsSection[]) => void;
   quotationData: {
     quotationId?: string;
+    referenceNo?: string;
     quotationTitle: string;
     clientName: string;
     clientAddress: string;

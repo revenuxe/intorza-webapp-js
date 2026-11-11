@@ -77,6 +77,7 @@ export interface Section {
 
 export interface QuotationData {
   quotationId?: string;
+  referenceNo?: string;
   quotationTitle: string;
   clientName: string;
   clientAddress: string;
@@ -476,7 +477,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
     if (headerColumns === 1) {
       // Single row: Quotation For + Project Details side-by-side in one card
-      const cardHeight = 48;
+      const cardHeight = data.referenceNo ? 54 : 48;
       doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
       doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
       doc.roundedRect(margin, yPosition, contentWidth, cardHeight, 2, 2, cardBorderStyle);
@@ -525,6 +526,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         rightY += 6;
       };
 
+      if (data.referenceNo) addMetaSingle('Ref QNO:', data.referenceNo);
       addMetaSingle('Date:', data.dateOfProposal);
       addMetaSingle('Valid Till:', data.quotationValidTill);
       addMetaSingle('Project:', data.quotationTitle.substring(0, 20));
@@ -560,6 +562,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       };
 
       const projectRows = metadataRows([
+        ...(data.referenceNo ? [['Ref QNO:', data.referenceNo] as [string, string]] : []),
         ['Date:', data.dateOfProposal],
         ['Valid:', data.quotationValidTill],
         ['Project:', data.quotationTitle],
@@ -647,7 +650,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
     } else {
       // Default: Two cards (existing behavior)
-      const cardHeight = 48;
+      const cardHeight = data.referenceNo ? 54 : 48;
       const cardWidth = (contentWidth - gap) / 2;
 
       // Left Card: Client Info
@@ -705,6 +708,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         metaY += 6;
       };
 
+      if (data.referenceNo) addMeta('Ref QNO:', data.referenceNo);
       addMeta('Date:', data.dateOfProposal);
       addMeta('Valid Till:', data.quotationValidTill);
       addMeta('Project:', data.quotationTitle.substring(0, 20));

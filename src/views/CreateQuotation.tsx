@@ -1014,6 +1014,7 @@ const CreateQuotation = () => {
       
       await generateQuotationPDF({
         quotationId: overrideQuotationId || quotationId || undefined,
+        referenceNo: referenceNo || await getDraftReference(),
         quotationTitle: projectTitle,
         clientName,
         clientAddress,
@@ -1092,6 +1093,7 @@ const CreateQuotation = () => {
   // treats a new reference as "data changed" and restarts PDF regeneration.
   const quotationPreviewData = useMemo(() => ({
     quotationId: quotationId || undefined,
+    referenceNo: referenceNo || undefined,
     quotationTitle: projectTitle,
     clientName,
     clientAddress,

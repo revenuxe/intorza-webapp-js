@@ -164,3 +164,12 @@ it.each([true, false])('exports canonical structured specifications without a le
   const output = pdf.internal.pages.flat().join('\n');
   expect(output).toContain('Century'); expect(output).toContain('0954');
 });
+
+// The same generator powers live preview and the downloaded PDF.
+it.each([1, 2, 3] as const)('prints the quotation reference in project details with %i header columns', async headerInfoColumns => {
+ const pdf = await generateQuotationPDF({ ...quotationData, referenceNo: 'QNO-0001AZ', settings: { ...getQuotationSettings(), showProjectDetails: true }, editorSettings: { ...quotationData.editorSettings!, headerInfoColumns } });
+ const content=pdf.internal.pages.flat().join('\n');
+ expect(content).toContain('(Ref QNO:)');
+ expect(content).toContain('(QNO-0001AZ)');
+ expect(content.indexOf('(QNO-0001AZ)')).toBeLessThan(content.indexOf('(TEST SECTION)'));
+});
