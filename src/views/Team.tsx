@@ -800,6 +800,7 @@ const Team = () => {
                 
                 return (
                   <div key={member.id} className="flex items-center gap-2.5 p-2.5 border rounded-xl">
+                    <button type="button" onClick={() => navigate(`/team/members/${member.id}`)} aria-label={`View ${member.name}`} className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     {/* Avatar circle */}
                     <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm shrink-0 ${isClockedIn ? 'bg-green-100 ring-2 ring-green-400' : 'bg-muted'}`}>
                       <UserRound className="h-4 w-4" aria-hidden="true" />
@@ -816,6 +817,7 @@ const Team = () => {
                         {taskStats.total > 0 && <span>{taskStats.completed}/{taskStats.total} tasks</span>}
                       </div>
                     </div>
+                    </button>
                     {/* Actions */}
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button className="p-1.5 hover:bg-muted rounded-lg" onClick={() => handleEditMember(member)}>
