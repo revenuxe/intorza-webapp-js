@@ -1,5 +1,6 @@
 "use client";
 
+import { teamProfessions } from "@/lib/team-professions";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,19 +60,7 @@ interface Attendance {
   team_member_id: string;
 }
 
-const workTypes: Record<string, string> = {
-  carpenter: 'Carpenter',
-  labour: 'Labour',
-  plumber: 'Plumber',
-  electrician: 'Electrician',
-  painter: 'Painter',
-  mason: 'Mason',
-  welder: 'Welder',
-  supervisor: 'Supervisor',
-  helper: 'Helper',
-  driver: 'Driver',
-  other: 'Other',
-};
+const workTypes: Record<string, string> = Object.fromEntries(teamProfessions.map(role => [role.value, role.label]));
 
 const ProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();

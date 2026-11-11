@@ -1,5 +1,9 @@
 "use client";
 
+import { teamProfessions as workTypes } from '@/lib/team-professions';
+import { ProfessionPicker } from '@/components/ProfessionPicker';
+
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
@@ -100,19 +104,7 @@ interface Task {
   created_at: string;
 }
 
-const workTypes = [
-  { value: 'carpenter', label: 'Carpenter', icon: '🪚' },
-  { value: 'labour', label: 'Labour', icon: '👷' },
-  { value: 'plumber', label: 'Plumber', icon: '🔧' },
-  { value: 'electrician', label: 'Electrician', icon: '⚡' },
-  { value: 'painter', label: 'Painter', icon: '🎨' },
-  { value: 'mason', label: 'Mason', icon: '🧱' },
-  { value: 'welder', label: 'Welder', icon: '🔥' },
-  { value: 'supervisor', label: 'Supervisor', icon: '📋' },
-  { value: 'helper', label: 'Helper', icon: '🤝' },
-  { value: 'driver', label: 'Driver', icon: '🚗' },
-  { value: 'other', label: 'Other', icon: '👤' },
-];
+
 
 const Team = () => {
   const { user } = useAuth();
@@ -1062,15 +1054,8 @@ const Team = () => {
               <Input value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} placeholder="Phone number" className="rounded-xl h-9" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Work Type *</Label>
-              <Select value={memberForm.work_type} onValueChange={(v) => setMemberForm({ ...memberForm, work_type: v })}>
-                <SelectTrigger className="rounded-xl h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {workTypes.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>{type.icon} {type.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="member-profession" className="text-xs">Profession / Work Type *</Label>
+              <ProfessionPicker id="member-profession" value={memberForm.work_type} onChange={(work_type) => setMemberForm({ ...memberForm, work_type })} />
             </div>
 
           </div>

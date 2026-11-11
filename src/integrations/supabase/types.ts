@@ -1700,6 +1700,48 @@ export type Database = {
       coin_tx_type: "welcome" | "purchase" | "admin_credit" | "admin_debit" | "floor_plan" | "ai_builder" | "refund"
       team_member_status: "active" | "inactive" | "on_leave"
       work_type:
+        | "interior_designer"
+        | "architect"
+        | "interior_architect"
+        | "design_consultant"
+        | "space_planner"
+        | "3d_visualizer"
+        | "cad_draftsperson"
+        | "bim_modeler"
+        | "landscape_designer"
+        | "lighting_designer"
+        | "furniture_designer"
+        | "kitchen_designer"
+        | "project_manager"
+        | "site_engineer"
+        | "civil_engineer"
+        | "quantity_surveyor"
+        | "estimator"
+        | "procurement_specialist"
+        | "safety_officer"
+        | "helper"
+        | "driver"
+        | "modular_kitchen_installer"
+        | "furniture_installer"
+        | "false_ceiling_installer"
+        | "drywall_installer"
+        | "tile_installer"
+        | "marble_and_granite_installer"
+        | "flooring_installer"
+        | "glass_and_aluminium_fabricator"
+        | "metal_fabricator"
+        | "waterproofing_specialist"
+        | "hvac_technician"
+        | "smart_home_technician"
+        | "fire_safety_technician"
+        | "interior_stylist"
+        | "decorator"
+        | "upholsterer"
+        | "curtain_and_blinds_installer"
+        | "wallpaper_installer"
+        | "polish_specialist"
+        | "signage_installer"
+        | "professional_cleaner"
         | "carpenter"
         | "labour"
         | "plumber"
@@ -1839,6 +1881,48 @@ export const Constants = {
       app_role: ["admin", "user"],
       team_member_status: ["active", "inactive", "on_leave"],
       work_type: [
+        "interior_designer",
+        "architect",
+        "interior_architect",
+        "design_consultant",
+        "space_planner",
+        "3d_visualizer",
+        "cad_draftsperson",
+        "bim_modeler",
+        "landscape_designer",
+        "lighting_designer",
+        "furniture_designer",
+        "kitchen_designer",
+        "project_manager",
+        "site_engineer",
+        "civil_engineer",
+        "quantity_surveyor",
+        "estimator",
+        "procurement_specialist",
+        "safety_officer",
+        "helper",
+        "driver",
+        "modular_kitchen_installer",
+        "furniture_installer",
+        "false_ceiling_installer",
+        "drywall_installer",
+        "tile_installer",
+        "marble_and_granite_installer",
+        "flooring_installer",
+        "glass_and_aluminium_fabricator",
+        "metal_fabricator",
+        "waterproofing_specialist",
+        "hvac_technician",
+        "smart_home_technician",
+        "fire_safety_technician",
+        "interior_stylist",
+        "decorator",
+        "upholsterer",
+        "curtain_and_blinds_installer",
+        "wallpaper_installer",
+        "polish_specialist",
+        "signage_installer",
+        "professional_cleaner",
         "carpenter",
         "labour",
         "plumber",

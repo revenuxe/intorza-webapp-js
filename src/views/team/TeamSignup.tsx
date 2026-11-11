@@ -1,5 +1,9 @@
 "use client";
 
+import { teamProfessions as workTypes } from '@/lib/team-professions';
+import { ProfessionPicker } from '@/components/ProfessionPicker';
+
+
 import { useState, useRef, useEffect } from "react";
 import { AuthCaptcha, requireAuthCaptcha, type AuthCaptchaHandle } from '@/components/AuthCaptcha';
 import { useNavigate } from "@/lib/navigation";
@@ -8,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCircle2, Hash, Building2, ChevronRight } from "lucide-react";
 import intorzaLogo from "@/assets/intorza-logo.webp";
@@ -19,17 +22,7 @@ interface Company {
   company_name: string;
 }
 
-const workTypes = [
-  { value: 'carpenter', label: 'Carpenter' },
-  { value: 'labour', label: 'Labour' },
-  { value: 'plumber', label: 'Plumber' },
-  { value: 'electrician', label: 'Electrician' },
-  { value: 'painter', label: 'Painter' },
-  { value: 'mason', label: 'Mason' },
-  { value: 'welder', label: 'Welder' },
-  { value: 'supervisor', label: 'Supervisor' },
-  { value: 'other', label: 'Other' },
-];
+
 
 const TeamSignup = () => {
   const captcha = useRef<AuthCaptchaHandle>(null);
@@ -279,17 +272,8 @@ const TeamSignup = () => {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Role / Work Type *</Label>
-                  <Select value={formData.work_type} onValueChange={(v) => setFormData({ ...formData, work_type: v })}>
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {workTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="profession">Profession / Work Type *</Label>
+                  <ProfessionPicker id="profession" value={formData.work_type} onChange={(work_type) => setFormData({ ...formData, work_type })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Password *</Label>
