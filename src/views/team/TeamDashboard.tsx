@@ -294,7 +294,11 @@ const TeamDashboard = () => {
           clock_out: new Date().toISOString(),
           clock_out_location: location,
         })
-        .eq('id', todayAttendance.id);
+        .eq('id', todayAttendance.id)
+        .eq('team_member_id', teamMember.id)
+        .is('clock_out', null)
+        .select('id')
+        .single();
 
       if (error) throw error;
 

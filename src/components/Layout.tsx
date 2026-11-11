@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
+import { WelcomeCoinsDialog } from "./WelcomeCoinsDialog";
 
 interface LayoutProps {
   children: ReactNode;
@@ -9,6 +10,7 @@ interface LayoutProps {
 export const Layout = ({ children }: LayoutProps) => {
   return (
     <div className="min-h-screen flex w-full bg-background">
+      <WelcomeCoinsDialog />
       {/* Desktop Sidebar - Fixed */}
       <Sidebar />
       
