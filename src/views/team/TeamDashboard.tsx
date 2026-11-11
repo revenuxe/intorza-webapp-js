@@ -532,7 +532,7 @@ const TeamDashboard = () => {
                   <div 
                     key={project.id} 
                     className="p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
-                    onClick={() => navigate(`/site-measurement/${project.id}`)}
+                    onClick={() => navigate(`/team/dashboard/measurements/${project.id}`)}
                   >
                     <div className="flex items-center justify-between">
                       <div>

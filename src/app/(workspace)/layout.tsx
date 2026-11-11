@@ -1,7 +1,8 @@
 "use client";
 
+import { WorkspaceAccountGuard } from '@/components/WorkspaceAccountGuard';
 import { Layout } from "@/components/Layout";
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
-  return <Layout>{children}</Layout>;
+  return <WorkspaceAccountGuard><Layout>{children}</Layout></WorkspaceAccountGuard>;
 }

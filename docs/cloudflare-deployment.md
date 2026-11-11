@@ -105,3 +105,23 @@ after upgrading. Repository cleanup does not alter hosted resources or
 publish without running the deploy command.
 
 Implementation reference: [OpenNext Cloudflare setup](https://opennext.js.org/cloudflare/get-started).
+
+## Separate application portals
+
+Production uses one Worker with three custom domains. The quotation workspace stays
+on https://app.intorza.com. Team registrations and sign-in use
+https://team.intorza.com/team/login and /team/signup; approved members use
+/team/dashboard. Admins use https://admin.intorza.com/admin/login and
+/admin/dashboard. The root of each portal redirects to its own login.
+
+The Worker redirects legacy app-domain team/admin links to their dedicated domain.
+Team and admin hosts do not serve quotation pages. Team browser sessions are
+origin-local; moving between portals requires signing in on that portal, and
+access/refresh tokens must never be put into cross-domain URLs. Team membership
+and administrator RPC checks remain mandatory regardless of the domain.
+
+The existing Turnstile widget must allow team.intorza.com and admin.intorza.com,
+and Supabase auth redirect URLs must include the team login callback. Localhost
+and preview hosts retain same-origin paths. The owner Team management page /team
+remains part of the quotation workspace. Assigned measurements use
+/team/dashboard/measurements/:id without the quotation sidebar or pricing action.

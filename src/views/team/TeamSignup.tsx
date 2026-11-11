@@ -1,6 +1,5 @@
 "use client";
 
-import { teamProfessions as workTypes } from '@/lib/team-professions';
 import { ProfessionPicker } from '@/components/ProfessionPicker';
 
 
@@ -123,19 +122,25 @@ const TeamSignup = () => {
         return;
       }
 
-      // Do not count Supabase's existing-email response as a new registration.
-      if (authData.user.identities?.length !== 0) trackMetaEvent('CompleteRegistration');
-
-      if (!authData.session) {
-        toast.success('Check your email to verify your account, then sign in to submit your join request.');
-        navigate('/team/login');
+      // Existing confirmed addresses return an obfuscated user with no identities.
+      if (authData.user.identities?.length === 0) {
+        toast.error('This email is already registered. Try logging in instead.');
         return;
       }
-      const { error: requestError } = await supabase.rpc('submit_pending_team_join');
-      if (requestError) throw requestError;
+      trackMetaEvent('CompleteRegistration');
 
-      setStep('success');
-      toast.success("Request sent successfully!");
+      // The signup trigger queues the pending request even without a session.
+      // The authenticated RPC remains idempotent for clients with a session.
+      if (authData.session) {
+        const { error: requestError } = await supabase.rpc('submit_pending_team_join');
+        if (requestError) throw requestError;
+        await supabase.auth.signOut();
+      }
+
+      sessionStorage.removeItem('returnPath');
+      sessionStorage.removeItem('pendingAction');
+      toast.success("Request sent! Your organization will review it.");
+      navigate('/team/login', { replace: true });
     } catch (error: any) {
       if (error.message?.includes('already registered')) {
         toast.error("This email is already registered. Try logging in instead.");
@@ -315,7 +320,7 @@ const TeamSignup = () => {
                   Your request to join <span className="font-semibold text-foreground">{selectedCompany?.company_name}</span> has been submitted.
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  The organization owner will review your request. You'll be able to login once approved.
+                  No email confirmation is needed. Your organization can accept or reject your request. You can sign in to your team once approved.
                 </p>
               </div>
               <Button variant="outline" onClick={() => navigate('/team/login')} className="mt-4 rounded-xl">

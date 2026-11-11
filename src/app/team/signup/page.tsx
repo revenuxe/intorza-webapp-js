@@ -3,7 +3,7 @@ import View from "@/views/team/TeamSignup";
 
 export const metadata: Metadata = {
   title: "Team Signup",
-  alternates: { canonical: "/team/signup" },
+  alternates: { canonical: "https://team.intorza.com/team/signup" },
 };
 
 export default function Page() {

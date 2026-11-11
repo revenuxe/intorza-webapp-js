@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "@/lib/navigation";
+import type { User } from '@supabase/supabase-js';
+import { isTeamAccount } from '@/lib/team-account';
 import { safeInternalPath } from "@/lib/safe-navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -150,7 +152,8 @@ const Auth = () => {
     let mounted = true;
     let redirectInProgress = false;
 
-    const handleAuthRedirect = async (userId: string) => {
+    const handleAuthRedirect = async (authUser: User) => {
+      const userId = authUser.id;
       if (!mounted || redirectInProgress || redirectClaimed.current) return;
       redirectClaimed.current = true;
       redirectInProgress = true;
@@ -165,8 +168,10 @@ const Auth = () => {
         
         if (!mounted) return;
         
-        if (teamMember) {
-          navigate('/team/dashboard', { replace: true });
+        if (teamMember || isTeamAccount(authUser)) {
+          sessionStorage.removeItem('returnPath');
+          sessionStorage.removeItem('pendingAction');
+          navigate(teamMember ? '/team/dashboard' : '/team/login', { replace: true });
           return;
         }
         
@@ -208,7 +213,7 @@ const Auth = () => {
         if (event === 'SIGNED_IN' && session?.user) {
           // Use setTimeout to avoid Supabase deadlock
           setTimeout(() => {
-            if (mounted) handleAuthRedirect(session.user.id);
+            if (mounted) handleAuthRedirect(session.user);
           }, 0);
         }
         
@@ -228,7 +233,7 @@ const Auth = () => {
       if (!mounted) return;
       
       if (session?.user) {
-        await handleAuthRedirect(session.user.id);
+        await handleAuthRedirect(session.user);
       }
       
       setInitialLoading(false);
@@ -296,10 +301,13 @@ const Auth = () => {
         .eq('user_id', data.user.id)
         .maybeSingle();
 
-      if (teamMember) {
+      if (teamMember || isTeamAccount(data.user)) {
+        sessionStorage.removeItem('returnPath');
+        sessionStorage.removeItem('pendingAction');
         await supabase.auth.signOut();
         redirectClaimed.current = false;
         toast.error("Team member accounts must login at /team/login");
+        navigate('/team/login', { replace: true });
         return;
       }
 

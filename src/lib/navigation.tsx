@@ -3,6 +3,7 @@
 import NextLink from "next/link";
 import { useParams, usePathname, useRouter, useSearchParams as useNextSearchParams } from "next/navigation";
 import { forwardRef, useCallback, useMemo, type ComponentProps } from "react";
+import { portalHref } from './portal-routing.mjs';
 import { safeInternalPath } from "./safe-navigation";
 
 export { useParams };
@@ -17,7 +18,13 @@ export function useNavigate() {
       else window.history.go(to);
       return;
     }
-    const href = safeInternalPath(to);
+    const path = safeInternalPath(to);
+    const href = portalHref(path, window.location.hostname);
+    if (href.startsWith('https://')) {
+      if (options?.replace) window.location.replace(href);
+      else window.location.assign(href);
+      return;
+    }
     if (options?.replace) router.replace(href);
     else router.push(href);
   }, [router]);
@@ -46,5 +53,15 @@ export function useSearchParams() {
 }
 
 type LinkProps = Omit<ComponentProps<typeof NextLink>, "href"> & { to: string };
-export const Link = forwardRef<HTMLAnchorElement, LinkProps>(({ to, ...props }, ref) => <NextLink ref={ref} href={to} {...props} />);
+export const Link = forwardRef<HTMLAnchorElement, LinkProps>(({ to, onClick, ...props }, ref) => {
+  const navigate = useNavigate();
+  return <NextLink ref={ref} href={to} {...props} onClick={event => {
+    onClick?.(event);
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || props.target === '_blank') return;
+    if (portalHref(to, window.location.hostname) !== to) {
+      event.preventDefault();
+      navigate(to);
+    }
+  }} />;
+});
 Link.displayName = "Link";

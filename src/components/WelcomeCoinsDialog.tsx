@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Check, Coins, Gift, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,19 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
 export function WelcomeCoinsDialog() {
+  const { user } = useAuth();
+  const pathname = usePathname();
+  const metadata = user?.user_metadata;
+  const isTeamAccount = metadata?.is_team_member === true
+    || metadata?.is_team_member === 'true'
+    || Boolean(metadata?.join_company_id);
+  const isAdminPage = pathname === '/admin' || pathname?.startsWith('/admin/');
+  const isTeamPage = pathname === '/team' || pathname?.startsWith('/team/');
+  if (!user || isTeamAccount || isTeamPage || isAdminPage) return null;
+  return <WelcomeCoinsContent key={user.id} />;
+}
+
+function WelcomeCoinsContent() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false), [claimed, setClaimed] = useState(false), [busy, setBusy] = useState(false);
   useEffect(() => {

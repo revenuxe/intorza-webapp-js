@@ -98,7 +98,9 @@ const TeamLogin = () => {
       }
 
       toast.success(`Welcome back, ${teamMember.name}!`);
-      navigate('/team/dashboard');
+      sessionStorage.removeItem('returnPath');
+      sessionStorage.removeItem('pendingAction');
+      navigate('/team/dashboard', { replace: true });
     } catch (error: any) {
       if (error.message.includes('Invalid login credentials')) {
         toast.error("Invalid email or password. Please check your credentials.");
@@ -117,10 +119,10 @@ const TeamLogin = () => {
         <Button
           variant="ghost"
           className="mb-4"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/team/signup')}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Home
+          Create a Team Account
         </Button>
 
         <Card>

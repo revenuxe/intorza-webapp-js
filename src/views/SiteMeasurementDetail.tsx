@@ -55,7 +55,7 @@ interface Project {
   } | null;
 }
 
-export default function SiteMeasurementDetail() {
+export default function SiteMeasurementDetail({ teamPortal = false }: { teamPortal?: boolean } = {}) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -81,7 +81,7 @@ export default function SiteMeasurementDetail() {
 
     if (error || !data) {
       toast.error("Project not found");
-      navigate('/site-measurement');
+      navigate(teamPortal ? '/team/dashboard' : '/site-measurement');
       return;
     }
 
@@ -89,7 +89,7 @@ export default function SiteMeasurementDetail() {
       ...data,
       team_member: data.team_member as Project['team_member']
     });
-  }, [id, navigate]);
+  }, [id, navigate, teamPortal]);
 
   const fetchRooms = useCallback(async () => {
     if (!id) return;
@@ -207,7 +207,7 @@ export default function SiteMeasurementDetail() {
     setSaving(true);
     await updateProjectStats();
     setSaving(false);
-    toast.success("Measurements saved. You can convert to a quotation later.");
+    toast.success(teamPortal ? "Measurements saved." : "Measurements saved. You can convert to a quotation later.");
   };
 
   const handleConvertToQuotation = () => {
@@ -382,14 +382,14 @@ export default function SiteMeasurementDetail() {
             <Save className="h-4 w-4 mr-2" />
             {saving ? "Saving..." : "Save Measurements"}
           </Button>
-          <Button 
+          {!teamPortal && <Button
             className="flex-1"
             onClick={handleConvertToQuotation}
             disabled={rooms.length === 0}
           >
             <FileText className="h-4 w-4 mr-2" />
             Convert to Quotation
-          </Button>
+          </Button>}
         </div>
       </div>
 
