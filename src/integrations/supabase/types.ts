@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      library_personal_entries: {
+        Row: { user_id: string; entry_id: string; kind: string; data: Json | null; revision: string; updated_at: string }
+        Insert: { user_id: string; entry_id: string; kind: string; data?: Json | null; revision: string; updated_at?: string }
+        Update: { kind?: string; data?: Json | null; revision?: string; updated_at?: string }
+        Relationships: []
+      }
       coin_wallets: {
         Row: { user_id: string; balance: number; lifetime_earned: number; lifetime_spent: number; welcome_claimed_at: string | null; created_at: string; updated_at: string }
         Insert: { user_id: string; balance?: number; lifetime_earned?: number; lifetime_spent?: number; welcome_claimed_at?: string | null; created_at?: string; updated_at?: string }

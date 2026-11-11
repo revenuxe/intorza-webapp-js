@@ -7,16 +7,19 @@ import { PaymentTemplatesTab } from "@/components/library/PaymentTemplatesTab";
 import { TermsTemplatesTab } from "@/components/library/TermsTemplatesTab";
 import { BankDetailsTab } from "@/components/library/BankDetailsTab";
 import { WarrantyNotesTab } from "@/components/library/WarrantyNotesTab";
-import { ItemsPricingTab } from "@/components/library/ItemsPricingTab";
+import { ProductLibrary } from "@/components/library/ProductLibrary";
+import { ApprovedRatesPanel } from "@/components/library/ApprovedRatesPanel";
 import { QuotationsLibraryTab } from "@/components/library/QuotationsLibraryTab";
 import { SectionTemplatesTab } from "@/components/library/SectionTemplatesTab";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useLocalization } from "@/hooks/useLocalization";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 
 const MyLibrary = () => {
-  const [activeTab, setActiveTab] = useState("terms");
+  const [activeTab, setActiveTab] = useState("items");
   const { toast } = useToast();
+  const { settings: localization } = useLocalization();
   const { isPro, loading: subscriptionLoading, setPaywallOpen } = useSubscription();
 
   useEffect(() => {
@@ -24,7 +27,7 @@ const MyLibrary = () => {
   }, [subscriptionLoading, isPro]);
 
   useEffect(() => {
-    if (!subscriptionLoading && !isPro && activeTab !== 'terms') setActiveTab('terms');
+    if (!subscriptionLoading && !isPro && activeTab !== 'terms' && activeTab !== 'items') setActiveTab('terms');
   }, [subscriptionLoading, isPro, activeTab]);
 
   const autoMigrateFromProfile = async () => {
@@ -137,7 +140,7 @@ const MyLibrary = () => {
   };
 
   return (
-    <div className="container max-w-5xl mx-auto p-4 md:p-6 lg:p-8">
+    <div className="container max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
@@ -145,20 +148,20 @@ const MyLibrary = () => {
             My Library
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Auto-learned items, section templates, and reusable configurations
+            Manage your products, categories, specifications and pricing.
           </p>
         </div>
 
         <Tabs value={activeTab} onValueChange={(tab) => {
-          if (tab === 'terms' || isPro) setActiveTab(tab);
+          if (tab === 'terms' || tab === 'items' || isPro) setActiveTab(tab);
           else setPaywallOpen(true, 'My Library');
         }} className="w-full">
           <div className="-mx-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
           <TabsList className="flex h-auto w-max min-w-full justify-start gap-1 p-1">
-            <TabsTrigger value="items" aria-label="Items — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs">
+            <TabsTrigger value="items" aria-label="Products and pricing" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Package className="h-4 w-4" />
               <span>Items</span>
-              {!isPro && <LockKeyhole className="h-3 w-3" />}
+
             </TabsTrigger>
             <TabsTrigger value="sections" aria-label="Sections — Pro required" className="shrink-0 gap-1 px-3 py-2 text-xs">
               <Layers className="h-4 w-4" />
@@ -192,9 +195,10 @@ const MyLibrary = () => {
           </TabsList>
           </div>
 
-          {isPro && <TabsContent value="items" className="mt-6">
-            <ItemsPricingTab />
-          </TabsContent>}
+          <TabsContent value="items" className="mt-6">
+            <ProductLibrary />
+            {isPro && <details className="mt-6 rounded-xl border p-4"><summary className="cursor-pointer text-sm font-medium">Approved rate sources</summary><div className="mt-4"><ApprovedRatesPanel currency={localization.currencyCode} /></div></details>}
+          </TabsContent>
 
           {isPro && <TabsContent value="sections" className="mt-6">
             <SectionTemplatesTab />
