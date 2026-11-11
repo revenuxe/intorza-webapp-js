@@ -1660,6 +1660,7 @@ export type Database = {
       }
     }
     Functions: {
+      reserve_quotation_reference: { Args: never; Returns: string }
       update_assigned_task_status: { Args: { p_task_id: string; p_status: string }; Returns: Json }
       get_quotation_coin_delivery: { Args: { p_project_id: string }; Returns: Json }
       confirm_quotation_coin_delivery: { Args: { p_project_id: string }; Returns: Json }

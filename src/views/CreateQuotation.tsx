@@ -1,4 +1,6 @@
 "use client";
+import { getDraftReference, clearDraftReference } from "@/lib/draft-quotation-reference";
+
 
 import { appendFloorPlanEstimate } from '@/lib/quotation-ai/apply-estimate';
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -94,6 +96,15 @@ const CreateQuotation = () => {
   const smartDefaultsApplied = useRef(false);
   const quotationSaveInProgress = useRef(false);
   const [referenceNo, setReferenceNo] = useState<string | null>(null);
+  const [referenceError, setReferenceError] = useState(false);
+  const [referenceRetry, setReferenceRetry] = useState(0);
+  useEffect(() => {
+    let active=true;
+    if (quotationId) return;
+    setReferenceError(false);
+    void getDraftReference().then(value=>{if(active)setReferenceNo(value);}).catch(()=>{if(active)setReferenceError(true);});
+    return ()=>{active=false;};
+  },[quotationId,referenceRetry]);
   const savedQuotationIdRef = useRef<string | null>(null);
   const pendingSaveAndSend = useRef(false);
   
@@ -230,6 +241,7 @@ const CreateQuotation = () => {
         formData
       } = getPendingAction();
       if (formData) {
+        if (formData.referenceNo) setReferenceNo(formData.referenceNo);
         if (formData.sections) setSections(formData.sections);
         if (formData.projectTitle) setProjectTitle(formData.projectTitle);
         if (formData.clientName) setClientName(formData.clientName);
@@ -271,7 +283,7 @@ const CreateQuotation = () => {
 
   useEffect(() => {
     savedQuotationIdRef.current = quotationId;
-    setReferenceNo(null);
+    if (quotationId) setReferenceNo(null);
     loadProfile();
     if (quotationId) {
       loadQuotation(quotationId);
@@ -644,6 +656,7 @@ const CreateQuotation = () => {
     && (!(item.sftArea > 0) || (!(item.ratePerSft > 0) && !lastAIDraft.current.sections.some(section => section.items.some(row => row.id === item.id && row.ratePerSft === 0))));
   const aiTotalPending = sections.some(section => section.items.some(isPendingAIItem));
   const getFormData = () => ({
+    referenceNo,
     appliedPricing,
     sections,
     projectTitle,
@@ -725,7 +738,9 @@ const CreateQuotation = () => {
         })),
       }));
 
+      const draftReference = referenceNo || await getDraftReference();
       const basePayload = {
+        reference_no: draftReference,
         quotation_title: status === 'draft' ? draftProjectTitle : projectTitle,
         client_name: status === 'draft' ? draftClientName : clientName,
         client_address: clientAddress,
@@ -765,6 +780,7 @@ const CreateQuotation = () => {
       // Read back the complete nested save before navigating or replacing any local identities.
       const { data: verifiedQuotation } = await quotationsApi.get(savedQuotationId);
       setReferenceNo(verifiedQuotation.reference_no || null);
+      clearDraftReference();
       const mapping = reconcileSavedQuotation(payloadSections, verifiedQuotation.sections);
       const currentPlanId = planProjectId.current;
       if (currentPlanId) {
@@ -883,6 +899,8 @@ const CreateQuotation = () => {
         planProjectId.current = null;
         savedQuotationIdRef.current = null;
         setReferenceNo(null);
+        clearDraftReference();
+        setReferenceRetry(value=>value+1);
         setClientAddress("");
         setDateOfProposal("");
         setQuotationValidTill("");
@@ -1240,7 +1258,7 @@ const CreateQuotation = () => {
         {/* Project Details */}
         <Card>
           <CardHeader>
-            <div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-lg">Project Details</CardTitle><div className="rounded-lg border bg-muted/40 px-3 py-2 text-xs"><span className="text-muted-foreground">Ref QNO: </span><span className="font-mono font-semibold" aria-live="polite">{referenceNo || 'Assigned on save'}</span></div></div>
+            <div className="flex items-center justify-between gap-2"><CardTitle className="shrink-0 text-base sm:text-lg">Project Details</CardTitle><div className="shrink-0 whitespace-nowrap rounded-lg border bg-muted/40 px-2 py-2 text-[10px] sm:px-3 sm:text-xs"><span className="text-muted-foreground">Ref QNO: </span><span className="font-mono font-semibold" aria-live="polite">{referenceNo || (referenceError ? <button type="button" onClick={()=>setReferenceRetry(value=>value+1)}>Retry</button> : 'Generating...')}</span></div></div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
