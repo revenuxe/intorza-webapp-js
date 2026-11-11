@@ -477,7 +477,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
     if (headerColumns === 1) {
       // Single row: Quotation For + Project Details side-by-side in one card
-      const cardHeight = data.referenceNo ? 54 : 48;
+      setBodyFont('bold');
+      setPdfFontSize(9);
+      const typeLines = data.projectType ? doc.splitTextToSize(data.projectType, contentWidth / 2 - 48) as string[] : [];
+      const cardHeight = (data.referenceNo ? 54 : 48) + typeLines.length * 6;
       doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
       doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
       doc.roundedRect(margin, yPosition, contentWidth, cardHeight, 2, 2, cardBorderStyle);
@@ -527,6 +530,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       };
 
       if (data.referenceNo) addMetaSingle('Ref QNO:', data.referenceNo);
+      typeLines.forEach((line, index) => addMetaSingle(index === 0 ? 'Project Type:' : '', line));
       addMetaSingle('Date:', data.dateOfProposal);
       addMetaSingle('Valid Till:', data.quotationValidTill);
       addMetaSingle('Project:', data.quotationTitle.substring(0, 20));
@@ -566,10 +570,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
         ['Date:', data.dateOfProposal],
         ['Valid:', data.quotationValidTill],
         ['Project:', data.quotationTitle],
+        ...(data.projectType ? [['Project Type:', data.projectType] as [string, string]] : []),
       ]);
       const additionalRows = metadataRows([
         ...(settings.showWarranty && warrantyDisplay ? [['Warranty:', warrantyDisplay] as [string, string]] : []),
-        ...(data.projectType ? [['Type:', data.projectType] as [string, string]] : []),
         ...(data.placeOfProject ? [['Place:', data.placeOfProject] as [string, string]] : []),
         ...(data.projectDeadline ? [['Deadline:', data.projectDeadline] as [string, string]] : []),
       ]);
@@ -650,7 +654,10 @@ export const generateQuotationPDF = async (data: QuotationData) => {
 
     } else {
       // Default: Two cards (existing behavior)
-      const cardHeight = data.referenceNo ? 54 : 48;
+      setBodyFont('bold');
+      setPdfFontSize(9);
+      const typeLines = data.projectType ? doc.splitTextToSize(data.projectType, (contentWidth - gap) / 2 - 48) as string[] : [];
+      const cardHeight = (data.referenceNo ? 54 : 48) + typeLines.length * 6 + (data.projectDeadline ? 6 : 0);
       const cardWidth = (contentWidth - gap) / 2;
 
       // Left Card: Client Info
@@ -709,6 +716,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       };
 
       if (data.referenceNo) addMeta('Ref QNO:', data.referenceNo);
+      typeLines.forEach((line, index) => addMeta(index === 0 ? 'Project Type:' : '', line));
       addMeta('Date:', data.dateOfProposal);
       addMeta('Valid Till:', data.quotationValidTill);
       addMeta('Project:', data.quotationTitle.substring(0, 20));
