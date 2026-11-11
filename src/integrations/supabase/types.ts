@@ -936,6 +936,7 @@ export type Database = {
       }
       quotations: {
         Row: {
+          reference_no: string
           client_address: string | null
           client_id: string | null
           client_name: string
@@ -962,6 +963,7 @@ export type Database = {
           warranty: string | null
         }
         Insert: {
+          reference_no?: string
           client_address?: string | null
           client_id?: string | null
           client_name: string
@@ -988,6 +990,7 @@ export type Database = {
           warranty?: string | null
         }
         Update: {
+          reference_no?: string
           client_address?: string | null
           client_id?: string | null
           client_name?: string

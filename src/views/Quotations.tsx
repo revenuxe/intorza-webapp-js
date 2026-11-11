@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { FileText, Plus, Edit, Trash2, Copy, Crown, LockKeyhole } from "lucide-react";
+import { FileText, Plus, Edit, Trash2, Copy, Crown, LockKeyhole, Search, X } from "lucide-react";
 import { useNavigate } from "@/lib/navigation";
+import { Input } from '@/components/ui/input';
+import { matchesQuotation } from '@/lib/quotation-search';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +18,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 interface Quotation {
   id: string;
   quotation_number: string;
+  reference_no: string;
   quotation_title: string;
   project_name: string;
   client_name: string;
@@ -49,6 +52,8 @@ const Quotations = () => {
   const { isPro, loading: subscriptionLoading, setPaywallOpen } = useSubscription();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const filteredQuotations = quotations.filter(quotation => matchesQuotation(quotation, search));
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -193,6 +198,7 @@ const Quotations = () => {
           </Button>
         </div>
 
+        <div className="space-y-2"><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input type="search" aria-label="Search quotations" placeholder="Search name or QNO reference..." value={search} onChange={event => setSearch(event.target.value)} className="h-12 rounded-xl pl-10 pr-12" />{search && <button type="button" aria-label="Clear search" onClick={() => setSearch('')} className="absolute right-1 top-1 flex h-10 w-10 items-center justify-center rounded-lg"><X className="h-4 w-4" /></button>}</div>{!loading && <p aria-live="polite" className="text-xs text-muted-foreground">{filteredQuotations.length} of {quotations.length} quotations</p>}</div>
         {loading ? (
           <ListSkeleton count={4} />
         ) : quotations.length === 0 ? (
@@ -207,17 +213,18 @@ const Quotations = () => {
               </Button>
             </CardContent>
           </Card>
-        ) : (
+        ) : filteredQuotations.length === 0 ? <Card><CardContent className="space-y-3 p-6 text-center"><p>No quotations match your search.</p><Button variant="outline" onClick={() => setSearch('')}>Clear search</Button></CardContent></Card> : (
           <div className="flex flex-col gap-4">
-            {quotations.map((quotation) => (
+            {filteredQuotations.map((quotation) => (
               <Card key={quotation.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-3">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="font-semibold text-foreground">{quotation.quotation_title || quotation.project_name}</h3>
+                        <h3 className="break-words font-semibold text-foreground">{quotation.quotation_title || quotation.project_name}</h3>
                         <p className="text-sm text-muted-foreground mt-1">{quotation.client_name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{quotation.quotation_number}</p>
+                        <p className="mt-2 w-fit rounded-md bg-muted px-2 py-1 font-mono text-xs font-semibold">Ref QNO: {quotation.reference_no}</p>
                       </div>
                       <Badge className={getStatusColor(quotation.status)}>
                         {quotation.status?.charAt(0).toUpperCase() + quotation.status?.slice(1) || 'Draft'}

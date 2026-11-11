@@ -93,6 +93,7 @@ const CreateQuotation = () => {
   const [actionExecuted, setActionExecuted] = useState(false);
   const smartDefaultsApplied = useRef(false);
   const quotationSaveInProgress = useRef(false);
+  const [referenceNo, setReferenceNo] = useState<string | null>(null);
   const savedQuotationIdRef = useRef<string | null>(null);
   const pendingSaveAndSend = useRef(false);
   
@@ -270,6 +271,7 @@ const CreateQuotation = () => {
 
   useEffect(() => {
     savedQuotationIdRef.current = quotationId;
+    setReferenceNo(null);
     loadProfile();
     if (quotationId) {
       loadQuotation(quotationId);
@@ -412,6 +414,7 @@ const CreateQuotation = () => {
       if (quotationError) throw quotationError;
 
       // Pre-fill form fields - use quotation_title or project_name as fallback
+      setReferenceNo(quotation.reference_no || null);
       setProjectTitle(quotation.quotation_title || quotation.project_name || "");
       setClientName(quotation.client_name || "");
       setClientAddress(quotation.client_address || "");
@@ -761,6 +764,7 @@ const CreateQuotation = () => {
       if (!savedQuotationId) throw new Error('The quotation save did not return an ID. Your editor has been preserved.');
       // Read back the complete nested save before navigating or replacing any local identities.
       const { data: verifiedQuotation } = await quotationsApi.get(savedQuotationId);
+      setReferenceNo(verifiedQuotation.reference_no || null);
       const mapping = reconcileSavedQuotation(payloadSections, verifiedQuotation.sections);
       const currentPlanId = planProjectId.current;
       if (currentPlanId) {
@@ -878,6 +882,7 @@ const CreateQuotation = () => {
         setAIPriceEvidence({});
         planProjectId.current = null;
         savedQuotationIdRef.current = null;
+        setReferenceNo(null);
         setClientAddress("");
         setDateOfProposal("");
         setQuotationValidTill("");
@@ -1235,7 +1240,7 @@ const CreateQuotation = () => {
         {/* Project Details */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Project Details</CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-lg">Project Details</CardTitle><div className="rounded-lg border bg-muted/40 px-3 py-2 text-xs"><span className="text-muted-foreground">Ref QNO: </span><span className="font-mono font-semibold" aria-live="polite">{referenceNo || 'Assigned on save'}</span></div></div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">

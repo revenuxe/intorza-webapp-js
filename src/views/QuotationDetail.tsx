@@ -25,6 +25,7 @@ import { getLibraryTerms } from "@/lib/libraryDefaults";
 interface Quotation {
   id: string;
   quotation_number: string;
+  reference_no: string;
   quotation_title: string;
   project_name: string;
   client_name: string;
@@ -437,6 +438,7 @@ const QuotationDetail = () => {
               <div>
                 <CardTitle className="text-2xl">{quotation.quotation_title || quotation.project_name}</CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">{quotation.quotation_number}</p>
+                <p className="mt-2 font-mono text-sm font-semibold">Ref QNO: {quotation.reference_no}</p>
               </div>
               <Badge className={getStatusColor(quotation.status)}>
                 {quotation.status?.charAt(0).toUpperCase() + quotation.status?.slice(1) || 'Draft'}

@@ -130,14 +130,14 @@ function structuredQuotationPayload(body: Record<string, unknown>) {
 export const quotationsApi = {
   list: async (): Promise<Envelope<any[]>> => {
     const uid = await requireUserId();
-    const rows = unwrap(
-      await supabase
-        .from('quotations')
-        .select('*')
-        .eq('user_id', uid)
-        .order('created_at', { ascending: false }),
-    );
-    return { data: (rows as any[]) || [] };
+    const rows: any[] = [];
+    for (let offset=0; ; offset+=500) {
+      const page = unwrap(await supabase.from('quotations').select('*').eq('user_id',uid)
+        .order('created_at',{ascending:false}).order('id').range(offset,offset+499)) as any[];
+      rows.push(...(page || []));
+      if ((page || []).length < 500) break;
+    }
+    return { data: rows };
   },
   get: async (id: string): Promise<Envelope<any>> => {
     const row = unwrap(
