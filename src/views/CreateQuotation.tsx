@@ -1151,6 +1151,7 @@ const CreateQuotation = () => {
     },
   }), [
     quotationId,
+    referenceNo,
     projectTitle,
     clientName,
     clientAddress,
