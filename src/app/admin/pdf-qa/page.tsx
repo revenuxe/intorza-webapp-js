@@ -3,7 +3,7 @@ import View from "@/components/next/adminPDFPreviewQAClient";
 
 export const metadata: Metadata = {
   title: "PDF Preview QA",
-  alternates: { canonical: "/admin/pdf-qa" },
+  alternates: { canonical: "https://admin.intorza.com/admin/pdf-qa" },
 };
 
 export default function Page() {
