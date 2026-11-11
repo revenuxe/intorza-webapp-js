@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Navigation, Calendar, ChevronRight, CheckCircle, XCircle, FileQuestion, AlertCircle, Hash, Copy, RefreshCw, ListTodo, BarChart3, MessageSquare, Target, TrendingUp, Award, Building2, ArrowUpRight, LogIn } from "lucide-react";
+import { Plus, Users, Clock, MapPin, Phone, Mail, Trash2, Edit, FolderPlus, UserPlus, Briefcase, Navigation, Calendar, ChevronRight, CheckCircle, XCircle, FileQuestion, AlertCircle, Hash, Copy, RefreshCw, ListTodo, BarChart3, MessageSquare, Target, TrendingUp, Award, Building2, ArrowUpRight, LogIn, UserRound } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useFeedback } from "@/components/FeedbackProvider";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -531,7 +531,7 @@ const Team = () => {
 
   const getWorkTypeBadge = (type: string) => {
     const wt = workTypes.find(t => t.value === type);
-    return wt ? `${wt.icon} ${wt.label}` : type;
+    return wt ? wt.label : type;
   };
 
   const toggleMemberSelection = (memberId: string) => {
@@ -802,7 +802,7 @@ const Team = () => {
                   <div key={member.id} className="flex items-center gap-2.5 p-2.5 border rounded-xl">
                     {/* Avatar circle */}
                     <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm shrink-0 ${isClockedIn ? 'bg-green-100 ring-2 ring-green-400' : 'bg-muted'}`}>
-                      {workTypes.find(t => t.value === member.work_type)?.icon || '👤'}
+                      <UserRound className="h-4 w-4" aria-hidden="true" />
                     </div>
                     {/* Info */}
                     <div className="flex-1 min-w-0">
@@ -961,7 +961,7 @@ const Team = () => {
                 <div key={member.id} className="p-2.5 border rounded-xl">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm">{workTypes.find(t => t.value === member.work_type)?.icon}</span>
+                      <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                       <p className="font-medium text-sm truncate">{member.name}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -1007,7 +1007,7 @@ const Team = () => {
                       <div className="min-w-0">
                         <p className="font-medium text-sm">{request.name}</p>
                         <div className="flex items-center gap-1 mt-0.5">
-                          <span className="text-[10px] text-muted-foreground">{workTypes.find(t => t.value === request.work_type)?.icon} {workTypes.find(t => t.value === request.work_type)?.label}</span>
+                          <span className="text-[10px] text-muted-foreground">{workTypes.find(t => t.value === request.work_type)?.label}</span>
                           <Badge className={`${statusStyles[request.status] || ''} text-[9px] h-4`}>{request.status}</Badge>
                         </div>
                       </div>
@@ -1109,7 +1109,7 @@ const Team = () => {
                 <SelectTrigger className="rounded-xl h-9"><SelectValue placeholder="Select member" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Unassigned</SelectItem>
-                  {teamMembers.map((m) => (<SelectItem key={m.id} value={m.id}>{workTypes.find(t => t.value === m.work_type)?.icon} {m.name}</SelectItem>))}
+                  {teamMembers.map((m) => (<SelectItem key={m.id} value={m.id}><span className="flex items-center gap-2"><UserRound className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />{m.name}</span></SelectItem>))}
                 </SelectContent>
               </Select>
             </div>
@@ -1154,7 +1154,7 @@ const Team = () => {
                   teamMembers.map((member) => (
                     <label key={member.id} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${teamForm.selectedMembers.includes(member.id) ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted'}`}>
                       <input type="checkbox" checked={teamForm.selectedMembers.includes(member.id)} onChange={() => toggleMemberSelection(member.id)} className="rounded" />
-                      <span className="text-sm">{workTypes.find(t => t.value === member.work_type)?.icon}</span>
+                      <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                       <span className="text-sm font-medium truncate">{member.name}</span>
                     </label>
                   ))
