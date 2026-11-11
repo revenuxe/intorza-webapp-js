@@ -1,4 +1,4 @@
-import { FileText, Receipt, Users, Settings, PlusCircle, UsersRound, LayoutDashboard, Ruler, FolderOpen, Lock, Crown, Library, MessageSquare, ImageIcon } from "lucide-react";
+import { FileText, Receipt, Users, Settings, PlusCircle, UsersRound, LayoutDashboard, Ruler, FolderOpen, Lock, Crown, Library, MessageCircleHeart, ImageIcon } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { cn } from "@/lib/utils";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -159,7 +159,7 @@ export const Navigation = ({ mobile }: NavigationProps) => {
         onClick={() => openFeedback()}
         className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 transition-colors mt-2"
       >
-        <MessageSquare className="h-5 w-5" />
+        <MessageCircleHeart className="h-5 w-5 shrink-0" strokeWidth={1.8} aria-hidden="true" />
         <span className="flex-1">Feedback</span>
       </button>
     </nav>
