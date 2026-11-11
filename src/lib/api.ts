@@ -240,9 +240,9 @@ export const clientsApi = {
       p_quotation_ids: quotationIds, p_invoice_ids: invoiceIds }));
   },
 };
-// Tasks are shared with assigned team members; their company/assignee RLS
-// policies govern visibility. This table has company_id, not user_id.
-export const tasksApi = tableCrud('tasks', { userScoped: false });
+// Organization task management uses company_id for ownership.
+// Assigned members update status through the restricted RPC.
+export const tasksApi = tableCrud('tasks', { ownerColumn: 'company_id' });
 export const galleryApi = tableCrud('gallery_images');
 
 export const paymentsApi = {

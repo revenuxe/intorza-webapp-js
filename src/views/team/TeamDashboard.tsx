@@ -360,17 +360,10 @@ const TeamDashboard = () => {
 
   // Task status update
   const handleUpdateTaskStatus = async (taskId: string, newStatus: string) => {
-    const updates: any = { status: newStatus };
-    if (newStatus === 'completed') {
-      updates.completed_at = new Date().toISOString();
-    } else {
-      updates.completed_at = null;
-    }
-
-    const { error } = await supabase
-      .from('tasks')
-      .update(updates)
-      .eq('id', taskId);
+    const { error } = await supabase.rpc('update_assigned_task_status', {
+      p_task_id: taskId,
+      p_status: newStatus,
+    });
 
     if (error) {
       toast.error("Error updating task");
