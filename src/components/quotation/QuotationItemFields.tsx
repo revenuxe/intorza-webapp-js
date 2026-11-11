@@ -9,11 +9,13 @@ import { ItemSpecifications } from './ItemSpecifications';
 import { ItemSideSelector } from './ItemSideSelector';
 import { combineItemDetails, splitItemDetails } from '@/lib/itemSpecifications';
 import { getQuotationUnit } from '@/lib/quotationUnits';
+import { suggestionAutofill } from '@/lib/quotationProductSuggestions';
 export type ItemField = 'productName' | 'productDetails' | 'side' | 'measurementUnit' | 'widthFt' | 'heightFt' | 'sftArea' | 'ratePerSft';
 export type EditableQuotationItem = { productName: string; productDetails: string; side: string; measurementUnit?: string; widthFt: number; heightFt: number; sftArea: number; ratePerSft: number; amount: number };
-export function QuotationItemFields({ item, onChange, patterns = [], pending = false, currencySymbol = '\u20b9', locale = 'en-IN', showProductDetails = true, showSideColumn = true, compact = false, idPrefix }: {
+export function QuotationItemFields({ item, onChange, patterns = [], suggestionNotice, pending = false, currencySymbol = '\u20b9', locale = 'en-IN', showProductDetails = true, showSideColumn = true, compact = false, idPrefix }: {
   item: EditableQuotationItem; onChange: (field: ItemField, value: string | number) => void;
   patterns?: ComponentProps<typeof ProductNameInput>['patterns']; pending?: boolean;
+  suggestionNotice?: string;
   currencySymbol?: string; locale?: string; showProductDetails?: boolean; showSideColumn?: boolean; compact?: boolean; idPrefix?: string;
 }) {
   const generatedId = useId();
@@ -24,10 +26,9 @@ export function QuotationItemFields({ item, onChange, patterns = [], pending = f
                   <div className="min-w-0 space-y-2">
                     <Label htmlFor={`product-name-${fieldId}`}>Product Name</Label>
                     <ProductNameInput id={`product-name-${fieldId}`} value={item.productName}
-                      onChange={name => onChange('productName', name)} patterns={patterns}
+                      onChange={name => onChange('productName', name)} patterns={patterns} notice={suggestionNotice}
                       onProductSelect={pattern => {
-                        if (pattern.product_details && !item.productDetails) onChange('productDetails', pattern.product_details);
-                        if (pattern.preferred_rate && pattern.preferred_rate > 0 && !item.ratePerSft) onChange('ratePerSft', pattern.preferred_rate);
+                        for (const update of suggestionAutofill(item, pattern)) onChange(update.field, update.value);
                       }} placeholder="e.g. Wardrobe" />
                   </div>
                   {showProductDetails && <div className="min-w-0 space-y-2">

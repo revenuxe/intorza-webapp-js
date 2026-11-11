@@ -17,6 +17,7 @@ export function readSnapshot(owner: string | null): Snapshot {
 }
 export function writeSnapshot(owner: string | null, snapshot: Snapshot) {
   localStorage.setItem(storageKey(owner), JSON.stringify(snapshot));
+  window.dispatchEvent(new CustomEvent('intorza:library-changed', { detail: { owner } }));
 }
 export async function loadAccountLibrary(owner: string) {
   const entries: Entries = {};

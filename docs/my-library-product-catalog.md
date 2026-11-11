@@ -50,9 +50,11 @@ Reset requires confirmation and affects only the selected master overrides.
 
 No quotation calculations, PDF generation, authentication implementation, or
 other application page was changed. Existing approved rate sources remain in the
-Items tab using their prior localization settings. The new catalog's personal
-overrides are specific to My Library; no automatic changes are made to existing
-quotations or the separate quotation rate-learning system.
+Items tab using their prior localization settings. The quotation Product Name field reads the merged catalog and current account/device
+overrides through a read-only suggestion adapter. Selecting a product fills only
+blank details and rates, and applies its unit only to a pristine measurement row.
+A rate is never applied across incompatible billing units. Existing saved quotations
+are not automatically changed. The separate rate-learning system remains intact.
 
 Verification includes catalog/unit/model/storage tests, sync/error/account-switch
 tests, rollback-only SQL RLS checks, guest mobile browser flows, mocked account

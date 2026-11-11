@@ -1,4 +1,5 @@
 "use client";
+import { useQuotationLibrarySuggestions } from "@/hooks/useQuotationLibrarySuggestions";
 import { ProjectTypePicker } from "@/components/quotation/ProjectTypePicker";
 import { getDraftReference, clearDraftReference } from "@/lib/draft-quotation-reference";
 
@@ -113,7 +114,6 @@ const CreateQuotation = () => {
   const {
     loading: automationLoading,
     clients,
-    itemPatterns,
     getSmartDefaults,
     getClientAddress,
     getItemDefaults,
@@ -162,6 +162,7 @@ const CreateQuotation = () => {
   const [projectDeadline, setProjectDeadline] = useState("");
   const [placeOfProject, setPlaceOfProject] = useState("");
   const [warranty, setWarranty] = useState("10");
+  const { patterns: librarySuggestions, notice: librarySuggestionNotice } = useQuotationLibrarySuggestions();
   const [projectType, setProjectType] = useState("Residential");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState("18");
@@ -1363,7 +1364,7 @@ const CreateQuotation = () => {
                     </div>
                   )}
 
-                  <QuotationItemFields idPrefix={item.id} item={item} patterns={itemPatterns} pending={isPendingAIItem(item)} currencySymbol={profile.currency_symbol} locale={profile.locale} showProductDetails={customizeSettings.showProductDetails} showSideColumn={customizeSettings.showSideColumn} onChange={(field, value) => updateItem(section.id, item.id, field, value)} />
+                  <QuotationItemFields idPrefix={item.id} item={item} patterns={librarySuggestions} suggestionNotice={librarySuggestionNotice} pending={isPendingAIItem(item)} currencySymbol={profile.currency_symbol} locale={profile.locale} showProductDetails={customizeSettings.showProductDetails} showSideColumn={customizeSettings.showSideColumn} onChange={(field, value) => updateItem(section.id, item.id, field, value)} />
                   {Object.prototype.hasOwnProperty.call(aiPriceEvidence, item.id) && <div className="rounded-lg bg-muted/30 px-3 py-2"><EstimatePriceDetails price={aiPriceEvidence[item.id]} /><p className="mt-1 text-[11px] text-muted-foreground">Original AI price evidence. Manual rate/specification changes require your review.</p></div>}
                 </QuotationItemCard>; })}
 

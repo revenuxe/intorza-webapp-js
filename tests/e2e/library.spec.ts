@@ -29,3 +29,20 @@ test('duplicate editor closes without leaving a menu pointer lock', async ({ pag
   await page.getByRole('textbox', { name: 'Search Products', exact: true }).fill('Independent test product');
   await expect(page.getByText('Independent test product', { exact: true })).toBeVisible();
 });
+
+test('quotation product names search My Library and preserve its rate/specifications', async ({ page }) => {
+  await page.goto('/library');
+  await page.getByRole('textbox', { name: 'Search Products', exact: true }).fill('Hinged Wardrobe');
+  const rate = page.getByRole('textbox', { name: 'Rate for Hinged Wardrobe', exact: true });
+  await rate.fill('1450.5'); await rate.press('Enter');
+  const material = page.getByRole('textbox', { name: 'Material for Hinged Wardrobe', exact: true });
+  await material.fill('BWR Plywood'); await material.press('Enter');
+  await page.goto('/');
+  const name = page.getByRole('combobox', { name: 'Product Name', exact: true }).first();
+  await name.fill('war');
+  await page.getByRole('option', { name: /Hinged Wardrobe/ }).click();
+  await expect(name).toHaveValue('Hinged Wardrobe');
+  await expect(page.locator('input[id^="item-rate-"]').first()).toHaveValue('1450.5');
+  await page.getByRole('button', { name: 'Specifications (1)', exact: true }).click();
+  await expect(page.getByLabel('Material', { exact: true }).first()).toHaveValue('BWR Plywood');
+});
