@@ -162,7 +162,7 @@ const CreateQuotation = () => {
   const [projectDeadline, setProjectDeadline] = useState("");
   const [placeOfProject, setPlaceOfProject] = useState("");
   const [warranty, setWarranty] = useState("10");
-  const [projectType, setProjectType] = useState("");
+  const [projectType, setProjectType] = useState("Residential");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState("18");
   const [discountPercentage, setDiscountPercentage] = useState(0);
@@ -271,7 +271,7 @@ const CreateQuotation = () => {
       setDateOfProposal(defaults.dateOfProposal);
       setQuotationValidTill(defaults.quotationValidTill);
       setWarranty(normalizeWarrantyInput(defaults.warranty));
-      setProjectType(defaults.projectType);
+      setProjectType("Residential");
       setPlaceOfProject(defaults.placeOfProject);
       setGstEnabled(defaults.gstEnabled);
       setGstRate(defaults.gstRate);
@@ -906,7 +906,7 @@ const CreateQuotation = () => {
         setDateOfProposal("");
         setQuotationValidTill("");
         setPlaceOfProject("");
-        setProjectType("");
+        setProjectType("Residential");
         setSections([{
           id: "1",
           title: "",
