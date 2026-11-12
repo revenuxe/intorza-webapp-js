@@ -1270,8 +1270,8 @@ const CreateQuotation = () => {
               <Label htmlFor="projectTitle">Quotation Title</Label>
               <Input id="projectTitle" value={projectTitle} onChange={e => setProjectTitle(e.target.value)} placeholder="e.g., BEST BUDGET, PREMIUM PACKAGE" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {customizeSettings.showClientName && <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:gap-4">
+              {customizeSettings.showClientName && <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
                   <Label htmlFor="clientName">Client Name</Label>
                   <ClientSelector
                     id="clientName"
@@ -1286,15 +1286,15 @@ const CreateQuotation = () => {
                     placeholder="Enter or select client name"
                   />
                 </div>}
-              {customizeSettings.showClientAddress && <div className="space-y-2">
+              {customizeSettings.showClientAddress && <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
                   <Label htmlFor="clientAddress">Client Address</Label>
                   <Input id="clientAddress" placeholder="Enter address" value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
                 </div>}
-              {customizeSettings.showDateOfProposal && <div className="min-w-0 space-y-2">
+              {customizeSettings.showDateOfProposal && <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
                   <Label htmlFor="dateOfProposal">Date of Proposal</Label>
                   <Input id="dateOfProposal" type="date" value={dateOfProposal} onChange={e => setDateOfProposal(e.target.value)} />
                 </div>}
-              {customizeSettings.showQuotationValidTill && <div className="min-w-0 space-y-2">
+              {customizeSettings.showQuotationValidTill && <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
                   <Label htmlFor="quotationValidTill">Quotation Valid Till</Label>
                   <Input id="quotationValidTill" type="date" value={quotationValidTill} onChange={e => setQuotationValidTill(e.target.value)} />
                 </div>}
@@ -1302,19 +1302,19 @@ const CreateQuotation = () => {
                   <Label htmlFor="projectDeadline">Project Deadline</Label>
                   <Input id="projectDeadline" type="date" value={projectDeadline} onChange={e => setProjectDeadline(e.target.value)} />
                 </div>}
-              {customizeSettings.showPlaceOfProject && <div className="space-y-2">
+              {customizeSettings.showPlaceOfProject && <div className="min-w-0 space-y-2">
                   <Label htmlFor="placeOfProject">Place of Project</Label>
                   <Input id="placeOfProject" placeholder="Enter location" value={placeOfProject} onChange={e => setPlaceOfProject(e.target.value)} />
                 </div>}
-              {customizeSettings.showWarranty && <div className="space-y-2">
+              {customizeSettings.showWarranty && <div className="min-w-0 space-y-2">
                   <Label htmlFor="warranty">Warranty (Years)</Label>
                   <Input id="warranty" type="number" value={warranty} onChange={e => setWarranty(e.target.value)} placeholder="10" />
                 </div>}
-              {customizeSettings.showProjectType && <div className="space-y-2 md:col-span-2">
+              {customizeSettings.showProjectType && <div className="min-w-0 space-y-2">
                   <Label htmlFor="projectType">Project Type</Label>
                   <ProjectTypePicker id="projectType" value={projectType} onChange={setProjectType} />
                 </div>}
-              {!profile.logo_url && <div className="space-y-2 md:col-span-2 p-3 bg-muted/30 rounded-lg">
+              {!profile.logo_url && <div className="col-span-2 space-y-2 p-3 bg-muted/30 rounded-lg">
                   <p className="text-sm text-muted-foreground">
                     Company logo not uploaded. <a href="/settings" className="text-primary underline">Go to Settings</a> to upload your logo.
                   </p>
