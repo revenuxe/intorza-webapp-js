@@ -1265,7 +1265,7 @@ const CreateQuotation = () => {
           <CardHeader>
             <div className="flex items-center justify-between gap-2"><CardTitle className="shrink-0 text-base sm:text-lg">Project Details</CardTitle><div className="shrink-0 whitespace-nowrap rounded-lg border bg-muted/40 px-2 py-2 text-[10px] sm:px-3 sm:text-xs"><span className="text-muted-foreground">Ref QNO: </span><span className="font-mono font-semibold" aria-live="polite">{referenceNo || (referenceError ? <button type="button" onClick={()=>setReferenceRetry(value=>value+1)}>Retry</button> : 'Generating...')}</span></div></div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 [&_label]:text-[13px] [&_input]:text-sm [&_button[role=combobox]]:text-sm">
             <div className="space-y-2">
               <Label htmlFor="projectTitle">Quotation Title</Label>
               <Input id="projectTitle" value={projectTitle} onChange={e => setProjectTitle(e.target.value)} placeholder="e.g., BEST BUDGET, PREMIUM PACKAGE" />
@@ -1306,7 +1306,7 @@ const CreateQuotation = () => {
                   <Label htmlFor="placeOfProject">Place of Project</Label>
                   <Input id="placeOfProject" placeholder="Enter location" value={placeOfProject} onChange={e => setPlaceOfProject(e.target.value)} />
                 </div>}
-              {(customizeSettings.showWarranty || customizeSettings.showProjectType) && <div className={`col-span-2 grid items-end gap-x-5 sm:gap-x-6 ${customizeSettings.showWarranty && customizeSettings.showProjectType ? "grid-cols-[minmax(7.5rem,0.7fr)_minmax(0,1.3fr)]" : "grid-cols-1"}`}>
+              {(customizeSettings.showWarranty || customizeSettings.showProjectType) && <div className={`col-span-2 grid items-end gap-x-5 sm:gap-x-6 ${customizeSettings.showWarranty && customizeSettings.showProjectType ? "grid-cols-[minmax(6.5rem,0.7fr)_minmax(0,1.3fr)]" : "grid-cols-1"}`}>
               {customizeSettings.showWarranty && <div className="min-w-0 space-y-2">
                   <Label htmlFor="warranty" className="whitespace-nowrap">Warranty (Years)</Label>
                   <Input id="warranty" className="h-12" type="number" value={warranty} onChange={e => setWarranty(e.target.value)} placeholder="10" />
