@@ -1,10 +1,8 @@
 import { Input } from '@/components/ui/input';
 import { quotationUnits, getQuotationUnit, isAreaUnit } from '@/lib/quotationUnits';
-import { useState } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { TypeChoicePicker } from './TypeChoicePicker';
 
 export function ItemMeasurements({ item, onChange, layout = 'standard' }: {
  layout?: 'standard' | 'product';
@@ -12,7 +10,6 @@ export function ItemMeasurements({ item, onChange, layout = 'standard' }: {
  onChange: (field: 'measurementUnit' | 'widthFt' | 'heightFt' | 'sftArea', value: string | number) => void;
 }) {
   const unit = getQuotationUnit(item.measurementUnit);
-  const [unitPickerOpen, setUnitPickerOpen] = useState(false);
   const area = isAreaUnit(unit);
   const calculated = area && item.widthFt > 0 && item.heightFt > 0 && Math.abs(item.widthFt * item.heightFt - item.sftArea) < 0.0001;
   const length = unit === 'Sq.m' ? 'm' : 'ft';
@@ -21,33 +18,7 @@ export function ItemMeasurements({ item, onChange, layout = 'standard' }: {
  return <div className="grid grid-cols-2 items-start gap-3">
  <div className={`space-y-2 text-sm ${layout === 'product' ? 'col-span-2' : ''}`}>
    <span className="block border-b border-border/60 pb-2 text-sm">Unit / Measurement</span>
-   <Popover open={unitPickerOpen} onOpenChange={setUnitPickerOpen}>
-     <PopoverTrigger asChild>
-       <Button type="button" variant="outline" role="combobox" aria-label="Measurement unit" aria-expanded={unitPickerOpen} className="h-10 w-full justify-between gap-2 rounded-lg border-primary/20 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 sm:text-sm">
-         <span>{unit}</span>
-         <ChevronDown className={`h-4 w-4 transition-transform ${unitPickerOpen ? 'rotate-180' : ''}`} />
-       </Button>
-     </PopoverTrigger>
-     <PopoverContent align="start" className="w-[min(220px,calc(100vw-2rem))] overflow-hidden rounded-xl p-0 shadow-lg">
-       <Command>
-         <CommandInput placeholder="Search units..." />
-         <CommandList className="max-h-60">
-           <CommandEmpty>No units found.</CommandEmpty>
-           <CommandGroup>
-             {quotationUnits.map(([value, name]) => (
-               <CommandItem key={value} value={value} keywords={[name]} onSelect={() => {
-                 if (value !== unit) onChange('measurementUnit', value);
-                 setUnitPickerOpen(false);
-               }} className="gap-2 py-2">
-                 <Check className={`h-4 w-4 shrink-0 ${unit === value ? 'opacity-100' : 'opacity-0'}`} />
-                 <span>{value}</span>
-               </CommandItem>
-             ))}
-           </CommandGroup>
-         </CommandList>
-       </Command>
-     </PopoverContent>
-   </Popover>
+   <TypeChoicePicker value={unit} onChange={value => { if (value !== unit) onChange('measurementUnit', value); }} options={quotationUnits.map(([value, name]) => ({ value, detail: name }))} label="Measurement unit" heading="Units & measurements" searchPlaceholder="Search units..." allowCustom={false} trigger={open => <Button type="button" variant="outline" role="combobox" aria-label="Measurement unit" aria-expanded={open} className="h-10 w-full justify-between gap-2 rounded-lg border-primary/20 bg-primary/5 px-3 text-xs font-medium text-primary hover:bg-primary/10 sm:text-sm"><span>{unit}</span><ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} /></Button>} />
  </div>
  {layout === 'product' ? <>{dimensionFields}{coverageField}</> : <>{coverageField}{dimensionFields}</>}
  <p className="col-span-2 text-xs text-muted-foreground">{unit === 'L.S.' ? 'Enter 1 for one complete job and the fixed price as the rate.' : area ? 'Enter dimensions or enter the area directly.' : 'Enter the billable quantity in the selected unit.'} Changing the unit clears measurements and rate.</p>
