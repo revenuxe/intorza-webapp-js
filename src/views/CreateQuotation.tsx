@@ -1306,14 +1306,16 @@ const CreateQuotation = () => {
                   <Label htmlFor="placeOfProject">Place of Project</Label>
                   <Input id="placeOfProject" placeholder="Enter location" value={placeOfProject} onChange={e => setPlaceOfProject(e.target.value)} />
                 </div>}
+              {(customizeSettings.showWarranty || customizeSettings.showProjectType) && <div className={`col-span-2 grid items-end gap-x-5 sm:gap-x-6 ${customizeSettings.showWarranty && customizeSettings.showProjectType ? "grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]" : "grid-cols-1"}`}>
               {customizeSettings.showWarranty && <div className="min-w-0 space-y-2">
                   <Label htmlFor="warranty">Warranty (Years)</Label>
-                  <Input id="warranty" type="number" value={warranty} onChange={e => setWarranty(e.target.value)} placeholder="10" />
+                  <Input id="warranty" className="h-12" type="number" value={warranty} onChange={e => setWarranty(e.target.value)} placeholder="10" />
                 </div>}
               {customizeSettings.showProjectType && <div className="min-w-0 space-y-2">
                   <Label htmlFor="projectType">Project Type</Label>
                   <ProjectTypePicker id="projectType" value={projectType} onChange={setProjectType} />
                 </div>}
+              </div>}
               {!profile.logo_url && <div className="col-span-2 space-y-2 p-3 bg-muted/30 rounded-lg">
                   <p className="text-sm text-muted-foreground">
                     Company logo not uploaded. <a href="/settings" className="text-primary underline">Go to Settings</a> to upload your logo.
