@@ -1306,9 +1306,9 @@ const CreateQuotation = () => {
                   <Label htmlFor="placeOfProject">Place of Project</Label>
                   <Input id="placeOfProject" placeholder="Enter location" value={placeOfProject} onChange={e => setPlaceOfProject(e.target.value)} />
                 </div>}
-              {(customizeSettings.showWarranty || customizeSettings.showProjectType) && <div className={`col-span-2 grid items-end gap-x-5 sm:gap-x-6 ${customizeSettings.showWarranty && customizeSettings.showProjectType ? "grid-cols-[minmax(6rem,0.7fr)_minmax(0,1.3fr)]" : "grid-cols-1"}`}>
+              {(customizeSettings.showWarranty || customizeSettings.showProjectType) && <div className={`col-span-2 grid items-end gap-x-5 sm:gap-x-6 ${customizeSettings.showWarranty && customizeSettings.showProjectType ? "grid-cols-[minmax(7.5rem,0.7fr)_minmax(0,1.3fr)]" : "grid-cols-1"}`}>
               {customizeSettings.showWarranty && <div className="min-w-0 space-y-2">
-                  <Label htmlFor="warranty" className="whitespace-nowrap text-xs sm:text-sm">Warranty (Years)</Label>
+                  <Label htmlFor="warranty" className="whitespace-nowrap">Warranty (Years)</Label>
                   <Input id="warranty" className="h-12" type="number" value={warranty} onChange={e => setWarranty(e.target.value)} placeholder="10" />
                 </div>}
               {customizeSettings.showProjectType && <div className="min-w-0 space-y-2">
