@@ -1290,11 +1290,11 @@ const CreateQuotation = () => {
                   <Label htmlFor="clientAddress">Client Address</Label>
                   <Input id="clientAddress" placeholder="Enter address" value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
                 </div>}
-              {customizeSettings.showDateOfProposal && <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
+              {customizeSettings.showDateOfProposal && <div className="flex min-w-0 flex-col justify-end space-y-2">
                   <Label htmlFor="dateOfProposal">Date of Proposal</Label>
                   <Input id="dateOfProposal" type="date" value={dateOfProposal} onChange={e => setDateOfProposal(e.target.value)} />
                 </div>}
-              {customizeSettings.showQuotationValidTill && <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
+              {customizeSettings.showQuotationValidTill && <div className="flex min-w-0 flex-col justify-end space-y-2">
                   <Label htmlFor="quotationValidTill">Quotation Valid Till</Label>
                   <Input id="quotationValidTill" type="date" value={quotationValidTill} onChange={e => setQuotationValidTill(e.target.value)} />
                 </div>}
