@@ -1270,7 +1270,7 @@ const CreateQuotation = () => {
               <Label htmlFor="projectTitle">Quotation Title</Label>
               <Input id="projectTitle" value={projectTitle} onChange={e => setProjectTitle(e.target.value)} placeholder="e.g., BEST BUDGET, PREMIUM PACKAGE" />
             </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:gap-4">
+            <div className="grid grid-cols-2 gap-x-5 gap-y-5 sm:gap-x-6 sm:gap-y-5">
               {customizeSettings.showClientName && <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
                   <Label htmlFor="clientName">Client Name</Label>
                   <ClientSelector
