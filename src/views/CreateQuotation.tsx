@@ -1270,7 +1270,7 @@ const CreateQuotation = () => {
           <CardHeader>
             <div className="flex items-center justify-between gap-2"><CardTitle className="shrink-0 text-base sm:text-lg">Project Details</CardTitle><div className="shrink-0 whitespace-nowrap rounded-lg border bg-muted/40 px-2 py-2 text-[10px] sm:px-3 sm:text-xs"><span className="text-muted-foreground">Ref QNO: </span><span className="font-mono font-semibold" aria-live="polite">{referenceNo || (referenceError ? <button type="button" onClick={()=>setReferenceRetry(value=>value+1)}>Retry</button> : 'Generating...')}</span></div></div>
           </CardHeader>
-          <CardContent className="space-y-4 [&_input]:text-sm [&_button[role=combobox]]:text-sm">
+          <CardContent className="space-y-4 [&_label]:block [&_label]:border-b [&_label]:border-border/60 [&_label]:pb-2 [&_input]:text-sm [&_button[role=combobox]]:text-sm">
             <div className="space-y-2">
               <Label htmlFor="projectTitle">Quotation Title</Label>
               <Input id="projectTitle" value={projectTitle} onChange={e => setProjectTitle(e.target.value)} placeholder="e.g., BEST BUDGET, PREMIUM PACKAGE" />
