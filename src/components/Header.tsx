@@ -61,7 +61,10 @@ export const Header = () => {
                 <span className="sr-only">Toggle menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0">
+            <SheetContent side="left" className="w-64 overflow-y-auto p-0">
+              <div className="flex h-20 items-center border-b border-border px-6 pr-12">
+                <img src={logo.src} alt="INTORZA" className="h-auto w-40 max-w-full object-contain" />
+              </div>
               <Navigation mobile />
             </SheetContent>
           </Sheet>

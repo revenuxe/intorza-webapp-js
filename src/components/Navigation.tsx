@@ -99,7 +99,7 @@ export const Navigation = ({ mobile }: NavigationProps) => {
   return (
     <nav className={cn(
       "flex flex-col gap-1 p-4",
-      mobile ? "pt-8" : "h-full"
+      mobile ? "pt-4" : "h-full"
     )}>
       {/* Upgrade Banner for non-Pro users */}
       {!proLoading && proStatus !== 'unavailable' && !isPro && (
