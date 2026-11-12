@@ -653,77 +653,80 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       yPosition += cardHeight + 10;
 
     } else {
-      // Default: Two cards (existing behavior)
-      setBodyFont('bold');
-      setPdfFontSize(9);
-      const typeLines = data.projectType ? doc.splitTextToSize(data.projectType, (contentWidth - gap) / 2 - 48) as string[] : [];
-      const cardHeight = (data.referenceNo ? 54 : 48) + typeLines.length * 6 + (data.projectDeadline ? 6 : 0);
+      // Balanced cards: client/project identity on the left, reference and dates on the right.
       const cardWidth = (contentWidth - gap) / 2;
-
-      // Left Card: Client Info
+      const cardPadding = 8;
+      const innerWidth = cardWidth - cardPadding * 2;
+      const labelWidth = 26;
+      const lineHeight = 4.5;
+      setHeadingFont('bold');
+      setPdfFontSize(11);
+      const clientLines = doc.splitTextToSize(data.clientName || '', innerWidth) as string[];
+      setBodyFont('normal');
+      setPdfFontSize(9);
+      const addressLines = data.clientAddress ? doc.splitTextToSize(data.clientAddress, innerWidth) as string[] : [];
+      const makeRows = (fields: Array<[string, string]>) => {
+        setBodyFont('bold');
+        setPdfFontSize(9);
+        return fields.filter(([, value]) => !!value).map(([label, value]) => ({ label, lines: doc.splitTextToSize(value, innerWidth - labelWidth) as string[] }));
+      };
+      const leftRows = makeRows([
+        ['Project:', data.quotationTitle],
+        ['Project Type:', data.projectType],
+        ['Location:', data.placeOfProject],
+      ]);
+      const rightRows = makeRows([
+        ['Ref QNO:', data.referenceNo || ''],
+        ['Date:', data.dateOfProposal],
+        ['Valid Till:', data.quotationValidTill],
+        ['Warranty:', settings.showWarranty ? warrantyDisplay : ''],
+        ['Deadline:', data.projectDeadline || ''],
+      ]);
+      const rowsHeight = (rows: typeof leftRows) => rows.reduce((sum, row) => sum + Math.max(row.lines.length, 1) * lineHeight + 2, 0);
+      const clientHeight = Math.max(clientLines.length, 1) * 5 + (addressLines.length ? addressLines.length * lineHeight + 2 : 0) + 5;
+      const cardHeight = Math.max(48, 17 + clientHeight + rowsHeight(leftRows) + cardPadding, 17 + rowsHeight(rightRows) + cardPadding);
+      if (yPosition + cardHeight > pageBottomY) {
+        doc.addPage();
+        yPosition = pageTopY;
+      }
+      const rightCardX = margin + cardWidth + gap;
       doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
       doc.setDrawColor(COLORS.BORDER[0], COLORS.BORDER[1], COLORS.BORDER[2]);
       doc.roundedRect(margin, yPosition, cardWidth, cardHeight, 2, 2, cardBorderStyle);
-      
-      let cardY = yPosition + 10;
-      const cardPadding = 8;
-      const cardContentX = margin + cardPadding;
-      
-      setHeadingFont('bold');
-      setPdfFontSize(8);
-      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-      doc.text('QUOTATION FOR', cardContentX, cardY);
-      
-      cardY += 7;
-      setHeadingFont('bold');
-      setPdfFontSize(11);
-      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-      doc.text(data.clientName, cardContentX, cardY);
-      
-      cardY += 6;
-      setBodyFont('normal');
-      setPdfFontSize(9);
-      doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-      const clientAddr = doc.splitTextToSize(data.clientAddress, cardWidth - (cardPadding * 2));
-      doc.text(clientAddr, cardContentX, cardY);
-
-      // Right Card: Project Meta
-      const rightCardX = margin + cardWidth + gap;
-      doc.setFillColor(COLORS.BG_CARD[0], COLORS.BG_CARD[1], COLORS.BG_CARD[2]);
       doc.roundedRect(rightCardX, yPosition, cardWidth, cardHeight, 2, 2, cardBorderStyle);
-      
-      let metaY = yPosition + 10;
-      const metaContentX = rightCardX + cardPadding;
-      const metaLabelX = metaContentX;
-      const metaValueX = metaContentX + 32;
-      
-      setHeadingFont('bold');
-      setPdfFontSize(8);
-      doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
-      doc.text('PROJECT DETAILS', metaContentX, metaY);
-      metaY += 7;
-
-      const addMeta = (label: string, value: string) => {
-        setBodyFont('normal');
-        setPdfFontSize(9);
-        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
-        doc.text(label, metaLabelX, metaY);
-        
-        setBodyFont('bold');
-        doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
-        doc.text(value, metaValueX, metaY);
-        metaY += 6;
+      const heading = (text: string, x: number) => {
+        setHeadingFont('bold'); setPdfFontSize(8);
+        doc.setTextColor(COLORS.TEXT_LIGHT[0], COLORS.TEXT_LIGHT[1], COLORS.TEXT_LIGHT[2]);
+        doc.text(text, x, yPosition + 10);
       };
-
-      if (data.referenceNo) addMeta('Ref QNO:', data.referenceNo);
-      typeLines.forEach((line, index) => addMeta(index === 0 ? 'Project Type:' : '', line));
-      addMeta('Date:', data.dateOfProposal);
-      addMeta('Valid Till:', data.quotationValidTill);
-      addMeta('Project:', data.quotationTitle.substring(0, 20));
-      if (settings.showWarranty && warrantyDisplay) addMeta('Warranty:', warrantyDisplay);
-      if (data.projectDeadline) {
-        addMeta('Deadline:', data.projectDeadline);
+      const drawRows = (rows: typeof leftRows, x: number, top: number) => {
+        let rowY = top;
+        for (const row of rows) {
+          setBodyFont('normal'); setPdfFontSize(9);
+          doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+          doc.text(row.label, x, rowY);
+          setBodyFont('bold');
+          doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+          doc.text(row.lines, x + labelWidth, rowY, { lineHeightFactor: 1.15 });
+          rowY += Math.max(row.lines.length, 1) * lineHeight + 2;
+        }
+      };
+      const leftX = margin + cardPadding;
+      heading('QUOTATION FOR', leftX);
+      let clientY = yPosition + 17;
+      setHeadingFont('bold'); setPdfFontSize(11);
+      doc.setTextColor(COLORS.TEXT_PRIMARY[0], COLORS.TEXT_PRIMARY[1], COLORS.TEXT_PRIMARY[2]);
+      doc.text(clientLines, leftX, clientY, { lineHeightFactor: 1.15 });
+      clientY += Math.max(clientLines.length, 1) * 5 + 2;
+      if (addressLines.length) {
+        setBodyFont('normal'); setPdfFontSize(9);
+        doc.setTextColor(COLORS.TEXT_SECONDARY[0], COLORS.TEXT_SECONDARY[1], COLORS.TEXT_SECONDARY[2]);
+        doc.text(addressLines, leftX, clientY, { lineHeightFactor: 1.15 });
+        clientY += addressLines.length * lineHeight + 2;
       }
+      drawRows(leftRows, leftX, clientY + 3);
+      heading('PROJECT DETAILS', rightCardX + cardPadding);
+      drawRows(rightRows, rightCardX + cardPadding, yPosition + 17);
 
       yPosition += cardHeight + 10;
     }

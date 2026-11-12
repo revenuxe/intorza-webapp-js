@@ -166,6 +166,17 @@ it.each([true, false])('exports canonical structured specifications without a le
 });
 
 // The same generator powers live preview and the downloaded PDF.
+it('balances the two-card header between project identity and quotation metadata', async () => {
+ const pdf = await generateQuotationPDF({ ...quotationData, referenceNo: 'QNO-0001AZ', projectDeadline: '2026-12-01', settings: { ...getQuotationSettings(), showProjectDetails: true }, editorSettings: { ...quotationData.editorSettings!, headerInfoColumns: 2 } });
+ const content=pdf.internal.pages.flat().join('\n');
+ const rightHeading=content.indexOf('(PROJECT DETAILS)');
+ expect(content.indexOf('(Project Type:)')).toBeLessThan(rightHeading);
+ expect(content.indexOf('(Location:)')).toBeLessThan(rightHeading);
+ expect(content.indexOf('(Ref QNO:)')).toBeGreaterThan(rightHeading);
+ expect(content.indexOf('(Deadline:)')).toBeGreaterThan(rightHeading);
+ expect(content).toContain('(2026-12-01)');
+});
+
 it.each([1, 2, 3] as const)('prints the selected project type in project details with %i header columns', async headerInfoColumns => {
  const pdf = await generateQuotationPDF({ ...quotationData, projectType: 'Commercial', referenceNo: 'QNO-0001AZ', settings: { ...getQuotationSettings(), showProjectDetails: true }, editorSettings: { ...quotationData.editorSettings!, headerInfoColumns } });
  const content=pdf.internal.pages.flat().join('\n');
