@@ -43,7 +43,7 @@ export function QuotationItemFields({ item, onChange, patterns = [], suggestionN
                   <div className="border-t border-border/70 pt-4">
                     <ItemMeasurements layout="product" item={item} onChange={(field, value) => onChange(field, value)} />
                   </div>
-                  <div className={`grid items-end gap-3 ${showSideColumn ? 'grid-cols-[minmax(0,1fr)_5.5rem] sm:grid-cols-[minmax(0,1fr)_7rem]' : 'grid-cols-1'}`}>
+                  <div className={`grid items-end gap-3 [&_label]:block [&_label]:border-b [&_label]:border-border/60 [&_label]:pb-2 ${showSideColumn ? 'grid-cols-[minmax(0,1fr)_5.5rem] sm:grid-cols-[minmax(0,1fr)_7rem]' : 'grid-cols-1'}`}>
                     <div className="min-w-0 space-y-2">
                       <Label htmlFor={`item-rate-${fieldId}`}>Rate / {getQuotationUnit(item.measurementUnit)} ({currencySymbol})</Label>
                       <Input id={`item-rate-${fieldId}`} type="number" min="0" value={item.ratePerSft || ''} onChange={event => onChange('ratePerSft', parseFloat(event.target.value) || 0)} placeholder="0" step="0.01" />
