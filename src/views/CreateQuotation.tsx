@@ -1,4 +1,5 @@
 "use client";
+import { addDays, format, parseISO } from 'date-fns';
 import { useQuotationLibrarySuggestions } from "@/hooks/useQuotationLibrarySuggestions";
 import { ProjectTypePicker } from "@/components/quotation/ProjectTypePicker";
 import { getDraftReference, clearDraftReference } from "@/lib/draft-quotation-reference";
@@ -71,6 +72,8 @@ interface PaymentStage {
   milestone: string;
   percentage: number;
 }
+const defaultProjectDeadline = (proposal: string) => proposal ? format(addDays(parseISO(proposal), 45), 'yyyy-MM-dd') : '';
+
 const CreateQuotation = () => {
   const {
     toast, feedback, clearFeedback
@@ -250,7 +253,7 @@ const CreateQuotation = () => {
         if (formData.clientAddress) setClientAddress(formData.clientAddress);
         if (formData.dateOfProposal) setDateOfProposal(formData.dateOfProposal);
         if (formData.quotationValidTill) setQuotationValidTill(formData.quotationValidTill);
-        if (formData.projectDeadline) setProjectDeadline(formData.projectDeadline);
+        setProjectDeadline(formData.projectDeadline || defaultProjectDeadline(formData.dateOfProposal || ""));
         if (formData.placeOfProject) setPlaceOfProject(formData.placeOfProject);
         if (formData.warranty) setWarranty(normalizeWarrantyInput(formData.warranty));
         if (formData.projectType) setProjectType(formData.projectType);
@@ -270,6 +273,7 @@ const CreateQuotation = () => {
     if (!automationLoading && !quotationId && !smartDefaultsApplied.current && !continueAction) {
       const defaults = getSmartDefaults();
       setDateOfProposal(defaults.dateOfProposal);
+      setProjectDeadline(defaultProjectDeadline(defaults.dateOfProposal));
       setQuotationValidTill(defaults.quotationValidTill);
       setWarranty(normalizeWarrantyInput(defaults.warranty));
       setProjectType("Residential");
@@ -927,6 +931,7 @@ const CreateQuotation = () => {
         // Re-apply smart defaults after reset
         const defaults = getSmartDefaults();
         setDateOfProposal(defaults.dateOfProposal);
+      setProjectDeadline(defaultProjectDeadline(defaults.dateOfProposal));
         setQuotationValidTill(defaults.quotationValidTill);
       }
       
@@ -1292,7 +1297,7 @@ const CreateQuotation = () => {
                 </div>}
               {customizeSettings.showDateOfProposal && <div className="flex min-w-0 flex-col justify-end space-y-2">
                   <Label htmlFor="dateOfProposal">Date of Proposal</Label>
-                  <Input id="dateOfProposal" type="date" value={dateOfProposal} onChange={e => setDateOfProposal(e.target.value)} />
+                  <Input id="dateOfProposal" type="date" value={dateOfProposal} onChange={e => { const next = e.target.value; if (!projectDeadline || projectDeadline === defaultProjectDeadline(dateOfProposal)) setProjectDeadline(defaultProjectDeadline(next)); setDateOfProposal(next); }} />
                 </div>}
               {customizeSettings.showQuotationValidTill && <div className="flex min-w-0 flex-col justify-end space-y-2">
                   <Label htmlFor="quotationValidTill">Quotation Valid Till</Label>
