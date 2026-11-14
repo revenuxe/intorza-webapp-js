@@ -366,7 +366,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // Logo placement based on editor settings
   let compressedLogo: string | null = null;
   const logoSize = 25;
-  const cornerRadius = logoSize * 0.1;
+  const logoMaxWidth = 45;
   const headerBandHeight = logoPlacement === 'center' ? 70 : 36;
   if (headerStyle === 'full-width') {
     doc.setFillColor(COLORS.HEADER_BG[0], COLORS.HEADER_BG[1], COLORS.HEADER_BG[2]);
@@ -378,21 +378,21 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   
   if (settings.showCompanyLogo && data.companyLogo) {
     try {
-      compressedLogo = await compressImage(data.companyLogo, 400, 400);
+      compressedLogo = await compressImage(data.companyLogo, 900, 500);
+      const imageProperties = doc.getImageProperties(compressedLogo);
+      const logoScale = Math.min(logoMaxWidth / imageProperties.width, logoSize / imageProperties.height);
+      const logoWidth = imageProperties.width * logoScale;
+      const logoHeight = imageProperties.height * logoScale;
       
       let logoX = margin;
       if (logoPlacement === 'center') {
-        logoX = (pageWidth - logoSize) / 2;
+        logoX = (pageWidth - logoWidth) / 2;
       } else if (logoPlacement === 'right') {
-        logoX = pageWidth - margin - logoSize;
+        logoX = pageWidth - margin - logoWidth;
       }
       
-      // Draw rounded rectangle for logo background
-      doc.setFillColor(COLORS.HEADER_BG[0], COLORS.HEADER_BG[1], COLORS.HEADER_BG[2]);
-      doc.roundedRect(logoX, yPosition, logoSize, logoSize, cornerRadius, cornerRadius, 'F');
-      
-      // Add logo on top of background
-      doc.addImage(compressedLogo, 'JPEG', logoX, yPosition, logoSize, logoSize, undefined, 'FAST');
+      // Fit the original proportions inside the header without stretching or cropping.
+      doc.addImage(compressedLogo, 'JPEG', logoX, yPosition, logoWidth, logoHeight, undefined, 'FAST');
     } catch (e) { console.error(e); }
   }
 
