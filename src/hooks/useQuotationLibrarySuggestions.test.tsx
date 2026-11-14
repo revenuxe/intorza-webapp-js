@@ -1,19 +1,33 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useQuotationLibrarySuggestions } from './useQuotationLibrarySuggestions';
 import { masterProducts } from '@/lib/library/model';
-import { writeSnapshot } from '@/lib/library/storage';
+import { writeSnapshot, readSnapshot } from '@/lib/library/storage';
 let mockUser: { id: string } | null = null;
 const mockLoad = jest.fn();
+const mockSave = jest.fn();
 jest.mock('./useAuth', () => ({ useAuth: () => ({ user: mockUser, loading: false }) }));
-jest.mock('@/lib/library/storage', () => ({ ...jest.requireActual('@/lib/library/storage'), loadAccountLibrary: (...args: unknown[]) => mockLoad(...args) }));
+jest.mock('@/lib/library/storage', () => ({ ...jest.requireActual('@/lib/library/storage'), loadAccountLibrary: (...args: unknown[]) => mockLoad(...args), saveAccountEntries: (...args: unknown[]) => mockSave(...args) }));
 jest.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-beforeEach(() => { localStorage.clear(); mockUser = null; mockLoad.mockReset(); mockLoad.mockResolvedValue({ entries: {}, legacy: { products: [], categories: [] } }); });
+beforeEach(() => { localStorage.clear(); mockUser = null; mockSave.mockReset(); mockSave.mockResolvedValue(undefined); mockLoad.mockReset(); mockLoad.mockResolvedValue({ entries: {}, legacy: { products: [], categories: [] } }); });
 it('reads guest edits and refreshes when My Library saves on the same device', async () => {
   const view = renderHook(useQuotationLibrarySuggestions);
   await waitFor(() => expect(view.result.current.patterns).toHaveLength(800));
   const product = { ...masterProducts[0], rate: 1600 };
   act(() => writeSnapshot(null, { entries: { [product.id]: { id: product.id, kind: 'product', data: product, revision: '1' } }, pending: {} }));
   await waitFor(() => expect(view.result.current.patterns.find(row => row.id === product.id)?.preferred_rate).toBe(1600));
+});
+it('updates a quotation price immediately in local library and syncs the latest rate to its account', async () => {
+  mockUser = { id: 'account-a' };
+  const view = renderHook(useQuotationLibrarySuggestions);
+  await waitFor(() => expect(mockLoad).toHaveBeenCalledWith('account-a'));
+  const item = { productName: 'Custom wardrobe', productDetails: 'Plywood', measurementUnit: 'Sq.ft', ratePerSft: 1500 };
+  act(() => view.result.current.remember(item));
+  const saved = view.result.current.patterns.find(row => row.product_name === item.productName)!;
+  expect(saved.preferred_rate).toBe(1500);
+  act(() => view.result.current.remember({ ...item, ratePerSft: 1750 }, saved.id));
+  expect(readSnapshot('account-a').entries[saved.id!].data).toMatchObject({ rate: 1750 });
+  expect(view.result.current.patterns.find(row => row.id === saved.id)?.preferred_rate).toBe(1750);
+  await waitFor(() => expect(mockSave).toHaveBeenCalledWith('account-a', expect.arrayContaining([expect.objectContaining({ id: saved.id, data: expect.objectContaining({ rate: 1750 }) })])), { timeout: 3000 });
 });
 it('does not expose another account or guest overrides after identity changes', async () => {
   const product = masterProducts[0];

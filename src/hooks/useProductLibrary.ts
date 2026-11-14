@@ -8,11 +8,14 @@ export function useProductLibrary(owner: string | null) {
   const current = useRef(snapshot);
   const [legacy, setLegacy] = useState<{ products: Product[]; categories: Category[] }>({ products: [], categories: [] });
   const [ready, setReady] = useState(false);
+  const [loadedOwner, setLoadedOwner] = useState<string | null | undefined>(undefined);
   const [cloudReady, setCloudReady] = useState(!owner);
   const [error, setError] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [retry, setRetry] = useState(0);
   const active = useRef(true);
+  const currentOwner = useRef(owner);
+  currentOwner.current = owner;
   const syncingRef = useRef(false);
   const persist = useCallback((next: Snapshot) => {
     // Save locally first. A storage failure never pretends the edit succeeded.
@@ -21,12 +24,23 @@ export function useProductLibrary(owner: string | null) {
   }, [owner]);
   useEffect(() => {
     active.current = true;
-    try { const saved = readSnapshot(owner); current.current = saved; setSnapshot(saved); setReady(true); }
+    setLegacy({ products: [], categories: [] }); setError(''); setCloudReady(!owner);
+    try { const saved = readSnapshot(owner); current.current = saved; setSnapshot(saved); setReady(true); setLoadedOwner(owner); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Browser storage is unavailable. Enable storage and retry.'); }
     return () => { active.current = false; };
   }, [owner]);
   useEffect(() => {
-    if (!ready || !owner) return;
+    const refresh = () => {
+      try { const saved = readSnapshot(owner); current.current = saved; setSnapshot(saved); }
+      catch { setError('Unable to refresh locally saved library changes.'); }
+    };
+    const changed = (event: Event) => { if ((event as CustomEvent).detail?.owner === owner) refresh(); };
+    const storage = (event: StorageEvent) => { if (!event.key || event.key === 'intorza:product-library:v1:' + (owner || 'guest')) refresh(); };
+    window.addEventListener('intorza:library-changed', changed); window.addEventListener('storage', storage);
+    return () => { window.removeEventListener('intorza:library-changed', changed); window.removeEventListener('storage', storage); };
+  }, [owner]);
+  useEffect(() => {
+    if (!ready || loadedOwner !== owner || !owner) return;
     let cancelled = false;
     setCloudReady(false);
     void loadAccountLibrary(owner).then(result => {
@@ -35,31 +49,31 @@ export function useProductLibrary(owner: string | null) {
       persist(next); setLegacy(result.legacy); setCloudReady(true); setError('');
     }).catch(() => { if (!cancelled) setError('Account library could not be loaded. Cached changes are safe on this device. Retry to sync.'); });
     return () => { cancelled = true; };
-  }, [ready, owner, retry, persist]);
+  }, [ready, loadedOwner, owner, retry, persist]);
   useEffect(() => {
-    if (!owner || !cloudReady || !Object.keys(snapshot.pending).length || syncingRef.current || error) return;
+    if (loadedOwner !== owner || !owner || !cloudReady || !Object.keys(snapshot.pending).length || syncingRef.current || error) return;
     const timer = setTimeout(async () => {
       const batch = Object.values(current.current.pending).slice(0, 100);
       if (!batch.length) return;
       syncingRef.current = true; setSyncing(true);
       try {
         await saveAccountEntries(owner, batch);
-        if (!active.current) return;
+        if (!active.current || currentOwner.current !== owner) return;
         const pending = { ...current.current.pending };
         for (const entry of batch) if (pending[entry.id]?.revision === entry.revision) delete pending[entry.id];
         persist({ entries: current.current.entries, pending });
-      } catch { if (active.current) setError('Cloud save failed. Your edits are saved on this device. Retry when connected.'); }
+      } catch { if (active.current && currentOwner.current === owner) setError('Cloud save failed. Your edits are saved on this device. Retry when connected.'); }
       finally { syncingRef.current = false; if (active.current) setSyncing(false); }
     }, 500);
     return () => clearTimeout(timer);
-  }, [snapshot, owner, cloudReady, error, persist, syncing]);
+  }, [snapshot, loadedOwner, owner, cloudReady, error, persist, syncing]);
   useEffect(() => {
     const online = () => { setError(''); setRetry(value => value + 1); };
     window.addEventListener('online', online);
     return () => window.removeEventListener('online', online);
   }, []);
   const commit = (updates: Omit<Entry, 'revision'>[]) => {
-    if (!ready) throw new Error('Library storage is not ready. Please retry.');
+    if (!ready || loadedOwner !== owner) throw new Error('Library storage is not ready. Please retry.');
     const entries: Entries = { ...current.current.entries }, pending = { ...current.current.pending };
     for (const update of updates) {
       const entry: Entry = { ...update, revision: crypto.randomUUID() };
@@ -68,8 +82,8 @@ export function useProductLibrary(owner: string | null) {
     try { persist({ entries, pending }); }
     catch { throw new Error('Browser storage is full or unavailable. The change has not been saved. Free space and retry.'); }
   };
-  return { entries: snapshot.entries, legacy, commit, ready, cloudReady, error, syncing,
+  return { entries: loadedOwner === owner ? snapshot.entries : {}, legacy: loadedOwner === owner ? legacy : { products: [], categories: [] }, commit, ready: ready && loadedOwner === owner, cloudReady: cloudReady && loadedOwner === owner, error, syncing,
     pendingCount: Object.keys(snapshot.pending).length,
-    retry: () => { setError(''); if (!ready) { try { const saved = readSnapshot(owner); current.current = saved; setSnapshot(saved); setReady(true); } catch { setError('Unable to read browser storage. Your saved data was not overwritten.'); } } else setRetry(value => value + 1); },
+    retry: () => { setError(''); if (!ready || loadedOwner !== owner) { try { const saved = readSnapshot(owner); current.current = saved; setSnapshot(saved); setReady(true); setLoadedOwner(owner); } catch { setError('Unable to read browser storage. Your saved data was not overwritten.'); } } else setRetry(value => value + 1); },
   };
 }

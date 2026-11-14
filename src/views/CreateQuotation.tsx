@@ -165,7 +165,7 @@ const CreateQuotation = () => {
   const [projectDeadline, setProjectDeadline] = useState("");
   const [placeOfProject, setPlaceOfProject] = useState("");
   const [warranty, setWarranty] = useState("10");
-  const { patterns: librarySuggestions, notice: librarySuggestionNotice } = useQuotationLibrarySuggestions();
+  const { patterns: librarySuggestions, notice: librarySuggestionNotice, remember: rememberLibraryProduct } = useQuotationLibrarySuggestions();
   const [projectType, setProjectType] = useState("Residential");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState("18");
@@ -1371,7 +1371,7 @@ const CreateQuotation = () => {
                     </div>
                   )}
 
-                  <QuotationItemFields idPrefix={item.id} item={item} patterns={librarySuggestions} suggestionNotice={librarySuggestionNotice} pending={isPendingAIItem(item)} currencySymbol={profile.currency_symbol} locale={profile.locale} showProductDetails={customizeSettings.showProductDetails} showSideColumn={customizeSettings.showSideColumn} onChange={(field, value) => updateItem(section.id, item.id, field, value)} />
+                  <QuotationItemFields idPrefix={item.id} item={item} patterns={librarySuggestions} onRemember={rememberLibraryProduct} suggestionNotice={librarySuggestionNotice} pending={isPendingAIItem(item)} currencySymbol={profile.currency_symbol} locale={profile.locale} showProductDetails={customizeSettings.showProductDetails} showSideColumn={customizeSettings.showSideColumn} onChange={(field, value) => updateItem(section.id, item.id, field, value)} />
                   {Object.prototype.hasOwnProperty.call(aiPriceEvidence, item.id) && <div className="rounded-lg bg-muted/30 px-3 py-2"><EstimatePriceDetails price={aiPriceEvidence[item.id]} /><p className="mt-1 text-[11px] text-muted-foreground">Original AI price evidence. Manual rate/specification changes require your review.</p></div>}
                 </QuotationItemCard>; })}
 
@@ -1537,7 +1537,7 @@ const CreateQuotation = () => {
         </Card>
 
         {/* PDF Preview Editor */}
-        <PDFPreviewEditor onItemMeasurementChange={(sectionIndex, itemIndex, field, value) => updateItem(sections[sectionIndex].id, sections[sectionIndex].items[itemIndex].id, field, value)} open={showPreview} onClose={() => setShowPreview(false)} onDownload={(settings, terms) => handleDownloadPDF(settings, undefined, undefined, terms)} quotationData={quotationPreviewData} customizeSettings={{ ...customizeSettings, areaOnly: !customizeSettings.showDetailedSizeColumns && !!lastAIDraft.current }} />
+        <PDFPreviewEditor onItemMeasurementChange={(sectionIndex, itemIndex, field, value) => { const section = sections[sectionIndex]; const item = section.items[itemIndex]; updateItem(section.id, item.id, field, value); if (field === 'ratePerSft') rememberLibraryProduct({ ...item, ratePerSft: Number(value) }); }} open={showPreview} onClose={() => setShowPreview(false)} onDownload={(settings, terms) => handleDownloadPDF(settings, undefined, undefined, terms)} quotationData={quotationPreviewData} customizeSettings={{ ...customizeSettings, areaOnly: !customizeSettings.showDetailedSizeColumns && !!lastAIDraft.current }} />
         
         {/* Gallery Image Picker */}
         <GalleryImagePicker
