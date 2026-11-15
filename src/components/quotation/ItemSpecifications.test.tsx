@@ -47,3 +47,26 @@ it('allows arbitrary values rather than requiring a catalog brand', () => {
   fireEvent.change(screen.getByLabelText('Brand'), { target: { value: 'Local supplier' } });
   expect(screen.getByTestId('details')).toHaveTextContent('Brand: Local supplier');
 });
+
+it('uses the room-style mobile sheet for suggestions and custom specification values', () => {
+  const original = window.matchMedia;
+  window.matchMedia = jest.fn().mockImplementation(() => ({ matches: true, addEventListener: jest.fn(), removeEventListener: jest.fn() }));
+  global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  HTMLElement.prototype.scrollIntoView = jest.fn();
+  try {
+    render(<Editor />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add specifications' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Material' }));
+    expect(screen.getByRole('dialog', { name: 'Material' })).toBeVisible();
+    fireEvent.click(screen.getByRole('option', { name: 'BWP Plywood' }));
+    expect(screen.getByRole('combobox', { name: 'Material' })).toHaveTextContent('BWP Plywood');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('combobox', { name: 'Brand' }));
+    const search = screen.getByPlaceholderText('Search or type brand...');
+    expect(search).toHaveAttribute('maxlength', '160');
+    fireEvent.change(search, { target: { value: 'Local supplier' } });
+    fireEvent.keyDown(search, { key: 'Enter' });
+    expect(screen.getByTestId('details')).toHaveTextContent('Brand: Local supplier');
+    expect(screen.getByTestId('details')).toHaveTextContent('Material: BWP Plywood');
+  } finally { window.matchMedia = original; }
+});

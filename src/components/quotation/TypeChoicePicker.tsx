@@ -10,9 +10,9 @@ type Choice = { value: string; detail?: string };
 
 /** Mobile uses a viewport-contained sheet, so keyboard scrolling cannot detach
  * the list from its field. Desktop retains a bounded, collision-aware popover. */
-export function TypeChoicePicker({ value, onChange, options, label, heading, searchPlaceholder, trigger, allowCustom = true }: {
+export function TypeChoicePicker({ value, onChange, options, label, heading, searchPlaceholder, trigger, allowCustom = true, maxLength = 120 }: {
   value: string; onChange: (value: string) => void; options: Choice[]; label: string;
-  heading: string; searchPlaceholder: string; allowCustom?: boolean; trigger: (open: boolean) => ReactNode;
+  heading: string; searchPlaceholder: string; allowCustom?: boolean; maxLength?: number; trigger: (open: boolean) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -39,7 +39,7 @@ export function TypeChoicePicker({ value, onChange, options, label, heading, sea
   const choices = value.trim() && !options.some(option => option.value.toLowerCase() === value.trim().toLowerCase()) ? [{ value: value.trim(), detail: 'Current value' }, ...options] : options;
   const exact = choices.some(option => option.value.toLowerCase() === custom.toLowerCase());
   const content = <Command className="flex min-h-0 flex-1 flex-col rounded-xl">
-    <CommandInput aria-label={label + ' search'} placeholder={searchPlaceholder} value={query} onValueChange={setQuery} maxLength={120} onKeyDown={event => {
+    <CommandInput aria-label={label + ' search'} placeholder={searchPlaceholder} value={query} onValueChange={setQuery} maxLength={maxLength} onKeyDown={event => {
       if (allowCustom && event.key === 'Enter' && custom && !exact) { event.preventDefault(); event.stopPropagation(); choose(custom); }
     }} />
     <CommandList className="min-h-0 max-h-none flex-1 overflow-y-auto overscroll-contain touch-pan-y">

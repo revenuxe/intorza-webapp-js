@@ -64,7 +64,7 @@ test('product-first item cards keep optional specifications, pricing and respons
   await expect(page.getByRole('article', { name: /^Item 2:/ }).getByLabel('Product Name', { exact: true })).toBeVisible();
   await card.getByRole('button', { name: '1. Wardrobe' }).click();
   await expect(card.getByLabel('Product Details', { exact: true })).toHaveValue('4-door wardrobe with loft');
-  await expect(card.getByLabel('Warranty', { exact: true })).toHaveValue('10 years');
+  await expect(card.getByRole('combobox', { name: 'Warranty', exact: true })).toHaveText('10 years');
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
   const preview = page.getByRole('dialog').first();
