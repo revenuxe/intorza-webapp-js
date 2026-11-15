@@ -11,7 +11,7 @@ beforeAll(() => {
   HTMLElement.prototype.scrollIntoView = jest.fn();
 });
 function choose(label: string, value: string) {
-  fireEvent.click(screen.getByRole('combobox', { name: label }));
+  fireEvent.click(screen.getByRole('combobox', { name: `Choose ${label}` }));
   const search = screen.getByPlaceholderText(`Search or type ${label.toLowerCase()}...`);
   fireEvent.change(search, { target: { value } });
   const option = screen.queryByRole('option', { name: value });
@@ -22,11 +22,11 @@ it('keeps specifications optional and adds only selected attributes', () => {
   render(<Editor />);
   expect(screen.queryByLabelText('Material')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Add specifications' }));
-  expect(screen.getByLabelText('Material')).toHaveTextContent('Enter material');
+  expect(screen.getByLabelText('Material')).toHaveValue('');
   choose('Material', 'BWP Plywood');
   choose('Brand', 'Century');
   expect(splitItemDetails(screen.getByTestId('details').textContent!)).toEqual({ description: 'Full-height wardrobe', specifications: [{ label: 'Material', value: 'BWP Plywood' }, { label: 'Brand', value: 'Century' }] });
-  expect(screen.getByLabelText('Hardware')).toHaveTextContent('Enter hardware');
+  expect(screen.getByLabelText('Hardware')).toHaveValue('');
   expect(screen.getByTestId('details')).not.toHaveTextContent('Hardware:');
 });
 it('adds custom attributes and rejects duplicate names', () => {
@@ -47,7 +47,7 @@ it('adds custom attributes and rejects duplicate names', () => {
 it('restores saved specifications and removes them without damaging the description', () => {
   render(<Editor initial={'False ceiling\n\nSpecifications:\nMaterial: Gypsum Board\nBrand: Gyproc'} />);
   fireEvent.click(screen.getByRole('button', { name: 'Specifications (2)' }));
-  expect(screen.getByLabelText('Brand')).toHaveTextContent('Gyproc');
+  expect(screen.getByLabelText('Brand')).toHaveValue('Gyproc');
   fireEvent.click(screen.getByRole('button', { name: 'Remove Brand specification' }));
   expect(screen.getByTestId('details')).not.toHaveTextContent('Gyproc');
   fireEvent.click(screen.getByRole('button', { name: 'Remove Material specification' }));
@@ -68,12 +68,12 @@ it('uses the room-style mobile sheet for suggestions and custom specification va
   try {
     render(<Editor />);
     fireEvent.click(screen.getByRole('button', { name: 'Add specifications' }));
-    fireEvent.click(screen.getByRole('combobox', { name: 'Material' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Choose Material' }));
     expect(screen.getByRole('dialog', { name: 'Material' })).toBeVisible();
     fireEvent.click(screen.getByRole('option', { name: 'BWP Plywood' }));
-    expect(screen.getByRole('combobox', { name: 'Material' })).toHaveTextContent('BWP Plywood');
+    expect(screen.getByLabelText('Material')).toHaveValue('BWP Plywood');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('combobox', { name: 'Brand' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Choose Brand' }));
     const search = screen.getByPlaceholderText('Search or type brand...');
     expect(search).toHaveAttribute('maxlength', '160');
     fireEvent.change(search, { target: { value: 'Local supplier' } });
@@ -86,9 +86,21 @@ it('uses the room-style mobile sheet for suggestions and custom specification va
 it('uses a styled searchable desktop popover without native datalists', () => {
   const { container } = render(<Editor />);
   fireEvent.click(screen.getByRole('button', { name: 'Add specifications' }));
-  fireEvent.click(screen.getByRole('combobox', { name: 'Material' }));
+  fireEvent.click(screen.getByRole('combobox', { name: 'Choose Material' }));
   expect(screen.getByPlaceholderText('Search or type material...')).toBeVisible();
   expect(screen.getByRole('option', { name: 'BWP Plywood' })).toBeVisible();
   expect(container.querySelector('datalist')).toBeNull();
   expect(screen.getByRole('dialog')).toHaveAttribute('data-side', 'bottom');
+});
+
+it('allows direct typing, replacing from suggestions, and clearing a value', () => {
+  render(<Editor />);
+  fireEvent.click(screen.getByRole('button', { name: 'Add specifications' }));
+  fireEvent.change(screen.getByLabelText('Material'), { target: { value: 'Custom board' } });
+  expect(screen.getByTestId('details')).toHaveTextContent('Material: Custom board');
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  choose('Material', 'BWP Plywood');
+  expect(screen.getByLabelText('Material')).toHaveValue('BWP Plywood');
+  fireEvent.change(screen.getByLabelText('Material'), { target: { value: '' } });
+  expect(screen.getByTestId('details').textContent).toBe('Full-height wardrobe');
 });

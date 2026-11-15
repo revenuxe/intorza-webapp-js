@@ -2,7 +2,7 @@ import { test, expect, type Page, type Locator } from '@playwright/test';
 import { mockCaptcha } from './mock-captcha';
 
 async function chooseSpecification(page: Page, scope: Locator, label: string, value: string) {
-  await scope.getByRole('combobox', { name: label, exact: true }).click();
+  await scope.getByRole('combobox', { name: `Choose ${label}`, exact: true }).click();
   const search = page.getByPlaceholder(`Search or type ${label.toLowerCase()}...`);
   await search.fill(value);
   const option = page.getByRole('option', { name: value, exact: true });
@@ -73,17 +73,17 @@ test('product-first item cards keep optional specifications, pricing and respons
   await expect(page.getByRole('article', { name: /^Item 2:/ }).getByLabel('Product Name', { exact: true })).toBeVisible();
   await card.getByRole('button', { name: '1. Wardrobe' }).click();
   await expect(card.getByLabel('Product Details', { exact: true })).toHaveValue('4-door wardrobe with loft');
-  await expect(card.getByRole('combobox', { name: 'Warranty', exact: true })).toHaveText('10 years');
+  await expect(card.getByLabel('Warranty', { exact: true })).toHaveValue('10 years');
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
   const preview = page.getByRole('dialog').first();
   await preview.getByRole('tab', { name: 'Content', exact: true }).click();
   await expect(preview.getByLabel('Product Name', { exact: true }).first()).toHaveValue('Wardrobe');
   await preview.getByRole('button', { name: 'Specifications (3)', exact: true }).first().click();
-  await expect(preview.getByRole('combobox', { name: 'Material', exact: true }).first()).toHaveText('BWP Plywood');
+  await expect(preview.getByLabel('Material', { exact: true }).first()).toHaveValue('BWP Plywood');
   await chooseSpecification(page, preview, 'Warranty', '12 years');
   await preview.getByRole('button', { name: 'Close', exact: true }).first().click();
-  await expect(card.getByRole('combobox', { name: 'Warranty', exact: true })).toHaveText('12 years');
+  await expect(card.getByLabel('Warranty', { exact: true })).toHaveValue('12 years');
   await page.getByRole('button', { name: 'Save as Draft', exact: true }).click();
   await expect(page).toHaveURL(/\/auth$/);
   const pending = await page.evaluate(() => sessionStorage.getItem('pendingFormData'));
