@@ -1,5 +1,14 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page, type Locator } from '@playwright/test';
 import { mockCaptcha } from './mock-captcha';
+
+async function chooseSpecification(page: Page, scope: Locator, label: string, value: string) {
+  await scope.getByRole('combobox', { name: label, exact: true }).click();
+  const search = page.getByPlaceholder(`Search or type ${label.toLowerCase()}...`);
+  await search.fill(value);
+  const option = page.getByRole('option', { name: value, exact: true });
+  if (await option.count()) await option.click();
+  else await search.press('Enter');
+}
 
 test('product-first item cards keep optional specifications, pricing and responsive order', async ({ page }) => {
   await mockCaptcha(page);
@@ -25,13 +34,13 @@ test('product-first item cards keep optional specifications, pricing and respons
   await card.getByLabel('Product Details', { exact: true }).fill('4-door wardrobe with loft');
   await expect(card.getByLabel('Material', { exact: true })).toHaveCount(0);
   await card.getByRole('button', { name: 'Add specifications', exact: true }).click();
-  await card.getByLabel('Material', { exact: true }).fill('BWP Plywood');
-  await card.getByLabel('Brand', { exact: true }).fill('Century');
+  await chooseSpecification(page, card, 'Material', 'BWP Plywood');
+  await chooseSpecification(page, card, 'Brand', 'Century');
   await card.getByRole('button', { name: 'Add field', exact: true }).click();
   await card.getByRole('button', { name: 'Add custom field', exact: true }).click();
   await card.getByLabel('Custom field name').fill('Warranty');
   await card.getByRole('button', { name: 'Add field', exact: true }).click();
-  await card.getByLabel('Warranty', { exact: true }).fill('10 years');
+  await chooseSpecification(page, card, 'Warranty', '10 years');
   await card.getByLabel('Width (ft)', { exact: true }).fill('8');
   await card.getByLabel('Height (ft)', { exact: true }).fill('7');
   await card.getByLabel('Rate / Sq.ft', { exact: false }).fill('1850');
@@ -71,10 +80,10 @@ test('product-first item cards keep optional specifications, pricing and respons
   await preview.getByRole('tab', { name: 'Content', exact: true }).click();
   await expect(preview.getByLabel('Product Name', { exact: true }).first()).toHaveValue('Wardrobe');
   await preview.getByRole('button', { name: 'Specifications (3)', exact: true }).first().click();
-  await expect(preview.getByLabel('Material', { exact: true }).first()).toHaveValue('BWP Plywood');
-  await preview.getByLabel('Warranty', { exact: true }).first().fill('12 years');
+  await expect(preview.getByRole('combobox', { name: 'Material', exact: true }).first()).toHaveText('BWP Plywood');
+  await chooseSpecification(page, preview, 'Warranty', '12 years');
   await preview.getByRole('button', { name: 'Close', exact: true }).first().click();
-  await expect(card.getByLabel('Warranty', { exact: true })).toHaveValue('12 years');
+  await expect(card.getByRole('combobox', { name: 'Warranty', exact: true })).toHaveText('12 years');
   await page.getByRole('button', { name: 'Save as Draft', exact: true }).click();
   await expect(page).toHaveURL(/\/auth$/);
   const pending = await page.evaluate(() => sessionStorage.getItem('pendingFormData'));
