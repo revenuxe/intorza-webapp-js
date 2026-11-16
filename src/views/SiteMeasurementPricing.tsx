@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { MeasurementJourney } from '@/components/site-measurement/MeasurementJourney';
+import { roomAmount, roomIsMeasured } from '@/lib/siteMeasurements';
+import { notifyAccountChanged } from '@/lib/accountQueries';
 import { useParams, useNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,7 +13,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, FileText } from "lucide-react";
 import { useInlineFeedback } from '@/hooks/useInlineFeedback';
 
@@ -19,6 +21,8 @@ interface Room {
   room_type: string;
   room_name: string | null;
   area_sqft: number;
+  width_ft:number;
+  length_ft:number;
   pricing_mode: string | null;
   rate_per_sqft: number | null;
   lump_sum_amount: number | null;
@@ -31,6 +35,7 @@ interface Project {
   id: string;
   client_name: string;
   site_location: string | null;
+  quotation_id?:string|null;
 }
 
 export default function SiteMeasurementPricing() {
@@ -38,12 +43,14 @@ export default function SiteMeasurementPricing() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { settings, formatCurrency: formatCurrencyLocalized, formatArea } = useLocalization();
+  const { formatCurrency: formatCurrencyLocalized } = useLocalization();
   const [project, setProject] = useState<Project | null>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [createAsDraft, setCreateAsDraft] = useState(true);
+  const generationBusy=useRef(false);
+  const requestId=useRef<string|null>(null);
+  const readyForQuotation=rooms.length>0&&rooms.every(roomIsMeasured);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -51,7 +58,7 @@ export default function SiteMeasurementPricing() {
     const [projectRes, roomsRes] = await Promise.all([
       supabase
         .from('site_measurement_projects')
-        .select('id, client_name, site_location')
+        .select('id, client_name, site_location, quotation_id')
         .eq('id', id)
         .maybeSingle(),
       supabase
@@ -71,9 +78,9 @@ export default function SiteMeasurementPricing() {
         pricing_mode: r.pricing_mode || 'per_sqft',
         rate_per_sqft: r.rate_per_sqft || 0,
         lump_sum_amount: r.lump_sum_amount || 0,
-        quantity: r.quantity || 1,
+        quantity: r.quantity ?? 1,
         rate_per_unit: r.rate_per_unit || 0,
-        final_amount: r.final_amount || 0
+        final_amount: roomAmount(r)
       })));
     }
 
@@ -104,122 +111,39 @@ export default function SiteMeasurementPricing() {
   };
 
   const getTotalAmount = () => {
-    return rooms.reduce((sum, r) => sum + (r.final_amount || 0), 0);
+    return rooms.reduce((sum, r) => sum + roomAmount(r), 0);
   };
 
-  const saveRoomPricing = async () => {
-    for (const room of rooms) {
-      await supabase
-        .from('site_measurement_rooms')
-        .update({
-          pricing_mode: room.pricing_mode,
-          rate_per_sqft: room.rate_per_sqft,
-          lump_sum_amount: room.lump_sum_amount,
-          quantity: room.quantity,
-          rate_per_unit: room.rate_per_unit,
-          final_amount: room.final_amount
-        })
-        .eq('id', room.id);
-    }
-  };
-
-  const generateQuotation = async (skipAmounts: boolean = false) => {
-    if (!user || !project || !id) return;
-
-    setGenerating(true);
-
-    try {
-      // Save pricing first
-      if (!skipAmounts) {
-        await saveRoomPricing();
-      }
-
-      // Generate quotation number
-      const { count } = await supabase
-        .from('quotations')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id);
-
-      const quotationNumber = `QT-${String((count || 0) + 1).padStart(4, '0')}`;
-
-      // Create quotation
-      const { data: quotation, error: quotationError } = await supabase
-        .from('quotations')
-        .insert({
-          user_id: user.id,
-          quotation_number: quotationNumber,
-          project_name: project.client_name,
-          client_name: project.client_name,
-          client_address: project.site_location,
-          status: createAsDraft ? 'draft' : 'pending',
-          subtotal: skipAmounts ? 0 : getTotalAmount(),
-          grand_total: skipAmounts ? 0 : getTotalAmount(),
-          date_of_proposal: new Date().toISOString().split('T')[0]
-        })
-        .select()
-        .single();
-
-      if (quotationError || !quotation) {
-        throw new Error('Failed to create quotation');
-      }
-
-      // Create a section for measurements
-      const { data: section, error: sectionError } = await supabase
-        .from('quotation_sections')
-        .insert({
-          quotation_id: quotation.id,
-          section_name: 'Site Measurements',
-          sort_order: 0
-        })
-        .select()
-        .single();
-
-      if (sectionError || !section) {
-        throw new Error('Failed to create section');
-      }
-
-      // Create items for each room
-      for (let i = 0; i < rooms.length; i++) {
-        const room = rooms[i];
-        await supabase
-          .from('quotation_items')
-          .insert({
-            section_id: section.id,
-            product_name: room.room_name || room.room_type,
-            product_details: `Area: ${room.area_sqft?.toFixed(1)} sq.ft`,
-            width_ft: Math.sqrt(room.area_sqft || 0),
-            height_ft: Math.sqrt(room.area_sqft || 0),
-            sft_area: room.area_sqft,
-            rate_per_sft: room.pricing_mode === 'per_sqft' ? room.rate_per_sqft : null,
-            amount: skipAmounts ? 0 : room.final_amount,
-            sort_order: i
-          });
-      }
-
-      // Update site measurement project
-      await supabase
-        .from('site_measurement_projects')
-        .update({
-          status: 'converted',
-          quotation_id: quotation.id
-        })
-        .eq('id', id);
-
-      navigate(`/?id=${quotation.id}`);
-    } catch (error) {
-      console.error(error);
-      toast({ title: 'Could not create quotation', description: 'Please try again.', variant: 'destructive' });
-    } finally {
-      setGenerating(false);
-    }
+  const generateQuotation = async (skipAmounts = false) => {
+    if (!user || !project || !id || generationBusy.current) return;
+    if(project.quotation_id){navigate('/?id='+project.quotation_id);return;}
+    if(!rooms.length){toast({title:'Add a room first',description:'Go back to the site visit and measure at least one room.',variant:'destructive'});return;}
+    if(rooms.some(room=>!roomIsMeasured(room))){toast({title:'Measurements need attention',description:'Each room needs a positive width and length before creating a quotation.',variant:'destructive'});return;}
+    const invalid=rooms.some(room=>{
+      const values=room.pricing_mode==='lump_sum'?[room.lump_sum_amount||0]:room.pricing_mode==='per_unit'?[room.quantity??1,room.rate_per_unit||0]:[room.rate_per_sqft||0];
+      return values.some(value=>!Number.isFinite(Number(value))||Number(value)<0)||(room.pricing_mode==='per_unit'&&Number(room.quantity??1)<=0);
+    });
+    if(!skipAmounts&&invalid){toast({title:'Check the room prices',description:'Use non-negative prices and a quantity greater than zero.',variant:'destructive'});return;}
+    generationBusy.current=true;setGenerating(true);requestId.current ||= crypto.randomUUID();
+    try{
+      const {data,error}=await supabase.rpc('convert_site_measurement',{
+        p_project_id:id,p_request_id:requestId.current,p_skip_amounts:skipAmounts,
+        p_pricing:rooms.map(room=>({id:room.id,expected_width_ft:room.width_ft,expected_length_ft:room.length_ft,pricing_mode:room.pricing_mode||'per_sqft',rate_per_sqft:room.rate_per_sqft||0,lump_sum_amount:room.lump_sum_amount||0,quantity:room.quantity??1,rate_per_unit:room.rate_per_unit||0})),
+      });
+      if(error)throw error;
+      const quotationId=(data as {quotation_id?:string}|null)?.quotation_id;
+      if(!quotationId)throw new Error('Missing quotation acknowledgement');
+      notifyAccountChanged(user.id,'quotations',true);
+      navigate('/?id='+quotationId);
+    }catch(error){const message=error&&typeof error==='object'&&'message' in error&&typeof error.message==='string'?error.message:'Your site visit is kept. Retry to confirm the saved draft.';toast({title:'Could not create the draft',description:message,variant:'destructive'});}
+    finally{generationBusy.current=false;setGenerating(false);}
   };
 
   // Use localized currency formatting
-  const formatCurrency = (amount: number) => formatCurrencyLocalized(amount);
+  const formatCurrency = (amount: number) => formatCurrencyLocalized(amount,true);
   
   // Get area unit label based on measurement system
-  const areaUnitLabel = settings.measurementSystem === 'metric' ? 'sq.m' : 'sq.ft';
-  const areaUnitShort = settings.areaUnitShort.toLowerCase();
+  const areaUnitLabel = 'sq.ft';
 
   if (loading) {
     return (
@@ -228,53 +152,62 @@ export default function SiteMeasurementPricing() {
       </div>
     );
   }
+  if(!project)return <div className="p-4"><p>This site visit could not be loaded.</p><Button variant="outline" className="mt-3" onClick={()=>navigate('/site-measurement')}>Back to site visits</Button></div>;
 
   if (!project) return null;
 
   return (
-    <div className="p-4 md:p-6 pb-32 md:pb-6">
+    <div className="mx-auto w-full min-w-0 max-w-6xl p-4 pb-40 md:p-6">
       {feedback}
+      <div className="mb-5"><MeasurementJourney step={3}/></div>
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button 
           variant="ghost" 
           size="icon"
+          className="h-11 w-11 shrink-0"
+          aria-label="Back to measurements"
           onClick={() => navigate(`/site-measurement/${id}`)}
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold">Pricing Setup</h1>
-          <p className="text-sm text-muted-foreground">{project.client_name}</p>
+        <div className="min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold">Prepare a quotation</h1>
+          <p className="break-words text-sm text-muted-foreground">{project.client_name}</p>
         </div>
       </div>
+      <div className="mb-5 space-y-2 rounded-xl border bg-card p-4 text-sm leading-6">
+        <p className="font-medium">{project.quotation_id?'A quotation already exists for this visit.':'Add room prices now, or start without prices.'}</p>
+        <p className="text-muted-foreground">{project.quotation_id?'Open the saved quotation to edit its items and prices. This site record is kept separately.':'Room dimensions describe floor area in square feet. Walls, cabinets and other work need their own billable measurements. Review the draft before sharing.'}</p>
+      </div>
 
+      {!project.quotation_id&&!readyForQuotation&&<p role="alert" className="mb-5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">The visit needs at least one room with a positive width and length for every room. Use Back to finish those measurements first.</p>}
       {/* Rooms Pricing */}
-      <div className="space-y-4 mb-6">
+      <fieldset disabled={generating||Boolean(project.quotation_id)} className="mb-6 min-w-0 space-y-4">
         {rooms.map((room) => (
-          <Card key={room.id}>
+          <Card key={room.id} className="min-w-0">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center justify-between">
-                <span>{room.room_name || room.room_type}</span>
-                <span className="text-sm font-normal text-muted-foreground">
+              <CardTitle className="flex min-w-0 flex-col gap-1 text-base sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <span className="min-w-0 break-words">{room.room_name || room.room_type}</span>
+                <span className="shrink-0 text-sm font-normal text-muted-foreground">
                   {room.area_sqft?.toFixed(1)} {areaUnitLabel}
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Pricing Mode</Label>
+                <Label htmlFor={`pricing-mode-${room.id}`}>How do you want to price this room?</Label>
                 <Select 
                   value={room.pricing_mode || 'per_sqft'} 
                   onValueChange={(value) => updateRoom(room.id, { pricing_mode: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id={`pricing-mode-${room.id}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="per_sqft">Per {areaUnitLabel}</SelectItem>
-                    <SelectItem value="lump_sum">Lump Sum</SelectItem>
-                    <SelectItem value="per_unit">Per Unit</SelectItem>
+                    <SelectItem value="per_sqft">Rate × floor area ({areaUnitLabel})</SelectItem>
+                    <SelectItem value="lump_sum">Fixed room price</SelectItem>
+                    <SelectItem value="per_unit">Quantity × rate</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -282,18 +215,21 @@ export default function SiteMeasurementPricing() {
               {room.pricing_mode === 'per_sqft' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Rate per {areaUnitLabel}</Label>
+                    <Label htmlFor={`area-rate-${room.id}`}>Rate per {areaUnitLabel}</Label>
                     <Input
                       type="number"
+                      id={`area-rate-${room.id}`}
+                      min="0"
                       inputMode="decimal"
                       value={room.rate_per_sqft || ''}
                       onChange={(e) => updateRoom(room.id, { rate_per_sqft: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Amount</Label>
+                    <Label htmlFor={`area-amount-${room.id}`}>Amount</Label>
                     <Input
                       type="text"
+                      id={`area-amount-${room.id}`}
                       value={formatCurrency(room.final_amount || 0)}
                       disabled
                       className="bg-muted"
@@ -304,9 +240,11 @@ export default function SiteMeasurementPricing() {
 
               {room.pricing_mode === 'lump_sum' && (
                 <div className="space-y-2">
-                  <Label>Amount</Label>
+                  <Label htmlFor={`fixed-amount-${room.id}`}>Fixed room price</Label>
                   <Input
                     type="number"
+                    id={`fixed-amount-${room.id}`}
+                    min="0"
                     inputMode="decimal"
                     value={room.lump_sum_amount || ''}
                     onChange={(e) => {
@@ -318,29 +256,34 @@ export default function SiteMeasurementPricing() {
               )}
 
               {room.pricing_mode === 'per_unit' && (
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
                   <div className="space-y-2">
-                    <Label>Quantity</Label>
+                    <Label htmlFor={`quantity-${room.id}`}>Quantity</Label>
                     <Input
                       type="number"
+                      id={`quantity-${room.id}`}
+                      min="0"
                       inputMode="numeric"
                       value={room.quantity || ''}
                       onChange={(e) => updateRoom(room.id, { quantity: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Rate/Unit</Label>
+                    <Label htmlFor={`unit-rate-${room.id}`}>Rate per unit</Label>
                     <Input
                       type="number"
+                      id={`unit-rate-${room.id}`}
+                      min="0"
                       inputMode="decimal"
                       value={room.rate_per_unit || ''}
                       onChange={(e) => updateRoom(room.id, { rate_per_unit: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Amount</Label>
+                  <div className="col-span-2 space-y-2 sm:col-span-1">
+                    <Label htmlFor={`unit-amount-${room.id}`}>Amount</Label>
                     <Input
                       type="text"
+                      id={`unit-amount-${room.id}`}
                       value={formatCurrency(room.final_amount || 0)}
                       disabled
                       className="bg-muted"
@@ -351,53 +294,46 @@ export default function SiteMeasurementPricing() {
             </CardContent>
           </Card>
         ))}
-      </div>
+      </fieldset>
 
       {/* Total */}
       <Card className="mb-6">
         <CardContent className="p-4">
-          <div className="flex justify-between items-center">
-            <span className="font-medium">Total Amount</span>
-            <span className="text-2xl font-bold tabular-nums">{formatCurrency(getTotalAmount())}</span>
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <span className="font-medium">Room subtotal</span>
+            <span className="min-w-0 break-all text-xl font-bold tabular-nums sm:text-2xl">{formatCurrency(getTotalAmount())}</span>
           </div>
         </CardContent>
       </Card>
 
-      {/* Draft checkbox */}
-      <div className="flex items-center space-x-2 mb-6">
-        <Checkbox 
-          id="draft" 
-          checked={createAsDraft}
-          onCheckedChange={(checked) => setCreateAsDraft(checked === true)}
-        />
-        <Label htmlFor="draft" className="cursor-pointer">Create quotation as Draft</Label>
-      </div>
+      <p className="mb-6 text-sm leading-6 text-muted-foreground">A draft opens in the quotation editor. Confirm work scope, billable units, taxes and discounts there before sharing it.</p>
 
       {/* Actions */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t md:relative md:border-t-0 md:p-0">
-        <div className="flex flex-col gap-2 max-w-lg mx-auto md:max-w-none md:flex-row">
+      <div className="fixed bottom-0 left-0 right-0 z-20 border-t bg-background p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:relative md:border-t-0 md:p-0">
+        <div className="mx-auto grid min-w-0 max-w-lg grid-cols-2 gap-2 md:max-w-none md:grid-cols-3 [&>button]:h-12 [&>button]:min-w-0 [&>button]:rounded-xl [&>button]:px-2 [&>button]:text-xs sm:[&>button]:text-sm">
           <Button 
             variant="outline" 
             className="flex-1"
             onClick={() => navigate(`/site-measurement/${id}`)}
+            disabled={generating}
           >
             Back
           </Button>
-          <Button 
+          {!project.quotation_id&&<Button
             variant="secondary" 
             className="flex-1"
             onClick={() => generateQuotation(true)}
-            disabled={generating}
+            disabled={generating||!readyForQuotation}
           >
-            Skip Amounts → Create Empty
-          </Button>
+            Create without prices
+          </Button>}
           <Button 
-            className="flex-1"
+            className="col-span-2 gap-2 md:col-span-1"
             onClick={() => generateQuotation(false)}
-            disabled={generating}
+            disabled={generating||(!project.quotation_id&&!readyForQuotation)}
           >
-            <FileText className="h-4 w-4 mr-2" />
-            {generating ? "Generating..." : "Generate Quotation"}
+            <FileText className="h-4 w-4 shrink-0" />
+            {generating ? "Creating draft..." : project.quotation_id?'Open quotation':"Create draft quotation"}
           </Button>
         </div>
       </div>

@@ -1685,6 +1685,8 @@ export type Database = {
       }
     }
     Functions: {
+      complete_site_measurement: { Args: { p_project_id: string }; Returns: Json }
+      convert_site_measurement: { Args: { p_project_id: string; p_request_id: string; p_pricing: Json; p_skip_amounts?: boolean }; Returns: Json }
       get_quotation_tier_metadata: { Args: { p_id: string }; Returns: Json }
       get_quotation_editor: { Args: { p_id: string }; Returns: Json }
       save_quotation_checked: { Args: { p_id: string | null; p_payload: Json; p_request_id: string; p_expected_version: number | null; p_project_id?: string | null }; Returns: Json }

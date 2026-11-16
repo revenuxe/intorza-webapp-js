@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "@/lib/navigation";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { MeasurementJourney } from '@/components/site-measurement/MeasurementJourney';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
+import { useInlineFeedback } from '@/hooks/useInlineFeedback';
 
 interface TeamMember {
   id: string;
@@ -18,6 +19,8 @@ interface TeamMember {
 }
 
 export default function SiteMeasurementNew() {
+  const {toast:notify,feedback}=useInlineFeedback({autoRevealErrors:true});
+  const toast={error:(description:string)=>notify({title:'Could not start the visit',description,variant:'destructive'})};
   const navigate = useNavigate();
   const { user } = useAuth();
   const [clientName, setClientName] = useState("");
@@ -25,6 +28,9 @@ export default function SiteMeasurementNew() {
   const [assignedTo, setAssignedTo] = useState<string>("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(false);
+  const inFlight = useRef(false);
+  const creationId = useRef<string | null>(null);
+  const nameInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchTeamMembers();
@@ -45,8 +51,10 @@ export default function SiteMeasurementNew() {
   };
 
   const handleCreate = async () => {
+    if(inFlight.current) return;
     if (!clientName.trim()) {
       toast.error("Please enter a client/project name");
+      nameInput.current?.focus();
       return;
     }
 
@@ -56,6 +64,9 @@ export default function SiteMeasurementNew() {
     }
 
     setLoading(true);
+    inFlight.current=true;
+    creationId.current ||= crypto.randomUUID();
+    try {
 
     // Handle "unassigned" value - convert to null
     const assignedToValue = assignedTo && assignedTo !== "unassigned" ? assignedTo : null;
@@ -63,6 +74,7 @@ export default function SiteMeasurementNew() {
     const { data, error } = await supabase
       .from('site_measurement_projects')
       .insert({
+        id:creationId.current,
         user_id: user.id,
         client_name: clientName.trim(),
         site_location: siteLocation.trim() || null,
@@ -72,20 +84,22 @@ export default function SiteMeasurementNew() {
       .select()
       .single();
 
-    setLoading(false);
-
     if (error) {
-      toast.error("Failed to create project");
-      console.error(error);
-      return;
+      if(error.code==='23505') {
+        const existing=await supabase.from('site_measurement_projects').select('id').eq('id',creationId.current).eq('user_id',user.id).maybeSingle();
+        if(existing.data){navigate(`/site-measurement/${existing.data.id}`);return;}
+      }
+      throw error;
     }
 
-    toast.success("Project created successfully");
     navigate(`/site-measurement/${data.id}`);
+    } catch {toast.error('Could not start the site visit. Your details are still here; retry when connected.');}
+    finally {inFlight.current=false;setLoading(false);}
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-lg mx-auto">
+    <div className="mx-auto w-full min-w-0 max-w-lg p-4 md:p-6">
+      {feedback}
       <Button 
         variant="ghost" 
         className="mb-4 -ml-2"
@@ -95,36 +109,42 @@ export default function SiteMeasurementNew() {
         Back
       </Button>
 
+      <div className="mb-5"><MeasurementJourney step={1}/></div>
+      <form onSubmit={event=>{event.preventDefault();void handleCreate();}}>
       <Card>
         <CardHeader>
-          <CardTitle>New Site Measurement</CardTitle>
+          <CardTitle className="break-words text-xl sm:text-2xl">Start a site visit</CardTitle>
+          <CardDescription className="leading-6">First, name the site. Next, measure each room and add photos. You can create a quotation later.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="clientName">Client Name / Project Name *</Label>
+            <Label htmlFor="clientName">Client or project name <span className="text-destructive">*</span></Label>
             <Input
               id="clientName"
-              placeholder="Enter client or project name"
+              ref={nameInput}
+              placeholder="e.g. Rahul's apartment"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
-              autoFocus
+              disabled={loading}
+              required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="siteLocation">Site Location (Optional)</Label>
+            <Label htmlFor="siteLocation">Site address <span className="font-normal text-muted-foreground">(optional)</span></Label>
             <Input
               id="siteLocation"
               placeholder="Enter site address or location"
               value={siteLocation}
+              disabled={loading}
               onChange={(e) => setSiteLocation(e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="assignedTo">Assign To Member</Label>
-            <Select value={assignedTo} onValueChange={setAssignedTo}>
-              <SelectTrigger>
+            <Label htmlFor="assignedTo">Who will measure this site?</Label>
+            <Select value={assignedTo} onValueChange={setAssignedTo} disabled={loading}>
+              <SelectTrigger id="assignedTo">
                 <SelectValue placeholder="Unassigned" />
               </SelectTrigger>
               <SelectContent>
@@ -136,26 +156,30 @@ export default function SiteMeasurementNew() {
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-xs leading-5 text-muted-foreground">Leave unassigned if you're measuring it yourself, or choose a team member.</p>
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="grid grid-cols-2 gap-3 pt-4 [&>button]:h-12 [&>button]:min-w-0 [&>button]:whitespace-normal [&>button]:rounded-xl [&>button]:px-2 [&>button]:leading-5">
             <Button 
+              type="button"
               variant="outline" 
               className="flex-1"
               onClick={() => navigate('/site-measurement')}
+              disabled={loading}
             >
               Cancel
             </Button>
             <Button 
+              type="submit"
               className="flex-1"
-              onClick={handleCreate}
               disabled={loading}
             >
-              {loading ? "Creating..." : "Create Project"}
+              {loading ? "Starting..." : "Continue to rooms"}
             </Button>
           </div>
         </CardContent>
       </Card>
+      </form>
     </div>
   );
 }
