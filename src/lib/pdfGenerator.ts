@@ -367,6 +367,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   let compressedLogo: string | null = null;
   const logoSize = 25;
   const logoMaxWidth = 45;
+  let headerLogo: { x: number; width: number; height: number } | null = null;
   const headerBandHeight = logoPlacement === 'center' ? 70 : 36;
   if (headerStyle === 'full-width') {
     doc.setFillColor(COLORS.HEADER_BG[0], COLORS.HEADER_BG[1], COLORS.HEADER_BG[2]);
@@ -392,14 +393,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       }
       
       // Fit the original proportions inside the header without stretching or cropping.
-      doc.addImage(compressedLogo, 'JPEG', logoX, yPosition, logoWidth, logoHeight, undefined, 'FAST');
+      headerLogo = { x: logoX, width: logoWidth, height: logoHeight };
     } catch (e) { console.error(e); }
   }
 
   // Company Details positioning based on logo placement
   let companyInfoX = pageWidth - margin;
   let companyInfoAlign: 'right' | 'left' | 'center' = 'right';
-  let headerStartY = yPosition;
   
   if (logoPlacement === 'right') {
     companyInfoX = margin;
@@ -409,7 +409,32 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     companyInfoAlign = 'center';
   }
   
-  let headerTextY = yPosition + 5;
+  setBodyFont('normal');
+  setPdfFontSize(9);
+  const maxAddressWidth = logoPlacement === 'center' ? contentWidth - 20 : 90;
+  const addressLines: string[] = settings.showCompanyAddress && data.companyAddress
+    ? doc.splitTextToSize(data.companyAddress, maxAddressWidth)
+    : [];
+  const detailLineCount = settings.showCompanyAddress
+    ? addressLines.length + Number(Boolean(data.companyPhone || data.companyEmail)) + Number(Boolean(data.gstin))
+    : 0;
+  // Align the visible text block and the actual fitted image around one center.
+  // A short contact block otherwise makes a taller logo appear to hang below it.
+  const headingAscent = 18 * fontScale / doc.internal.scaleFactor * 0.7;
+  const detailDescent = 9 * fontScale / doc.internal.scaleFactor * 0.2;
+  const textBlockHeight = detailLineCount > 0
+    ? headingAscent + 7 + (detailLineCount - 1) * 4.5 + detailDescent
+    : headingAscent;
+  const headerRowHeight = Math.max(headerLogo?.height || 0, textBlockHeight);
+  let headerTextY = headerLogo && logoPlacement !== 'center'
+    ? yPosition + (headerRowHeight - textBlockHeight) / 2 + headingAscent
+    : yPosition + 5;
+  if (headerLogo && compressedLogo) {
+    const logoY = logoPlacement === 'center'
+      ? yPosition
+      : yPosition + (headerRowHeight - headerLogo.height) / 2;
+    doc.addImage(compressedLogo, 'JPEG', headerLogo.x, logoY, headerLogo.width, headerLogo.height, undefined, 'FAST');
+  }
   if (logoPlacement === 'center') {
     // For center layout, position text below logo with proper spacing
     headerTextY = yPosition + logoSize + 10;
@@ -428,8 +453,6 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // Company address and contact details
   if (settings.showCompanyAddress) {
     if (data.companyAddress) {
-      const maxAddressWidth = logoPlacement === 'center' ? contentWidth - 20 : 90;
-      const addressLines = doc.splitTextToSize(data.companyAddress, maxAddressWidth);
       addressLines.forEach((line: string) => {
         doc.text(line, companyInfoX, headerTextY, { align: companyInfoAlign });
         headerTextY += 4.5;
@@ -457,14 +480,15 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   if (headerStyle === 'underlined') {
     doc.setDrawColor(COLORS.ACCENT[0], COLORS.ACCENT[1], COLORS.ACCENT[2]);
     doc.setLineWidth(showBorders ? 0.5 : 0.25);
-    doc.line(margin, headerTextY + 1, pageWidth - margin, headerTextY + 1);
+    const underlineY = Math.max(headerTextY + 1, yPosition + (headerLogo?.height || 0) + 2);
+    doc.line(margin, underlineY, pageWidth - margin, underlineY);
   }
 
   // Calculate yPosition based on layout - ensure no overlap with cards
   if (logoPlacement === 'center') {
     yPosition = headerTextY + 8; // Add extra space after center-aligned header
   } else {
-    yPosition += 35; // Standard spacing for left/right layouts
+    yPosition = Math.max(yPosition + 35, yPosition + headerRowHeight + 8, headerTextY + 8);
   }
   if (headerStyle === 'full-width') {
     yPosition = Math.max(yPosition, pageTopY + headerBandHeight + 8);
