@@ -782,6 +782,12 @@ export type Database = {
           },
         ]
       }
+      quotation_versions: {
+        Row: { id: string; quotation_id: string; version_number: number; saved_at: string; snapshot: Json }
+        Insert: { id?: string; quotation_id: string; version_number: number; saved_at?: string; snapshot: Json }
+        Update: { id?: string; quotation_id?: string; version_number?: number; saved_at?: string; snapshot?: Json }
+        Relationships: [{ foreignKeyName: "quotation_versions_quotation_id_fkey"; columns: ["quotation_id"]; isOneToOne: false; referencedRelation: "quotations"; referencedColumns: ["id"] }]
+      }
       quotation_preferences: {
         Row: {
           created_at: string
@@ -942,6 +948,8 @@ export type Database = {
       }
       quotations: {
         Row: {
+          tier_parent_id: string | null
+          tier_name: string | null
           reference_no: string
           client_address: string | null
           client_id: string | null
@@ -969,6 +977,8 @@ export type Database = {
           warranty: string | null
         }
         Insert: {
+          tier_parent_id?: string | null
+          tier_name?: string | null
           reference_no?: string
           client_address?: string | null
           client_id?: string | null
@@ -996,6 +1006,8 @@ export type Database = {
           warranty?: string | null
         }
         Update: {
+          tier_parent_id?: string | null
+          tier_name?: string | null
           reference_no?: string
           client_address?: string | null
           client_id?: string | null
@@ -1028,6 +1040,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotations_tier_parent_id_fkey"
+            columns: ["tier_parent_id"]
+            isOneToOne: false
+            referencedRelation: "quotations"
             referencedColumns: ["id"]
           },
         ]
@@ -1666,6 +1685,11 @@ export type Database = {
       }
     }
     Functions: {
+      get_quotation_tiers: { Args: { p_id: string }; Returns: Json }
+      name_quotation_tier: { Args: { p_id: string; p_name: string }; Returns: undefined }
+      create_quotation_tier: { Args: { p_source_id: string; p_name: string }; Returns: Json }
+      revert_quotation_version: { Args: { p_id: string; p_version_id: string; p_expected_version: number }; Returns: Json }
+      record_quotation_version: { Args: { p_id: string; p_baseline_only?: boolean }; Returns: undefined }
       admin_quotation_directory: { Args: { p_search?: string; p_page?: number }; Returns: Json }
       reserve_quotation_reference: { Args: never; Returns: string }
       update_assigned_task_status: { Args: { p_task_id: string; p_status: string }; Returns: Json }

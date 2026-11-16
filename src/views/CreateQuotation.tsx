@@ -21,7 +21,7 @@ import { useInlineFeedback } from "@/hooks/useInlineFeedback";
 import { supabase } from "@/integrations/supabase/client";
 import { quotationsApi } from "@/lib/api";
 import { generateQuotationPDF } from "@/lib/pdfGenerator";
-import { useSearchParams } from "@/lib/navigation";
+import { useNavigate, useSearchParams } from "@/lib/navigation";
 import { useAuthAction } from "@/hooks/useAuthAction";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useQuotationAutomation } from "@/hooks/useQuotationAutomation";
@@ -44,6 +44,7 @@ import type { PriceEvidence } from '@/lib/quotation-ai/floor-plan';
 import { reconcileSavedQuotation, remapDraftIds } from '@/lib/quotation-ai/save-reconciliation';
 import { fromQuotation, lineAmount, quotationTotals, reviewDraft, draftSchema, type VoiceDraft } from "@/lib/quotation-ai/domain";
 import { QuotationItemCard } from '@/components/quotation/QuotationItemCard';
+import { tierQuotationTitle } from '@/lib/quotationTiers';
 
 import { QuotationItemFields } from '@/components/quotation/QuotationItemFields';
 import { splitItemDetails } from '@/lib/itemSpecifications';
@@ -75,6 +76,7 @@ interface PaymentStage {
 const defaultProjectDeadline = (proposal: string) => proposal ? format(addDays(parseISO(proposal), 45), 'yyyy-MM-dd') : '';
 
 const CreateQuotation = () => {
+  const navigate = useNavigate();
   const {
     toast, feedback, clearFeedback
   } = useInlineFeedback({ autoRevealErrors: true });
@@ -96,6 +98,7 @@ const CreateQuotation = () => {
   const { isPro, setPaywallOpen } = useSubscription();
   const [searchParams, setSearchParams] = useSearchParams();
   const quotationId = searchParams.get('id');
+  const [tierContext, setTierContext] = useState<{ name: string; parentId: string | null; referenceNo: string } | null>(null);
   const continueAction = searchParams.get('continueAction');
   const [actionExecuted, setActionExecuted] = useState(false);
   const smartDefaultsApplied = useRef(false);
@@ -289,6 +292,7 @@ const CreateQuotation = () => {
 
   useEffect(() => {
     savedQuotationIdRef.current = quotationId;
+    setTierContext(null);
     if (quotationId) setReferenceNo(null);
     loadProfile();
     if (quotationId) {
@@ -430,6 +434,13 @@ const CreateQuotation = () => {
         error: quotationError
       } = await supabase.from('quotations').select('*').eq('id', id).single();
       if (quotationError) throw quotationError;
+      let groupReference = quotation.reference_no;
+      if (quotation.tier_parent_id) {
+        const parent = await supabase.from('quotations').select('reference_no').eq('id', quotation.tier_parent_id).single();
+        if (parent.error) throw parent.error;
+        groupReference = parent.data.reference_no;
+      }
+      setTierContext(quotation.tier_name ? { name: quotation.tier_name, parentId: quotation.tier_parent_id, referenceNo: groupReference } : null);
 
       // Pre-fill form fields - use quotation_title or project_name as fallback
       setReferenceNo(quotation.reference_no || null);
@@ -1021,8 +1032,8 @@ const CreateQuotation = () => {
       
       await generateQuotationPDF({
         quotationId: overrideQuotationId || quotationId || undefined,
-        referenceNo: referenceNo || await getDraftReference(),
-        quotationTitle: projectTitle,
+        referenceNo: tierContext?.referenceNo || referenceNo || await getDraftReference(),
+        quotationTitle: tierQuotationTitle(projectTitle, tierContext?.name),
         clientName,
         clientAddress,
         dateOfProposal: dateOfProposal || new Date().toLocaleDateString('en-IN'),
@@ -1100,8 +1111,8 @@ const CreateQuotation = () => {
   // treats a new reference as "data changed" and restarts PDF regeneration.
   const quotationPreviewData = useMemo(() => ({
     quotationId: quotationId || undefined,
-    referenceNo: referenceNo || undefined,
-    quotationTitle: projectTitle,
+    referenceNo: tierContext?.referenceNo || referenceNo || undefined,
+    quotationTitle: tierQuotationTitle(projectTitle, tierContext?.name),
     clientName,
     clientAddress,
     dateOfProposal,
@@ -1160,6 +1171,7 @@ const CreateQuotation = () => {
     quotationId,
     referenceNo,
     projectTitle,
+    tierContext,
     clientName,
     clientAddress,
     dateOfProposal,
@@ -1266,9 +1278,10 @@ const CreateQuotation = () => {
         {lastAIDraft.current && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100" role="status">AI-generated estimate — rates and measurements require review before final confirmation. Pending items are excluded from the provisional total.</div>}
 
         {/* Project Details */}
+        {tierContext && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><div><p className="font-semibold">Editing {tierContext.name} tier</p><p className="mt-1 text-sm text-muted-foreground">Items and prices belong to this tier.{tierContext.parentId ? ' Client details are shared from the original tier.' : ' Client details apply to every tier.'}</p></div><div className="flex flex-wrap gap-2">{tierContext.parentId && <Button variant="outline" onClick={() => navigate(`/?id=${tierContext.parentId}`)}>Edit shared client</Button>}<Button variant="outline" onClick={() => navigate(`/quotations/${tierContext.parentId || quotationId}${tierContext.parentId ? `?tier=${quotationId}` : ''}`)}>View tiers</Button></div></div>}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between gap-2"><CardTitle className="shrink-0 text-base sm:text-lg">Project Details</CardTitle><div className="shrink-0 whitespace-nowrap rounded-lg border bg-muted/40 px-2 py-2 text-[10px] sm:px-3 sm:text-xs"><span className="text-muted-foreground">Ref QNO: </span><span className="font-mono font-semibold" aria-live="polite">{referenceNo || (referenceError ? <button type="button" onClick={()=>setReferenceRetry(value=>value+1)}>Retry</button> : 'Generating...')}</span></div></div>
+            <div className="flex items-center justify-between gap-2"><CardTitle className="shrink-0 text-base sm:text-lg">Project Details</CardTitle><div className="shrink-0 whitespace-nowrap rounded-lg border bg-muted/40 px-2 py-2 text-[10px] sm:px-3 sm:text-xs"><span className="text-muted-foreground">Ref QNO: </span><span className="font-mono font-semibold" aria-live="polite">{tierContext?.referenceNo || referenceNo || (referenceError ? <button type="button" onClick={()=>setReferenceRetry(value=>value+1)}>Retry</button> : 'Generating...')}</span></div></div>
           </CardHeader>
           <CardContent className="space-y-4 [&_label]:block [&_label]:border-b [&_label]:border-border/60 [&_label]:pb-2 [&_input]:text-sm [&_button[role=combobox]]:text-sm">
             <div className="space-y-2">
@@ -1278,7 +1291,7 @@ const CreateQuotation = () => {
             <div className="grid grid-cols-2 gap-x-5 gap-y-5 sm:gap-x-6 sm:gap-y-5">
               {customizeSettings.showClientName && <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
                   <Label htmlFor="clientName">Client Name</Label>
-                  <ClientSelector
+                  {tierContext?.parentId ? <Input id="clientName" value={clientName} readOnly aria-describedby="shared-client-note" /> : <ClientSelector
                     id="clientName"
                     value={clientName}
                     onChange={setClientName}
@@ -1289,11 +1302,12 @@ const CreateQuotation = () => {
                       }
                     }}
                     placeholder="Enter or select client name"
-                  />
+                  />}
+                  {tierContext?.parentId && <p id="shared-client-note" className="text-xs text-muted-foreground">Shared across tiers. Use Edit shared client to change these details.</p>}
                 </div>}
               {customizeSettings.showClientAddress && <div className="col-span-2 min-w-0 space-y-2 md:col-span-1">
                   <Label htmlFor="clientAddress">Client Address</Label>
-                  <Input id="clientAddress" placeholder="Enter address" value={clientAddress} onChange={e => setClientAddress(e.target.value)} />
+                  <Input id="clientAddress" placeholder="Enter address" value={clientAddress} readOnly={Boolean(tierContext?.parentId)} onChange={e => setClientAddress(e.target.value)} />
                 </div>}
               {customizeSettings.showDateOfProposal && <div className="flex min-w-0 flex-col justify-end space-y-2">
                   <Label htmlFor="dateOfProposal">Date of Proposal</Label>

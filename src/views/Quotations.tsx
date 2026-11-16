@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { FileText, Plus, Edit, Trash2, Copy, Crown, LockKeyhole, Search, X } from "lucide-react";
-import { useNavigate } from "@/lib/navigation";
+import { Link, useNavigate } from "@/lib/navigation";
 import { Input } from '@/components/ui/input';
 import { matchesQuotation } from '@/lib/quotation-search';
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { ListSkeleton } from "@/components/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Quotation {
+  tier_name?: string | null;
   id: string;
   quotation_number: string;
   reference_no: string;
@@ -213,15 +214,16 @@ const Quotations = () => {
         ) : filteredQuotations.length === 0 ? <Card><CardContent className="space-y-3 p-6 text-center"><p>No quotations match your search.</p><Button variant="outline" onClick={() => setSearch('')}>Clear search</Button></CardContent></Card> : (
           <div className="flex flex-col gap-4">
             {filteredQuotations.map((quotation) => (
-              <Card key={quotation.id} className="hover:shadow-md transition-shadow">
+              <Card key={quotation.id} className="relative hover:shadow-md transition-shadow">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-3">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="break-words font-semibold text-foreground">{quotation.quotation_title || quotation.project_name}</h3>
+                        <h3 className="break-words font-semibold text-foreground"><Link to={`/quotations/${quotation.id}`} className="after:absolute after:inset-0 after:rounded-2xl focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-primary">{quotation.quotation_title || quotation.project_name || 'Untitled quotation'}</Link></h3>
                         <p className="text-sm text-muted-foreground mt-1">{quotation.client_name}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">{quotation.quotation_number}</p>
                         <p className="mt-2 w-fit rounded-md bg-muted px-2 py-1 font-mono text-xs font-semibold">Ref QNO: {quotation.reference_no}</p>
+                        {quotation.tier_name && <p className="mt-2 text-xs text-primary">{quotation.tier_name} · Open to view tiers</p>}
                       </div>
                       <Badge className={getStatusColor(quotation.status)}>
                         {quotation.status?.charAt(0).toUpperCase() + quotation.status?.slice(1) || 'Draft'}
@@ -241,7 +243,7 @@ const Quotations = () => {
                         </p>
                       </div>
                     </div>
-                    <div className="flex gap-2 mt-2">
+                    <div className="relative z-10 flex gap-2 mt-2">
                       {quotation.status === 'draft' ? (
                         <Button 
                           variant="outline" 
@@ -279,7 +281,7 @@ const Quotations = () => {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Quotation?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will permanently delete this quotation and all its sections and items. This action cannot be undone.
+                              This will permanently delete this quotation, all its tiers, version history, sections and items. This action cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>

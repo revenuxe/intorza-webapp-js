@@ -3,8 +3,8 @@ import { formatItemDetails } from '@/lib/itemSpecifications';
 import { getQuotationUnit } from '@/lib/quotationUnits';
 
 
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "@/lib/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useNavigate, useSearchParams } from "@/lib/navigation";
 import { ArrowLeft, Download, FileText, Edit, Check, X, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,8 +21,14 @@ import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getEditorSettings } from "@/lib/pdfThemes";
 import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
 import { getLibraryTerms } from "@/lib/libraryDefaults";
+import { QuotationVersions } from '@/components/quotation/QuotationVersions';
+import { QuotationTiers } from '@/components/quotation/QuotationTiers';
+import { quotationsApi } from '@/lib/api';
+import { tierQuotationTitle, type QuotationTierGroup } from '@/lib/quotationTiers';
 
 interface Quotation {
+  tier_parent_id: string | null;
+  tier_name: string | null;
   id: string;
   quotation_number: string;
   reference_no: string;
@@ -66,11 +72,15 @@ const getStatusColor = (status: string) => {
 
 const QuotationDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const selectedTierId = searchParams.get('tier');
   const navigate = useNavigate();
   const { toast, feedback } = useInlineFeedback();
   const { checkProFeature } = useSubscription();
   const { formatCurrency, formatDateShort, settings } = useLocalization();
   const [quotation, setQuotation] = useState<Quotation | null>(null);
+  const [tierGroup, setTierGroup] = useState<QuotationTierGroup | null>(null);
+  const loadGeneration = useRef(0);
   const [loading, setLoading] = useState(true);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [invoiceAmount, setInvoiceAmount] = useState(0);
@@ -82,29 +92,39 @@ const QuotationDetail = () => {
     if (id) {
       loadQuotation();
     }
-  }, [id]);
+    return () => { loadGeneration.current++; };
+  }, [id, selectedTierId]);
 
-  const loadQuotation = async () => {
+  const loadQuotation = async (silent = false) => {
+    const generation = ++loadGeneration.current;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
+      const { data: group } = await quotationsApi.tiers(id);
+      const targetId = selectedTierId || id;
+      if (!group.tiers.some(tier => tier.id === targetId)) throw new Error('This tier does not belong to the quotation');
       const { data, error } = await supabase
         .from('quotations')
         .select('*')
-        .eq('id', id)
+        .eq('id', targetId)
         .single();
 
       if (error) throw error;
+      if (generation !== loadGeneration.current) return;
       setQuotation(data);
+      setTierGroup(group);
       setInvoiceAmount(data?.grand_total || 0);
     } catch (error) {
+      if (generation !== loadGeneration.current) return;
+      if (!silent) { setQuotation(null); setTierGroup(null); }
       console.error('Error loading quotation:', error);
       toast({
         title: "Error",
         description: "Failed to load quotation details",
         variant: "destructive",
       });
+      if (silent) throw error;
     } finally {
-      setLoading(false);
+      if (!silent && generation === loadGeneration.current) setLoading(false);
     }
   };
 
@@ -114,20 +134,24 @@ const QuotationDetail = () => {
     return formatDateShort(dateString);
   };
 
-  const handleDownloadPdf = async () => {
+  const handleDownloadPdf = async (tierId?: string, share = false) => {
     if (!quotation) return;
+    const exportId = tierId || quotation.id;
     
     try {
+      const { data: quotation, error: quotationError } = await supabase.from('quotations').select('*').eq('id', exportId).single();
+      if (quotationError || !quotation) throw quotationError || new Error('Quotation not found');
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
         .single();
 
-      const { data: sections } = await supabase
+      const { data: sections, error: sectionsError } = await supabase
         .from('quotation_sections')
         .select('*, quotation_items(*)')
         .eq('quotation_id', quotation.id)
         .order('sort_order');
+      if (sectionsError) throw sectionsError;
 
       // Fetch latest templates from My Library
       const { data: { user } } = await supabase.auth.getUser();
@@ -176,10 +200,11 @@ const QuotationDetail = () => {
       const editorSettings = getEditorSettings();
       const customizeSettings = getQuotationSettings();
 
-      await generateQuotationPDF({
+      const pdf = await generateQuotationPDF({
+        previewOnly: true,
         quotationId: quotation.id,
-        referenceNo: quotation.reference_no,
-        quotationTitle: quotation.quotation_title || quotation.project_name,
+        referenceNo: tierGroup?.tiers[0]?.reference_no || quotation.reference_no,
+        quotationTitle: tierQuotationTitle(quotation.quotation_title || quotation.project_name, quotation.tier_name),
         dateOfProposal: quotation.date_of_proposal,
         quotationValidTill: quotation.valid_till,
         projectDeadline: quotation.project_deadline || '',
@@ -190,12 +215,13 @@ const QuotationDetail = () => {
         projectType: quotation.project_type,
         sections: await Promise.all((sections || []).map(async (s) => {
           // Fetch images for each item
-          const itemsWithImages = await Promise.all(s.quotation_items.map(async (item: any) => {
-            const { data: itemImagesData } = await supabase
+          const itemsWithImages = await Promise.all((s.quotation_items || []).sort((a: any, b: any) => a.sort_order - b.sort_order).map(async (item: any) => {
+            const { data: itemImagesData, error: imagesError } = await supabase
               .from('quotation_item_images')
               .select('gallery_image_id, gallery_images(image_url)')
               .eq('quotation_item_id', item.id)
               .order('sort_order');
+            if (imagesError) throw imagesError;
             
             return {
               productName: item.product_name,
@@ -220,6 +246,7 @@ const QuotationDetail = () => {
           };
         })),
         subtotal: quotation.subtotal,
+        grandTotal: quotation.grand_total,
         discount: quotation.discount_amount,
         gstEnabled: quotation.gst_enabled,
         gstRate: quotation.gst_percentage || 18,
@@ -245,17 +272,32 @@ const QuotationDetail = () => {
         editorSettings: editorSettings,
       });
 
+      const filename = `${quotation.client_name || 'Quotation'}${quotation.tier_name ? `-${quotation.tier_name}` : ''}.pdf`.replace(/[<>:"/\\|?*]/g, '-');
+      const file = new File([pdf.output('blob')], filename, { type: 'application/pdf' });
+      if (share && navigator.share && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: tierQuotationTitle(quotation.quotation_title || quotation.project_name, quotation.tier_name) });
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') return;
+          pdf.save(filename);
+        }
+      } else {
+        pdf.save(filename);
+      }
+
       toast({
-        title: "PDF Downloaded",
-        description: "Quotation PDF has been downloaded successfully",
+        title: share ? 'Tier PDF ready' : 'PDF downloaded',
+        description: share ? 'Your selected tier PDF is ready to share.' : 'Quotation PDF has been downloaded successfully',
       });
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') return;
       console.error('Error downloading PDF:', error);
       toast({
         title: "Error",
         description: "Failed to download PDF",
         variant: "destructive",
       });
+      if (tierId) throw error;
     }
   };
 
@@ -264,7 +306,7 @@ const QuotationDetail = () => {
       const { error } = await supabase
         .from('quotations')
         .update({ status })
-        .eq('id', id);
+        .eq('id', quotation?.id);
 
       if (error) throw error;
 
@@ -373,12 +415,16 @@ const QuotationDetail = () => {
       {feedback}
       <div className="flex flex-col gap-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Button variant="ghost" onClick={() => navigate('/quotations')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
           <div className="flex gap-2 flex-wrap">
+            <QuotationVersions quotationId={quotation.id} onRestored={() => loadQuotation(true)} />
+            {tierGroup && <QuotationTiers group={tierGroup} activeId={quotation.id} onRefresh={() => loadQuotation(true)}
+              onSelect={tierId => navigate(`/quotations/${tierGroup.root_id}${tierId === tierGroup.root_id ? '' : `?tier=${tierId}`}`)}
+              onEdit={tierId => navigate(`/?id=${tierId}`)} onExport={handleDownloadPdf} />}
             <Button 
               variant="outline" 
               onClick={() => navigate(`/?id=${quotation.id}`)}
@@ -386,12 +432,14 @@ const QuotationDetail = () => {
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
-            <Button onClick={handleDownloadPdf}>
+            <Button onClick={() => handleDownloadPdf()}>
               <Download className="h-4 w-4 mr-2" />
               PDF
             </Button>
           </div>
         </div>
+
+        {tierGroup?.tiers[0]?.tier_name && <div className="space-y-2"><p className="text-sm text-muted-foreground">Choose a tier. Client details are shared across these options.</p><nav aria-label="Quotation tiers" className="flex flex-wrap gap-2">{tierGroup.tiers.map(tier => <Button key={tier.id} variant={tier.id === quotation.id ? 'default' : 'outline'} aria-current={tier.id === quotation.id ? 'page' : undefined} onClick={() => navigate(`/quotations/${tierGroup.root_id}${tier.id === tierGroup.root_id ? '' : `?tier=${tier.id}`}`)}>{tier.tier_name} · {formatCurrency(tier.grand_total || 0,true)}</Button>)}</nav></div>}
 
         {/* Action Buttons */}
         {quotation.status !== 'converted' && (
@@ -437,9 +485,9 @@ const QuotationDetail = () => {
           <CardHeader>
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
               <div>
-                <CardTitle className="text-2xl">{quotation.quotation_title || quotation.project_name}</CardTitle>
+                <CardTitle className="text-2xl">{tierQuotationTitle(quotation.quotation_title || quotation.project_name, quotation.tier_name)}</CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">{quotation.quotation_number}</p>
-                <p className="mt-2 font-mono text-sm font-semibold">Ref QNO: {quotation.reference_no}</p>
+                <p className="mt-2 font-mono text-sm font-semibold">Ref QNO: {tierGroup?.tiers[0]?.reference_no || quotation.reference_no}</p>
               </div>
               <Badge className={getStatusColor(quotation.status)}>
                 {quotation.status?.charAt(0).toUpperCase() + quotation.status?.slice(1) || 'Draft'}

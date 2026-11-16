@@ -1,0 +1,33 @@
+import { quotationVersionChanges, type QuotationSnapshot } from './quotationVersions';
+const original: QuotationSnapshot = { quotation_title: 'Bedroom', grand_total: 100, sections: [{ id: 'room', section_name: 'Bedroom', items: [{ id: 'item', product_name: 'Wardrobe', rate_per_sft: 100, specifications: [{ label: 'Material', value: 'Plywood' }] }] }] };
+const clone = (): QuotationSnapshot => JSON.parse(JSON.stringify(original));
+it('shows saved field, rate and specification changes with before/after values', () => {
+  const next = clone();
+  next.quotation_title = 'Bedroom update'; next.grand_total = 200;
+  next.sections[0].items[0].rate_per_sft = 200;
+  next.sections[0].items[0].specifications = [{ label: 'Material', value: 'Oak' }];
+  const changes = quotationVersionChanges(original, next);
+  expect(changes).toEqual(expect.arrayContaining([
+    { label: 'Title', before: 'Bedroom', after: 'Bedroom update' },
+    { label: 'Grand total', before: '100', after: '200' },
+    { label: 'Room 1 · Bedroom · Item 1 · Rate', before: '100', after: '200' },
+    { label: 'Room 1 · Bedroom · Item 1 · Specifications', before: 'Material: Plywood', after: 'Material: Oak' },
+  ]));
+});
+it('ignores regenerated identities when reverting a deleted room or item', () => {
+  const next = clone();
+  next.sections[0].id = 'new-room'; next.sections[0].items[0].id = 'new-item';
+  expect(quotationVersionChanges(original, next)).toEqual([]);
+});
+it('reports added and removed rooms and items', () => {
+  const next = clone();
+  next.sections[0].items.push({ product_name: 'Bed' });
+  next.sections.push({ section_name: 'Kitchen', items: [] });
+  expect(quotationVersionChanges(original, next)).toEqual(expect.arrayContaining([
+    { label: 'Room 1 · Bedroom · Item 2', before: '—', after: 'Bed' },
+    { label: 'Room 2 · Kitchen', before: '—', after: '0 items' },
+  ]));
+  expect(quotationVersionChanges(next, original)).toEqual(expect.arrayContaining([
+    { label: 'Room 1 · Bedroom · Item 2', before: 'Bed', after: 'Removed' },
+  ]));
+});

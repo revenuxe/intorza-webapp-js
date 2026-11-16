@@ -1,4 +1,6 @@
 import { formatItemDetails, normalizeItemDetails } from './itemSpecifications';
+import type { QuotationVersion, QuotationVersionDetail } from './quotationVersions';
+import type { QuotationTierGroup } from './quotationTiers';
 /**
  * Intorza API client — Supabase-backed.
  *
@@ -128,11 +130,49 @@ function structuredQuotationPayload(body: Record<string, unknown>) {
   }) })) };
 }
 export const quotationsApi = {
+  tiers: async (id: string): Promise<Envelope<QuotationTierGroup>> => {
+    await requireUserId();
+    return { data: unwrap(await supabase.rpc('get_quotation_tiers', { p_id: id })) as QuotationTierGroup };
+  },
+  nameTier: async (id: string, name: string): Promise<void> => {
+    await requireUserId();
+    unwrap(await supabase.rpc('name_quotation_tier', { p_id: id, p_name: name.trim() }));
+  },
+  createTier: async (sourceId: string, name: string): Promise<Envelope<any>> => {
+    await requireUserId();
+    return { data: unwrap(await supabase.rpc('create_quotation_tier', { p_source_id: sourceId, p_name: name.trim() })) };
+  },
+  versions: async (id: string): Promise<Envelope<QuotationVersion[]>> => {
+    await requireUserId();
+    const rows: QuotationVersion[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const page = unwrap(await supabase.from('quotation_versions')
+        .select('id, quotation_id, version_number, saved_at').eq('quotation_id', id)
+        .order('version_number', { ascending: false }).range(offset, offset + 499)) as QuotationVersion[];
+      rows.push(...(page || []));
+      if ((page || []).length < 500) break;
+    }
+    return { data: rows };
+  },
+  version: async (id: string, versionNumber: number): Promise<Envelope<QuotationVersionDetail>> => {
+    await requireUserId();
+    const row = unwrap(await supabase.from('quotation_versions').select('*')
+      .eq('quotation_id', id).eq('version_number', versionNumber).maybeSingle()) as QuotationVersionDetail | null;
+    if (!row) throw new ApiError(404, 'Quotation version not found');
+    return { data: row };
+  },
+  revertVersion: async (id: string, versionId: string, expectedVersion: number): Promise<Envelope<any>> => {
+    await requireUserId();
+    const row = unwrap(await supabase.rpc('revert_quotation_version', {
+      p_id: id, p_version_id: versionId, p_expected_version: expectedVersion,
+    }));
+    return { data: row };
+  },
   list: async (): Promise<Envelope<any[]>> => {
     const uid = await requireUserId();
     const rows: any[] = [];
     for (let offset=0; ; offset+=500) {
-      const page = unwrap(await supabase.from('quotations').select('*').eq('user_id',uid)
+      const page = unwrap(await supabase.from('quotations').select('*').eq('user_id',uid).is('tier_parent_id', null)
         .order('created_at',{ascending:false}).order('id').range(offset,offset+499)) as any[];
       rows.push(...(page || []));
       if ((page || []).length < 500) break;
