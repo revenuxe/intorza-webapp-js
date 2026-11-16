@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from '@/lib/navigation';
 import {
   Dialog,
@@ -35,6 +36,7 @@ export const PaywallModal: React.FC = () => {
   const { session } = useAuth();
   const { settings, countryConfig } = useLocalization();
   const [loading, setLoading] = useState(false);
+  const [checkoutActive, setCheckoutActive] = useState(false);
   
   // Determine price text and flag based on country
   const priceText = settings.countryCode === 'IN' ? '₹499' : '$1';
@@ -102,6 +104,7 @@ export const PaywallModal: React.FC = () => {
         handler: async function (response: Record<string, string>) {
           try {
             setPaywallOpen(false);
+            setCheckoutActive(false);
             // When the paywall was triggered by an in-editor action (e.g. Save & Send),
             // stay on the current page so the action auto-executes once isPro is confirmed.
             // For generic upgrades, navigate to the payment-processing page as before.
@@ -141,15 +144,20 @@ export const PaywallModal: React.FC = () => {
         },
         modal: {
           ondismiss: function () {
+            setCheckoutActive(false);
             setLoading(false);
           },
         },
       };
 
       const razorpay = new window.Razorpay(options);
+      // Release Radix's focus/pointer lock before Razorpay mounts its iframe.
+      flushSync(() => setCheckoutActive(true));
+      await new Promise<void>(resolve => window.setTimeout(resolve, 0));
       razorpay.open();
       
     } catch (error: unknown) {
+      setCheckoutActive(false);
       console.error('Upgrade error:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to start checkout');
     } finally {
@@ -157,7 +165,7 @@ export const PaywallModal: React.FC = () => {
     }
   };
 
-  return (
+  return checkoutActive ? null : (
     <Dialog open={paywallOpen} onOpenChange={(open) => setPaywallOpen(open)}>
       <DialogContent className="w-[calc(100%-2rem)] max-w-[19.5rem] gap-0 overflow-hidden rounded-3xl border-0 p-0 shadow-2xl sm:max-w-[20.5rem] sm:p-0 [&>button:last-child]:right-3 [&>button:last-child]:top-3 [&>button:last-child]:z-10 [&>button:last-child]:rounded-full [&>button:last-child]:bg-white/15 [&>button:last-child]:p-1.5 [&>button:last-child]:text-white [&>button:last-child]:opacity-100 [&>button:last-child]:ring-1 [&>button:last-child]:ring-white/20 [&>button:last-child]:hover:bg-white/25">
         <DialogTitle className="sr-only">Upgrade to Intorza Pro</DialogTitle>
