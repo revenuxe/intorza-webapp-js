@@ -51,7 +51,7 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
   return <>
     <Button variant="outline" className="gap-2" onClick={() => { setError(''); setMode(null); setName(''); setOpen(true); }}><Layers3 className="h-4 w-4" />Tier</Button>
     <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}>
-      <DialogContent className={`flex max-h-[92dvh] w-[calc(100%-1rem)] flex-col overflow-hidden p-4 sm:w-[calc(100%-2rem)] sm:p-6 ${compare && !firstTime && !mode ? 'max-w-6xl' : 'max-w-2xl'}`}>
+      <DialogContent className={`flex max-h-[84dvh] w-[calc(100%-2rem)] flex-col gap-3 overflow-hidden p-3.5 sm:max-h-[92dvh] sm:p-6 [&_h2]:text-base sm:[&_h2]:text-lg ${compare && !firstTime && !mode ? 'max-w-6xl' : 'max-w-2xl'}`}>
         <DialogHeader className="pr-6 text-left"><DialogTitle>{firstTime ? 'Name your first tier' : mode === 'create' ? 'Create another tier' : mode === 'rename' ? 'Rename tier' : 'Quotation tiers'}</DialogTitle><DialogDescription>{firstTime ? 'Choose a label for this saved quotation. Its items and prices stay as they are.' : mode === 'create' ? `Copy ${current?.tier_name} with the same client, rooms, items and prices, then adjust your new tier.` : 'Choose an option to view, edit, download or share.'}</DialogDescription></DialogHeader>
         {error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{error}</p>}
         <div className="min-h-0 space-y-4 overflow-y-auto">

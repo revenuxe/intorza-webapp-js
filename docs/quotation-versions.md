@@ -2,7 +2,12 @@
 
 Quotation cards link to `/quotations/[id]`, including drafts. The existing Edit,
 Duplicate and Delete buttons keep their own actions. The detail page's Versions
-button opens saved history, field changes and a read-only snapshot.
+button opens a compact list of saved versions and recent changes. Tapping an
+entry expands its before/after changes and revert action, without showing the
+whole quotation. When tiers exist, a selector switches the history to that tier;
+it defaults to the option currently being viewed. Switching clears selection,
+confirmation and cached snapshots. Delayed responses from the previous tier are
+ignored, and reverts always target the selected tier.
 
 Apply `supabase/migrations/20261116120000_quotation_versions.sql` before releasing
 the frontend. It depends on the existing quotation save, specifications and

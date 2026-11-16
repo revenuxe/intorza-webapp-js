@@ -422,7 +422,7 @@ const QuotationDetail = () => {
             Back
           </Button>
           <div aria-label="Quotation actions" className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:flex-wrap [&>button]:h-12 [&>button]:min-w-0 [&>button]:rounded-xl sm:[&>button]:h-11">
-            <QuotationVersions quotationId={quotation.id} onRestored={() => loadQuotation(true)} />
+            <QuotationVersions quotationId={quotation.id} tiers={tierGroup?.tiers} onRestored={() => loadQuotation(true)} />
             {tierGroup && <QuotationTiers group={tierGroup} activeId={quotation.id} onRefresh={() => loadQuotation(true)}
               onSelect={tierId => navigate(`/quotations/${tierGroup.root_id}${tierId === tierGroup.root_id ? '' : `?tier=${tierId}`}`)}
               onEdit={tierId => navigate(`/?id=${tierId}`)} onExport={handleDownloadPdf} />}

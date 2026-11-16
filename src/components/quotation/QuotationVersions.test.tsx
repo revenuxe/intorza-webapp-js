@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QuotationVersions } from './QuotationVersions';
 import { quotationsApi } from '@/lib/api';
 jest.mock('@/lib/api', () => ({ quotationsApi: { versions: jest.fn(), version: jest.fn(), revertVersion: jest.fn() } }));
@@ -53,4 +53,44 @@ it('expands just the selected changes and keeps the latest version non-revertibl
   expect(screen.queryByRole('button', { name: 'Revert to this version' })).not.toBeInTheDocument();
   fireEvent.click(latest);
   expect(screen.queryByRole('list', { name: 'Changes in Version 2' })).not.toBeInTheDocument();
+});
+
+it('switches to the selected tier history and reverts only that tier', async () => {
+  const restored = jest.fn(async () => {});
+  render(<QuotationVersions quotationId="quote" tiers={[{ id: 'quote', tier_name: 'Standard' }, { id: 'luxury', tier_name: 'Luxury' }]} onRestored={restored} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Versions' }));
+  await screen.findByText('First saved version');
+  expect(screen.getByRole('combobox', { name: 'Tier' })).toHaveValue('quote');
+  fireEvent.click(screen.getByRole('button', { name: /Version 1 16/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Revert to this version' }));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Tier' }), { target: { value: 'luxury' } });
+  expect(screen.queryByRole('button', { name: 'Confirm revert' })).not.toBeInTheDocument();
+  await waitFor(() => expect(quotationsApi.versions).toHaveBeenCalledWith('luxury'));
+  await screen.findByText('First saved version');
+  expect(quotationsApi.version).toHaveBeenCalledWith('luxury',1);
+  fireEvent.click(screen.getByRole('button', { name: /Version 1 16/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Revert to this version' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm revert' }));
+  await waitFor(() => expect(quotationsApi.revertVersion).toHaveBeenCalledWith('luxury','v1',2));
+  expect(await screen.findByText('Version 1 of Luxury restored and saved as a new version.')).toBeVisible();
+  expect(restored).toHaveBeenCalledTimes(1);
+});
+
+it('ignores an older tier response arriving after the user switches tiers', async () => {
+  let finishOldRequest!: (result: Awaited<ReturnType<typeof quotationsApi.version>>) => void;
+  jest.mocked(quotationsApi.versions).mockImplementation(async id => ({ data: versions.map(version => ({ ...version, id: `${id}-${version.id}`, quotation_id: id })) }));
+  jest.mocked(quotationsApi.version).mockImplementation(async (id, number) => {
+    if (id === 'quote' && number === 1) return new Promise(resolve => { finishOldRequest = resolve; });
+    return { data: { ...versions.find(version => version.version_number === number)!, id: `${id}-v${number}`, quotation_id: id, snapshot: snapshot(number) } };
+  });
+  render(<QuotationVersions quotationId="quote" tiers={[{ id: 'quote', tier_name: 'Standard' }, { id: 'luxury', tier_name: 'Luxury' }]} onRestored={async () => {}} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Versions' }));
+  await waitFor(() => expect(quotationsApi.version).toHaveBeenCalledWith('quote',1));
+  fireEvent.change(screen.getByRole('combobox', { name: 'Tier' }), { target: { value: 'luxury' } });
+  await screen.findByText('First saved version');
+  await act(async () => finishOldRequest({ data: { ...versions[1], snapshot: snapshot(1) } }));
+  fireEvent.click(screen.getByRole('button', { name: /Version 1 16/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Revert to this version' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm revert' }));
+  await waitFor(() => expect(quotationsApi.revertVersion).toHaveBeenCalledWith('luxury','luxury-v1',2));
 });
