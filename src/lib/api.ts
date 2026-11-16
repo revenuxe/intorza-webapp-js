@@ -1,6 +1,8 @@
 import { formatItemDetails, normalizeItemDetails } from './itemSpecifications';
 import type { QuotationVersion, QuotationVersionDetail } from './quotationVersions';
 import type { QuotationTierGroup } from './quotationTiers';
+import { notifyAccountChanged } from './accountQueries';
+import type { QuotationSaveAttempt, QuotationSaveAcknowledgement } from './quotationSaveSession';
 /**
  * Intorza API client — Supabase-backed.
  *
@@ -94,6 +96,7 @@ export const profileApi = {
     const row = unwrap(
       await supabase.from('profiles').update(body).eq('id', uid).select().single(),
     );
+    notifyAccountChanged(uid,'profile');
     return { data: row };
   },
   roles: async (): Promise<Envelope<string[]>> => {
@@ -130,20 +133,32 @@ function structuredQuotationPayload(body: Record<string, unknown>) {
   }) })) };
 }
 export const quotationsApi = {
+  tierMetadata: async (id: string): Promise<Envelope<QuotationTierGroup>> => ({ data: unwrap(await supabase.rpc('get_quotation_tier_metadata',{p_id:id})) as QuotationTierGroup }),
+  editor: async (id: string): Promise<Envelope<any>> => ({ data: unwrap(await supabase.rpc('get_quotation_editor',{p_id:id})) }),
+  saveChecked: async (attempt: QuotationSaveAttempt): Promise<QuotationSaveAcknowledgement> => {
+    const saved = unwrap(await supabase.rpc('save_quotation_checked',{
+      p_id:attempt.id,p_payload:structuredQuotationPayload(attempt.payload),p_request_id:attempt.requestId,
+      p_expected_version:attempt.expectedVersion,p_project_id:attempt.projectId,
+    })) as QuotationSaveAcknowledgement;
+    if (saved?.user_id) notifyAccountChanged(saved.user_id,'quotations',true);
+    return saved;
+  },
   removeTier: async (id: string, rootId: string): Promise<void> => {
     const uid = await requireUserId();
     const { data, error } = await supabase.from('quotations').delete()
       .eq('id', id).eq('tier_parent_id', rootId).eq('user_id', uid).select('id');
     if (error) throw new ApiError(400, error.message, error);
     if (!data?.length) throw new ApiError(404, 'Tier not found. The original quotation cannot be deleted as an individual tier.');
+    notifyAccountChanged(uid,'quotations');
   },
   tiers: async (id: string): Promise<Envelope<QuotationTierGroup>> => {
     await requireUserId();
     return { data: unwrap(await supabase.rpc('get_quotation_tiers', { p_id: id })) as QuotationTierGroup };
   },
   nameTier: async (id: string, name: string): Promise<void> => {
-    await requireUserId();
+    const uid = await requireUserId();
     unwrap(await supabase.rpc('name_quotation_tier', { p_id: id, p_name: name.trim() }));
+    notifyAccountChanged(uid,'quotations');
   },
   createTier: async (sourceId: string, name: string): Promise<Envelope<any>> => {
     const owner = await requireUserId();
@@ -152,7 +167,9 @@ export const quotationsApi = {
     const { readSnapshot, saveAccountEntries } = await import('./library/storage');
     const pending = Object.values(readSnapshot(owner).pending);
     for (let offset = 0; offset < pending.length; offset += 100) await saveAccountEntries(owner,pending.slice(offset,offset + 100));
-    return { data: unwrap(await supabase.rpc('create_quotation_tier', { p_source_id: sourceId, p_name: name.trim() })) };
+    const data = unwrap(await supabase.rpc('create_quotation_tier', { p_source_id: sourceId, p_name: name.trim() }));
+    notifyAccountChanged(owner,'quotations');
+    return { data };
   },
   versions: async (id: string): Promise<Envelope<QuotationVersion[]>> => {
     await requireUserId();
@@ -173,11 +190,22 @@ export const quotationsApi = {
     if (!row) throw new ApiError(404, 'Quotation version not found');
     return { data: row };
   },
-  revertVersion: async (id: string, versionId: string, expectedVersion: number): Promise<Envelope<any>> => {
+  versionBatch: async (id: string, versionNumbers: number[]): Promise<Envelope<QuotationVersionDetail[]>> => {
+    const numbers = [...new Set(versionNumbers)];
+    if (numbers.length > 100 || numbers.some(number => !Number.isInteger(number) || number < 1)) throw new ApiError(400, 'Invalid version batch');
+    if (!numbers.length) return { data: [] };
     await requireUserId();
+    const rows = unwrap(await supabase.from('quotation_versions').select('*')
+      .eq('quotation_id',id).in('version_number',numbers).order('version_number',{ascending:false})) as QuotationVersionDetail[];
+    if (rows.length !== numbers.length) throw new ApiError(404,'Some quotation versions could not be found. Refresh versions to try again.');
+    return { data: rows };
+  },
+  revertVersion: async (id: string, versionId: string, expectedVersion: number): Promise<Envelope<any>> => {
+    const uid = await requireUserId();
     const row = unwrap(await supabase.rpc('revert_quotation_version', {
       p_id: id, p_version_id: versionId, p_expected_version: expectedVersion,
     }));
+    notifyAccountChanged(uid,'quotations');
     return { data: row };
   },
   list: async (): Promise<Envelope<any[]>> => {
@@ -212,19 +240,21 @@ export const quotationsApi = {
     return { data: { ...(row as any), sections: normalized } };
   },
   create: async (body: any, aiProjectId?: string | null): Promise<Envelope<any>> => {
-    await requireUserId();
+    const uid = await requireUserId();
     const payload = structuredQuotationPayload(body);
     const row = unwrap(await (aiProjectId
       ? supabase.rpc('save_ai_quotation', { p_id: null, p_payload: payload, p_project_id: aiProjectId })
       : supabase.rpc('save_quotation', { p_id: null, p_payload: payload })));
+    notifyAccountChanged(uid,'quotations');
     return { data: row };
   },
   update: async (id: string, body: any, aiProjectId?: string | null): Promise<Envelope<any>> => {
-    await requireUserId();
+    const uid = await requireUserId();
     const payload = structuredQuotationPayload(body);
     const row = unwrap(await (aiProjectId
       ? supabase.rpc('save_ai_quotation', { p_id: id, p_payload: payload, p_project_id: aiProjectId })
       : supabase.rpc('save_quotation', { p_id: id, p_payload: payload })));
+    notifyAccountChanged(uid,'quotations');
     return { data: row };
   },
   remove: async (id: string): Promise<void> => {
@@ -232,6 +262,7 @@ export const quotationsApi = {
     const { data, error } = await supabase.from('quotations').delete().eq('id', id).eq('user_id', uid).select('id');
     if (error) throw new ApiError(400, error.message, error);
     if (!data?.length) throw new ApiError(404, 'Quotation not found or access denied');
+    notifyAccountChanged(uid,'quotations');
   },
 };
 

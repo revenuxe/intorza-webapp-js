@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { profileApi } from '@/lib/api';
-import { useAuth } from './useAuth';
-import { getCountryByCode, getDefaultCountry, CountryConfig } from '@/lib/countryConfig';
+import { useCallback, useMemo } from 'react';
+import { useAccountProfile } from './useAccountProfile';
+import { getCountryByCode, getDefaultCountry } from '@/lib/countryConfig';
 
 export interface LocalizationSettings {
   countryCode: string;
@@ -48,56 +47,33 @@ const DEFAULT_SETTINGS: LocalizationSettings = {
 };
 
 export const useLocalization = () => {
-  const { user } = useAuth();
-  const [settings, setSettings] = useState<LocalizationSettings>(DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(true);
-  const [countryConfig, setCountryConfig] = useState<CountryConfig | null>(null);
-
-  useEffect(() => {
-    const loadSettings = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const { data: profile } = await profileApi.get();
-
-        if (profile?.country_code) {
-          const country = getCountryByCode(profile.country_code) || getDefaultCountry();
-          setCountryConfig(country);
-          
-          setSettings({
-            countryCode: country.code,
-            currencyCode: country.currency.code,
-            currencySymbol: profile.currency_symbol || country.currency.symbol,
-            currencyPosition: country.currency.position,
-            locale: profile.locale || country.currency.locale,
-            decimalPlaces: country.currency.decimalPlaces,
-            taxLabel: profile.tax_label || country.tax.label,
-            taxShortLabel: country.tax.shortLabel,
-            taxRegistrationLabel: country.tax.registrationLabel,
-            defaultTaxRate: country.tax.defaultRate,
-            commonTaxRates: country.tax.commonRates,
-            measurementSystem: (profile.measurement_system as 'metric' | 'imperial') || country.measurement.system,
-            areaUnit: country.measurement.areaUnit,
-            areaUnitShort: country.measurement.areaUnitShort,
-            lengthUnit: country.measurement.lengthUnit,
-            lengthUnitShort: country.measurement.lengthUnitShort,
-            dateFormat: country.dateFormat,
-            thousandSeparator: country.numberFormat.thousandSeparator,
-            decimalSeparator: country.numberFormat.decimalSeparator,
-          });
-        }
-      } catch (error) {
-        console.error('Error loading localization settings:', error);
-      } finally {
-        setLoading(false);
-      }
+  const { data: profile, loading } = useAccountProfile();
+  const countryConfig = useMemo(() => profile?.country_code ? getCountryByCode(profile.country_code) || getDefaultCountry() : null, [profile?.country_code]);
+  const settings = useMemo<LocalizationSettings>(() => {
+    if (!profile || !countryConfig) return DEFAULT_SETTINGS;
+    const country = countryConfig;
+    return {
+      countryCode: country.code,
+      currencyCode: country.currency.code,
+      currencySymbol: profile.currency_symbol || country.currency.symbol,
+      currencyPosition: country.currency.position,
+      locale: profile.locale || country.currency.locale,
+      decimalPlaces: country.currency.decimalPlaces,
+      taxLabel: profile.tax_label || country.tax.label,
+      taxShortLabel: country.tax.shortLabel,
+      taxRegistrationLabel: country.tax.registrationLabel,
+      defaultTaxRate: country.tax.defaultRate,
+      commonTaxRates: country.tax.commonRates,
+      measurementSystem: (profile.measurement_system as 'metric' | 'imperial') || country.measurement.system,
+      areaUnit: country.measurement.areaUnit,
+      areaUnitShort: country.measurement.areaUnitShort,
+      lengthUnit: country.measurement.lengthUnit,
+      lengthUnitShort: country.measurement.lengthUnitShort,
+      dateFormat: country.dateFormat,
+      thousandSeparator: country.numberFormat.thousandSeparator,
+      decimalSeparator: country.numberFormat.decimalSeparator,
     };
-
-    loadSettings();
-  }, [user]);
+  }, [profile,countryConfig]);
 
   // Format currency with proper symbol and locale
   const formatCurrency = useCallback((amount: number, showDecimals = false): string => {

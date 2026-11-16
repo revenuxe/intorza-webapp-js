@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Layers3, Plus, Pencil, Download, Share2, Columns3, Trash2, Check } from 'lucide-react';
 import { quotationsApi } from '@/lib/api';
 import { tierComparisonRows, tierPresets, type QuotationTierGroup } from '@/lib/quotationTiers';
@@ -12,11 +12,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { QuotationOptionScroller } from './QuotationOptionScroller';
 import { rememberLibraryTier } from '@/lib/library/pricingPreference';
 
-export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, onExport }: {
+export function QuotationTiers({ group: metadata, activeId, onRefresh, onSelect, onEdit, onExport, loadComparison }: {
   group: QuotationTierGroup; activeId: string; onRefresh: () => Promise<void>;
   onSelect: (id: string) => void; onEdit: (id: string) => void;
   onExport: (id: string, share: boolean) => Promise<void>;
+  loadComparison?: () => Promise<QuotationTierGroup>;
 }) {
+  const [comparisonGroup,setComparisonGroup] = useState<QuotationTierGroup | null>(null);
+  const [comparisonLoading,setComparisonLoading] = useState(false);
+  const group=comparisonGroup || metadata;
   const { formatCurrency } = useLocalization();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'create' | 'rename' | null>(null);
@@ -24,6 +28,25 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [compare, setCompare] = useState(false);
+  const comparisonGeneration = useRef(0);
+  useEffect(() => {
+    comparisonGeneration.current++;
+    setComparisonGroup(null); setComparisonLoading(false); setCompare(false);
+    return () => { comparisonGeneration.current++; };
+  }, [metadata, open]);
+  const showComparison = async () => {
+    if (compare) { setCompare(false); return; }
+    setCompare(true);
+    if (!loadComparison || comparisonGroup) return;
+    const generation = ++comparisonGeneration.current;
+    setComparisonLoading(true); setError('');
+    try {
+      const result = await loadComparison();
+      if (generation === comparisonGeneration.current) setComparisonGroup(result);
+    }
+    catch { if (generation === comparisonGeneration.current) { setError('Could not load tier comparison. Please try again.'); setCompare(false); } }
+    finally { if (generation === comparisonGeneration.current) setComparisonLoading(false); }
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const firstTime = !group.tiers[0]?.tier_name;
@@ -80,11 +103,11 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
             <div className="space-y-2"><Label htmlFor="tier-name">Tier name</Label><Input id="tier-name" placeholder="Basic, Standard, Luxury, or your own name" value={name} maxLength={40} disabled={busy} onChange={event => setName(event.target.value)} /></div>
             <div className="grid grid-cols-2 gap-3 [&>button]:min-h-12 [&>button]:whitespace-normal [&>button]:rounded-xl"><Button className={firstTime ? 'col-span-2' : ''} disabled={busy || !name.trim()} onClick={save}>{busy ? 'Saving...' : mode === 'create' ? 'Create tier and edit' : 'Save tier name'}</Button>{!firstTime && <Button variant="outline" disabled={busy} onClick={() => { setMode(null); setName(''); }}>Cancel</Button>}</div>
           </div> : <>
-            <div className="grid grid-cols-2 gap-3 [&>button]:min-h-12 [&>button]:rounded-xl [&>button]:px-3"><Button aria-label="Create another tier" disabled={busy} onClick={() => { setName(''); setMode('create'); }}><Plus className="h-4 w-4" />New tier</Button><Button variant="outline" disabled={group.tiers.length < 2 || busy} onClick={() => setCompare(value => !value)}><Columns3 className="h-4 w-4" />{compare ? 'Show tiers' : 'Compare tiers'}</Button></div>
+            <div className="grid grid-cols-2 gap-3 [&>button]:min-h-12 [&>button]:rounded-xl [&>button]:px-3"><Button aria-label="Create another tier" disabled={busy} onClick={() => { setName(''); setMode('create'); }}><Plus className="h-4 w-4" />New tier</Button><Button variant="outline" disabled={group.tiers.length < 2 || busy || comparisonLoading} onClick={() => void showComparison()}><Columns3 className="h-4 w-4" />{compare ? 'Show tiers' : 'Compare tiers'}</Button></div>
             <div className="flex min-w-0 items-center justify-between gap-2"><p className="min-w-0 truncate text-sm"><span className="text-muted-foreground">Selected </span><span className="font-semibold">{current.tier_name}</span></p><Button variant="ghost" className="h-11 shrink-0 gap-1.5 px-2" disabled={busy} onClick={() => { setName(current.tier_name || ''); setMode('rename'); }}><Pencil className="h-3.5 w-3.5" />Rename tier</Button></div>
             {!compare && <p className="text-xs text-muted-foreground">Tap a card to select it. New tier copies your selection.</p>}
             {compare && <p className="text-xs text-muted-foreground">Swipe across the table to compare all tiers.</p>}
-            {compare ? <div className="overflow-x-auto rounded-xl border" tabIndex={0} role="region" aria-label="Tier comparison">
+            {comparisonLoading ? <p role="status" className="py-4 text-sm text-muted-foreground">Loading tier comparison...</p> : compare ? <div className="overflow-x-auto rounded-xl border" tabIndex={0} role="region" aria-label="Tier comparison">
               <table className="w-full border-collapse text-left text-sm">
                 <caption className="sr-only">Quotation tiers compared by saved items, specifications, quantities, prices and totals</caption>
                 <thead><tr><th className="min-w-36 border-b bg-muted/40 p-3">Compare</th>{group.tiers.map(tier => <th key={tier.id} scope="col" className="min-w-56 border-b border-l bg-muted/40 p-3"><p>{tier.tier_name}</p><p className="mt-1 font-normal text-muted-foreground">{formatCurrency(tier.grand_total || 0, true)}</p><Button variant="outline" size="sm" className="mt-3" disabled={busy} onClick={() => { setOpen(false); onSelect(tier.id); }}>Open {tier.tier_name}</Button></th>)}</tr></thead>
@@ -101,7 +124,7 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
               <div className="flex items-start justify-between gap-2"><button type="button" aria-label={`Select ${tier.tier_name} tier`} aria-pressed={tier.id === current.id} disabled={busy} onClick={() => selectTier(tier.id)} className="min-h-11 min-w-0 flex-1 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="block break-words font-semibold">{tier.tier_name}</span>{tier.id === current.id && <span className="mt-1 flex items-center gap-1 text-xs text-primary"><Check className="h-3 w-3" />Selected</span>}</button><Button type="button" variant="ghost" size="icon" aria-label={`Delete ${tier.tier_name} tier`} title={tier.id === group.root_id ? 'Original tier holds the shared quotation. Delete the whole quotation from My Quotations.' : `Delete ${tier.tier_name} tier`} disabled={busy || tier.id === group.root_id} className="h-11 w-11 shrink-0 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => { setDeleteId(tier.id); setError(''); }}><Trash2 className="h-4 w-4" /></Button></div>
               {tier.id === group.root_id && <p className="text-[11px] text-muted-foreground">Original tier · keeps shared details</p>}
               <p className="text-xl font-semibold tabular-nums text-primary">{formatCurrency(tier.grand_total || 0,true)}</p>
-              <p className="text-xs text-muted-foreground">{tier.snapshot.sections.length} rooms · {tier.snapshot.sections.reduce((sum,section) => sum + section.items.length,0)} items · {tier.status}</p>
+              <p className="text-xs text-muted-foreground">{tier.room_count ?? tier.snapshot.sections.length} rooms · {tier.item_count ?? tier.snapshot.sections.reduce((sum,section) => sum + section.items.length,0)} items · {tier.status}</p>
               <div className="grid grid-cols-2 gap-3 [&>button]:h-11 [&>button]:rounded-xl [&>button]:px-2"><Button variant={tier.id === activeId ? 'secondary' : 'default'} disabled={busy} onClick={() => { setOpen(false); onSelect(tier.id); }}>View tier</Button><Button variant="outline" disabled={busy} onClick={() => { setOpen(false); onEdit(tier.id); }}><Pencil className="h-3.5 w-3.5" />Edit tier</Button><Button variant="outline" disabled={busy} onClick={() => exportTier(tier.id,false)}><Download className="h-3.5 w-3.5" />PDF</Button><Button variant="outline" disabled={busy} onClick={() => exportTier(tier.id,true)}><Share2 className="h-3.5 w-3.5" />Share</Button></div>
             </div>)}</QuotationOptionScroller>}
             <p className="text-xs text-muted-foreground">Client details are shared. Edit them in the original tier. If file sharing is unavailable, Share downloads the tier PDF.</p>

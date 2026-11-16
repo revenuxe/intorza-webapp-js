@@ -8,8 +8,14 @@ it('starts saved completed items collapsed with their pricing summary', () => {
   expect(screen.getByText('56 Sq.ft x Rs. 1,850.00')).toBeVisible();
   expect(screen.getByText('Rs. 1,03,600.00')).toBeVisible();
   expect(screen.queryByRole('textbox', { name: 'Description' })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText('Description')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '1. Wardrobe' }));
   expect(screen.getByRole('textbox', { name: 'Description' })).toHaveValue('Loft');
+  fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'My unfinished notes' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Done - collapse item' }));
+  expect(screen.getByLabelText('Description')).toHaveValue('My unfinished notes');
+  fireEvent.click(screen.getByRole('button', { name: '1. Wardrobe' }));
+  expect(screen.getByRole('textbox', { name: 'Description' })).toHaveValue('My unfinished notes');
 });
 it('keeps the current item open as its rate becomes complete, then closes when another item is activated', () => {
   const view = render(<QuotationItemCard {...props} item={{ ...item, ratePerSft: 0 }} activeItemId="wardrobe"><input aria-label="Description" defaultValue="Loft" /></QuotationItemCard>);

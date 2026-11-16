@@ -7,6 +7,9 @@ import { getDraftReference, clearDraftReference } from "@/lib/draft-quotation-re
 
 import { appendFloorPlanEstimate } from '@/lib/quotation-ai/apply-estimate';
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { accountProfileOptions } from '@/lib/accountQueries';
 import dynamic from 'next/dynamic';
 import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon, LockKeyhole } from "lucide-react";
 import { getCountryByCode } from "@/lib/countryConfig";
@@ -20,13 +23,13 @@ import { Switch } from "@/components/ui/switch";
 import { useInlineFeedback } from "@/hooks/useInlineFeedback";
 import { supabase } from "@/integrations/supabase/client";
 import { quotationsApi } from "@/lib/api";
-import { generateQuotationPDF } from "@/lib/pdfGenerator";
+import { QuotationSaveSession } from "@/lib/quotationSaveSession";
 import { useNavigate, useSearchParams } from "@/lib/navigation";
 import { useAuthAction } from "@/hooks/useAuthAction";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { useQuotationAutomation } from "@/hooks/useQuotationAutomation";
 import { CustomizeFieldsDrawer, QuotationSettings, getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
-import { PDFPreviewEditor } from "@/components/PDFPreviewEditor";
+const PDFPreviewEditor = dynamic(() => import("@/components/PDFPreviewEditor").then(module => module.PDFPreviewEditor), { ssr: false });
 import { PDFEditorSettings, getEditorSettings } from "@/lib/pdfThemes";
 import { normalizeWarrantyInput } from "@/lib/warrantyFormatter";
 import { ClientSelector } from "@/components/quotation/ClientSelector";
@@ -41,14 +44,14 @@ const FloorPlanQuotationBuilder = dynamic(() => import('@/components/quotation/F
 import type { BuilderMode } from '@/components/quotation/FloorPlanQuotationBuilder';
 import { EstimatePriceDetails } from '@/components/quotation/EstimatePriceDetails';
 import type { PriceEvidence } from '@/lib/quotation-ai/floor-plan';
-import { reconcileSavedQuotation, remapDraftIds } from '@/lib/quotation-ai/save-reconciliation';
+import { remapDraftIds, type SavedSection } from '@/lib/quotation-ai/save-reconciliation';
 import { fromQuotation, lineAmount, quotationTotals, reviewDraft, draftSchema, type VoiceDraft } from "@/lib/quotation-ai/domain";
 import { QuotationItemCard } from '@/components/quotation/QuotationItemCard';
 import { tierQuotationTitle } from '@/lib/quotationTiers';
 import { libraryTierForName } from '@/lib/library/model';
 
 import { QuotationItemFields } from '@/components/quotation/QuotationItemFields';
-import { splitItemDetails } from '@/lib/itemSpecifications';
+import { splitItemDetails, formatItemDetails } from '@/lib/itemSpecifications';
 
 import { changeQuotationUnit, getQuotationUnit } from '@/lib/quotationUnits';
 interface LineItem {
@@ -77,6 +80,8 @@ interface PaymentStage {
 const defaultProjectDeadline = (proposal: string) => proposal ? format(addDays(parseISO(proposal), 45), 'yyyy-MM-dd') : '';
 
 const CreateQuotation = () => {
+  const { user: accountUser, loading: accountLoading } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const {
     toast, feedback, clearFeedback
@@ -104,6 +109,9 @@ const CreateQuotation = () => {
   const [actionExecuted, setActionExecuted] = useState(false);
   const smartDefaultsApplied = useRef(false);
   const quotationSaveInProgress = useRef(false);
+  const [saveSession] = useState(() => new QuotationSaveSession(attempt => quotationsApi.saveChecked(attempt)));
+  const quotationLoadGeneration = useRef(0);
+  const adoptedSaveRoute = useRef<{ id: string; owner: string } | null>(null);
   const [referenceNo, setReferenceNo] = useState<string | null>(null);
   const [referenceError, setReferenceError] = useState(false);
   const [referenceRetry, setReferenceRetry] = useState(0);
@@ -292,14 +300,22 @@ const CreateQuotation = () => {
   }, [automationLoading, quotationId, continueAction, getSmartDefaults]);
 
   useEffect(() => {
+    if (accountLoading) return;
+    if (adoptedSaveRoute.current?.id === quotationId && adoptedSaveRoute.current?.owner === accountUser?.id && saveSession.id === quotationId) {
+      adoptedSaveRoute.current = null;
+      return;
+    }
+    adoptedSaveRoute.current = null;
+    saveSession.reset();
     savedQuotationIdRef.current = quotationId;
     setTierContext(null);
     if (quotationId) setReferenceNo(null);
-    loadProfile();
     if (quotationId) {
       loadQuotation(quotationId);
     }
-  }, [quotationId]);
+    loadProfile();
+    return () => { quotationLoadGeneration.current++; };
+  }, [quotationId, accountUser?.id, accountLoading]);
 
   // Handle continuing actions after login (wait for form to be restored and profile to be loaded)
   useEffect(() => {
@@ -363,18 +379,11 @@ const CreateQuotation = () => {
     executePendingAction();
   }, [continueAction, formRestored, actionExecuted, isPro, setPaywallOpen]);
   const loadProfile = async () => {
+    const generation = quotationLoadGeneration.current;
     try {
-      const {
-        data: {
-          user
-        }
-      } = await supabase.auth.getUser();
+      const user = accountUser;
       if (!user) return;
-      const {
-        data,
-        error
-      } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      if (error) throw error;
+      const data = await queryClient.fetchQuery(accountProfileOptions(user.id));
       if (data) {
         // Get templates from My Library (default first, else latest saved)
         const [libraryStages, libraryTerms, bankTemplate, warrantyTemplate] = await Promise.all([
@@ -383,7 +392,8 @@ const CreateQuotation = () => {
           getLibraryBankTemplate(user.id),
           supabase.from('warranty_templates').select('warranty_years').eq('user_id', user.id).eq('is_default', true).maybeSingle(),
         ]);
-        if ((warrantyTemplate.data as any)?.warranty_years) setWarranty(normalizeWarrantyInput(String((warrantyTemplate.data as any).warranty_years)));
+        if (generation !== quotationLoadGeneration.current) return;
+        if (!quotationId && (warrantyTemplate.data as any)?.warranty_years) setWarranty(normalizeWarrantyInput(String((warrantyTemplate.data as any).warranty_years)));
 
         setProfile({
           company_name: data.company_name || "",
@@ -423,24 +433,18 @@ const CreateQuotation = () => {
     }
   };
   const loadQuotation = async (id: string) => {
+    const generation = ++quotationLoadGeneration.current;
     setIsLoadingQuotation(true);
     lastAIDraft.current = null;
     setAIPriceEvidence({});
     planProjectId.current = null;
     clearFeedback();
     try {
-      // Load quotation data
-      const {
-        data: quotation,
-        error: quotationError
-      } = await supabase.from('quotations').select('*').eq('id', id).single();
-      if (quotationError) throw quotationError;
-      let groupReference = quotation.reference_no;
-      if (quotation.tier_parent_id) {
-        const parent = await supabase.from('quotations').select('reference_no').eq('id', quotation.tier_parent_id).single();
-        if (parent.error) throw parent.error;
-        groupReference = parent.data.reference_no;
-      }
+      const { data: quotation } = await quotationsApi.editor(id);
+      if (generation !== quotationLoadGeneration.current) return;
+      if (!quotation || !Number.isInteger(quotation.version_number)) throw new Error('Quotation response was incomplete. Reload before editing.');
+      saveSession.adopt(quotation.id,quotation.version_number);
+      const groupReference = quotation.group_reference_no || quotation.reference_no;
       setTierContext(quotation.tier_name ? { name: quotation.tier_name, parentId: quotation.tier_parent_id, referenceNo: groupReference } : null);
 
       // Pre-fill form fields - use quotation_title or project_name as fallback
@@ -472,54 +476,20 @@ const CreateQuotation = () => {
         discountPercentage: loadedDiscount,
       }));
 
-      // Load sections
-      const {
-        data: sectionsData,
-        error: sectionsError
-      } = await supabase.from('quotation_sections').select('*').eq('quotation_id', id).order('sort_order');
-      if (sectionsError) throw sectionsError;
-
-      // Load items for each section
-      const loadedSections: Section[] = [];
-      for (const section of sectionsData || []) {
-        const {
-          data: itemsData,
-          error: itemsError
-        } = await supabase.from('quotation_items').select('*').eq('section_id', section.id).order('sort_order');
-        if (itemsError) throw itemsError;
-        loadedSections.push({
-          id: section.id,
-          title: section.section_name,
-          items: (itemsData || []).map(item => ({
-            id: item.id,
-            side: item.side || "A",
-            productName: item.product_name || "",
-            productDetails: item.product_details || "",
-            measurementUnit: getQuotationUnit(item.measurement_unit),
-
-            widthFt: item.width_ft || 0,
-            heightFt: item.height_ft || 0,
-            sftArea: item.sft_area || 0,
-            ratePerSft: item.rate_per_sft || 0,
-            amount: item.amount || 0
-          }))
-        });
-      }
-      if (loadedSections.length > 0) {
-        setSections(loadedSections);
-      }
-      const loadedItemIds = loadedSections.flatMap(section => section.items.map(item => item.id));
+      const loadedSections: Section[] = (quotation.sections || []).map((section: SavedSection) => ({
+        id: section.id, title: section.section_name,
+        items: (section.items || []).map(item => ({
+          id: item.id, side: item.side || 'A', productName: item.product_name || '',
+          productDetails: formatItemDetails(item.product_details, item.specifications), measurementUnit: getQuotationUnit(item.measurement_unit),
+          widthFt: item.width_ft || 0, heightFt: item.height_ft || 0, sftArea: item.sft_area || 0,
+          ratePerSft: item.rate_per_sft || 0, amount: item.amount || 0,
+        })),
+      }));
+      setSections(loadedSections);
       const restoredImages: Record<string, GalleryImage[]> = {};
-      if (loadedItemIds.length) {
-        const { data: links, error } = await supabase.from('quotation_item_images')
-          .select('quotation_item_id, sort_order, gallery_images(*)').in('quotation_item_id', loadedItemIds).order('sort_order');
-        if (error) throw error;
-        for (const link of links || []) {
-          if (link.gallery_images) (restoredImages[link.quotation_item_id] ||= []).push(link.gallery_images as GalleryImage);
-        }
-      }
+      for (const image of quotation.item_images || []) (restoredImages[image.quotation_item_id] ||= []).push(image as GalleryImage);
       setItemImages(restoredImages);
-      const { data: planProject } = await supabase.from('quotation_plan_projects').select('id,estimate').eq('quotation_id', id).order('updated_at', { ascending: false }).limit(1).maybeSingle();
+      const planProject = quotation.plan_project;
       if (planProject) {
         planProjectId.current = planProject.id;
         const restored = draftSchema.safeParse((planProject.estimate as { draft?: unknown } | null)?.draft);
@@ -528,6 +498,7 @@ const CreateQuotation = () => {
         if (Array.isArray(storedEvidence)) setAIPriceEvidence(Object.fromEntries(storedEvidence.map(row => [row.itemId, row.price])));
       }
     } catch (error) {
+      if (generation !== quotationLoadGeneration.current) return;
       console.error('Error loading quotation:', error);
       toast({
         title: "Load failed",
@@ -535,7 +506,7 @@ const CreateQuotation = () => {
         variant: "destructive"
       });
     } finally {
-      setIsLoadingQuotation(false);
+      if (generation === quotationLoadGeneration.current) setIsLoadingQuotation(false);
     }
   };
   const addSection = () => {
@@ -780,38 +751,15 @@ const CreateQuotation = () => {
       };
 
       const existingId = quotationId || savedQuotationIdRef.current;
-      if (existingId) {
-        const { data: updated } = await quotationsApi.update(existingId, basePayload, planProjectId.current);
-        savedQuotationId = updated?.id || existingId;
-      } else {
-        const quotationNumber = `QT-${Date.now()}`;
-        const { data: created } = await quotationsApi.create({
-          ...basePayload,
-          quotation_number: quotationNumber,
-        }, planProjectId.current);
-        savedQuotationId = created?.id ?? null;
-        savedQuotationIdRef.current = savedQuotationId;
-      }
-
-
-      if (!savedQuotationId) throw new Error('The quotation save did not return an ID. Your editor has been preserved.');
-      // Read back the complete nested save before navigating or replacing any local identities.
-      const { data: verifiedQuotation } = await quotationsApi.get(savedQuotationId);
+      const { quotation: verifiedQuotation, mapping } = await saveSession.save({
+        id: existingId, version: saveSession.version, payload: basePayload, projectId: planProjectId.current,
+      });
+      savedQuotationId = verifiedQuotation.id;
+      savedQuotationIdRef.current = savedQuotationId;
       setReferenceNo(verifiedQuotation.reference_no || null);
       clearDraftReference();
-      const mapping = reconcileSavedQuotation(payloadSections, verifiedQuotation.sections);
-      const currentPlanId = planProjectId.current;
-      if (currentPlanId) {
-        const source = await supabase.from('quotation_plan_projects').select('estimate').eq('id', currentPlanId).eq('user_id', user.id).single();
-        if (source.error || !source.data?.estimate) throw new Error('Quotation saved, but its AI reference could not be loaded. Your editor is preserved; retry saving to link it.');
-        const estimate = source.data.estimate as unknown as import('@/lib/quotation-ai/floor-plan').Estimate;
-        const linked = await supabase.from('quotation_plan_projects').update({ quotation_id: savedQuotationId, updated_at: new Date().toISOString(), estimate: {
-          ...estimate, draft: remapDraftIds(estimate.draft, mapping),
-          evidence: estimate.evidence.map(row => ({ ...row, itemId: mapping.items[row.itemId] ?? row.itemId })),
-          roomSections: estimate.roomSections.map(row => ({ ...row, sectionId: mapping.sections[row.sectionId] ?? row.sectionId })),
-        } }).eq('id', currentPlanId).eq('user_id', user.id);
-        if (linked.error) throw new Error('Quotation saved, but its AI reference could not be linked. Your editor is preserved; retry saving.');
-      }
+      // Canonical IDs, versions and AI provenance are verified in the same DB
+      // transaction. Keep local value reconciliation before replacing identities.
       if (lastAIDraft.current) lastAIDraft.current = remapDraftIds(lastAIDraft.current, mapping);
       setSections(current => current.map(section => ({ ...section, id: mapping.sections[section.id] ?? section.id,
         items: section.items.map(item => ({ ...item, id: mapping.items[item.id] ?? item.id })),
@@ -819,6 +767,7 @@ const CreateQuotation = () => {
       setAIPriceEvidence(current => Object.fromEntries(Object.entries(current).map(([id, price]) => [mapping.items[id] ?? id, price])));
       setItemImages(current => Object.fromEntries(Object.entries(current).map(([id, images]) => [mapping.items[id] ?? id, images])));
       if (!existingId && !showShare) {
+        adoptedSaveRoute.current = { id: savedQuotationId, owner: user.id };
         const params = new URLSearchParams(searchParams); params.set('id', savedQuotationId); setSearchParams(params, { replace: true });
       }
       toast({ title: existingId ? 'Quotation updated' : 'Quotation saved', description: `Verified ${payloadSections.length} sections and ${payloadSections.reduce((count, section) => count + section.items.length, 0)} items.` });
@@ -847,61 +796,8 @@ const CreateQuotation = () => {
       // Learn final user-reviewed quotations without reinforcing an AI's own draft.
       if (status !== 'draft') trackItemUsage(allItems);
 
-      // Auto-save quotation as template (silently)
-      try {
-        const templateName = projectTitle;
-        const templateSections = sections.map(section => ({
-          id: section.id,
-          title: section.title,
-          items: section.items.map(item => ({
-            id: item.id,
-            side: item.side,
-            productName: item.productName,
-            productDetails: item.productDetails,
-            measurementUnit: getQuotationUnit(item.measurementUnit),
-
-            widthFt: item.widthFt,
-            heightFt: item.heightFt,
-            sftArea: item.sftArea,
-            ratePerSft: item.ratePerSft,
-            amount: item.amount,
-          })),
-        }));
-
-        // Check if template already exists
-        const { data: existingTemplate } = await supabase
-          .from('quotation_templates')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('template_name', templateName)
-          .maybeSingle();
-
-        if (existingTemplate) {
-          // Update existing template
-          await supabase
-            .from('quotation_templates')
-            .update({
-              sections: templateSections as any,
-              description: `Auto-saved from quotation: ${clientName}`,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existingTemplate.id);
-        } else {
-          // Create new template
-          await supabase
-            .from('quotation_templates')
-            .insert({
-              user_id: user.id,
-              template_name: templateName,
-              category: 'Custom',
-              description: `Auto-saved from quotation: ${clientName}`,
-              sections: templateSections as any,
-            });
-        }
-      } catch (templateError) {
-        // Silently fail - template saving is optional
-        console.error('Error auto-saving template:', templateError);
-      }
+      // Template updates are queued durably by save_quotation_checked and
+      // processed independently. They no longer hold the editor's save lock.
 
       // Reset form only for Save & Send flow (pending status with share)
       if (status === 'pending' && showShare) {
@@ -916,6 +812,7 @@ const CreateQuotation = () => {
         setAIPriceEvidence({});
         planProjectId.current = null;
         savedQuotationIdRef.current = null;
+        saveSession.reset();
         setReferenceNo(null);
         clearDraftReference();
         setReferenceRetry(value=>value+1);
@@ -949,6 +846,7 @@ const CreateQuotation = () => {
       
       return savedQuotationId;
     } catch (error) {
+      if (saveSession.id) savedQuotationIdRef.current = saveSession.id;
       console.error('Error saving quotation:', error);
       const message = error instanceof Error ? error.message : '';
       const saved = !!savedQuotationId;
@@ -1031,6 +929,7 @@ const CreateQuotation = () => {
         if (freshProfile) setProfile(freshProfile);
       }
       
+      const { generateQuotationPDF } = await import("@/lib/pdfGenerator");
       await generateQuotationPDF({
         quotationId: overrideQuotationId || quotationId || undefined,
         referenceNo: tierContext?.referenceNo || referenceNo || await getDraftReference(),
@@ -1552,7 +1451,7 @@ const CreateQuotation = () => {
         </Card>
 
         {/* PDF Preview Editor */}
-        <PDFPreviewEditor onItemMeasurementChange={(sectionIndex, itemIndex, field, value) => { const section = sections[sectionIndex]; const item = section.items[itemIndex]; updateItem(section.id, item.id, field, value); if (field === 'ratePerSft') rememberLibraryProduct({ ...item, ratePerSft: Number(value) }); }} open={showPreview} onClose={() => setShowPreview(false)} onDownload={(settings, terms) => handleDownloadPDF(settings, undefined, undefined, terms)} quotationData={quotationPreviewData} customizeSettings={{ ...customizeSettings, areaOnly: !customizeSettings.showDetailedSizeColumns && !!lastAIDraft.current }} />
+        {showPreview && <PDFPreviewEditor onItemMeasurementChange={(sectionIndex, itemIndex, field, value) => { const section = sections[sectionIndex]; const item = section.items[itemIndex]; updateItem(section.id, item.id, field, value); if (field === 'ratePerSft') rememberLibraryProduct({ ...item, ratePerSft: Number(value) }); }} open={showPreview} onClose={() => setShowPreview(false)} onDownload={(settings, terms) => handleDownloadPDF(settings, undefined, undefined, terms)} quotationData={quotationPreviewData} customizeSettings={{ ...customizeSettings, areaOnly: !customizeSettings.showDetailedSizeColumns && !!lastAIDraft.current }} />}
         
         {/* Gallery Image Picker */}
         <GalleryImagePicker

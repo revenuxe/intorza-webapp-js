@@ -44,7 +44,7 @@ export const ProductNameInput: React.FC<ProductNameInputProps> = ({
   const areaUnit = areaUnitShort || settings.areaUnitShort.toLowerCase();
 
   // Filter and prioritize products
-  const filteredProducts = useMemo(() => filterProductSuggestions(patterns, inputValue), [patterns, inputValue]);
+  const filteredProducts = useMemo(() => open ? filterProductSuggestions(patterns, inputValue) : [], [patterns, inputValue, open]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;

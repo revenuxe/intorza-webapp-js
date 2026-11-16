@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from 'next/navigation';
 import { useNavigate } from "@/lib/navigation";
 import { Menu, LogOut, Settings, ChevronDown, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,9 @@ import logo from "@/assets/intorza-logo.webp";
 import { format } from "date-fns";
 
 export const Header = () => {
+  const [menuOpen,setMenuOpen] = useState(false);
+  const pathname = usePathname();
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
   const navigate = useNavigate();
   const { user, signOut, isAuthenticated } = useAuth();
   const { isPro, expiry, loading: proLoading, status: proStatus, setPaywallOpen } = useSubscription();
@@ -54,7 +58,7 @@ export const Header = () => {
       <div className="container flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-2">
           {/* Mobile menu */}
-          <Sheet>
+          <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
             <SheetTrigger asChild className="lg:hidden">
               <Button variant="ghost" size="icon" className="h-9 w-9">
                 <Menu className="h-5 w-5" />

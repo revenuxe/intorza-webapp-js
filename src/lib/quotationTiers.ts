@@ -1,6 +1,7 @@
 import type { QuotationSnapshot } from './quotationVersions';
 export const tierPresets = ['Basic', 'Standard', 'Luxury'] as const;
 export type QuotationTier = {
+  room_count?: number; item_count?: number;
   id: string; tier_name: string | null; reference_no: string; status: string;
   grand_total: number; snapshot: QuotationSnapshot;
 };

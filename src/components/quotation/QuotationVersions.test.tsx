@@ -1,14 +1,14 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QuotationVersions } from './QuotationVersions';
 import { quotationsApi } from '@/lib/api';
-jest.mock('@/lib/api', () => ({ quotationsApi: { versions: jest.fn(), version: jest.fn(), revertVersion: jest.fn() } }));
+jest.mock('@/lib/api', () => ({ quotationsApi: { versions: jest.fn(), versionBatch: jest.fn(), revertVersion: jest.fn() } }));
 jest.mock('@/hooks/useLocalization', () => ({ useLocalization: () => ({ formatCurrency: (value: number) => `Rs ${value}`, formatDateShort: () => '16/11/2026' }) }));
 const versions = [2, 1].map(number => ({ id: `v${number}`, quotation_id: 'quote', version_number: number, saved_at: '2026-11-16T10:00:00Z' }));
 const snapshot = (number: number) => ({ quotation_title: 'Bedroom', client_name: 'Client', grand_total: number * 100, sections: [{ section_name: 'Bedroom', items: [{ product_name: 'Wardrobe', amount: number * 100 }, ...(number > 1 ? [{ product_name: 'Bed', amount: 100 }] : [])] }] });
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(quotationsApi.versions).mockResolvedValue({ data: versions });
-  jest.mocked(quotationsApi.version).mockImplementation(async (_id, number) => ({ data: { ...versions.find(version => version.version_number === number)!, snapshot: snapshot(number) } }));
+  jest.mocked(quotationsApi.versionBatch).mockImplementation(async (_id, numbers) => ({ data: numbers.map(number => ({ ...versions.find(version => version.version_number === number)!, snapshot: snapshot(number) })) }));
   jest.mocked(quotationsApi.revertVersion).mockResolvedValue({ data: {} });
 });
 it('lists recent changes without the quotation and reverts an expanded version only after confirmation', async () => {
@@ -69,7 +69,7 @@ it('switches to the selected tier history and reverts only that tier', async () 
   expect(screen.queryByRole('button', { name: 'Confirm revert' })).not.toBeInTheDocument();
   await waitFor(() => expect(quotationsApi.versions).toHaveBeenCalledWith('luxury'));
   await screen.findByText('First saved version');
-  expect(quotationsApi.version).toHaveBeenCalledWith('luxury',1);
+  expect(quotationsApi.versionBatch).toHaveBeenCalledWith('luxury',[2,1]);
   fireEvent.click(screen.getByRole('button', { name: /Version 1 16/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Revert to this version' }));
   fireEvent.click(screen.getByRole('button', { name: 'Confirm revert' }));
@@ -79,18 +79,18 @@ it('switches to the selected tier history and reverts only that tier', async () 
 });
 
 it('ignores an older tier response arriving after the user switches tiers', async () => {
-  let finishOldRequest!: (result: Awaited<ReturnType<typeof quotationsApi.version>>) => void;
+  let finishOldRequest!: (result: Awaited<ReturnType<typeof quotationsApi.versionBatch>>) => void;
   jest.mocked(quotationsApi.versions).mockImplementation(async id => ({ data: versions.map(version => ({ ...version, id: `${id}-${version.id}`, quotation_id: id })) }));
-  jest.mocked(quotationsApi.version).mockImplementation(async (id, number) => {
-    if (id === 'quote' && number === 1) return new Promise(resolve => { finishOldRequest = resolve; });
-    return { data: { ...versions.find(version => version.version_number === number)!, id: `${id}-v${number}`, quotation_id: id, snapshot: snapshot(number) } };
+  jest.mocked(quotationsApi.versionBatch).mockImplementation(async (id, numbers) => {
+    if (id === 'quote') return new Promise(resolve => { finishOldRequest = resolve; });
+    return { data: numbers.map(number => ({ ...versions.find(version => version.version_number === number)!, id: `${id}-v${number}`, quotation_id: id, snapshot: snapshot(number) })) };
   });
   render(<QuotationVersions quotationId="quote" tiers={[{ id: 'quote', tier_name: 'Standard' }, { id: 'luxury', tier_name: 'Luxury' }]} onRestored={async () => {}} />);
   fireEvent.click(screen.getByRole('button', { name: 'Versions' }));
-  await waitFor(() => expect(quotationsApi.version).toHaveBeenCalledWith('quote',1));
+  await waitFor(() => expect(quotationsApi.versionBatch).toHaveBeenCalledWith('quote',[2,1]));
   fireEvent.change(screen.getByRole('combobox', { name: 'Tier' }), { target: { value: 'luxury' } });
   await screen.findByText('First saved version');
-  await act(async () => finishOldRequest({ data: { ...versions[1], snapshot: snapshot(1) } }));
+  await act(async () => finishOldRequest({ data: [{ ...versions[1], snapshot: snapshot(1) }] }));
   fireEvent.click(screen.getByRole('button', { name: /Version 1 16/ }));
   fireEvent.click(screen.getByRole('button', { name: 'Revert to this version' }));
   fireEvent.click(screen.getByRole('button', { name: 'Confirm revert' }));

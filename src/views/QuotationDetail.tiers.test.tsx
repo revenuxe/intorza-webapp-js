@@ -1,6 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import QuotationDetail from './QuotationDetail';
 import { generateQuotationPDF } from '@/lib/pdfGenerator';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+jest.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'owner' } }) }));
+const renderDetail = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><QuotationDetail /></QueryClientProvider>);
 const mockNavigate = jest.fn();
 let mockSelected = 'luxury';
 const mockSave = jest.fn();
@@ -10,7 +13,7 @@ const mockQuotes = {
   luxury: { id: 'luxury', tier_name: 'Luxury', tier_parent_id: 'standard', reference_no: 'QNO-CHILD', quotation_title: 'Bedroom', project_name: 'Bedroom', client_name: 'Client', grand_total: 300, status: 'draft' },
 };
 jest.mock('@/lib/navigation', () => ({ useParams: () => ({ id: 'standard' }), useNavigate: () => mockNavigate, useSearchParams: () => [new URLSearchParams({ tier: mockSelected })] }));
-jest.mock('@/lib/api', () => ({ quotationsApi: { tiers: async () => ({ data: { root_id: 'standard', tiers: Object.values(mockQuotes) } }) } }));
+jest.mock('@/lib/api', () => ({ quotationsApi: { tierMetadata: async () => ({ data: { root_id: 'standard', tiers: Object.values(mockQuotes).map(q => ({ ...q, snapshot: { ...q, sections: [] } })) } }), tiers: async () => ({ data: { root_id: 'standard', tiers: Object.values(mockQuotes) } }) } }));
 jest.mock('@/components/quotation/QuotationVersions', () => ({ QuotationVersions: ({ quotationId }: { quotationId: string }) => <span>History for {quotationId}</span> }));
 jest.mock('@/components/quotation/QuotationTiers', () => ({ QuotationTiers: ({ onExport, onSelect }: { onExport: (id: string, share: boolean) => void; onSelect: (id: string) => void }) => <><button onClick={() => onExport('standard',true)}>Share Standard</button><button onClick={() => onSelect('luxury')}>Open Luxury</button></> }));
 jest.mock('@/hooks/useInlineFeedback', () => ({ useInlineFeedback: () => ({ toast: jest.fn(), feedback: null }) }));
@@ -39,7 +42,7 @@ beforeEach(() => {
   jest.mocked(generateQuotationPDF).mockResolvedValue({ output: () => new Blob(['pdf']), save: mockSave } as never);
 });
 it('opens the selected tier and scopes version history to that tier', async () => {
-  render(<QuotationDetail />);
+  renderDetail();
   expect(await screen.findByText('History for luxury')).toBeVisible();
   expect(screen.getByText('Bedroom — Luxury')).toBeVisible();
   expect(screen.getByText('Ref QNO: QNO-ROOT')).toBeVisible();
@@ -47,7 +50,7 @@ it('opens the selected tier and scopes version history to that tier', async () =
   expect(mockNavigate).toHaveBeenCalledWith('/quotations/standard?tier=luxury');
 });
 it('exports the requested Standard option while Luxury is being viewed', async () => {
-  render(<QuotationDetail />);
+  renderDetail();
   fireEvent.click(await screen.findByRole('button', { name: 'Share Standard' }));
   await waitFor(() => expect(generateQuotationPDF).toHaveBeenCalledWith(expect.objectContaining({
     quotationId: 'standard', quotationTitle: 'Bedroom — Standard', referenceNo: 'QNO-ROOT', grandTotal: 100,
@@ -58,7 +61,7 @@ it('exports the requested Standard option while Luxury is being viewed', async (
 it('rejects tier IDs that do not belong to the quotation before reading their content', async () => {
   mockSelected='unrelated';
   const originalError = jest.spyOn(console,'error').mockImplementation(() => {});
-  render(<QuotationDetail />);
+  renderDetail();
   expect(await screen.findByText('Quotation not found')).toBeVisible();
   expect(mockEq).not.toHaveBeenCalledWith('quotations','id','unrelated');
   originalError.mockRestore();

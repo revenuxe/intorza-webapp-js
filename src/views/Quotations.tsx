@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { accountKeys } from '@/lib/accountQueries';
 import { FileText, Plus, Edit, Trash2, Copy, Crown, LockKeyhole, Search, X } from "lucide-react";
 import { Link, useNavigate } from "@/lib/navigation";
 import { Input } from '@/components/ui/input';
@@ -47,6 +50,8 @@ const getStatusColor = (status: string) => {
 };
 
 const Quotations = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { toast, feedback } = useInlineFeedback();
   const { formatCurrency, formatDate } = useLocalization();
@@ -56,18 +61,27 @@ const Quotations = () => {
   const [search, setSearch] = useState('');
   const filteredQuotations = quotations.filter(quotation => matchesQuotation(quotation, search));
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const loadGeneration = useRef(0);
 
   useEffect(() => {
+    setQuotations([]);
     if (!subscriptionLoading && isPro) loadQuotations();
-  }, [subscriptionLoading, isPro]);
+    return () => { loadGeneration.current++; };
+  }, [subscriptionLoading, isPro, user?.id]);
 
-  const loadQuotations = async () => {
+  const loadQuotations = async (force = false) => {
+    const generation = ++loadGeneration.current;
     try {
       setLoading(true);
       // Backend scopes to the authenticated user and orders by created_at desc.
-      const { data } = await quotationsApi.list();
+      if (!user?.id) return;
+      const queryKey=[...accountKeys.quotations(user.id),'list'];
+      if (force) await queryClient.invalidateQueries({queryKey});
+      const data = await queryClient.fetchQuery({queryKey,queryFn:async () => (await quotationsApi.list()).data,staleTime:30_000});
+      if (generation !== loadGeneration.current) return;
       setQuotations((data as Quotation[]) || []);
     } catch (error) {
+      if (generation !== loadGeneration.current) return;
       console.error('Error loading quotations:', error);
       toast({
         title: "Error loading quotations",
@@ -75,7 +89,7 @@ const Quotations = () => {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      if (generation === loadGeneration.current) setLoading(false);
     }
   };
 
@@ -91,7 +105,7 @@ const Quotations = () => {
         description: "The quotation has been permanently deleted",
       });
       
-      loadQuotations();
+      loadQuotations(true);
     } catch (error) {
       console.error('Error deleting quotation:', error);
       toast({
@@ -155,7 +169,7 @@ const Quotations = () => {
         description: `Created ${newQuotationNumber} as a copy`,
       });
 
-      loadQuotations();
+      loadQuotations(true);
     } catch (error) {
       console.error('Error duplicating quotation:', error);
       toast({

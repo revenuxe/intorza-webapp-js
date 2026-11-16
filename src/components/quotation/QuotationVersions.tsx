@@ -45,17 +45,11 @@ export function QuotationVersions({ quotationId, tiers = [], onRestored }: { quo
     let active = true;
     // One page plus its preceding snapshot; reuse cached snapshots and bound requests.
     const pending = versions.slice(0, visibleCount + 1).filter(version => !details[version.version_number]);
-    let cursor = 0;
+    if (!pending.length) return;
     setSummariesLoading(true);
-    const worker = async () => {
-      while (active && cursor < pending.length) {
-        const version = pending[cursor++];
-        const { data } = await quotationsApi.version(historyId, version.version_number);
-        if (active) setDetails(current => ({ ...current, [version.version_number]: data }));
-      }
-    };
-    Promise.allSettled(Array.from({ length: Math.min(3, pending.length) }, worker))
-      .then(results => { if (active && results.some(result => result.status === 'rejected')) setError('Some changes could not be loaded. Refresh versions to try again.'); })
+    quotationsApi.versionBatch(historyId,pending.map(version => version.version_number))
+      .then(({ data }) => { if (active) setDetails(current => ({ ...current, ...Object.fromEntries(data.map(version => [version.version_number,version])) })); })
+      .catch(() => { if (active) setError('Some changes could not be loaded. Refresh versions to try again.'); })
       .finally(() => { if (active) setSummariesLoading(false); });
     return () => { active = false; };
     // Cache updates must not restart requests already in flight.

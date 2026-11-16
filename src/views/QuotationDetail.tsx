@@ -4,6 +4,9 @@ import { getQuotationUnit } from '@/lib/quotationUnits';
 
 
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { accountKeys, notifyAccountChanged } from '@/lib/accountQueries';
 import { useParams, useNavigate, useSearchParams } from "@/lib/navigation";
 import { ArrowLeft, Download, FileText, Edit, Check, X, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,7 +19,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { generateQuotationPDF } from "@/lib/pdfGenerator";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import { getEditorSettings } from "@/lib/pdfThemes";
 import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
@@ -73,6 +75,8 @@ const getStatusColor = (status: string) => {
 };
 
 const QuotationDetail = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const selectedTierId = searchParams.get('tier');
@@ -90,28 +94,28 @@ const QuotationDetail = () => {
   const [paidAmount, setPaidAmount] = useState(0);
   const [dueDate, setDueDate] = useState("");
   const [invoiceNotes, setInvoiceNotes] = useState("");
+  useEffect(() => { setQuotation(null); setTierGroup(null); setLoading(true); }, [user?.id]);
 
   useEffect(() => {
     if (id) {
       loadQuotation();
     }
     return () => { loadGeneration.current++; };
-  }, [id, selectedTierId]);
+  }, [id, selectedTierId, user?.id]);
 
   const loadQuotation = async (silent = false) => {
     const generation = ++loadGeneration.current;
     try {
-      if (!silent) setLoading(true);
-      const { data: group } = await quotationsApi.tiers(id);
+      if (!user?.id) return;
+      const queryKey = [...accountKeys.quotations(user.id),'tiers',id];
+      if (!silent && !queryClient.getQueryData(queryKey)) setLoading(true);
+      if (silent) await queryClient.invalidateQueries({queryKey});
+      const group = await queryClient.fetchQuery({queryKey,queryFn:async () => (await quotationsApi.tierMetadata(id)).data,staleTime:30_000});
       const targetId = selectedTierId || id;
       if (!group.tiers.some(tier => tier.id === targetId)) throw new Error('This tier does not belong to the quotation');
-      const { data, error } = await supabase
-        .from('quotations')
-        .select('*')
-        .eq('id', targetId)
-        .single();
-
-      if (error) throw error;
+      const option=group.tiers.find(tier => tier.id===targetId)!;
+      const data={...option.snapshot,id:option.id,reference_no:option.reference_no,tier_name:option.tier_name,
+        tier_parent_id:option.id===group.root_id ? null : group.root_id,status:option.status,grand_total:option.grand_total} as unknown as Quotation;
       if (generation !== loadGeneration.current) return;
       setQuotation(data);
       setTierGroup(group);
@@ -203,6 +207,7 @@ const QuotationDetail = () => {
       const editorSettings = getEditorSettings();
       const customizeSettings = getQuotationSettings();
 
+      const { generateQuotationPDF } = await import('@/lib/pdfGenerator');
       const pdf = await generateQuotationPDF({
         previewOnly: true,
         quotationId: quotation.id,
@@ -314,6 +319,8 @@ const QuotationDetail = () => {
       if (error) throw error;
 
       setQuotation(prev => prev ? { ...prev, status } : null);
+      setTierGroup(prev => prev ? { ...prev, tiers: prev.tiers.map(tier => tier.id === quotation?.id ? { ...tier, status } : tier) } : null);
+      if (user?.id) notifyAccountChanged(user.id,'quotations');
       toast({
         title: "Status Updated",
         description: `Quotation marked as ${status}`,
@@ -367,6 +374,7 @@ const QuotationDetail = () => {
         .from('quotations')
         .update({ status: 'converted' })
         .eq('id', quotation?.id);
+      notifyAccountChanged(user.id,'quotations');
 
       toast({
         title: "Invoice Created",
@@ -426,6 +434,7 @@ const QuotationDetail = () => {
           <div aria-label="Quotation actions" className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:flex-wrap [&>button]:h-12 [&>button]:min-w-0 [&>button]:rounded-xl sm:[&>button]:h-11">
             <QuotationVersions quotationId={quotation.id} tiers={tierGroup?.tiers} onRestored={() => loadQuotation(true)} />
             {tierGroup && <QuotationTiers group={tierGroup} activeId={quotation.id} onRefresh={() => loadQuotation(true)}
+              loadComparison={async () => (await quotationsApi.tiers(tierGroup.root_id)).data}
               onSelect={tierId => navigate(`/quotations/${tierGroup.root_id}${tierId === tierGroup.root_id ? '' : `?tier=${tierId}`}`)}
               onEdit={tierId => navigate(`/?id=${tierId}`)} onExport={handleDownloadPdf} />}
             <Button 
