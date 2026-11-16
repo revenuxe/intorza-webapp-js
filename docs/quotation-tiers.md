@@ -8,6 +8,14 @@ Basic, Standard, Luxury, or a custom name of up to 40 characters. Naming an opti
 does not change its pricing. Names are unique within the quotation, ignoring case
 and surrounding whitespace.
 
+The tier popup supports selecting a card without leaving the popup. Rename and
+New tier use that selection; View tier opens its detail page. Each child tier has
+a delete icon and confirmation. Deletion is scoped to its owner and parent group
+and removes that option's history through existing database cascades. Deleting
+the viewed child returns to the original quotation. The original tier's icon is
+disabled because deleting that record would delete the whole group; whole-group
+deletion remains available in My Quotations.
+
 Create another tier copies the selected tier's current saved rooms, items,
 specifications, quantities, rates, totals and gallery links atomically, then opens
 the copy in the editor. It starts as a draft. A copy has independent item/room IDs

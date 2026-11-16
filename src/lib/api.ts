@@ -130,6 +130,13 @@ function structuredQuotationPayload(body: Record<string, unknown>) {
   }) })) };
 }
 export const quotationsApi = {
+  removeTier: async (id: string, rootId: string): Promise<void> => {
+    const uid = await requireUserId();
+    const { data, error } = await supabase.from('quotations').delete()
+      .eq('id', id).eq('tier_parent_id', rootId).eq('user_id', uid).select('id');
+    if (error) throw new ApiError(400, error.message, error);
+    if (!data?.length) throw new ApiError(404, 'Tier not found. The original quotation cannot be deleted as an individual tier.');
+  },
   tiers: async (id: string): Promise<Envelope<QuotationTierGroup>> => {
     await requireUserId();
     return { data: unwrap(await supabase.rpc('get_quotation_tiers', { p_id: id })) as QuotationTierGroup };

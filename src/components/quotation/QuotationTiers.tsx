@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Layers3, Plus, Pencil, Download, Share2, Columns3 } from 'lucide-react';
+import { Layers3, Plus, Pencil, Download, Share2, Columns3, Trash2, Check } from 'lucide-react';
 import { quotationsApi } from '@/lib/api';
 import { tierComparisonRows, tierPresets, type QuotationTierGroup } from '@/lib/quotationTiers';
 import { useLocalization } from '@/hooks/useLocalization';
@@ -23,8 +23,24 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [compare, setCompare] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const firstTime = !group.tiers[0]?.tier_name;
-  const current = group.tiers.find(tier => tier.id === activeId) || group.tiers[0];
+  const current = group.tiers.find(tier => tier.id === (selectedId || activeId)) || group.tiers[0];
+  const deleting = group.tiers.find(tier => tier.id === deleteId);
+  const selectTier = (id: string) => { setSelectedId(id); setDeleteId(null); setError(''); };
+  const deleteTier = async () => {
+    if (!deleting || deleting.id === group.root_id || busy) return;
+    setBusy(true); setError('');
+    try {
+      await quotationsApi.removeTier(deleting.id, group.root_id);
+      setDeleteId(null); setSelectedId(group.root_id);
+      if (deleting.id === activeId) { setOpen(false); onSelect(group.root_id); }
+      else await onRefresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not delete the tier. Please try again.');
+    } finally { setBusy(false); }
+  };
   const save = async () => {
     if (!current || busy || !name.trim()) return;
     setBusy(true); setError('');
@@ -49,11 +65,12 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
     finally { setBusy(false); }
   };
   return <>
-    <Button variant="outline" className="gap-2" onClick={() => { setError(''); setMode(null); setName(''); setOpen(true); }}><Layers3 className="h-4 w-4" />Tier</Button>
+    <Button variant="outline" className="gap-2" onClick={() => { setSelectedId(activeId); setDeleteId(null); setError(''); setMode(null); setName(''); setOpen(true); }}><Layers3 className="h-4 w-4" />Tier</Button>
     <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}>
       <DialogContent className={`flex max-h-[84dvh] w-[calc(100%-2rem)] flex-col gap-3 overflow-hidden p-3.5 sm:max-h-[92dvh] sm:p-6 [&_h2]:text-base sm:[&_h2]:text-lg ${compare && !firstTime && !mode ? 'max-w-6xl' : 'max-w-2xl'}`}>
         <DialogHeader className="pr-6 text-left"><DialogTitle>{firstTime ? 'Name your first tier' : mode === 'create' ? 'Create another tier' : mode === 'rename' ? 'Rename tier' : 'Quotation tiers'}</DialogTitle><DialogDescription>{firstTime ? 'Choose a label for this saved quotation. Its items and prices stay as they are.' : mode === 'create' ? `Copy ${current?.tier_name} with the same client, rooms, items and prices, then adjust your new tier.` : 'Choose an option to view, edit, download or share.'}</DialogDescription></DialogHeader>
         {error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{error}</p>}
+        {deleting && <div role="group" aria-label="Confirm tier deletion" className="shrink-0 space-y-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3"><p className="text-sm font-semibold">Delete {deleting.tier_name}?</p><p className="text-xs leading-5 text-muted-foreground">This permanently deletes this tier and its version history. Other tiers and shared client details stay.</p><div className="grid grid-cols-2 gap-3"><Button variant="destructive" className="h-11 rounded-xl" disabled={busy} onClick={deleteTier}>{busy ? 'Deleting...' : 'Delete tier'}</Button><Button variant="outline" className="h-11 rounded-xl" disabled={busy} onClick={() => setDeleteId(null)}>Cancel</Button></div></div>}
         <div className="min-h-0 space-y-4 overflow-y-auto">
           {firstTime || mode ? <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-3">{tierPresets.map(preset => <Button key={preset} className="h-12 rounded-xl" aria-pressed={name === preset} variant={name === preset ? 'default' : 'outline'} disabled={busy} onClick={() => setName(preset)}>{preset}</Button>)}</div>
@@ -61,7 +78,8 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
             <div className="grid grid-cols-2 gap-3 [&>button]:min-h-12 [&>button]:whitespace-normal [&>button]:rounded-xl"><Button className={firstTime ? 'col-span-2' : ''} disabled={busy || !name.trim()} onClick={save}>{busy ? 'Saving...' : mode === 'create' ? 'Create tier and edit' : 'Save tier name'}</Button>{!firstTime && <Button variant="outline" disabled={busy} onClick={() => { setMode(null); setName(''); }}>Cancel</Button>}</div>
           </div> : <>
             <div className="grid grid-cols-2 gap-3 [&>button]:min-h-12 [&>button]:rounded-xl [&>button]:px-3"><Button aria-label="Create another tier" disabled={busy} onClick={() => { setName(''); setMode('create'); }}><Plus className="h-4 w-4" />New tier</Button><Button variant="outline" disabled={group.tiers.length < 2 || busy} onClick={() => setCompare(value => !value)}><Columns3 className="h-4 w-4" />{compare ? 'Show tiers' : 'Compare tiers'}</Button></div>
-            <div className="flex min-w-0 items-center justify-between gap-2"><p className="min-w-0 truncate text-sm"><span className="text-muted-foreground">Viewing </span><span className="font-semibold">{current.tier_name}</span></p><Button variant="ghost" className="h-11 shrink-0 gap-1.5 px-2" disabled={busy} onClick={() => { setName(current.tier_name || ''); setMode('rename'); }}><Pencil className="h-3.5 w-3.5" />Rename tier</Button></div>
+            <div className="flex min-w-0 items-center justify-between gap-2"><p className="min-w-0 truncate text-sm"><span className="text-muted-foreground">Selected </span><span className="font-semibold">{current.tier_name}</span></p><Button variant="ghost" className="h-11 shrink-0 gap-1.5 px-2" disabled={busy} onClick={() => { setName(current.tier_name || ''); setMode('rename'); }}><Pencil className="h-3.5 w-3.5" />Rename tier</Button></div>
+            {!compare && <p className="text-xs text-muted-foreground">Tap a card to select it. New tier copies your selection.</p>}
             {compare && <p className="text-xs text-muted-foreground">Swipe across the table to compare all tiers.</p>}
             {compare ? <div className="overflow-x-auto rounded-xl border" tabIndex={0} role="region" aria-label="Tier comparison">
               <table className="w-full border-collapse text-left text-sm">
@@ -76,8 +94,9 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
                 <tr><th scope="row" className="p-3">Share an option</th>{group.tiers.map(tier => <td key={tier.id} className="border-l p-3"><Button variant="outline" size="sm" className="gap-2" disabled={busy} onClick={() => exportTier(tier.id,true)}><Share2 className="h-4 w-4" />Share {tier.tier_name}</Button></td>)}</tr>
                 </tbody>
               </table>
-            </div> : <QuotationOptionScroller label="Saved tiers" activeKey={activeId}>{group.tiers.map(tier => <div key={tier.id} aria-current={tier.id === activeId ? 'true' : undefined} className={`w-[min(17rem,85%)] min-w-0 space-y-4 rounded-xl border p-4 ${tier.id === activeId ? 'border-primary bg-primary/5' : ''}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="break-words font-semibold">{tier.tier_name}</h3>{tier.id === activeId && <span className="text-xs text-primary">Viewing</span>}</div>
+            </div> : <QuotationOptionScroller label="Saved tiers" activeKey={current.id}>{group.tiers.map(tier => <div key={tier.id} aria-current={tier.id === current.id ? 'true' : undefined} onClick={event => { if (!busy && !(event.target as HTMLElement).closest('button')) selectTier(tier.id); }} className={`w-[min(17rem,85%)] min-w-0 cursor-pointer space-y-4 rounded-xl border p-4 ${tier.id === current.id ? 'border-primary bg-primary/5' : ''}`}>
+              <div className="flex items-start justify-between gap-2"><button type="button" aria-label={`Select ${tier.tier_name} tier`} aria-pressed={tier.id === current.id} disabled={busy} onClick={() => selectTier(tier.id)} className="min-h-11 min-w-0 flex-1 rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><span className="block break-words font-semibold">{tier.tier_name}</span>{tier.id === current.id && <span className="mt-1 flex items-center gap-1 text-xs text-primary"><Check className="h-3 w-3" />Selected</span>}</button><Button type="button" variant="ghost" size="icon" aria-label={`Delete ${tier.tier_name} tier`} title={tier.id === group.root_id ? 'Original tier holds the shared quotation. Delete the whole quotation from My Quotations.' : `Delete ${tier.tier_name} tier`} disabled={busy || tier.id === group.root_id} className="h-11 w-11 shrink-0 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => { setDeleteId(tier.id); setError(''); }}><Trash2 className="h-4 w-4" /></Button></div>
+              {tier.id === group.root_id && <p className="text-[11px] text-muted-foreground">Original tier · keeps shared details</p>}
               <p className="text-xl font-semibold tabular-nums text-primary">{formatCurrency(tier.grand_total || 0,true)}</p>
               <p className="text-xs text-muted-foreground">{tier.snapshot.sections.length} rooms · {tier.snapshot.sections.reduce((sum,section) => sum + section.items.length,0)} items · {tier.status}</p>
               <div className="grid grid-cols-2 gap-3 [&>button]:h-11 [&>button]:rounded-xl [&>button]:px-2"><Button variant={tier.id === activeId ? 'secondary' : 'default'} disabled={busy} onClick={() => { setOpen(false); onSelect(tier.id); }}>View tier</Button><Button variant="outline" disabled={busy} onClick={() => { setOpen(false); onEdit(tier.id); }}><Pencil className="h-3.5 w-3.5" />Edit tier</Button><Button variant="outline" disabled={busy} onClick={() => exportTier(tier.id,false)}><Download className="h-3.5 w-3.5" />PDF</Button><Button variant="outline" disabled={busy} onClick={() => exportTier(tier.id,true)}><Share2 className="h-3.5 w-3.5" />Share</Button></div>
