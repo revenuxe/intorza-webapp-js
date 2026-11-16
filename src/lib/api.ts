@@ -146,7 +146,12 @@ export const quotationsApi = {
     unwrap(await supabase.rpc('name_quotation_tier', { p_id: id, p_name: name.trim() }));
   },
   createTier: async (sourceId: string, name: string): Promise<Envelope<any>> => {
-    await requireUserId();
+    const owner = await requireUserId();
+    // Flush device-saved library edits before the server copies/reprices a tier.
+    // A failed sync must not silently use an older account price.
+    const { readSnapshot, saveAccountEntries } = await import('./library/storage');
+    const pending = Object.values(readSnapshot(owner).pending);
+    for (let offset = 0; offset < pending.length; offset += 100) await saveAccountEntries(owner,pending.slice(offset,offset + 100));
     return { data: unwrap(await supabase.rpc('create_quotation_tier', { p_source_id: sourceId, p_name: name.trim() })) };
   },
   versions: async (id: string): Promise<Envelope<QuotationVersion[]>> => {

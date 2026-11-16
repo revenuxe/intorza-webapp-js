@@ -45,6 +45,7 @@ import { reconcileSavedQuotation, remapDraftIds } from '@/lib/quotation-ai/save-
 import { fromQuotation, lineAmount, quotationTotals, reviewDraft, draftSchema, type VoiceDraft } from "@/lib/quotation-ai/domain";
 import { QuotationItemCard } from '@/components/quotation/QuotationItemCard';
 import { tierQuotationTitle } from '@/lib/quotationTiers';
+import { libraryTierForName } from '@/lib/library/model';
 
 import { QuotationItemFields } from '@/components/quotation/QuotationItemFields';
 import { splitItemDetails } from '@/lib/itemSpecifications';
@@ -168,7 +169,7 @@ const CreateQuotation = () => {
   const [projectDeadline, setProjectDeadline] = useState("");
   const [placeOfProject, setPlaceOfProject] = useState("");
   const [warranty, setWarranty] = useState("10");
-  const { patterns: librarySuggestions, notice: librarySuggestionNotice, remember: rememberLibraryProduct } = useQuotationLibrarySuggestions();
+  const { patterns: librarySuggestions, notice: librarySuggestionNotice, remember: rememberLibraryProduct } = useQuotationLibrarySuggestions(libraryTierForName(tierContext?.name));
   const [projectType, setProjectType] = useState("Residential");
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState("18");
@@ -227,7 +228,7 @@ const CreateQuotation = () => {
     payment_qr_url: "",
     // Localization settings
     currency_code: "INR",
-    currency_symbol: "₹",
+    currency_symbol: "\u20B9",
     tax_label: "GST",
     locale: "en-IN",
     measurement_system: "imperial",
@@ -402,7 +403,7 @@ const CreateQuotation = () => {
           payment_qr_url: bankTemplate?.qr_code_url || (data as any).payment_qr_url || "",
           // Localization settings
           currency_code: data.currency_code || "INR",
-          currency_symbol: data.currency_symbol || "₹",
+          currency_symbol: data.currency_symbol || "\u20B9",
           tax_label: data.tax_label || "GST",
           locale: data.locale || "en-IN",
           measurement_system: data.measurement_system || "imperial",
@@ -999,7 +1000,7 @@ const CreateQuotation = () => {
       payment_qr_url: bankTemplate?.qr_code_url || (profileData as any).payment_qr_url || "",
       // Localization settings
       currency_code: profileData.currency_code || "INR",
-      currency_symbol: profileData.currency_symbol || "₹",
+      currency_symbol: profileData.currency_symbol || "\u20B9",
       tax_label: profileData.tax_label || "GST",
       locale: profileData.locale || "en-IN",
       measurement_system: profileData.measurement_system || "imperial",
@@ -1278,7 +1279,7 @@ const CreateQuotation = () => {
         {lastAIDraft.current && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100" role="status">AI-generated estimate — rates and measurements require review before final confirmation. Pending items are excluded from the provisional total.</div>}
 
         {/* Project Details */}
-        {tierContext && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><div><p className="font-semibold">Editing {tierContext.name} tier</p><p className="mt-1 text-sm text-muted-foreground">Items and prices belong to this tier.{tierContext.parentId ? ' Client details are shared from the original tier.' : ' Client details apply to every tier.'}</p></div><div className="flex flex-wrap gap-2">{tierContext.parentId && <Button variant="outline" onClick={() => navigate(`/?id=${tierContext.parentId}`)}>Edit shared client</Button>}<Button variant="outline" onClick={() => navigate(`/quotations/${tierContext.parentId || quotationId}${tierContext.parentId ? `?tier=${quotationId}` : ''}`)}>View tiers</Button></div></div>}
+        {tierContext && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><div><p className="font-semibold">Editing {tierContext.name} tier</p><p className="mt-1 text-xs text-muted-foreground">Library pricing: {libraryTierForName(tierContext.name)} · Matching rates are used for item suggestions.</p><p className="mt-1 text-sm text-muted-foreground">Items and prices belong to this tier.{tierContext.parentId ? ' Client details are shared from the original tier.' : ' Client details apply to every tier.'}</p></div><div className="flex flex-wrap gap-2">{tierContext.parentId && <Button variant="outline" onClick={() => navigate(`/?id=${tierContext.parentId}`)}>Edit shared client</Button>}<Button variant="outline" onClick={() => navigate(`/quotations/${tierContext.parentId || quotationId}${tierContext.parentId ? `?tier=${quotationId}` : ''}`)}>View tiers</Button><Button variant="outline" onClick={() => navigate(`/library?pricingTier=${libraryTierForName(tierContext.name)}`)}>My Library</Button></div></div>}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-2"><CardTitle className="shrink-0 text-base sm:text-lg">Project Details</CardTitle><div className="shrink-0 whitespace-nowrap rounded-lg border bg-muted/40 px-2 py-2 text-[10px] sm:px-3 sm:text-xs"><span className="text-muted-foreground">Ref QNO: </span><span className="font-mono font-semibold" aria-live="polite">{tierContext?.referenceNo || referenceNo || (referenceError ? <button type="button" onClick={()=>setReferenceRetry(value=>value+1)}>Retry</button> : 'Generating...')}</span></div></div>

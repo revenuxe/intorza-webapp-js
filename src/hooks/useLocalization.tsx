@@ -28,7 +28,7 @@ export interface LocalizationSettings {
 const DEFAULT_SETTINGS: LocalizationSettings = {
   countryCode: 'IN',
   currencyCode: 'INR',
-  currencySymbol: '₹',
+  currencySymbol: '\u20B9',
   currencyPosition: 'before',
   locale: 'en-IN',
   decimalPlaces: 2,

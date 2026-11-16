@@ -3,7 +3,33 @@ import { itemSpecificationsSchema, splitItemDetails, type ItemSpecification } fr
 
 export const units = ['Sq.ft', 'Sq.m', 'R.ft', 'R.m', 'Nos', 'Set', 'Pair', 'Cu.ft', 'Cu.m', 'Kg', 'Litre', 'Day', 'Hour', 'Job', 'L.S.'] as const;
 export type Category = { id: string; name: string; order: number; master: boolean; hidden?: boolean };
-export type Product = { id: string; categoryId: string; name: string; description: string; unit: string; rate: number | null; specifications: ItemSpecification[]; hidden: boolean; master: boolean; updatedAt: string | null; source: string };
+export const libraryPricingTiers = ['Basic', 'Standard', 'Luxury'] as const;
+export type LibraryPricingTier = 'basic' | 'standard' | 'luxury';
+export type TierProductValues = Pick<Product, 'description' | 'unit' | 'rate' | 'specifications'>;
+export type Product = { id: string; categoryId: string; name: string; description: string; unit: string; rate: number | null; specifications: ItemSpecification[]; hidden: boolean; master: boolean; updatedAt: string | null; source: string; tierPrices?: Partial<Record<'basic' | 'luxury', TierProductValues>> };
+export function libraryTierForName(name?: string | null): LibraryPricingTier {
+  const tier = name?.trim().toLowerCase();
+  return tier === 'basic' || tier === 'luxury' ? tier : 'standard';
+}
+export function productForTier(product: Product, tier: LibraryPricingTier): Product {
+  if (tier === 'standard') return product;
+  return { ...product, ...product.tierPrices?.[tier], rate: product.tierPrices?.[tier]?.rate ?? null };
+}
+export function saveProductForTier(original: Product | undefined, edited: Product, tier: LibraryPricingTier): Product {
+  if (tier === 'standard') return validateProduct({ ...edited, tierPrices: original?.tierPrices || edited.tierPrices });
+  const base = original || { ...edited, rate: null, tierPrices: undefined };
+  return validateProduct({ ...base, name: edited.name, categoryId: edited.categoryId, hidden: edited.hidden, updatedAt: edited.updatedAt,
+    tierPrices: { ...base.tierPrices, [tier]: { rate: edited.rate, unit: edited.unit, description: edited.description, specifications: edited.specifications } } });
+}
+export function resetProductForTier(original: Product, tier: LibraryPricingTier): Product {
+  if (tier === 'standard') {
+    const master = masterProducts.find(product => product.id === original.id);
+    if (!master) throw new Error('Reset applies only to default catalog products.');
+    return { ...master, tierPrices: original.tierPrices };
+  }
+  const tierPrices = { ...original.tierPrices }; delete tierPrices[tier];
+  return { ...original, tierPrices };
+}
 export type Entry = { id: string; kind: 'product' | 'category'; data: Product | Category | null; revision: string };
 export type Entries = Record<string, Entry>;
 export const masterCategories = catalog.categories as Category[];
@@ -24,6 +50,12 @@ export function validateProduct(product: Product) {
   if (product.rate !== null && (!Number.isFinite(product.rate) || product.rate < 0 || product.rate > 1e12)) throw new Error('Enter a valid non-negative rate.');
   if (product.description.length > 5000) throw new Error('Keep the description under 5,000 characters.');
   itemSpecificationsSchema.parse(product.specifications);
+  for (const [tier, values] of Object.entries(product.tierPrices || {})) {
+    if (!['basic','luxury'].includes(tier) || !values || !units.includes(values.unit as typeof units[number])) throw new Error('Invalid library pricing tier.');
+    if (values.rate !== null && (!Number.isFinite(values.rate) || values.rate < 0 || values.rate > 1e12)) throw new Error('Enter a valid tier rate.');
+    if (typeof values.description !== 'string' || values.description.length > 5000) throw new Error('Keep tier descriptions under 5,000 characters.');
+    itemSpecificationsSchema.parse(values.specifications);
+  }
   return { ...product, name: product.name.trim() };
 }
 export function parseRate(text: string): number | null {

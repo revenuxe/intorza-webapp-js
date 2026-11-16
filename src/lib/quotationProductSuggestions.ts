@@ -1,6 +1,6 @@
 import { combineItemDetails } from './itemSpecifications';
 import { getQuotationUnit } from './quotationUnits';
-import { mergeLibrary, type Entries, type Product, type Category } from './library/model';
+import { mergeLibrary, productForTier, type LibraryPricingTier, type Entries, type Product, type Category } from './library/model';
 
 export type ProductSuggestion = {
   id?: string; product_name: string; product_details: string | null;
@@ -8,10 +8,10 @@ export type ProductSuggestion = {
   measurement_unit?: string;
   updated_at?: string | null;
 };
-export function libraryProductSuggestions(entries: Entries, legacy: Product[] = [], legacyCategories: Category[] = []): ProductSuggestion[] {
+export function libraryProductSuggestions(entries: Entries, legacy: Product[] = [], legacyCategories: Category[] = [], tier: LibraryPricingTier = 'standard'): ProductSuggestion[] {
   const library = mergeLibrary(entries, legacy, legacyCategories);
   const categories = new Map(library.categories.map(category => [category.id, category]));
-  return library.products.filter(product => !product.hidden && categories.has(product.categoryId) && !categories.get(product.categoryId)?.hidden).map(product => ({
+  return library.products.map(product => productForTier(product,tier)).filter(product => !product.hidden && categories.has(product.categoryId) && !categories.get(product.categoryId)?.hidden).map(product => ({
     id: product.id, product_name: product.name,
     product_details: combineItemDetails(product.description, product.specifications) || null,
     preferred_rate: product.rate, usage_count: 0,

@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useQuotationLibrarySuggestions } from './useQuotationLibrarySuggestions';
-import { masterProducts } from '@/lib/library/model';
+import { masterProducts, type LibraryPricingTier } from '@/lib/library/model';
 import { writeSnapshot, readSnapshot } from '@/lib/library/storage';
 let mockUser: { id: string } | null = null;
 const mockLoad = jest.fn();
@@ -36,5 +36,17 @@ it('does not expose another account or guest overrides after identity changes', 
   await waitFor(() => expect(view.result.current.patterns.find(row => row.id === product.id)?.preferred_rate).toBe(100));
   mockUser = { id: 'account-b' }; view.rerender();
   await waitFor(() => expect(mockLoad).toHaveBeenCalledWith('account-b'));
+  expect(view.result.current.patterns.find(row => row.id === product.id)?.preferred_rate).toBeNull();
+});
+it('switches suggestions and learned rates to the quotation pricing tier', async () => {
+  const product = { ...masterProducts[0], rate: 100, tierPrices: { luxury: { rate: 300, unit: masterProducts[0].unit, description: 'Oak', specifications: [] } } };
+  writeSnapshot(null,{ entries: { [product.id]: { id: product.id, kind: 'product', data: product, revision: '1' } }, pending: {} });
+  const view = renderHook(({ tier }: { tier: LibraryPricingTier }) => useQuotationLibrarySuggestions(tier), { initialProps: { tier: 'standard' as LibraryPricingTier } });
+  await waitFor(() => expect(view.result.current.patterns.find(row => row.id === product.id)?.preferred_rate).toBe(100));
+  view.rerender({ tier: 'luxury' });
+  expect(view.result.current.patterns.find(row => row.id === product.id)?.preferred_rate).toBe(300);
+  act(() => view.result.current.remember({ productName: product.name, productDetails: 'Premium oak', measurementUnit: product.unit, ratePerSft: 350 },product.id));
+  expect(readSnapshot(null).entries[product.id].data).toMatchObject({ rate: 100, tierPrices: { luxury: { rate: 350 } } });
+  view.rerender({ tier: 'basic' });
   expect(view.result.current.patterns.find(row => row.id === product.id)?.preferred_rate).toBeNull();
 });

@@ -7,9 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ItemSpecifications } from '@/components/quotation/ItemSpecifications';
 import { combineItemDetails, splitItemDetails } from '@/lib/itemSpecifications';
-import { parseRate, units, validateProduct, type Product, type Category } from '@/lib/library/model';
+import { parseRate, units, validateProduct, type LibraryPricingTier, type Product, type Category } from '@/lib/library/model';
 
-export function ProductLibraryEditor({ initial, categories, onClose, onSave }: { initial: Product; categories: Category[]; onClose: () => void; onSave: (product: Product) => void }) {
+export function ProductLibraryEditor({ initial, categories, pricingTier = 'standard', onClose, onSave }: { initial: Product; categories: Category[]; pricingTier?: LibraryPricingTier; onClose: () => void; onSave: (product: Product) => void }) {
   const [product, setProduct] = useState(initial);
   const [rate, setRate] = useState(initial.rate === null ? '' : String(initial.rate));
   const [error, setError] = useState('');
@@ -18,7 +18,7 @@ export function ProductLibraryEditor({ initial, categories, onClose, onSave }: {
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to save product.'); }
   };
   return <Sheet open onOpenChange={open => { if (!open) onClose(); }}><SheetContent side="bottom" className="mx-auto flex max-h-[92dvh] max-w-2xl flex-col overflow-hidden rounded-t-2xl p-0">
-    <SheetHeader className="border-b px-5 py-4 pr-12"><SheetTitle>{initial.updatedAt || initial.master ? 'Edit product' : 'Add product'}</SheetTitle><SheetDescription>Only your library changes. Leave the rate blank when it is not set.</SheetDescription></SheetHeader>
+    <SheetHeader className="border-b px-5 py-4 pr-12"><SheetTitle>{initial.updatedAt || initial.master ? 'Edit product' : 'Add product'} · {pricingTier}</SheetTitle><SheetDescription>Rates, units and specifications apply to this tier. Product names and categories are shared. Leave the rate blank when it is not set.</SheetDescription></SheetHeader>
     <form id="library-product-form" className="min-h-0 space-y-4 overflow-y-auto p-5" onSubmit={event => { event.preventDefault(); save(); }}>
       <div className="space-y-1.5"><Label htmlFor="library-product-name">Product name *</Label><Input id="library-product-name" required maxLength={160} value={product.name} onChange={event => setProduct({ ...product, name: event.target.value })} /></div>
       <div className="space-y-1.5"><Label htmlFor="library-product-category">Category *</Label><select id="library-product-category" required className="h-11 w-full min-w-0 rounded-lg border bg-background px-3 text-sm" value={product.categoryId} onChange={event => setProduct({ ...product, categoryId: event.target.value })}>{categories.filter(row => !row.hidden || row.id === product.categoryId).map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></div>

@@ -24,6 +24,7 @@ import { getLibraryTerms } from "@/lib/libraryDefaults";
 import { QuotationVersions } from '@/components/quotation/QuotationVersions';
 import { QuotationTiers } from '@/components/quotation/QuotationTiers';
 import { QuotationOptionScroller } from '@/components/quotation/QuotationOptionScroller';
+import { rememberLibraryTier } from '@/lib/library/pricingPreference';
 import { quotationsApi } from '@/lib/api';
 import { tierQuotationTitle, type QuotationTierGroup } from '@/lib/quotationTiers';
 
@@ -81,6 +82,7 @@ const QuotationDetail = () => {
   const { formatCurrency, formatDateShort, settings } = useLocalization();
   const [quotation, setQuotation] = useState<Quotation | null>(null);
   const [tierGroup, setTierGroup] = useState<QuotationTierGroup | null>(null);
+  useEffect(() => { if (quotation?.tier_name) rememberLibraryTier(quotation.tier_name); }, [quotation?.tier_name]);
   const loadGeneration = useRef(0);
   const [loading, setLoading] = useState(true);
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);

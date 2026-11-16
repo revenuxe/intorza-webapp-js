@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QuotationTiers } from './QuotationTiers';
 import { quotationsApi } from '@/lib/api';
 import type { QuotationTierGroup } from '@/lib/quotationTiers';
+import { preferredLibraryTier } from '@/lib/library/pricingPreference';
 jest.mock('@/lib/api', () => ({ quotationsApi: { nameTier: jest.fn(), createTier: jest.fn(), removeTier: jest.fn() } }));
 jest.mock('@/hooks/useLocalization', () => ({ useLocalization: () => ({ formatCurrency: (amount: number) => `Rs ${amount}` }) }));
 const group: QuotationTierGroup = { root_id: 'standard', tiers: [
@@ -61,6 +62,7 @@ it('selects a tier inside the popup and copies that selection without navigating
   fireEvent.click(screen.getByRole('button', { name: 'Tier' }));
   fireEvent.click(screen.getByRole('button', { name: 'Select Luxury tier' }));
   expect(screen.getByRole('button', { name: 'Select Luxury tier' })).toHaveAttribute('aria-pressed','true');
+  expect(preferredLibraryTier()).toBe('luxury');
   expect(p.onSelect).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Create another tier' }));
   fireEvent.click(screen.getByRole('button', { name: 'Basic' }));

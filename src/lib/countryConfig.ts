@@ -42,7 +42,7 @@ export const COUNTRY_CONFIGS: CountryConfig[] = [
     flag: '🇮🇳',
     currency: {
       code: 'INR',
-      symbol: '₹',
+      symbol: '\u20B9',
       position: 'before',
       locale: 'en-IN',
       decimalPlaces: 2,

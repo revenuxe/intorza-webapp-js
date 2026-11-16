@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { QuotationOptionScroller } from './QuotationOptionScroller';
+import { rememberLibraryTier } from '@/lib/library/pricingPreference';
 
 export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, onExport }: {
   group: QuotationTierGroup; activeId: string; onRefresh: () => Promise<void>;
@@ -28,7 +29,7 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
   const firstTime = !group.tiers[0]?.tier_name;
   const current = group.tiers.find(tier => tier.id === (selectedId || activeId)) || group.tiers[0];
   const deleting = group.tiers.find(tier => tier.id === deleteId);
-  const selectTier = (id: string) => { setSelectedId(id); setDeleteId(null); setError(''); };
+  const selectTier = (id: string) => { setSelectedId(id); rememberLibraryTier(group.tiers.find(tier => tier.id === id)?.tier_name); setDeleteId(null); setError(''); };
   const deleteTier = async () => {
     if (!deleting || deleting.id === group.root_id || busy) return;
     setBusy(true); setError('');
@@ -47,9 +48,11 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
     try {
       if (mode === 'create') {
         const { data } = await quotationsApi.createTier(current.id, name);
+        rememberLibraryTier(name);
         setOpen(false); onEdit(data.id);
       } else {
         await quotationsApi.nameTier(current.id, name);
+        rememberLibraryTier(name);
         await onRefresh(); setMode(null); setName('');
       }
     } catch (cause) {
@@ -68,7 +71,7 @@ export function QuotationTiers({ group, activeId, onRefresh, onSelect, onEdit, o
     <Button variant="outline" className="gap-2" onClick={() => { setSelectedId(activeId); setDeleteId(null); setError(''); setMode(null); setName(''); setOpen(true); }}><Layers3 className="h-4 w-4" />Tier</Button>
     <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value); }}>
       <DialogContent className={`flex max-h-[84dvh] w-[calc(100%-2rem)] flex-col gap-3 overflow-hidden p-3.5 sm:max-h-[92dvh] sm:p-6 [&_h2]:text-base sm:[&_h2]:text-lg ${compare && !firstTime && !mode ? 'max-w-6xl' : 'max-w-2xl'}`}>
-        <DialogHeader className="pr-6 text-left"><DialogTitle>{firstTime ? 'Name your first tier' : mode === 'create' ? 'Create another tier' : mode === 'rename' ? 'Rename tier' : 'Quotation tiers'}</DialogTitle><DialogDescription>{firstTime ? 'Choose a label for this saved quotation. Its items and prices stay as they are.' : mode === 'create' ? `Copy ${current?.tier_name} with the same client, rooms, items and prices, then adjust your new tier.` : 'Choose an option to view, edit, download or share.'}</DialogDescription></DialogHeader>
+        <DialogHeader className="pr-6 text-left"><DialogTitle>{firstTime ? 'Name your first tier' : mode === 'create' ? 'Create another tier' : mode === 'rename' ? 'Rename tier' : 'Quotation tiers'}</DialogTitle><DialogDescription>{firstTime ? 'Choose a label for this saved quotation. Its items and prices stay as they are.' : mode === 'create' ? `Copy ${current?.tier_name} with the same client and items. Matching account library prices for your new tier are applied; other items keep their copied prices.` : 'Choose an option to view, edit, download or share.'}</DialogDescription></DialogHeader>
         {error && <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">{error}</p>}
         {deleting && <div role="group" aria-label="Confirm tier deletion" className="shrink-0 space-y-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3"><p className="text-sm font-semibold">Delete {deleting.tier_name}?</p><p className="text-xs leading-5 text-muted-foreground">This permanently deletes this tier and its version history. Other tiers and shared client details stay.</p><div className="grid grid-cols-2 gap-3"><Button variant="destructive" className="h-11 rounded-xl" disabled={busy} onClick={deleteTier}>{busy ? 'Deleting...' : 'Delete tier'}</Button><Button variant="outline" className="h-11 rounded-xl" disabled={busy} onClick={() => setDeleteId(null)}>Cancel</Button></div></div>}
         <div className="min-h-0 space-y-4 overflow-y-auto">
