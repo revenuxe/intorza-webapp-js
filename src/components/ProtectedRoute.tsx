@@ -5,25 +5,27 @@ import { GlobalLoader } from "@/components/GlobalLoader";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
+  loginPath?: string;
 }
 
-export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ children, loginPath = '/auth' }: ProtectedRouteProps) => {
   const { user, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
-      sessionStorage.setItem('returnPath', location.pathname + location.search);
-      navigate("/auth", { replace: true });
+      try { sessionStorage.setItem('returnPath', location.pathname + location.search); }
+      catch { /* Signing in must still work when browser storage is blocked. */ }
+      navigate(loginPath, { replace: true });
     }
-  }, [isAuthenticated, loading, navigate, location.pathname, location.search]);
+  }, [isAuthenticated, loading, navigate, location.pathname, location.search, loginPath]);
 
   if (loading) {
     return <GlobalLoader message="Loading..." fullScreen={false} />;
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return null;
   }
 

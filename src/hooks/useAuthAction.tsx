@@ -7,17 +7,29 @@ export const useAuthAction = () => {
   const location = useLocation();
   const { toast } = useToast();
 
-  const requireAuth = async (action: () => Promise<void>, actionName?: string, formData?: any) => {
-    const { data: { user } } = await supabase.auth.getUser();
+  const requireAuth = async (action: () => Promise<void>, actionName?: string, formData?: unknown) => {
+    let result: Awaited<ReturnType<typeof supabase.auth.getUser>>;
+    try { result = await supabase.auth.getUser(); }
+    catch {
+      toast({ title: 'Sign-in check unavailable', description: 'Check your connection and retry. Your editor has been kept.', variant: 'destructive' });
+      return;
+    }
+    const { data: { user }, error } = result;
+    if (error && (error.status === 0 || (error.status ?? 0) >= 500 || error.name === 'AuthRetryableFetchError')) {
+      toast({ title: 'Sign-in check unavailable', description: 'Check your connection and retry. Your editor has been kept.', variant: 'destructive' });
+      return;
+    }
     
     if (!user) {
       // Store the current path and action to continue after login
-      sessionStorage.setItem('pendingAction', actionName || 'default');
-      sessionStorage.setItem('returnPath', location.pathname + location.search);
-      
-      // Store form data if provided
-      if (formData) {
-        sessionStorage.setItem('pendingFormData', JSON.stringify(formData));
+      try {
+        sessionStorage.setItem('pendingAction', actionName || 'default');
+        sessionStorage.setItem('returnPath', location.pathname + location.search);
+        // Store form data before navigating away from the editor.
+        if (formData) sessionStorage.setItem('pendingFormData', JSON.stringify(formData));
+      } catch {
+        toast({ title: 'Browser storage unavailable', description: 'Enable browser storage before continuing so your quotation can be kept during sign-in.', variant: 'destructive' });
+        return;
       }
       
       toast({
@@ -28,26 +40,38 @@ export const useAuthAction = () => {
       return;
     }
     
-    await action();
+    if (!error) await action();
   };
 
   const isAuthenticated = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    return !!user;
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      return !error && !!user;
+    } catch { return false; }
   };
 
-  const getPendingAction = () => {
-    const action = sessionStorage.getItem('pendingAction');
-    const returnPath = sessionStorage.getItem('returnPath');
-    const formDataStr = sessionStorage.getItem('pendingFormData');
-    const formData = formDataStr ? JSON.parse(formDataStr) : null;
-    return { action, returnPath, formData };
+  const getPendingAction = <T,>(parse?: (value: unknown) => T | null) => {
+    try {
+      const action = sessionStorage.getItem('pendingAction');
+      const returnPath = sessionStorage.getItem('returnPath');
+      const formDataStr = sessionStorage.getItem('pendingFormData');
+      let formData: T | null = null;
+      try {
+        const parsed: unknown = formDataStr ? JSON.parse(formDataStr) : null;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) formData = parse ? parse(parsed) : parsed as T;
+        if (formDataStr && formData === null) sessionStorage.removeItem('pendingFormData');
+      }
+      catch { sessionStorage.removeItem('pendingFormData'); }
+      return { action, returnPath, formData };
+    } catch { return { action: null, returnPath: null, formData: null }; }
   };
 
   const clearPendingAction = () => {
-    sessionStorage.removeItem('pendingAction');
-    sessionStorage.removeItem('returnPath');
-    sessionStorage.removeItem('pendingFormData');
+    try {
+      sessionStorage.removeItem('pendingAction');
+      sessionStorage.removeItem('returnPath');
+      sessionStorage.removeItem('pendingFormData');
+    } catch { /* Storage can be disabled after a page has loaded. */ }
   };
 
   return { requireAuth, isAuthenticated, getPendingAction, clearPendingAction };

@@ -65,3 +65,12 @@ it('reports a failed check without treating it as a free plan and can retry', as
   single.mockResolvedValueOnce(profile(true)); fireEvent.click(screen.getByText('Refresh'));
   await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('pro')); log.mockRestore();
 });
+it('expires Pro in an open tab without another database fetch',async()=>{
+ jest.useFakeTimers();
+ try {
+  const result=profile(true);result.data.pro_expiry=new Date(Date.now()+5_000).toISOString();single.mockResolvedValue(result);
+  render(app());await act(async()=>{});expect(screen.getByTestId('status')).toHaveTextContent('pro');
+  await act(async()=>{jest.advanceTimersByTime(5_001);});expect(screen.getByTestId('status')).toHaveTextContent('free');
+  fireEvent.click(screen.getByText('Protected action'));expect(callback).not.toHaveBeenCalled();expect(single).toHaveBeenCalledTimes(1);
+ } finally {jest.useRealTimers();}
+});

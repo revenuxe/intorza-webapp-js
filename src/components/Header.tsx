@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/contexts/SubscriptionContext";
 import logo from "@/assets/intorza-logo.webp";
 import { format } from "date-fns";
+import { toast } from 'sonner';
 
 export const Header = () => {
   const [menuOpen,setMenuOpen] = useState(false);
@@ -32,6 +33,14 @@ export const Header = () => {
   const navigate = useNavigate();
   const { user, signOut, isAuthenticated } = useAuth();
   const { isPro, expiry, loading: proLoading, status: proStatus, setPaywallOpen } = useSubscription();
+  const [signingOut,setSigningOut] = useState(false);
+  const handleSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    try { await signOut(); }
+    catch { toast.error('Sign-out could not be fully confirmed. Check your connection.'); }
+    finally { setSigningOut(false); }
+  };
   
   const getInitials = () => {
     if (!user?.email) return "U";
@@ -115,7 +124,7 @@ export const Header = () => {
           {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-9 px-2 gap-2">
+                <Button variant="ghost" className="h-9 px-2 gap-2" aria-label="Account menu">
                   <Avatar className="h-7 w-7">
                     <AvatarImage src={user?.user_metadata?.avatar_url} />
                     <AvatarFallback className="text-xs bg-primary text-primary-foreground">
@@ -144,7 +153,7 @@ export const Header = () => {
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
+                <DropdownMenuItem onClick={() => void handleSignOut()} disabled={signingOut} className="text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Logout
                 </DropdownMenuItem>

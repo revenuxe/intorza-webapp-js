@@ -47,6 +47,15 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [state, setState] = useState(getInitialState);
   const [paywallOpen, setPaywallOpenState] = useState(false);
   const [paywallAction, setPaywallAction] = useState('');
+  const [clock, setClock] = useState(() => Date.now());
+  const expiresAt = state.expiry ? Date.parse(state.expiry) : null;
+  const isCurrentPro = state.isPro && (expiresAt === null || (Number.isFinite(expiresAt) && expiresAt > Math.max(clock,Date.now())));
+  // Expire open tabs without polling the database or relying on another render.
+  useEffect(() => {
+    if (!state.isPro || expiresAt === null || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) return;
+    const timer = setTimeout(() => setClock(Date.now()), Math.min(expiresAt-Date.now(),2_147_483_647));
+    return () => clearTimeout(timer);
+  }, [expiresAt,state.isPro,clock]);
 
   // Persist Pro status to localStorage
   const persistStatus = useCallback((newState: Partial<SubscriptionState>) => {
@@ -179,7 +188,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const checkProFeature = useCallback((actionName: string, callback: () => void) => {
     if (authLoading || state.ownerId !== (user?.id ?? null) || state.loading || !state.initialLoadComplete || state.status === 'unavailable') return;
-    if (state.isPro) {
+    if (state.isPro && (!state.expiry || Date.parse(state.expiry)>Date.now())) {
       callback();
     } else {
       setPaywallOpen(true, actionName);
@@ -190,7 +199,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
     <SubscriptionContext.Provider
       value={{
         ...state,
-        isPro: !authLoading && state.ownerId === (user?.id ?? null) && state.initialLoadComplete && state.isPro,
+        isPro: !authLoading && state.ownerId === (user?.id ?? null) && state.initialLoadComplete && isCurrentPro,
         loading: authLoading || state.ownerId !== (user?.id ?? null) || state.loading,
         initialLoadComplete: !authLoading && state.ownerId === (user?.id ?? null) && state.initialLoadComplete,
         refreshSubscription,

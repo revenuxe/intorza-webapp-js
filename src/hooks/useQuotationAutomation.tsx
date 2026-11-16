@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
@@ -67,18 +67,30 @@ export const useQuotationAutomation = () => {
   const [itemPatterns, setItemPatterns] = useState<ItemUsagePattern[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const owner = user?.id ?? null;
+  const identity = useRef(owner);
+  identity.current = owner;
+  const requestGeneration = useRef(0);
+  const active = useRef(true);
+  const [loadedOwner,setLoadedOwner] = useState<string | null>(null);
+  const activePreferences = loadedOwner === owner ? preferences : DEFAULT_PREFERENCES;
 
   // Load preferences and item patterns
   useEffect(() => {
+    active.current = true;
+    setPreferences(DEFAULT_PREFERENCES); setClients([]); setItemPatterns([]); setLoadedOwner(null);
     if (user) {
       loadData();
     } else {
       setLoading(false);
     }
-  }, [user]);
+    return () => { active.current = false; requestGeneration.current++; };
+  }, [owner]);
 
   const loadData = async () => {
     if (!user) return;
+    const generation = ++requestGeneration.current;
+    const isCurrent = () => active.current && generation === requestGeneration.current && identity.current === user.id;
     
     try {
       setLoading(true);
@@ -103,6 +115,8 @@ export const useQuotationAutomation = () => {
           .eq('user_id', user.id)
           .order('name')
       ]);
+      if (!isCurrent()) return;
+      setLoadedOwner(user.id);
 
       if (prefsResult.data) {
         setPreferences({
@@ -119,14 +133,17 @@ export const useQuotationAutomation = () => {
         setClients(clientsResult.data);
       }
     } catch (error) {
+      if (!isCurrent()) return;
+      setLoadedOwner(user.id);
       console.error('Error loading automation data:', error);
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
   // Get smart defaults for a new quotation
   const getSmartDefaults = useCallback(() => {
+    const preferences = activePreferences;
     const today = new Date();
     const validTillDate = new Date(today);
     validTillDate.setDate(validTillDate.getDate() + (preferences.default_quotation_valid_days || 7));
@@ -144,16 +161,18 @@ export const useQuotationAutomation = () => {
       enableSocialMediaDiscount: preferences.last_social_media_discount_enabled ?? preferences.default_social_media_discount_enabled ?? false,
       socialMediaDiscountRate: preferences.last_social_media_discount_rate ?? preferences.default_social_media_discount_rate ?? 6,
     };
-  }, [preferences]);
+  }, [activePreferences]);
 
   // Get client address when client is selected
   const getClientAddress = useCallback((clientName: string): string | null => {
+    if (loadedOwner !== owner) return null;
     const client = clients.find(c => c.name.toLowerCase() === clientName.toLowerCase());
     return client?.address || null;
-  }, [clients]);
+  }, [clients, loadedOwner, owner]);
 
   // Get prioritized product suggestions
   const getProductSuggestions = useCallback((searchTerm: string = ''): ItemUsagePattern[] => {
+    if (loadedOwner !== owner) return [];
     if (!searchTerm) {
       // Return top used items
       return itemPatterns.slice(0, 20);
@@ -163,10 +182,11 @@ export const useQuotationAutomation = () => {
     return itemPatterns
       .filter(p => p.product_name.toLowerCase().includes(term))
       .slice(0, 20);
-  }, [itemPatterns]);
+  }, [itemPatterns, loadedOwner, owner]);
 
   // Get item details and rate for a product
   const getItemDefaults = useCallback((productName: string): { details: string; rate: number } | null => {
+    if (loadedOwner !== owner) return null;
     const pattern = itemPatterns.find(
       p => p.product_name.toLowerCase() === productName.toLowerCase()
     );
@@ -178,7 +198,7 @@ export const useQuotationAutomation = () => {
       };
     }
     return null;
-  }, [itemPatterns]);
+  }, [itemPatterns, loadedOwner, owner]);
 
   // Save last used preferences after quotation save
   const saveLastUsedPreferences = useCallback(async (values: {
@@ -191,7 +211,7 @@ export const useQuotationAutomation = () => {
     enableSocialMediaDiscount?: boolean;
     socialMediaDiscountRate?: number;
   }) => {
-    if (!user) return;
+    if (!user || !active.current || identity.current !== user.id) return;
 
     try {
       const updateData: any = {
@@ -228,6 +248,7 @@ export const useQuotationAutomation = () => {
 
     try {
       for (const item of items) {
+        if (!active.current || identity.current !== user.id) return;
         if (!item.productName.trim()) continue;
 
         // Check if pattern exists
@@ -237,6 +258,7 @@ export const useQuotationAutomation = () => {
           .eq('user_id', user.id)
           .eq('product_name', item.productName)
           .single();
+        if (!active.current || identity.current !== user.id) return;
 
         if (existing) {
           // Update existing pattern
@@ -267,17 +289,17 @@ export const useQuotationAutomation = () => {
       }
 
       // Reload patterns
-      loadData();
+      if (active.current && identity.current === user.id) loadData();
     } catch (error) {
       console.error('Error tracking item usage:', error);
     }
   }, [user]);
 
   return {
-    loading,
-    preferences,
-    clients,
-    itemPatterns,
+    loading: Boolean(owner) && (loadedOwner !== owner || loading),
+    preferences: loadedOwner === owner ? preferences : DEFAULT_PREFERENCES,
+    clients: loadedOwner === owner ? clients : [],
+    itemPatterns: loadedOwner === owner ? itemPatterns : [],
     getSmartDefaults,
     getClientAddress,
     getProductSuggestions,

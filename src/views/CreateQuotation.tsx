@@ -9,6 +9,7 @@ import { appendFloorPlanEstimate } from '@/lib/quotation-ai/apply-estimate';
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { GlobalLoader } from '@/components/GlobalLoader';
 import { accountProfileOptions } from '@/lib/accountQueries';
 import dynamic from 'next/dynamic';
 import { Plus, Trash2, Upload, Eye, Share2, Loader2, ImageIcon, LockKeyhole } from "lucide-react";
@@ -24,6 +25,7 @@ import { useInlineFeedback } from "@/hooks/useInlineFeedback";
 import { supabase } from "@/integrations/supabase/client";
 import { quotationsApi } from "@/lib/api";
 import { QuotationSaveSession } from "@/lib/quotationSaveSession";
+import { parsePendingQuotation } from '@/lib/pendingQuotation';
 import { useNavigate, useSearchParams } from "@/lib/navigation";
 import { useAuthAction } from "@/hooks/useAuthAction";
 import { useSubscription } from "@/contexts/SubscriptionContext";
@@ -79,7 +81,7 @@ interface PaymentStage {
 }
 const defaultProjectDeadline = (proposal: string) => proposal ? format(addDays(parseISO(proposal), 45), 'yyyy-MM-dd') : '';
 
-const CreateQuotation = () => {
+const QuotationEditor = () => {
   const { user: accountUser, loading: accountLoading } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -256,7 +258,12 @@ const CreateQuotation = () => {
     if (continueAction && !formRestored) {
       const {
         formData
-      } = getPendingAction();
+      } = getPendingAction(parsePendingQuotation);
+      if (!formData) {
+        setActionExecuted(true); setFormRestored(true); clearPendingAction();
+        toast({title:'Draft could not be restored',description:'Reopen a saved quotation or enter your details to continue.',variant:'destructive'});
+        return;
+      }
       if (formData) {
         if (formData.referenceNo) setReferenceNo(formData.referenceNo);
         if (formData.sections) setSections(formData.sections);
@@ -320,7 +327,7 @@ const CreateQuotation = () => {
   // Handle continuing actions after login (wait for form to be restored and profile to be loaded)
   useEffect(() => {
     const executePendingAction = async () => {
-      if (continueAction && formRestored && !actionExecuted) {
+      if (continueAction && formRestored && !actionExecuted && !accountLoading && accountUser) {
         setActionExecuted(true);
         clearPendingAction();
 
@@ -377,7 +384,7 @@ const CreateQuotation = () => {
       }
     };
     executePendingAction();
-  }, [continueAction, formRestored, actionExecuted, isPro, setPaywallOpen]);
+  }, [continueAction, formRestored, actionExecuted, isPro, setPaywallOpen, accountLoading, accountUser?.id]);
   const loadProfile = async () => {
     const generation = quotationLoadGeneration.current;
     try {
@@ -1476,4 +1483,10 @@ const CreateQuotation = () => {
       </div>
     </div>;
 };
-export default CreateQuotation;
+export default function CreateQuotation() {
+  const {user,loading}=useAuth();
+  if(loading) return <GlobalLoader message="Loading quotation workspace…" fullScreen={false} />;
+  // Retain edits through token refresh, but never carry one account's form,
+  // profile, gallery or pending save session into another identity.
+  return <QuotationEditor key={user?.id || 'guest'} />;
+}

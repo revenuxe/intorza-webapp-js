@@ -1,6 +1,8 @@
 import { act, render, screen } from '@testing-library/react';
 import type { Session } from '@supabase/supabase-js';
 import { AuthProvider, useAuth } from './useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { renderHook } from '@testing-library/react';
 
 let mockListener: (event: string, session: Session | null) => void;
 let mockResolve: (value: { data: { session: Session | null } }) => void;
@@ -42,4 +44,10 @@ it('unsubscribes on unmount and ignores a pending startup result', async () => {
   unmount();
   expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
   await act(async () => { mockResolve({ data: { session: session('owner') } }); });
+});
+it('reports a rejected logout instead of silently claiming success',async()=>{
+ const error=new Error('Network unavailable');jest.mocked(supabase.auth.signOut).mockResolvedValueOnce({error} as never);
+ const {result}=renderHook(useAuth,{wrapper:AuthProvider});
+ await act(async()=>{mockResolve({data:{session:session('owner')}});});
+ await expect(result.current.signOut()).rejects.toThrow('Network unavailable');expect(result.current.user?.id).toBe('owner');
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from '@/lib/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +14,7 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (loading) return;
     let active = true;
+    setAuthorizedUser(null);
     if (!userId) {
       navigate('/admin/login', { replace: true });
       return;
@@ -25,6 +26,6 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
     }, () => { if (active) navigate('/admin/login', { replace: true }); });
     return () => { active = false; };
   }, [userId, loading, navigate]);
-  if (!user || authorizedUser !== user.id) return <GlobalLoader message="Checking admin access…" fullScreen={false} />;
-  return <>{children}</>;
+  if (loading || !user || authorizedUser !== user.id) return <GlobalLoader message="Checking admin access…" fullScreen={false} />;
+  return <Fragment key={user.id}>{children}</Fragment>;
 }

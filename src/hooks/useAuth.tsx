@@ -44,7 +44,8 @@ const useAuthSession = () => {
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
     // Stay on current page after logout - don't redirect
   }, []);
 

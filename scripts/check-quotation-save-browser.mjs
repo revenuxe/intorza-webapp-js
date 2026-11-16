@@ -55,7 +55,14 @@ try {
  assert.equal(saves[2].p_id,qid);
  assert.equal(saves[2].p_expected_version,1);
  assert.notEqual(saves[2].p_request_id,saves[0].p_request_id);
+  await page.evaluate(()=>sessionStorage.setItem('pendingFormData',JSON.stringify({sections:[],projectTitle:'Restored draft',clientName:'Restored client'})));
+  await page.goto('http://localhost:8080/?continueAction=saveDraft',{waitUntil:'networkidle'});
+  await page.getByText('Quotation saved',{exact:true}).waitFor();
+  assert.equal(saves.length,4,'Valid sign-in continuation should save once');
+  assert.equal(saves[3].p_payload.quotation_title,'Restored draft');
+  assert.equal(saves[3].p_payload.client_name,'Restored client');
+  assert.equal(saves[3].p_id,null);
  assert.deepEqual(errors,[]);
- process.stdout.write(JSON.stringify({result:'PASS',checks:['Lost-response retry uses identical creation request','No editor reload after creation','Next save updates acknowledged ID/version','No browser runtime errors'],requests:counts})+'\n');
+  process.stdout.write(JSON.stringify({result:'PASS',checks:['Lost-response retry uses identical creation request','No editor reload after creation','Next save updates acknowledged ID/version','Valid sign-in draft resumes once','No browser runtime errors'],requests:counts})+'\n');
  await context.close();
 } finally { await browser.close(); }
