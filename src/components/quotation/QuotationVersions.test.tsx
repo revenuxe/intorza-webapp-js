@@ -4,7 +4,7 @@ import { quotationsApi } from '@/lib/api';
 jest.mock('@/lib/api', () => ({ quotationsApi: { versions: jest.fn(), version: jest.fn(), revertVersion: jest.fn() } }));
 jest.mock('@/hooks/useLocalization', () => ({ useLocalization: () => ({ formatCurrency: (value: number) => `Rs ${value}`, formatDateShort: () => '16/11/2026' }) }));
 const versions = [2, 1].map(number => ({ id: `v${number}`, quotation_id: 'quote', version_number: number, saved_at: '2026-11-16T10:00:00Z' }));
-const snapshot = (number: number) => ({ quotation_title: 'Bedroom', client_name: 'Client', grand_total: number * 100, sections: [{ section_name: 'Bedroom', items: [{ product_name: 'Wardrobe', amount: number * 100 }] }] });
+const snapshot = (number: number) => ({ quotation_title: 'Bedroom', client_name: 'Client', grand_total: number * 100, sections: [{ section_name: 'Bedroom', items: [{ product_name: 'Wardrobe', amount: number * 100 }, ...(number > 1 ? [{ product_name: 'Bed', amount: 100 }] : [])] }] });
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(quotationsApi.versions).mockResolvedValue({ data: versions });
@@ -16,7 +16,8 @@ it('lists recent changes without the quotation and reverts an expanded version o
   render(<QuotationVersions quotationId="quote" onRestored={restored} />);
   fireEvent.click(screen.getByRole('button', { name: 'Versions' }));
   expect(await screen.findByText('First saved version')).toBeVisible();
-  expect(screen.getByText(/Grand total ·/)).toBeVisible();
+  expect(screen.getByText('Added Bed to Bedroom')).toBeVisible();
+  expect(screen.queryByText(/Subtotal|Grand total|Before:|After:/)).not.toBeInTheDocument();
   expect(screen.queryByText('Bedroom')).not.toBeInTheDocument();
   expect(screen.queryByText('Client')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Revert to this version' })).not.toBeInTheDocument();
@@ -49,7 +50,8 @@ it('expands just the selected changes and keeps the latest version non-revertibl
   expect(latest).toHaveAttribute('aria-expanded','false');
   fireEvent.click(latest);
   expect(screen.getByRole('list', { name: 'Changes in Version 2' })).toBeVisible();
-  expect(screen.getAllByText('Before: 100')).toHaveLength(2);
+  expect(screen.getByRole('list', { name: 'Changes in Version 2' })).toHaveTextContent('Added Bed to Bedroom');
+  expect(screen.queryByText(/Before:|After:/)).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Revert to this version' })).not.toBeInTheDocument();
   fireEvent.click(latest);
   expect(screen.queryByRole('list', { name: 'Changes in Version 2' })).not.toBeInTheDocument();

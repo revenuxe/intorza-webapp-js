@@ -2,9 +2,12 @@
 
 Quotation cards link to `/quotations/[id]`, including drafts. The existing Edit,
 Duplicate and Delete buttons keep their own actions. The detail page's Versions
-button opens a compact list of saved versions and recent changes. Tapping an
-entry expands its before/after changes and revert action, without showing the
-whole quotation. When tiers exist, a selector switches the history to that tier;
+button opens a compact list of saved versions, summarizing rooms and items added
+or removed. Tapping an entry expands those activity notes and its revert action.
+Calculated totals, side defaults and before/after field dumps are omitted. Content
+is matched by identity, then by name when IDs were recreated, so inserts and
+removals do not falsely describe every following item as changed.
+When tiers exist, a selector switches the history to that tier;
 it defaults to the option currently being viewed. Switching clears selection,
 confirmation and cached snapshots. Delayed responses from the previous tier are
 ignored, and reverts always target the selected tier.

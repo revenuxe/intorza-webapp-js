@@ -22,6 +22,7 @@ import { AITrainingPanel } from '@/components/admin/AITrainingPanel';
 import { AdminUserDirectory } from '@/components/admin/AdminUserDirectory';
 import { CoinWalletAdminPanel } from '@/components/admin/CoinWalletAdminPanel';
 import { AdminQuotes } from '@/components/admin/AdminQuotes';
+import { AdminTabsScroller } from '@/components/admin/AdminTabsScroller';
 
 interface User {
   id: string;
@@ -611,12 +612,12 @@ const AdminDashboard = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-6">
+      <main className="container mx-auto min-w-0 px-3 sm:px-4 py-4 sm:py-8 space-y-6">
         {failedSections.length > 0 && <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">Some data is unavailable or may be outdated: {failedSections.join(', ')}. Use Refresh to retry. Empty tables and totals in those sections are not confirmed.</div>}
         {/* Data Tables */}
-        <Tabs defaultValue="users" className="space-y-3">
-          <div className="overflow-x-auto -mx-3 px-3">
-            <TabsList aria-label="Admin sections" className="flex h-auto flex-wrap justify-start gap-1 p-1 w-full">
+        <Tabs defaultValue="users" className="min-w-0 space-y-3">
+          <AdminTabsScroller>
+            <TabsList aria-label="Admin sections" className="flex h-auto w-max min-w-full flex-nowrap justify-start gap-1 p-1 [&>button]:h-11 [&>button]:shrink-0 [&>button]:rounded-lg">
               <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 sm:px-3">Overview</TabsTrigger>
               <TabsTrigger value="users" className="text-xs sm:text-sm px-2 sm:px-3">Users</TabsTrigger>
               <TabsTrigger value="companies" className="text-xs sm:text-sm px-2 sm:px-3">Companies</TabsTrigger>
@@ -628,7 +629,7 @@ const AdminDashboard = () => {
               <TabsTrigger value="sites" className="text-xs sm:text-sm px-2 sm:px-3">Sites</TabsTrigger>
               <TabsTrigger value="teams" className="text-xs sm:text-sm px-2 sm:px-3">Teams</TabsTrigger>
             </TabsList>
-          </div>
+          </AdminTabsScroller>
 
           <TabsContent value="overview" className="space-y-6">
         {/* Overview Stats */}
@@ -831,7 +832,7 @@ const AdminDashboard = () => {
           <TabsContent value="billing" className="space-y-4">
             <div><h2 className="text-2xl font-semibold">Billing</h2><p className="mt-1 text-sm text-muted-foreground">Subscriptions, payment history and coin balances in one place.</p></div>
             <Tabs defaultValue="subscriptions" className="space-y-4">
-              <TabsList className="h-auto flex-wrap gap-1 p-1"><TabsTrigger value="subscriptions">Pro subscriptions</TabsTrigger><TabsTrigger value="coins">Coin wallets</TabsTrigger></TabsList>
+              <AdminTabsScroller label="Billing tabs"><TabsList className="h-auto w-max min-w-full flex-nowrap justify-start gap-1 p-1 [&>button]:h-11 [&>button]:shrink-0"><TabsTrigger value="subscriptions">Pro subscriptions</TabsTrigger><TabsTrigger value="coins">Coin wallets</TabsTrigger></TabsList></AdminTabsScroller>
               <TabsContent value="subscriptions"><AdminUserDirectory billing refreshVersion={refreshVersion} /></TabsContent>
               <TabsContent value="coins"><CoinWalletAdminPanel refreshVersion={refreshVersion} /></TabsContent>
             </Tabs>

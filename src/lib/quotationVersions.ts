@@ -8,6 +8,52 @@ export type QuotationSnapshot = Record<string, unknown> & { sections: VersionSec
 export type QuotationVersion = { id: string; quotation_id: string; version_number: number; saved_at: string };
 export type QuotationVersionDetail = QuotationVersion & { snapshot: QuotationSnapshot };
 export type VersionChange = { label: string; before: string; after: string };
+export type VersionActivity = { kind: 'added' | 'removed'; label: string };
+
+// Match identities first, then names for content whose IDs were recreated by a
+// revert. Inserting/removing an item must not turn every following row into edits.
+function matchContent<T extends { id?: string }>(old: T[], next: T[], name: (value: T) => string) {
+  const used = new Set<number>();
+  const matches = new Map<number, number>();
+  old.forEach((value, index) => {
+    const match = value.id ? next.findIndex((candidate, i) => !used.has(i) && candidate.id === value.id) : -1;
+    if (match >= 0) { matches.set(index, match); used.add(match); }
+  });
+  old.forEach((value, index) => {
+    if (matches.has(index)) return;
+    const match = next.findIndex((candidate, i) => !used.has(i) && name(candidate).trim().toLowerCase() === name(value).trim().toLowerCase());
+    if (match >= 0) { matches.set(index, match); used.add(match); }
+  });
+  return { matches, used };
+}
+
+export function quotationVersionActivity(before: QuotationSnapshot | null, after: QuotationSnapshot): VersionActivity[] {
+  if (!before) return [];
+  const activity: VersionActivity[] = [];
+  const rooms = matchContent(before.sections, after.sections, room => room.section_name);
+  before.sections.forEach((room, roomIndex) => {
+    const nextIndex = rooms.matches.get(roomIndex);
+    if (nextIndex === undefined) {
+      activity.push({ kind: 'removed', label: `Removed room: ${room.section_name}` });
+      return;
+    }
+    const next = after.sections[nextIndex];
+    const items = matchContent(room.items, next.items, item => item.product_name);
+    room.items.forEach((item, index) => {
+      if (!items.matches.has(index)) activity.push({ kind: 'removed', label: `Removed ${item.product_name || 'unnamed item'} from ${room.section_name}` });
+    });
+    next.items.forEach((item, index) => {
+      if (!items.used.has(index)) activity.push({ kind: 'added', label: `Added ${item.product_name || 'unnamed item'} to ${next.section_name}` });
+    });
+  });
+  after.sections.forEach((room, index) => {
+    if (!rooms.used.has(index)) {
+      activity.push({ kind: 'added', label: `Added room: ${room.section_name}` });
+      room.items.forEach(item => activity.push({ kind: 'added', label: `Added ${item.product_name || 'unnamed item'} to ${room.section_name}` }));
+    }
+  });
+  return activity;
+}
 
 const labels: Record<string, string> = {
   quotation_title: 'Title', project_name: 'Project name', quotation_number: 'Quotation number',

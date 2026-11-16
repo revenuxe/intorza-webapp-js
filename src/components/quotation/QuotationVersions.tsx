@@ -2,7 +2,7 @@
 import { useEffect, useId, useState } from 'react';
 import { ChevronDown, History, RotateCcw } from 'lucide-react';
 import { quotationsApi } from '@/lib/api';
-import { quotationVersionChanges, type QuotationVersion, type QuotationVersionDetail } from '@/lib/quotationVersions';
+import { quotationVersionActivity, type QuotationVersion, type QuotationVersionDetail } from '@/lib/quotationVersions';
 import { useLocalization } from '@/hooks/useLocalization';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -83,7 +83,7 @@ export function QuotationVersions({ quotationId, tiers = [], onRestored }: { quo
       <DialogContent className="flex max-h-[84dvh] w-[calc(100%-2rem)] max-w-lg flex-col gap-3 overflow-hidden p-3.5 sm:max-h-[90dvh] sm:gap-4 sm:p-6">
         <DialogHeader className="shrink-0 pr-6 text-left">
           <DialogTitle className="text-base sm:text-lg">Version history</DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">Tap a saved version to see changes or revert.</DialogDescription>
+          <DialogDescription className="text-xs sm:text-sm">See what was added or removed. Tap a version to revert.</DialogDescription>
         </DialogHeader>
         {tiers.some(tier => tier.tier_name) && <div className="shrink-0 space-y-1.5"><label htmlFor={tierSelectId} className="text-xs font-medium">Tier</label><select id={tierSelectId} value={historyId} disabled={restoring} onChange={event => { setSelectedTierId(event.target.value); setSelected(null); setConfirm(false); setNotice(''); }} className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50">{tiers.map(tier => <option key={tier.id} value={tier.id}>{tier.tier_name || 'Original tier'}</option>)}</select></div>}
         {notice && <p role="status" className="rounded-lg bg-primary/5 p-3 text-sm">{notice}</p>}
@@ -95,10 +95,10 @@ export function QuotationVersions({ quotationId, tiers = [], onRestored }: { quo
               const detail = details[number];
               const previous = details[number - 1];
               const ready = Boolean(detail && (number === 1 || previous));
-              const changes = ready ? quotationVersionChanges(previous?.snapshot ?? null, detail.snapshot) : [];
+              const changes = ready ? quotationVersionActivity(previous?.snapshot ?? null, detail.snapshot) : [];
               const expanded = selected === number;
               const latest = number === versions[0]?.version_number;
-              const summary = !ready ? 'Loading changes...' : number === 1 ? 'First saved version' : !changes.length ? 'Saved without changes' : changes.slice(0, 3).map(change => change.label).join(' · ') + (changes.length > 3 ? ` · +${changes.length - 3} more` : '');
+              const summary = !ready ? 'Loading changes...' : number === 1 ? 'First saved version' : !changes.length ? 'No rooms or items added or removed.' : changes.slice(0, 2).map(change => change.label).join(' · ') + (changes.length > 2 ? ` · +${changes.length - 2} more` : '');
               return <li key={version.id} className={`overflow-hidden rounded-xl border ${expanded ? 'border-primary/50' : 'border-border'}`}>
                 <button type="button" aria-expanded={expanded} aria-controls={`version-${version.id}-changes`} disabled={restoring} className="w-full space-y-1.5 p-3 text-left text-sm transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:p-4" onClick={() => { setSelected(expanded ? null : number); setConfirm(false); }}>
                   <span className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 font-semibold">Version {number}{latest && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Latest</span>}</span><ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} /></span>
@@ -106,7 +106,7 @@ export function QuotationVersions({ quotationId, tiers = [], onRestored }: { quo
                   <span className="line-clamp-2 break-words text-sm leading-5 text-muted-foreground">{summary}</span>
                 </button>
                 {expanded && <div id={`version-${version.id}-changes`} className="space-y-4 border-t px-4 pb-4 pt-3">
-                  {ready && number > 1 && changes.length > 0 && <ul aria-label={`Changes in Version ${number}`} className="space-y-3">{changes.map((change, index) => <li key={index} className="min-w-0 break-words text-sm"><p className="font-medium">{change.label}</p><div className="mt-1 space-y-1 text-xs leading-5"><p className="text-muted-foreground">Before: {change.before}</p><p>After: {change.after}</p></div></li>)}</ul>}
+                  {ready && number > 1 && changes.length > 0 && <ul aria-label={`Changes in Version ${number}`} className="space-y-2">{changes.map((change, index) => <li key={index} className="flex min-w-0 items-start gap-2 break-words text-sm"><span aria-hidden="true" className="mt-0.5 shrink-0 text-muted-foreground">{change.kind === 'added' ? '+' : '−'}</span><span>{change.label}</span></li>)}</ul>}
                   {number === 1 && <p className="text-xs leading-5 text-muted-foreground">History starts with this saved version. Earlier edits are unavailable.</p>}
                   {latest ? <p className="text-xs text-muted-foreground">This is your current saved version.</p> : confirm ? <div className="space-y-3"><p className="text-sm">Restore Version {number}? Your current version will stay in history.</p><div className="grid grid-cols-2 gap-3 [&>button]:h-11 [&>button]:rounded-xl"><Button disabled={restoring} onClick={restore}>{restoring ? 'Reverting...' : 'Confirm revert'}</Button><Button variant="outline" disabled={restoring} onClick={() => setConfirm(false)}>Cancel</Button></div></div> : <Button aria-label="Revert to this version" className="h-11 w-full gap-2 rounded-xl" disabled={!ready || restoring} onClick={() => setConfirm(true)}><RotateCcw className="h-4 w-4" />Revert to Version {number}</Button>}
                 </div>}

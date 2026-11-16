@@ -1685,6 +1685,7 @@ export type Database = {
       }
     }
     Functions: {
+      admin_quotation_detail: { Args: { p_id: string }; Returns: Json }
       get_quotation_tiers: { Args: { p_id: string }; Returns: Json }
       name_quotation_tier: { Args: { p_id: string; p_name: string }; Returns: undefined }
       create_quotation_tier: { Args: { p_source_id: string; p_name: string }; Returns: Json }
