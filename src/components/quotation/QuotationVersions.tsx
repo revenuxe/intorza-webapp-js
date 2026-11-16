@@ -1,22 +1,21 @@
-'use client';
+﻿'use client';
 import { useEffect, useState } from 'react';
-import { History, RotateCcw } from 'lucide-react';
+import { ChevronDown, History, RotateCcw } from 'lucide-react';
 import { quotationsApi } from '@/lib/api';
 import { quotationVersionChanges, type QuotationVersion, type QuotationVersionDetail } from '@/lib/quotationVersions';
 import { useLocalization } from '@/hooks/useLocalization';
-import { formatItemDetails } from '@/lib/itemSpecifications';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export function QuotationVersions({ quotationId, onRestored }: { quotationId: string; onRestored: () => Promise<void> }) {
-  const { formatCurrency, formatDateShort } = useLocalization();
+  const { formatDateShort } = useLocalization();
   const [open, setOpen] = useState(false);
   const [versions, setVersions] = useState<QuotationVersion[]>([]);
+  const [details, setDetails] = useState<Record<number, QuotationVersionDetail>>({});
   const [selected, setSelected] = useState<number | null>(null);
-  const [detail, setDetail] = useState<QuotationVersionDetail | null>(null);
-  const [previous, setPrevious] = useState<QuotationVersionDetail | null>(null);
+  const [visibleCount, setVisibleCount] = useState(10);
   const [loading, setLoading] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
+  const [summariesLoading, setSummariesLoading] = useState(false);
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -26,30 +25,40 @@ export function QuotationVersions({ quotationId, onRestored }: { quotationId: st
   useEffect(() => {
     if (!open) return;
     let active = true;
-    setLoading(true); setError(''); setVersions([]); setDetail(null); setSelected(null); setConfirm(false);
+    setLoading(true); setError(''); setVersions([]); setDetails({});
+    setSelected(null); setVisibleCount(10); setConfirm(false);
     quotationsApi.versions(quotationId).then(({ data }) => {
-      if (active) { setVersions(data); setSelected(data[0]?.version_number ?? null); }
+      if (active) setVersions(data);
     }).catch(() => { if (active) setError('Could not load version history. Please try again.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [open, quotationId, refresh]);
 
   useEffect(() => {
-    if (!open || selected === null) return;
+    if (!open || !versions.length) return;
     let active = true;
-    setDetailLoading(true); setDetail(null); setPrevious(null); setError(''); setConfirm(false);
-    Promise.all([
-      quotationsApi.version(quotationId, selected),
-      selected > 1 ? quotationsApi.version(quotationId, selected - 1) : Promise.resolve(null),
-    ]).then(([current, before]) => {
-      if (active) { setDetail(current.data); setPrevious(before?.data ?? null); }
-    }).catch(() => { if (active) setError('Could not load this version. Please try again.'); })
-      .finally(() => { if (active) setDetailLoading(false); });
+    // One page plus its preceding snapshot; reuse cached snapshots and bound requests.
+    const pending = versions.slice(0, visibleCount + 1).filter(version => !details[version.version_number]);
+    let cursor = 0;
+    setSummariesLoading(true);
+    const worker = async () => {
+      while (active && cursor < pending.length) {
+        const version = pending[cursor++];
+        const { data } = await quotationsApi.version(quotationId, version.version_number);
+        if (active) setDetails(current => ({ ...current, [version.version_number]: data }));
+      }
+    };
+    Promise.allSettled(Array.from({ length: Math.min(3, pending.length) }, worker))
+      .then(results => { if (active && results.some(result => result.status === 'rejected')) setError('Some changes could not be loaded. Refresh versions to try again.'); })
+      .finally(() => { if (active) setSummariesLoading(false); });
     return () => { active = false; };
-  }, [open, quotationId, selected, refresh]);
+    // Cache updates must not restart requests already in flight.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, quotationId, versions, visibleCount]);
 
   const restore = async () => {
-    if (!detail || !versions[0] || restoring) return;
+    const detail = selected === null ? null : details[selected];
+    if (!detail || !versions[0] || selected === versions[0].version_number || restoring) return;
     setRestoring(true); setError('');
     try {
       await quotationsApi.revertVersion(quotationId, detail.id, versions[0].version_number);
@@ -61,58 +70,44 @@ export function QuotationVersions({ quotationId, onRestored }: { quotationId: st
       setError(cause instanceof Error ? cause.message : 'Could not revert this version. Please try again.');
     } finally { setRestoring(false); }
   };
-  const changes = detail ? quotationVersionChanges(previous?.snapshot ?? null, detail.snapshot) : [];
-  const snapshot = detail?.snapshot;
-  const latest = detail?.version_number === versions[0]?.version_number;
 
   return <>
     <Button variant="outline" className="gap-2" onClick={() => { setNotice(''); setOpen(true); }}><History className="h-4 w-4" />Versions</Button>
     <Dialog open={open} onOpenChange={value => { if (!restoring) setOpen(value); }}>
-      <DialogContent className="flex max-h-[90dvh] max-w-4xl flex-col overflow-hidden">
-        <DialogHeader className="pr-6">
-          <DialogTitle>Quotation versions</DialogTitle>
-          <DialogDescription>View saved versions and restore an earlier one. Reverting keeps your history and creates a new saved version.</DialogDescription>
+      <DialogContent className="flex max-h-[90dvh] w-[calc(100%-1rem)] max-w-lg flex-col gap-4 overflow-hidden p-4 sm:p-6">
+        <DialogHeader className="shrink-0 pr-6 text-left">
+          <DialogTitle>Version history</DialogTitle>
+          <DialogDescription>See what changed. Tap a version to restore it.</DialogDescription>
         </DialogHeader>
         {notice && <p role="status" className="rounded-lg bg-primary/5 p-3 text-sm">{notice}</p>}
         {error && <div role="alert" className="space-y-2 rounded-lg border border-destructive/30 p-3 text-sm"><p>{error}</p><Button variant="outline" size="sm" disabled={restoring} onClick={() => setRefresh(value => value + 1)}>Refresh versions</Button></div>}
-        {loading ? <p role="status" className="py-6 text-sm text-muted-foreground">Loading versions...</p> : !versions.length && !error ? <p className="py-6 text-sm text-muted-foreground">No saved versions yet. History starts with the current saved quotation; earlier edits are unavailable.</p> : <div className="grid min-h-0 gap-4 overflow-y-auto md:grid-cols-[12rem_minmax(0,1fr)]">
-          <nav aria-label="Saved quotation versions" className="flex gap-2 overflow-x-auto pb-2 md:flex-col md:overflow-x-visible">
-            {versions.map(version => <button key={version.id} type="button" disabled={restoring} aria-current={selected === version.version_number ? 'true' : undefined}
-              className={`shrink-0 rounded-xl border p-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${selected === version.version_number ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'}`}
-              onClick={() => { setNotice(''); setSelected(version.version_number); }}>
-              <span className="block font-semibold">Version {version.version_number}{version.version_number === versions[0]?.version_number && <span className="ml-2 text-xs font-normal text-primary">Latest</span>}</span>
-              <span className="mt-1 block text-xs text-muted-foreground">{formatDateShort(version.saved_at)} · {new Date(version.saved_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-            </button>)}
-          </nav>
-          <div className="min-w-0 space-y-4">
-            {detailLoading && <p role="status" className="py-6 text-sm text-muted-foreground">Loading saved quotation...</p>}
-            {detail && snapshot && <>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h3 className="font-semibold">Version {detail.version_number}</h3>
-                <Button variant="outline" className="gap-2" disabled={latest || restoring} onClick={() => setConfirm(true)}><RotateCcw className="h-4 w-4" />{latest ? 'Latest version' : 'Revert to this version'}</Button>
-              </div>
-              {confirm && <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
-                <p className="text-sm">Restore Version {detail.version_number}? This replaces the current quotation details, rooms, items, and prices. Your current version stays in history.</p>
-                <div className="flex flex-wrap gap-2"><Button disabled={restoring} onClick={restore}>{restoring ? 'Reverting...' : 'Confirm revert'}</Button><Button variant="outline" disabled={restoring} onClick={() => setConfirm(false)}>Cancel</Button></div>
-              </div>}
-              <section className="space-y-3 rounded-xl border p-4" aria-label="Version changes">
-                <h4 className="text-sm font-semibold">{previous ? `Changes from Version ${previous.version_number}` : 'First recorded version'}</h4>
-                {!previous ? <p className="text-sm text-muted-foreground">History starts here. Edits made before version history was enabled are unavailable.</p> : changes.length ? <ul className="space-y-3">{changes.map((change, index) => <li key={index} className="min-w-0 break-words text-sm"><p className="font-medium">{change.label}</p><p className="mt-1 text-muted-foreground"><span className="line-through">{change.before}</span><span aria-hidden="true"> → </span><span className="sr-only"> changed to </span><span className="text-foreground">{change.after}</span></p></li>)}</ul> : <p className="text-sm text-muted-foreground">Saved without content changes.</p>}
-              </section>
-              <section className="space-y-4 rounded-xl border p-4" aria-label="Saved quotation">
-                <div><h4 className="break-words font-semibold">{String(snapshot.quotation_title || snapshot.project_name || 'Quotation')}</h4><p className="mt-1 break-words text-sm text-muted-foreground">{String(snapshot.client_name || 'Client to be confirmed')}</p><p className="mt-2 text-lg font-semibold text-primary">{formatCurrency(Number(snapshot.grand_total || 0), true)}</p></div>
-                <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{[
-                  ['Client address', snapshot.client_address], ['Project location', snapshot.place_of_project],
-                  ['Proposal date', snapshot.date_of_proposal], ['Valid till', snapshot.valid_till],
-                  ['Project deadline', snapshot.project_deadline], ['Project type', snapshot.project_type],
-                  ['Warranty', snapshot.warranty], ['Status', snapshot.status], ['Notes', snapshot.notes],
-                ].map(([label, value]) => <div key={String(label)} className="min-w-0 break-words"><dt className="text-muted-foreground">{String(label)}</dt><dd>{String(value || '—')}</dd></div>)}</dl>
-                {snapshot.sections.map((section, index) => <div key={index} className="space-y-3 border-t pt-3"><h5 className="break-words text-sm font-semibold">{section.section_name}</h5>{section.items.map((item, itemIndex) => <div key={itemIndex} className="space-y-1 rounded-lg bg-muted/40 p-3 text-sm"><p className="break-words font-medium">{item.product_name}</p><p className="whitespace-pre-wrap break-words text-muted-foreground">{formatItemDetails(item.product_details, item.specifications)}</p><p className="text-muted-foreground">{Number(item.sft_area || 0)} {item.measurement_unit || 'Sq.ft'} × {formatCurrency(Number(item.rate_per_sft || 0), true)}</p><p className="font-semibold">{formatCurrency(Number(item.amount || 0), true)}</p></div>)}</div>)}
-                <dl className="space-y-2 border-t pt-3 text-sm">{[['Subtotal', snapshot.subtotal], ['Discount', snapshot.discount_amount], ['Tax', snapshot.gst_amount], ['Grand total', snapshot.grand_total]].map(([label, value]) => <div key={String(label)} className="flex justify-between gap-3"><dt>{String(label)}</dt><dd className="font-medium tabular-nums">{formatCurrency(Number(value || 0), true)}</dd></div>)}</dl>
-              </section>
-            </>}
-          </div>
-        </div>}
+        <div className="min-h-0 space-y-3 overflow-y-auto overscroll-y-contain pb-1">
+          {loading ? <p role="status" className="py-6 text-sm text-muted-foreground">Loading versions...</p> : !versions.length && !error ? <p className="py-6 text-sm text-muted-foreground">No saved versions yet.</p> : <ul aria-label="Saved quotation versions" className="space-y-3">
+            {versions.slice(0, visibleCount).map(version => {
+              const number = version.version_number;
+              const detail = details[number];
+              const previous = details[number - 1];
+              const ready = Boolean(detail && (number === 1 || previous));
+              const changes = ready ? quotationVersionChanges(previous?.snapshot ?? null, detail.snapshot) : [];
+              const expanded = selected === number;
+              const latest = number === versions[0]?.version_number;
+              const summary = !ready ? 'Loading changes...' : number === 1 ? 'First saved version' : !changes.length ? 'Saved without changes' : changes.slice(0, 3).map(change => change.label).join(' · ') + (changes.length > 3 ? ` · +${changes.length - 3} more` : '');
+              return <li key={version.id} className={`overflow-hidden rounded-xl border ${expanded ? 'border-primary/50' : 'border-border'}`}>
+                <button type="button" aria-expanded={expanded} aria-controls={`version-${version.id}-changes`} disabled={restoring} className="w-full space-y-2 p-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary" onClick={() => { setSelected(expanded ? null : number); setConfirm(false); }}>
+                  <span className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 font-semibold">Version {number}{latest && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">Latest</span>}</span><ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} /></span>
+                  <span className="block text-xs text-muted-foreground">{formatDateShort(version.saved_at)} · {new Date(version.saved_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="line-clamp-2 break-words text-sm leading-5 text-muted-foreground">{summary}</span>
+                </button>
+                {expanded && <div id={`version-${version.id}-changes`} className="space-y-4 border-t px-4 pb-4 pt-3">
+                  {ready && number > 1 && changes.length > 0 && <ul aria-label={`Changes in Version ${number}`} className="space-y-3">{changes.map((change, index) => <li key={index} className="min-w-0 break-words text-sm"><p className="font-medium">{change.label}</p><div className="mt-1 space-y-1 text-xs leading-5"><p className="text-muted-foreground">Before: {change.before}</p><p>After: {change.after}</p></div></li>)}</ul>}
+                  {number === 1 && <p className="text-xs leading-5 text-muted-foreground">History starts with this saved version. Earlier edits are unavailable.</p>}
+                  {latest ? <p className="text-xs text-muted-foreground">This is your current saved version.</p> : confirm ? <div className="space-y-3"><p className="text-sm">Restore Version {number}? Your current version will stay in history.</p><div className="grid grid-cols-2 gap-3 [&>button]:h-11 [&>button]:rounded-xl"><Button disabled={restoring} onClick={restore}>{restoring ? 'Reverting...' : 'Confirm revert'}</Button><Button variant="outline" disabled={restoring} onClick={() => setConfirm(false)}>Cancel</Button></div></div> : <Button aria-label="Revert to this version" className="h-11 w-full gap-2 rounded-xl" disabled={!ready || restoring} onClick={() => setConfirm(true)}><RotateCcw className="h-4 w-4" />Revert to Version {number}</Button>}
+                </div>}
+              </li>;
+            })}
+          </ul>}
+          {visibleCount < versions.length && <Button variant="outline" className="h-11 w-full rounded-xl" disabled={summariesLoading || restoring} onClick={() => setVisibleCount(count => count + 10)}>Show older versions</Button>}
+        </div>
       </DialogContent>
     </Dialog>
   </>;

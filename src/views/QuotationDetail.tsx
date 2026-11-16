@@ -23,6 +23,7 @@ import { getQuotationSettings } from "@/components/CustomizeFieldsDrawer";
 import { getLibraryTerms } from "@/lib/libraryDefaults";
 import { QuotationVersions } from '@/components/quotation/QuotationVersions';
 import { QuotationTiers } from '@/components/quotation/QuotationTiers';
+import { QuotationOptionScroller } from '@/components/quotation/QuotationOptionScroller';
 import { quotationsApi } from '@/lib/api';
 import { tierQuotationTitle, type QuotationTierGroup } from '@/lib/quotationTiers';
 
@@ -415,12 +416,12 @@ const QuotationDetail = () => {
       {feedback}
       <div className="flex flex-col gap-6">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={() => navigate('/quotations')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <div className="flex gap-2 flex-wrap">
+          <div aria-label="Quotation actions" className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto sm:flex-wrap [&>button]:h-12 [&>button]:min-w-0 [&>button]:rounded-xl sm:[&>button]:h-11">
             <QuotationVersions quotationId={quotation.id} onRestored={() => loadQuotation(true)} />
             {tierGroup && <QuotationTiers group={tierGroup} activeId={quotation.id} onRefresh={() => loadQuotation(true)}
               onSelect={tierId => navigate(`/quotations/${tierGroup.root_id}${tierId === tierGroup.root_id ? '' : `?tier=${tierId}`}`)}
@@ -439,7 +440,7 @@ const QuotationDetail = () => {
           </div>
         </div>
 
-        {tierGroup?.tiers[0]?.tier_name && <div className="space-y-2"><p className="text-sm text-muted-foreground">Choose a tier. Client details are shared across these options.</p><nav aria-label="Quotation tiers" className="flex flex-wrap gap-2">{tierGroup.tiers.map(tier => <Button key={tier.id} variant={tier.id === quotation.id ? 'default' : 'outline'} aria-current={tier.id === quotation.id ? 'page' : undefined} onClick={() => navigate(`/quotations/${tierGroup.root_id}${tier.id === tierGroup.root_id ? '' : `?tier=${tier.id}`}`)}>{tier.tier_name} · {formatCurrency(tier.grand_total || 0,true)}</Button>)}</nav></div>}
+        {tierGroup?.tiers[0]?.tier_name && <section className="min-w-0 space-y-1" aria-label="Choose a quotation tier"><h2 className="text-sm font-semibold">Choose your tier</h2><p className="text-xs leading-5 text-muted-foreground">Same client. Different options and prices.</p><QuotationOptionScroller label="Quotation tiers" activeKey={quotation.id}>{tierGroup.tiers.map(tier => <Button key={tier.id} variant={tier.id === quotation.id ? 'default' : 'outline'} className="h-auto min-h-20 w-44 flex-col items-start gap-1 rounded-xl px-4 py-3 text-left" aria-current={tier.id === quotation.id ? 'page' : undefined} onClick={() => navigate(`/quotations/${tierGroup.root_id}${tier.id === tierGroup.root_id ? '' : `?tier=${tier.id}`}`)}><span className="w-full truncate text-sm font-semibold">{tier.tier_name}</span><span className="text-sm tabular-nums">{formatCurrency(tier.grand_total || 0,true)}</span></Button>)}</QuotationOptionScroller></section>}
 
         {/* Action Buttons */}
         {quotation.status !== 'converted' && (
