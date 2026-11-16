@@ -25,7 +25,7 @@ export function QuotationItemFields({ item, onChange, onRemember, patterns = [],
   const details = splitItemDetails(item.productDetails);
   const selectedId = useRef<string | undefined>(undefined);
   const selecting = useRef(false);
-  return <div className="contents" onBlur={event => {
+  return <div className="min-w-0 space-y-4" onBlur={event => {
     if (selecting.current) { selecting.current = false; return; }
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) onRemember?.({ ...item, ratePerSft: item.ratePerSft || null }, selectedId.current);
   }}>

@@ -37,7 +37,7 @@ export function ItemSpecifications({ value, onChange }: { value: string; onChang
     if (fields.some(field => field.label.toLowerCase() === clean.toLowerCase())) { setError('This field has already been added.'); return; }
     setFields(current => [...current, { label: clean, value: '' }]); setError(''); setCustom(false); setCustomLabel(''); setFieldPicker(false);
   };
-  return <div className="min-w-0 pt-3">
+  return <div className="min-w-0">
     <Button type="button" variant="ghost" size="sm" aria-expanded={open} aria-controls={`${id}-fields`} onClick={() => setOpen(current => !current)} className="h-auto gap-1.5 px-0 py-1 text-primary hover:bg-transparent"><Plus className="h-3.5 w-3.5" />{fields.some(field => field.value.trim()) ? `Specifications (${fields.filter(field => field.value.trim()).length})` : 'Add specifications'}<ChevronDown className={`ml-1 h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} /></Button>
     {open && <div id={`${id}-fields`} className="mt-3 space-y-3 rounded-xl border bg-background/70 p-3 sm:p-4">
       <p className="text-xs text-muted-foreground">Add only what this item needs. Choose a suggestion or type your own value.</p>
