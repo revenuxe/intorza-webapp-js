@@ -203,6 +203,49 @@ const compressImage = async (imageUrl: string, maxWidth: number, maxHeight: numb
   });
 };
 
+// Keep signature strokes at source resolution and remove blank scan margins.
+const prepareSignatureImage = async (imageUrl: string): Promise<string> => {
+  const source = await resolveCompanyAssetUrl(imageUrl);
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const timeout = setTimeout(() => reject(new Error('Signature load timeout')), 10000);
+    img.onerror = () => { clearTimeout(timeout); reject(new Error('Failed to load signature')); };
+    img.onload = () => {
+      clearTimeout(timeout);
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Canvas context not available');
+        ctx.drawImage(img, 0, 0);
+        const { data: pixels } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        let left = canvas.width, top = canvas.height, right = -1, bottom = -1;
+        for (let y = 0; y < canvas.height; y++) {
+          for (let x = 0; x < canvas.width; x++) {
+            const i = (y * canvas.width + x) * 4;
+            // Ignore transparent and nearly white background pixels.
+            const darkness = (255 - Math.min(pixels[i], pixels[i + 1], pixels[i + 2])) * pixels[i + 3] / 255;
+            if (darkness < 40) continue;
+            left = Math.min(left, x); right = Math.max(right, x);
+            top = Math.min(top, y); bottom = Math.max(bottom, y);
+          }
+        }
+        if (right < left) throw new Error('Signature image is blank');
+        const cropped = document.createElement('canvas');
+        cropped.width = right - left + 1;
+        cropped.height = bottom - top + 1;
+        const croppedContext = cropped.getContext('2d');
+        if (!croppedContext) throw new Error('Canvas context not available');
+        croppedContext.drawImage(canvas, left, top, cropped.width, cropped.height, 0, 0, cropped.width, cropped.height);
+        resolve(cropped.toDataURL('image/png'));
+      } catch (error) { reject(error); }
+    };
+    img.src = source;
+  });
+};
+
 // --- Main Generator Function ---
 
 export const generateQuotationPDF = async (data: QuotationData) => {
@@ -1506,8 +1549,13 @@ export const generateQuotationPDF = async (data: QuotationData) => {
     
     if (data.signatureUrl) {
       try {
-        let compressedSig = await compressImage(data.signatureUrl, 150, 60);
-        doc.addImage(compressedSig, 'JPEG', companySignX, yPosition - 5, 50, 15);
+        const signature = await prepareSignatureImage(data.signatureUrl);
+        const properties = doc.getImageProperties(signature);
+        const scale = Math.min(60 / properties.width, 18 / properties.height);
+        const width = properties.width * scale;
+        const height = properties.height * scale;
+        const signatureLineY = yPosition + 20;
+        doc.addImage(signature, 'PNG', companySignX + (signBoxWidth - width) / 2, signatureLineY - 2 - height, width, height);
       } catch (e) {}
     }
 
