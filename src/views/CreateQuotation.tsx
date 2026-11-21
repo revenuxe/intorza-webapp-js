@@ -1,7 +1,7 @@
 "use client";
 import { addDays, format, parseISO } from 'date-fns';
 import { useQuotationLibrarySuggestions } from "@/hooks/useQuotationLibrarySuggestions";
-import { ProjectTypeFields, residentialProjectType } from "@/components/quotation/ProjectTypeFields";
+import { ProjectTypeFields } from "@/components/quotation/ProjectTypeFields";
 import { getDraftReference, clearDraftReference } from "@/lib/draft-quotation-reference";
 
 
@@ -1242,12 +1242,14 @@ const QuotationEditor = () => {
                   <Label htmlFor="warranty" className="whitespace-nowrap">Warranty</Label>
                   <Input id="warranty" className="h-12" type="number" value={warranty} onChange={e => setWarranty(e.target.value)} placeholder="10" />
                 </div>}
-              {(customizeSettings.showPlaceOfProject || customizeSettings.showProjectType) && <div className={`col-span-2 grid items-end gap-x-5 gap-y-5 sm:gap-x-6 ${customizeSettings.showPlaceOfProject && customizeSettings.showProjectType && !residentialProjectType(projectType) ? "grid-cols-2" : "grid-cols-1"}`}>
-              {customizeSettings.showPlaceOfProject && <div className="min-w-0 space-y-2">
+              {(customizeSettings.showPlaceOfProject || customizeSettings.showProjectType) && <div className="col-span-2 min-w-0">
+              {customizeSettings.showProjectType ? <ProjectTypeFields value={projectType} onChange={setProjectType} placeField={customizeSettings.showPlaceOfProject ? <div className="min-w-0 space-y-2">
+                  <Label htmlFor="placeOfProject">Place of Project</Label>
+                  <Input id="placeOfProject" className="h-12" placeholder="Enter location" value={placeOfProject} onChange={e => setPlaceOfProject(e.target.value)} />
+                </div> : undefined} /> : customizeSettings.showPlaceOfProject && <div className="min-w-0 space-y-2">
                   <Label htmlFor="placeOfProject">Place of Project</Label>
                   <Input id="placeOfProject" placeholder="Enter location" value={placeOfProject} onChange={e => setPlaceOfProject(e.target.value)} />
                 </div>}
-              {customizeSettings.showProjectType && <ProjectTypeFields value={projectType} onChange={setProjectType} />}
               </div>}
               {!profile.logo_url && <div className="col-span-2 space-y-2 p-3 bg-muted/30 rounded-lg">
                   <p className="text-sm text-muted-foreground">

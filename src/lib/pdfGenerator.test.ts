@@ -166,6 +166,14 @@ it.each([true, false])('exports canonical structured specifications without a le
 });
 
 // The same generator powers live preview and the downloaded PDF.
+it('prints compact floor home layouts in the preview and exported PDF', async () => {
+ const pdf = await generateQuotationPDF({ ...quotationData, projectType: 'Residential | Floors: G+2 | Homes: Ground Floor=1 BHK; First Floor=2 BHK; Second Floor=2 BHK', settings: { ...getQuotationSettings(), showProjectDetails: true } });
+ const content = pdf.internal.pages.flat().join('\n');
+ expect(content).toContain('G 1 BHK');
+ expect(content).toContain('1F 2 BHK');
+ expect(content).toContain('2F 2 BHK');
+ expect(content).not.toMatch(/Homes:|Floors:|Ground Floor|First Floor|Second Floor/);
+});
 it('balances the two-card header between project identity and quotation metadata', async () => {
  const pdf = await generateQuotationPDF({ ...quotationData, referenceNo: 'QNO-0001AZ', projectDeadline: '2026-12-01', settings: { ...getQuotationSettings(), showProjectDetails: true }, editorSettings: { ...quotationData.editorSettings!, headerInfoColumns: 2 } });
  const content=pdf.internal.pages.flat().join('\n');

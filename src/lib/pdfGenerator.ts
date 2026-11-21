@@ -1,4 +1,5 @@
 import { formatItemDetails, type ItemSpecification } from './itemSpecifications';
+import { displayProjectTypeDetails } from './projectTypeDetails';
 import { getQuotationUnit, isAreaUnit, projectAreaSqft } from './quotationUnits';
 import { resolveCompanyAssetUrl } from '@/lib/company-assets';
 
@@ -249,6 +250,7 @@ const prepareSignatureImage = async (imageUrl: string): Promise<string> => {
 // --- Main Generator Function ---
 
 export const generateQuotationPDF = async (data: QuotationData) => {
+  data = { ...data, projectType: displayProjectTypeDetails(data.projectType || '') };
   const doc = new jsPDF({
     orientation: 'p',
     unit: 'mm',
