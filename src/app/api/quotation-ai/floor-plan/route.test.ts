@@ -3,7 +3,7 @@ import { POST } from './route';
 import { createClient } from '@supabase/supabase-js';
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
-import { OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
+import { MarketResearchError, OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
 import { OpenAIEstimateCompletion, applyCompletion, completionItems } from '@/lib/quotation-ai/estimate-completion';
 import { briefFixture, draftFixture, planFixture, proposalFixture } from '@/test/floor-plan-fixtures';
 import { buildEstimate, type Estimate } from '@/lib/quotation-ai/floor-plan';
@@ -327,6 +327,24 @@ it('automatically finishes all default full-interior items when research returns
   expect(items.every(item => item.widthFt > 0 && item.heightFt > 0 && item.ratePerSft > 0 && item.amount > 0)).toBe(true);
   expect(estimate.evidence.every(row => row.price.source === 'ai_estimate' && !row.reason.includes('Price pending'))).toBe(true);
   expect(OpenAIEstimateCompletion).toHaveBeenCalledWith('secret', 'gpt-6-astra');
+});
+it.each(['configuration', 'rate_limit', 'timeout', 'incomplete', 'invalid_output'] as const)('preserves generation and automatic completion when market research fails: %s', async code => {
+  research.mockRejectedValue(new MarketResearchError(code, 'Search failed'));
+  const response = await POST(request({ ...payload(), brief: { ...briefFixture(), automatic: true } }));
+  expect(response.status).toBe(200);
+  const { estimate } = await response.json();
+  expect(estimate.assumptions.some((note: string) => note.includes(`Live market research was unavailable (${code})`))).toBe(true);
+  expect(estimate.evidence.every((row: { price: { source: string } | null }) => row.price?.source !== 'market_estimate')).toBe(true);
+  expect(autoComplete).toHaveBeenCalled();
+  expect(insert).toHaveBeenCalledWith('quotation_plan_projects', expect.anything());
+  expect(rpc).not.toHaveBeenCalledWith('confirm_quotation_coin_delivery', expect.anything());
+});
+it('does not swallow unexpected market research errors', async () => {
+  research.mockRejectedValueOnce(new Error('Unexpected failure'));
+  const response = await POST(request(payload()));
+  expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({ stage: 'pricing', code: 'AI_SERVICE_UNAVAILABLE' });
+  expect(insert).not.toHaveBeenCalledWith('quotation_plan_projects', expect.anything());
 });
 it('does not save an apparently complete quotation when automatic estimation fails', async () => {
   autoComplete.mockRejectedValueOnce(new Error('Estimation model unavailable. Retry automatic estimation.'));

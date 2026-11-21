@@ -1,7 +1,44 @@
 /** @jest-environment node */
-import { OpenAIWebMarketPricing, resolveMarketEvidence, type ResearchInput } from './market-pricing';
+import { MarketResearchError, researchMarketBatches, OpenAIWebMarketPricing, resolveMarketEvidence, type ResearchInput } from './market-pricing';
 const now = new Date('2026-10-15T00:00:00Z');
 const input: ResearchInput = { products: [{ name: 'Wardrobe', specification: 'Laminate wardrobe installed' }], location: 'Bengaluru', currency: 'INR', finish: 'Standard' };
+it('runs at most two market batches concurrently and preserves input order', async () => {
+  let active = 0; let peak = 0;
+  const research = jest.fn(async (batch: ResearchInput) => {
+    active++; peak = Math.max(peak, active);
+    await new Promise(resolve => setTimeout(resolve, 1));
+    active--;
+    return { rates: [], limitations: [batch.location] };
+  });
+  const result = await researchMarketBatches({ research }, ['A','B','C','D'].map(location => ({ ...input, location })), new AbortController().signal, jest.fn());
+  expect(peak).toBe(2);
+  expect(result.limitations).toEqual(['A','B','C','D']);
+});
+it.each(['configuration', 'rate_limit'] as const)('stops queueing searches after %s failures', async code => {
+  const research = jest.fn().mockRejectedValue(new MarketResearchError(code, 'Unavailable'));
+  const result = await researchMarketBatches({ research }, Array(5).fill(input), new AbortController().signal, jest.fn());
+  expect(research).toHaveBeenCalledTimes(2);
+  expect(result.limitations).toHaveLength(5);
+});
+it('shares one deadline across all batches instead of waiting a timeout per batch', async () => {
+  jest.useFakeTimers();
+  try {
+    const research = jest.fn((_input, signal: AbortSignal) => new Promise<never>((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new MarketResearchError('timeout', 'Expired')), { once: true });
+    }));
+    const pending = researchMarketBatches({ research }, Array(5).fill(input), new AbortController().signal, jest.fn(), 30000);
+    await jest.advanceTimersByTimeAsync(30000);
+    const result = await pending;
+    expect(research).toHaveBeenCalledTimes(2);
+    expect(result.limitations).toHaveLength(5);
+    expect(result.rates).toEqual([]);
+  } finally { jest.useRealTimers(); }
+});
+it('propagates user cancellation instead of returning a fallback estimate', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await expect(researchMarketBatches({ research: jest.fn() }, [input], controller.signal, jest.fn())).rejects.toThrow();
+});
 const sample = (url = 'https://supplier.example/wardrobe', low = 1000, high = 1400) => ({ productName: 'Wardrobe', specification: 'Laminate wardrobe installed', low, high, unit: 'sqft', currency: 'INR', location: 'Bengaluru', sourceUrl: url, sourceName: 'Supplier', publishedDate: '2026-10-01', tax: 'excluded', sellingRate: true, installationIncluded: true, comparable: true, inclusions: 'Hardware and installation included', quote: 'Installed wardrobe rate 1000–1400 per sqft excluding GST' });
 const resolve = (rows: unknown[], urls = ['https://supplier.example/wardrobe']) => resolveMarketEvidence({ observations: rows, limitations: [] }, urls, input, now);
 it.each(['Basic', 'Premium', 'Luxury'])('requires source-supported %s evidence instead of generic or different-tier prices', finish => {
@@ -56,6 +93,16 @@ it('does not fabricate a fallback if search fails or the model never searches', 
 it('reports search model configuration failures explicitly instead of hiding them as missing sources', async () => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400 });
   await expect(new OpenAIWebMarketPricing('secret', 'configured-model').research(input, new AbortController().signal)).rejects.toThrow('OPENAI_MARKET_MODEL');
+});
+it.each([null, {}, { status: 'completed', output: null }])('classifies malformed search responses for graceful fallback: %j', result => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => result });
+  return expect(new OpenAIWebMarketPricing('secret', 'configured-model').research(input, new AbortController().signal))
+    .rejects.toMatchObject({ code: 'invalid_output' });
+});
+it('classifies an unreadable upstream response for graceful fallback', async () => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => { throw new SyntaxError('Invalid JSON'); } });
+  await expect(new OpenAIWebMarketPricing('secret', 'configured-model').research(input, new AbortController().signal))
+    .rejects.toMatchObject({ code: 'invalid_output' });
 });
 it('sends a bounded search request and accepts only URLs returned by that search', async () => {
   const row = { ...sample(), publishedDate: new Date().toISOString().slice(0, 10) };

@@ -10,7 +10,7 @@ import { draftSchema, itemCalculation } from '@/lib/quotation-ai/domain';
 import { OpenAIFloorPlanProvider } from '@/lib/quotation-ai/floor-plan-provider';
 import { ProviderError } from '@/lib/quotation-ai/provider';
 import { AI_SERVICE_ISSUE } from '@/lib/quotation-ai/service-issue';
-import { OpenAIWebMarketPricing } from '@/lib/quotation-ai/market-pricing';
+import { researchMarketBatches, OpenAIWebMarketPricing, type ResearchInput } from '@/lib/quotation-ai/market-pricing';
 import { OpenAIEstimateCompletion } from '@/lib/quotation-ai/estimate-completion';
 import { finishTierGuidance, rateSupportsFinishTier, tierPricingSpecification } from '@/lib/quotation-ai/finish-tier';
 import { formatItemDetails } from '@/lib/itemSpecifications';
@@ -348,14 +348,19 @@ export async function POST(request: Request) {
           && products.some(product => product.name === rate.name && product.specification === rate.description && rateSupportsFinishTier(rate, product.finishTier)));
       rates.push(...cached);
       const uncached = products.filter(product => !cached.some(rate => rate.name === product.name && rate.description === product.specification));
+      const researchInputs: ResearchInput[] = [];
       for (const finishTier of new Set(uncached.map(product => product.finishTier))) {
         const tierProducts = uncached.filter(product => product.finishTier === finishTier);
         for (let offset = 0; offset < tierProducts.length; offset += 12) {
-          const research = await new OpenAIWebMarketPricing(key, env.OPENAI_MARKET_MODEL || process.env.OPENAI_MARKET_MODEL || model)
-            .research({ products: tierProducts.slice(offset, offset + 12), location: brief.location, currency, finish: finishTier }, request.signal);
-          rates.push(...research.rates.filter(rate => rateSupportsFinishTier(rate, finishTier))); researchLimitations.push(...research.limitations);
+          researchInputs.push({ products: tierProducts.slice(offset, offset + 12), location: brief.location, currency, finish: finishTier });
         }
       }
+      const research = await researchMarketBatches(
+        new OpenAIWebMarketPricing(key, env.OPENAI_MARKET_MODEL || process.env.OPENAI_MARKET_MODEL || model),
+        researchInputs, request.signal,
+        code => console.error('floor_plan_market_research_failed', { requestId, stage, code }),
+      );
+      rates.push(...research.rates); researchLimitations.push(...research.limitations);
       if (cached.length) researchLimitations.push('Some market evidence is cached from this project within the last 24 hours; retrieval dates are shown.');
     } else if (products.length) researchLimitations.push('Live pricing research is disabled or the project city is unknown. Enter a city or review pending rates.');
     for (const section of proposal.sections) for (const item of section.items) {
@@ -367,6 +372,7 @@ export async function POST(request: Request) {
         if (close) { rates.push(close); item.rateId = close.id; }
       }
     }
+    stage = 'estimate';
     let estimate = buildEstimate(proposal, analysis, requestedBrief, rates, draft);
     if (previousEstimate && action !== 'retry_pricing') estimate = preserveRefinedItems(previousEstimate, estimate, requestedBrief);
     if (!estimate.draft.sections.some(section => section.items.length)) throw new InputError('Your requirements leave no quotation work. Include at least one item or update the selected rooms.', 400);

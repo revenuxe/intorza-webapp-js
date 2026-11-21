@@ -17,6 +17,12 @@ const row = (patch: Partial<ReferencePrice> = {}): ReferencePrice => ({
   median_rate: 1300, low_rate: 900, high_rate: 1800, recent_source_count: 5,
   recent_rate: 1400, recent_low: 1200, recent_high: 1600, ...patch,
 });
+it('prefers a compatible owner library price even when an admin price has an exact description', () => {
+  const admin = referencePriceEvidence([row()], 'INR', 'Bengaluru');
+  const owner = { ...admin[0], id: 'owner', source: 'approved' as const, description: '18mm plywood', rate: 1550 };
+  expect(matchingReferenceRate([...admin, owner], 'Wardrobe', 'laminate. 18mm plywood')?.id).toBe('owner');
+  expect(matchingReferenceRate([...admin, { ...owner, description: '18mm MDF acrylic' }], 'Wardrobe', 'laminate. 18mm plywood')?.id).toBe('laminate');
+});
 it('uses the recent aggregate median with range and source count, accepting normalized cities', () => {
   const [price] = referencePriceEvidence([row()], 'INR', ' Bengaluru ');
   expect(price).toMatchObject({ rate: 1400, range: { low: 1200, high: 1600 }, confidence: 'medium' });

@@ -1,7 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import type { PriceEvidence } from './floor-plan';
-import { finishTierGuidance, type FinishTier } from './finish-tier';
+import { finishTierGuidance, rateSupportsFinishTier, type FinishTier } from './finish-tier';
 
 const observation = z.object({
   finishTier: z.enum(['Basic','Standard','Premium','Luxury']).optional(), tierSupported: z.boolean().optional(),
@@ -18,6 +18,41 @@ export type ResearchInput = { products: { name: string; specification: string; h
 export interface MarketPricingProvider { research(input: ResearchInput, signal: AbortSignal): Promise<{ rates: PriceEvidence[]; limitations: string[] }> }
 export class MarketResearchError extends Error {
   constructor(public code: 'configuration' | 'rate_limit' | 'timeout' | 'incomplete' | 'invalid_output', message: string) { super(message); }
+}
+
+/** Share one search budget across the quotation, with at most two searches in flight. */
+export async function researchMarketBatches(provider: MarketPricingProvider, inputs: ResearchInput[], signal: AbortSignal,
+  onFailure: (code: MarketResearchError['code']) => void, budgetMs = 30000) {
+  if (!inputs.length) return { rates: [] as PriceEvidence[], limitations: [] as string[] };
+  const deadline = new AbortController();
+  const timer = setTimeout(() => deadline.abort(), budgetMs);
+  const combined = AbortSignal.any([signal, deadline.signal]);
+  const results: { rates: PriceEvidence[]; limitations: string[] }[] = new Array(inputs.length);
+  let next = 0;
+  let unavailable: MarketResearchError['code'] | undefined;
+  const worker = async () => {
+    while (next < inputs.length) {
+      signal.throwIfAborted();
+      const index = next++;
+      const input = inputs[index];
+      try {
+        if (unavailable || deadline.signal.aborted) throw new MarketResearchError(unavailable ?? 'timeout', 'Search budget exhausted');
+        const result = await provider.research(input, combined);
+        signal.throwIfAborted();
+        results[index] = { ...result, rates: result.rates.filter(rate => rateSupportsFinishTier(rate, input.finish as FinishTier)) };
+      } catch (error) {
+        signal.throwIfAborted();
+        if (!(error instanceof MarketResearchError)) throw error;
+        if (error.code === 'configuration' || error.code === 'rate_limit') unavailable = error.code;
+        onFailure(error.code);
+        results[index] = { rates: [], limitations: [`Live market research was unavailable (${error.code}) for ${input.products.map(product => product.name).join(', ')}. No live source prices were added for this batch; review any labelled AI allowances or pending rates.`] };
+      }
+    }
+  };
+  try {
+    await Promise.all(Array.from({ length: Math.min(2, inputs.length) }, worker));
+    return { rates: results.flatMap(result => result.rates), limitations: results.flatMap(result => result.limitations) };
+  } finally { clearTimeout(timer); }
 }
 const normal = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
 const safeUrl = (value: string) => { try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password && !/^(localhost|127\.|10\.|192\.168\.|\[)/i.test(url.hostname); } catch { return false; } };
@@ -84,7 +119,13 @@ export class OpenAIWebMarketPricing implements MarketPricingProvider {
       if (response.status === 429) throw new MarketResearchError('rate_limit', 'Pricing search reached the provider usage limit (HTTP 429). Retry after checking billing or rate limits.');
       throw new MarketResearchError('incomplete', `Pricing search is temporarily unavailable (HTTP ${response.status}).`);
     }
-    const result = await response.json();
+    let result;
+    try { result = await response.json(); }
+    catch {
+      signal.throwIfAborted();
+      throw new MarketResearchError('invalid_output', 'Pricing search returned an unreadable response.');
+    }
+    if (!result || typeof result !== 'object' || !Array.isArray(result.output)) throw new MarketResearchError('invalid_output', 'Pricing search returned an invalid response.');
     if (result.status !== 'completed') throw new MarketResearchError('incomplete', 'Pricing search did not complete. Retry pricing with fewer products.');
     const urls: string[] = []; const text: string[] = [];
     for (const output of result.output ?? []) {

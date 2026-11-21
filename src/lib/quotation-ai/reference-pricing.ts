@@ -88,8 +88,10 @@ export function referencePriceEvidence(rows: ReferencePrice[], currency: string,
 export function matchingReferenceRate(rates: PriceEvidence[], name: string, specification: string) {
   const matches = rates.filter(row => ['approved','admin_reference'].includes(row.source)
     && referenceProduct(row.name) === referenceProduct(name));
-  return matches.find(row => normalizeReferenceText(row.description) === normalizeReferenceText(specification))
-    ?? (matches.length === 1 && matches[0].source === 'approved' && !conflicts(specification, matches[0].description) ? matches[0] : undefined);
+  const owner = matches.filter(row => row.source === 'approved');
+  return owner.find(row => normalizeReferenceText(row.description) === normalizeReferenceText(specification))
+    ?? (owner.length === 1 && !conflicts(specification, owner[0].description) ? owner[0] : undefined)
+    ?? matches.find(row => row.source === 'admin_reference' && normalizeReferenceText(row.description) === normalizeReferenceText(specification));
 }
 
 const words = (value: string) => new Set(normalizeReferenceText(value)
