@@ -46,10 +46,7 @@ export function ProjectTypeFields({ value, onChange, placeField }: { value: stri
       <Label htmlFor="projectBhk">BHK / Home Size</Label>
       <FloorHomeSizePicker floors={projectFloorNames(details.floors)} values={details.floorSizes ?? (details.floors === 'Ground Floor' && details.size ? { 'Ground Floor': details.size } : {})}
         previousSize={details.size} onChange={floorSizes => change({ size: '', floorSizes })} />
-    </div> : details.floors === 'Other' ? <DetailPicker id="projectBhk" label="BHK / Home Size" value={details.size} options={homeSizes} placeholder="Select BHK" onChange={size => change({ size })} /> : <div className="min-w-0 space-y-2">
-      <Label htmlFor="projectBhk">BHK / Home Size</Label>
-      <Button id="projectBhk" type="button" variant="outline" disabled className="h-auto min-h-12 w-full justify-start whitespace-normal rounded-xl px-2 py-3 text-left text-sm font-normal sm:px-3">Select Floors</Button>
-    </div>)}
+    </div> : <DetailPicker id="projectBhk" label="BHK / Home Size" value={details.size} options={homeSizes} placeholder="Select BHK" onChange={size => change({ size })} />)}
     {residential && completedFloors > 0 && completedFloors < floors.length && <p className="col-span-2 -mt-3 text-right text-xs text-muted-foreground" role="status">{completedFloors} of {floors.length} floors set</p>}
   </div>;
 }
