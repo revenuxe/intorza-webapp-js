@@ -29,6 +29,9 @@ function DetailPicker({ id, label, value, options, placeholder, onChange }: {
 export function ProjectTypeFields({ value, onChange, placeField }: { value: string; onChange: (value: string) => void; placeField?: ReactNode }) {
   const details = parseProjectTypeDetails(value);
   const residential = details.type.toLowerCase() === 'residential';
+  const floors = projectFloorNames(details.floors);
+  const floorSizes = details.floorSizes ?? (details.floors === 'Ground Floor' && details.size ? { 'Ground Floor': details.size } : {});
+  const completedFloors = floors.filter(floor => floorSizes[floor]).length;
   const change = (next: Partial<typeof details>) => onChange(formatProjectTypeDetails({ ...details, ...next }));
   return <div className="grid min-w-0 grid-cols-2 items-end gap-x-5 gap-y-5 sm:gap-x-6">
     {placeField}
@@ -47,5 +50,6 @@ export function ProjectTypeFields({ value, onChange, placeField }: { value: stri
       <Label htmlFor="projectBhk">BHK / Home Size</Label>
       <Button id="projectBhk" type="button" variant="outline" disabled className="h-auto min-h-12 w-full justify-start whitespace-normal rounded-xl px-2 py-3 text-left text-sm font-normal sm:px-3">Select Floors</Button>
     </div>)}
+    {residential && completedFloors > 0 && completedFloors < floors.length && <p className="col-span-2 -mt-3 text-right text-xs text-muted-foreground" role="status">{completedFloors} of {floors.length} floors set</p>}
   </div>;
 }

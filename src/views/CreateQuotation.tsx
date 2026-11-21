@@ -1351,11 +1351,11 @@ const QuotationEditor = () => {
             </CardContent>
           </Card></Fragment>)}
 
-        <div className="flex flex-wrap items-center gap-2">
-        {nextFloor && <Button type="button" onClick={() => addSection(nextFloor)} variant="outline" className="min-h-10 min-w-0 shrink-0 gap-1 whitespace-normal border-primary/30 px-3 text-primary">
+        <div className={`grid items-stretch gap-2 ${nextFloor ? 'grid-cols-[max-content_minmax(0,1fr)]' : 'grid-cols-1'}`}>
+        {nextFloor && <Button type="button" onClick={() => addSection(nextFloor)} variant="outline" className="h-auto min-h-12 min-w-0 gap-1 whitespace-nowrap border-primary/30 px-2 py-2 text-sm text-primary sm:px-3">
           <Plus className="h-4 w-4" />Add {nextFloor}
         </Button>}
-        <Button onClick={() => addSection()} className="ml-auto min-w-40 flex-1 gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button onClick={() => addSection()} className="h-auto min-h-12 min-w-0 gap-2 whitespace-normal bg-primary px-2 py-2 text-primary-foreground hover:bg-primary/90">
           <Plus className="h-4 w-4" />
           Add Room
         </Button>

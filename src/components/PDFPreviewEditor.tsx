@@ -641,16 +641,55 @@ export const PDFPreviewEditor = ({
               </div>
             </div>
 
-            {/* Custom Theme Builder Button */}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="w-full mb-3"
-              onClick={() => setShowThemeBuilder(true)}
-            >
-              <Wand2 className="h-4 w-4 mr-2" />
-              Create Custom Theme
-            </Button>
+            {/* Brand Colors Section */}
+            {brandColors && (
+              <div className="space-y-3 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-semibold flex items-center gap-2">
+                      <CircleDot className="h-4 w-4 text-primary" />
+                      Use Brand Colors
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Apply your saved brand palette to the PDF
+                    </p>
+                  </div>
+                  <Switch
+                    checked={editorSettings.useBrandColors || false}
+                    onCheckedChange={(v) => updateSettings({
+                      useBrandColors: v,
+                      brandColors: brandColors
+                    })}
+                  />
+                </div>
+
+                {editorSettings.useBrandColors && (
+                  <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-6 h-6 rounded-full border shadow-sm"
+                        style={{ backgroundColor: brandColors.primary }}
+                        title="Primary"
+                      />
+                      <div
+                        className="w-6 h-6 rounded-full border shadow-sm"
+                        style={{ backgroundColor: brandColors.secondary }}
+                        title="Secondary"
+                      />
+                      <div
+                        className="w-6 h-6 rounded-full border shadow-sm"
+                        style={{ backgroundColor: brandColors.accent }}
+                        title="Accent"
+                      />
+                      <span className="text-xs text-muted-foreground ml-2">Your brand palette</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Edit brand colors in Settings → Brand Colors
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Themes Grid */}
             <div className="space-y-3">
@@ -715,55 +754,16 @@ export const PDFPreviewEditor = ({
               </div>
             </div>
 
-            {/* Brand Colors Section */}
-            {brandColors && (
-              <div className="space-y-3 pt-4 border-t">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-sm font-semibold flex items-center gap-2">
-                      <CircleDot className="h-4 w-4 text-primary" />
-                      Use Brand Colors
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Apply your saved brand palette to the PDF
-                    </p>
-                  </div>
-                  <Switch
-                    checked={editorSettings.useBrandColors || false}
-                    onCheckedChange={(v) => updateSettings({ 
-                      useBrandColors: v,
-                      brandColors: brandColors
-                    })}
-                  />
-                </div>
-                
-                {editorSettings.useBrandColors && (
-                  <div className="p-3 rounded-lg bg-muted/50 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-6 h-6 rounded-full border shadow-sm"
-                        style={{ backgroundColor: brandColors.primary }}
-                        title="Primary"
-                      />
-                      <div 
-                        className="w-6 h-6 rounded-full border shadow-sm"
-                        style={{ backgroundColor: brandColors.secondary }}
-                        title="Secondary"
-                      />
-                      <div 
-                        className="w-6 h-6 rounded-full border shadow-sm"
-                        style={{ backgroundColor: brandColors.accent }}
-                        title="Accent"
-                      />
-                      <span className="text-xs text-muted-foreground ml-2">Your brand palette</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">
-                      Edit brand colors in Settings → Brand Colors
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+            {/* Custom Theme Builder Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full mb-3"
+              onClick={() => setShowThemeBuilder(true)}
+            >
+              <Wand2 className="h-4 w-4 mr-2" />
+              Create Custom Theme
+            </Button>
 
             {/* Custom Color Overrides */}
             <div className="space-y-3 pt-4 border-t">

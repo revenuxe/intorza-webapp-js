@@ -25,9 +25,8 @@ export function FloorHomeSizePicker({ floors, values, previousSize, onChange }: 
   const summary = selected.map(floor => `${floor === 'Ground Floor' ? 'G' : floors.indexOf(floor)}: ${values[floor]}`).join(' · ');
   const trigger = <Button id="projectBhk" type="button" variant="outline" aria-haspopup="dialog" aria-expanded={open} aria-label="BHK / Home Size"
     className="h-auto min-h-12 w-full justify-between gap-2 rounded-xl px-2 py-3 text-sm font-normal sm:px-3">
-    <span className="min-w-0 text-left"><span className="block truncate" title={summary}>{summary || 'Select BHK by floor'}</span>
-      {selected.length > 0 && selected.length < floors.length && <span className="block text-xs text-muted-foreground">{selected.length} of {floors.length} floors set</span>}
-    </span><ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    <span className="min-w-0 truncate text-left" title={summary}>{summary || 'Select BHK by floor'}</span>
+    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
   </Button>;
   const content = <>
     <Tabs value={currentFloor} onValueChange={setActiveFloor} className="flex min-h-0 flex-1 flex-col">
