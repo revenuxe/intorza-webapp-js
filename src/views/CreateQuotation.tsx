@@ -6,7 +6,10 @@ import { getDraftReference, clearDraftReference } from "@/lib/draft-quotation-re
 
 
 import { appendFloorPlanEstimate } from '@/lib/quotation-ai/apply-estimate';
-import { useState, useEffect, useRef, useMemo } from "react";
+import { Fragment, useState, useEffect, useRef, useMemo } from "react";
+import { floorRoomTitle, groupFloorSections, nextQuotationFloor, quotationFloorNames, splitFloorRoomTitle } from '@/lib/quotationFloorGroups';
+import { parseProjectTypeDetails, projectFloorNames } from '@/lib/projectTypeDetails';
+import { TypeChoicePicker } from '@/components/quotation/TypeChoicePicker';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { GlobalLoader } from '@/components/GlobalLoader';
@@ -181,6 +184,10 @@ const QuotationEditor = () => {
   const [warranty, setWarranty] = useState("10");
   const { patterns: librarySuggestions, notice: librarySuggestionNotice, remember: rememberLibraryProduct } = useQuotationLibrarySuggestions(libraryTierForName(tierContext?.name));
   const [projectType, setProjectType] = useState("Residential");
+  const [activeRoomFloor, setActiveRoomFloor] = useState<string | null>(null);
+  const floorSections = useMemo(() => groupFloorSections(sections, projectType), [sections, projectType]);
+  const availableFloors = projectFloorNames(parseProjectTypeDetails(projectType).floors);
+  const nextFloor = nextQuotationFloor(floorSections, projectType);
   const [gstEnabled, setGstEnabled] = useState(false);
   const [gstRate, setGstRate] = useState("18");
   const [discountPercentage, setDiscountPercentage] = useState(0);
@@ -516,7 +523,8 @@ const QuotationEditor = () => {
       if (generation === quotationLoadGeneration.current) setIsLoadingQuotation(false);
     }
   };
-  const addSection = () => {
+  const addSection = (newFloor?: string) => {
+    if (newFloor) setActiveRoomFloor(newFloor);
     const newItemId = crypto.randomUUID();
     const newRoomId = crypto.randomUUID();
     newItemToFocus.current = { itemId: newItemId, roomId: newRoomId };
@@ -524,7 +532,7 @@ const QuotationEditor = () => {
     setCollapseExceptItemId(newItemId);
     setSections(current => [...current, {
       id: newRoomId,
-      title: "",
+      title: floorRoomTitle(newFloor || activeRoomFloor || splitFloorRoomTitle(floorSections.at(-1)?.title || '').floor || availableFloors[0] || '', ''),
       items: [{
         id: newItemId,
         side: "A",
@@ -575,7 +583,7 @@ const QuotationEditor = () => {
         if (emptyIndex >= 0) items[emptyIndex] = { ...items[emptyIndex], productName };
         else items.push({ id: crypto.randomUUID(), side: 'A', productName, productDetails: '', widthFt: 0, heightFt: 0, sftArea: 0, ratePerSft: 0, amount: 0 });
       }
-      return { ...section, title: room, items };
+      return { ...section, title: floorRoomTitle(splitFloorRoomTitle(section.title).floor || availableFloors[0] || '', room), items };
     }));
   };
   const removeSection = (sectionId: string) => {
@@ -584,7 +592,7 @@ const QuotationEditor = () => {
   const updateSectionTitle = (sectionId: string, title: string) => {
     setSections(sections.map(section => section.id === sectionId ? {
       ...section,
-      title
+      title: floorRoomTitle(splitFloorRoomTitle(section.title).floor || availableFloors[0] || '', title)
     } : section));
   };
   const updateItem = (sectionId: string, itemId: string, field: keyof LineItem, value: any) => {
@@ -671,7 +679,7 @@ const QuotationEditor = () => {
     socialMediaDiscountRate
   });
   const getAIDraft = () => fromQuotation(
-    { projectTitle, clientName, clientAddress, placeOfProject, projectType }, sections,
+    { projectTitle, clientName, clientAddress, placeOfProject, projectType }, floorSections,
     { gstEnabled, gstRate: Number(gstRate) || 0, discountPercentage, enableSocialMediaDiscount, socialMediaDiscountRate },
   );
   const handleSaveQuotation = async (status: string, showShare: boolean = false, startNewDraft: boolean = false): Promise<string | null> => {
@@ -712,9 +720,9 @@ const QuotationEditor = () => {
       if (!user) throw new Error('No user found');
       
       // Build the quotation payload for the Supabase API.
-      const payloadSections = sections.map((section, sIdx) => ({
+      const payloadSections = floorSections.map((section, sIdx) => ({
         id: section.id,
-        section_name: section.title || `Section ${sIdx + 1}`,
+        section_name: floorRoomTitle(splitFloorRoomTitle(section.title).floor, splitFloorRoomTitle(section.title).room || `Section ${sIdx + 1}`),
         sort_order: sIdx,
         items: section.items.map((item, iIdx) => ({
           id: item.id,
@@ -828,6 +836,7 @@ const QuotationEditor = () => {
         setQuotationValidTill("");
         setPlaceOfProject("");
         setProjectType("Residential");
+        setActiveRoomFloor(null);
         setSections([{
           id: "1",
           title: "",
@@ -959,7 +968,7 @@ const QuotationEditor = () => {
         placeOfProject: placeOfProject || '',
         warranty,
         projectType,
-        sections: sections.map(section => ({
+        sections: floorSections.map(section => ({
           title: section.title,
           items: section.items.map(item => ({
             ...item,
@@ -1038,7 +1047,7 @@ const QuotationEditor = () => {
     placeOfProject,
     warranty,
     projectType,
-    sections: sections.map(section => ({
+    sections: floorSections.map(section => ({
       ...section,
       items: section.items.map(item => ({
         ...item,
@@ -1261,11 +1270,31 @@ const QuotationEditor = () => {
         </Card>
 
         {/* Rooms & Items */}
-        {sections.map((section, sectionIndex) => <Card key={section.id} id={`quotation-room-${section.id}`} className="min-w-0 max-w-full">
+        {floorSections.map((section, sectionIndex) => <Fragment key={section.id}>
+          {splitFloorRoomTitle(section.title).floor && (sectionIndex === 0 || splitFloorRoomTitle(floorSections[sectionIndex - 1].title).floor !== splitFloorRoomTitle(section.title).floor) && <Card className="rounded-xl border-primary/30 bg-primary/5 shadow-none">
+            <CardContent className="flex items-center justify-between gap-3 px-4 py-2">
+              <h2 className="text-sm font-semibold">{splitFloorRoomTitle(section.title).floor}</h2>
+              <TypeChoicePicker value={splitFloorRoomTitle(section.title).floor}
+                options={[...new Set([...availableFloors, ...floorSections.map(row => splitFloorRoomTitle(row.title).floor)])].filter(Boolean).map(floor => ({ value: floor }))}
+                label={`Floor for ${splitFloorRoomTitle(section.title).floor} rooms`} heading="Choose floor" searchPlaceholder="Search floors..." allowCustom={false}
+                onChange={floor => {
+                  const previous = splitFloorRoomTitle(section.title).floor;
+                  setSections(current => groupFloorSections(current, projectType).map(row => {
+                    const details = splitFloorRoomTitle(row.title);
+                    return details.floor === previous ? { ...row, title: floorRoomTitle(floor, details.room) } : row;
+                  }));
+                  setActiveRoomFloor(floor);
+                }}
+                trigger={open => <Button type="button" variant="outline" size="sm" aria-expanded={open} className="h-8 min-w-20 gap-2 rounded-lg border-primary/30 bg-background px-3">
+                  {splitFloorRoomTitle(section.title).floor === 'Ground Floor' ? 'G' : `${quotationFloorNames.indexOf(splitFloorRoomTitle(section.title).floor)}F`}<span className="text-xs text-muted-foreground">Change</span>
+                </Button>} />
+            </CardContent>
+          </Card>}
+          <Card id={`quotation-room-${section.id}`} className="min-w-0 max-w-full" onFocusCapture={() => setActiveRoomFloor(splitFloorRoomTitle(section.title).floor || null)}>
             <CardHeader className="px-5 sm:px-8">
               <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-3">
-                <Input id={`room-title-${section.id}`} aria-label={`Room title ${sectionIndex + 1}`} value={section.title} onChange={e => updateSectionTitle(section.id, e.target.value)} className="min-w-0 basis-40 flex-1 text-lg font-semibold border-none px-2 py-1 h-auto focus-visible:ring-0" placeholder="Room Title" />
-                <RoomPicker value={section.title} onChange={room => selectRoom(section.id, room)} />
+                <Input id={`room-title-${section.id}`} aria-label={`Room title ${sectionIndex + 1}`} value={splitFloorRoomTitle(section.title).room} onChange={e => updateSectionTitle(section.id, e.target.value)} className="min-w-0 basis-40 flex-1 text-lg font-semibold border-none px-2 py-1 h-auto focus-visible:ring-0" placeholder="Room Title" />
+                <RoomPicker value={splitFloorRoomTitle(section.title).room} onChange={room => selectRoom(section.id, room)} />
                 {sections.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeSection(section.id)} className="text-destructive hover:text-destructive">
                     <Trash2 className="h-4 w-4" />
                   </Button>}
@@ -1320,12 +1349,17 @@ const QuotationEditor = () => {
                 Add Item to Room
               </Button>
             </CardContent>
-          </Card>)}
+          </Card></Fragment>)}
 
-        <Button onClick={addSection} variant="outline" className="w-full gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+        {nextFloor && <Button type="button" onClick={() => addSection(nextFloor)} variant="outline" className="min-h-10 min-w-0 shrink-0 gap-1 whitespace-normal border-primary/30 px-3 text-primary">
+          <Plus className="h-4 w-4" />Add {nextFloor}
+        </Button>}
+        <Button onClick={() => addSection()} className="ml-auto min-w-40 flex-1 gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
           <Plus className="h-4 w-4" />
           Add Room
         </Button>
+        </div>
 
         {/* Summary */}
         <Card className="sticky bottom-0 md:static shadow-lg md:shadow-none">
@@ -1467,7 +1501,7 @@ const QuotationEditor = () => {
         </Card>
 
         {/* PDF Preview Editor */}
-        {showPreview && <PDFPreviewEditor onItemMeasurementChange={(sectionIndex, itemIndex, field, value) => { const section = sections[sectionIndex]; const item = section.items[itemIndex]; updateItem(section.id, item.id, field, value); if (field === 'ratePerSft') rememberLibraryProduct({ ...item, ratePerSft: Number(value) }); }} open={showPreview} onClose={() => setShowPreview(false)} onDownload={(settings, terms) => handleDownloadPDF(settings, undefined, undefined, terms)} quotationData={quotationPreviewData} customizeSettings={{ ...customizeSettings, areaOnly: !customizeSettings.showDetailedSizeColumns && !!lastAIDraft.current }} />}
+        {showPreview && <PDFPreviewEditor onItemMeasurementChange={(sectionIndex, itemIndex, field, value) => { const section = floorSections[sectionIndex]; const item = section.items[itemIndex]; updateItem(section.id, item.id, field, value); if (field === 'ratePerSft') rememberLibraryProduct({ ...item, ratePerSft: Number(value) }); }} open={showPreview} onClose={() => setShowPreview(false)} onDownload={(settings, terms) => handleDownloadPDF(settings, undefined, undefined, terms)} quotationData={quotationPreviewData} customizeSettings={{ ...customizeSettings, areaOnly: !customizeSettings.showDetailedSizeColumns && !!lastAIDraft.current }} />}
         
         {/* Gallery Image Picker */}
         <GalleryImagePicker

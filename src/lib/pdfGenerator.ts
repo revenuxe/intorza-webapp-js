@@ -1,5 +1,6 @@
 import { formatItemDetails, type ItemSpecification } from './itemSpecifications';
 import { displayProjectTypeDetails } from './projectTypeDetails';
+import { groupFloorSections, splitFloorRoomTitle } from './quotationFloorGroups';
 import { getQuotationUnit, isAreaUnit, projectAreaSqft } from './quotationUnits';
 import { resolveCompanyAssetUrl } from '@/lib/company-assets';
 
@@ -250,7 +251,7 @@ const prepareSignatureImage = async (imageUrl: string): Promise<string> => {
 // --- Main Generator Function ---
 
 export const generateQuotationPDF = async (data: QuotationData) => {
-  data = { ...data, projectType: displayProjectTypeDetails(data.projectType || '') };
+  data = { ...data, sections: groupFloorSections(data.sections, data.projectType || ''), projectType: displayProjectTypeDetails(data.projectType || '') };
   const doc = new jsPDF({
     orientation: 'p',
     unit: 'mm',
@@ -804,14 +805,17 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   // --- 3. Product Sections (Enhanced Cards) ---
   
   let totalSFT = 0;
+  let previousFloor = '';
 
   for (const section of data.sections) {
+    const { floor, room } = splitFloorRoomTitle(section.title);
+    const startsFloor = Boolean(floor && floor !== previousFloor);
     const filledRoomHeading = editorSettings?.roomHeadingBackground ?? false;
     setHeadingFont('bold');
     setPdfFontSize(8.5);
     const headingPadding = compactMode ? 3 : 4;
     const headingLines: string[] = doc.splitTextToSize(
-      section.title.toUpperCase(),
+      room.toUpperCase(),
       contentWidth - (filledRoomHeading ? headingPadding * 2 : 0),
     );
     const headingLineHeight = doc.getFontSize() / doc.internal.scaleFactor * doc.getLineHeightFactor();
@@ -820,10 +824,23 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       : 7 + Math.max(0, headingLines.length - 1) * headingLineHeight;
     const headingGap = compactMode ? 2 : 5;
     // Check page break
-    if (yPosition > pageBottomY - Math.max(35, headingHeight + headingGap + 22)) {
+    if (yPosition > pageBottomY - Math.max(35, headingHeight + headingGap + 22) - (startsFloor ? 15 : 0)) {
       doc.addPage();
       yPosition = pageTopY;
     }
+    if (startsFloor) {
+      // Keep the banner with the first room, including wrapped room headings.
+      const background = theme.colors.accent;
+      doc.setFillColor(...background);
+      doc.roundedRect(margin, yPosition, contentWidth, 10, 1.5, 1.5, 'F');
+      setHeadingFont('bold');
+      setPdfFontSize(10);
+      doc.setTextColor(...getPDFCardTextColor(background));
+      doc.text(floor, margin + 4, yPosition + 6.5);
+      yPosition += 15;
+      setPdfFontSize(8.5);
+    }
+    previousFloor = floor;
 
     if (filledRoomHeading) {
       const background = editorSettings?.customColors?.accent
@@ -1137,7 +1154,7 @@ export const generateQuotationPDF = async (data: QuotationData) => {
       countryCode: data.localization?.countryCode || 'IN',
     });
 
-    const labelText = `Total ${section.title}:`;
+    const labelText = `Total ${room}:`;
     const amountText = fmtCurrencyLocal(sectionTotal);
 
     // Get advanced settings for highlight styling

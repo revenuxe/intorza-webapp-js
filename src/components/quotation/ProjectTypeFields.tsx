@@ -37,7 +37,7 @@ export function ProjectTypeFields({ value, onChange, placeField }: { value: stri
       <ProjectTypePicker id="projectType" value={details.type} onChange={type => change({ type, size: type.toLowerCase() === 'residential' ? details.size : '' })} />
     </div>
     <div className={residential ? 'min-w-0' : 'col-span-2 min-w-0'}>
-      <DetailPicker id="projectFloors" label="Floors" value={details.floors} options={floorOptions} placeholder="Select Floors" onChange={floors => change({ floors, floorSizes: Object.fromEntries(Object.entries(details.floorSizes ?? {}).filter(([floor]) => projectFloorNames(floors).includes(floor))) })} />
+      <DetailPicker id="projectFloors" label="Select Floors" value={details.floors} options={floorOptions} placeholder="Select Floors" onChange={floors => change({ floors, floorSizes: Object.fromEntries(Object.entries(details.floorSizes ?? {}).filter(([floor]) => projectFloorNames(floors).includes(floor))) })} />
     </div>
     {residential && (projectFloorNames(details.floors).length ? <div className="min-w-0 space-y-2">
       <Label htmlFor="projectBhk">BHK / Home Size</Label>

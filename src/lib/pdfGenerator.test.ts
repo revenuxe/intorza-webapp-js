@@ -166,13 +166,33 @@ it.each([true, false])('exports canonical structured specifications without a le
 });
 
 // The same generator powers live preview and the downloaded PDF.
+it('groups room tables under one full heading per floor in floor order', async () => {
+ const section = quotationData.sections[0];
+ const pdf = await generateQuotationPDF({ ...quotationData, projectType: 'Residential | Floors: G+1',
+   sections: [
+     { ...section, title: 'First Floor — Upper bedroom' },
+     { ...section, title: 'Ground Floor — Kitchen' },
+     { ...section, title: 'Ground Floor — Living' },
+   ],
+ });
+ const content = pdf.internal.pages.flat().join('\n');
+ expect(content.match(/\(Ground Floor\)/g)).toHaveLength(1);
+ expect(content.match(/\(First Floor\)/g)).toHaveLength(1);
+ expect(content.indexOf('(Ground Floor)')).toBeLessThan(content.indexOf('(KITCHEN)'));
+ expect(content.indexOf('(LIVING)')).toBeLessThan(content.indexOf('(First Floor)'));
+ expect(content.indexOf('(First Floor)')).toBeLessThan(content.indexOf('(UPPER BEDROOM)'));
+ expect(content).not.toContain('Ground Floor — Kitchen');
+});
 it('prints compact floor home layouts in the preview and exported PDF', async () => {
  const pdf = await generateQuotationPDF({ ...quotationData, projectType: 'Residential | Floors: G+2 | Homes: Ground Floor=1 BHK; First Floor=2 BHK; Second Floor=2 BHK', settings: { ...getQuotationSettings(), showProjectDetails: true } });
  const content = pdf.internal.pages.flat().join('\n');
  expect(content).toContain('G 1 BHK');
  expect(content).toContain('1F 2 BHK');
  expect(content).toContain('2F 2 BHK');
- expect(content).not.toMatch(/Homes:|Floors:|Ground Floor|First Floor|Second Floor/);
+ expect(content).not.toMatch(/Homes:|Floors:/);
+ // The metadata remains compact; full names are intentional room-group banners.
+ const metadata = content.slice(0, content.indexOf('(Ground Floor)'));
+ expect(metadata).not.toMatch(/Ground Floor|First Floor|Second Floor/);
 });
 it('balances the two-card header between project identity and quotation metadata', async () => {
  const pdf = await generateQuotationPDF({ ...quotationData, referenceNo: 'QNO-0001AZ', projectDeadline: '2026-12-01', settings: { ...getQuotationSettings(), showProjectDetails: true }, editorSettings: { ...quotationData.editorSettings!, headerInfoColumns: 2 } });
