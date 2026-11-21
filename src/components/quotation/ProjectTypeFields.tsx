@@ -37,7 +37,7 @@ export function ProjectTypeFields({ value, onChange, placeField }: { value: stri
       <ProjectTypePicker id="projectType" value={details.type} onChange={type => change({ type, size: type.toLowerCase() === 'residential' ? details.size : '' })} />
     </div>
     <div className={residential ? 'min-w-0' : 'col-span-2 min-w-0'}>
-      <DetailPicker id="projectFloors" label="Floors" value={details.floors} options={floorOptions} placeholder="Select floors" onChange={floors => change({ floors, floorSizes: Object.fromEntries(Object.entries(details.floorSizes ?? {}).filter(([floor]) => projectFloorNames(floors).includes(floor))) })} />
+      <DetailPicker id="projectFloors" label="Floors" value={details.floors} options={floorOptions} placeholder="Select Floors" onChange={floors => change({ floors, floorSizes: Object.fromEntries(Object.entries(details.floorSizes ?? {}).filter(([floor]) => projectFloorNames(floors).includes(floor))) })} />
     </div>
     {residential && (projectFloorNames(details.floors).length ? <div className="min-w-0 space-y-2">
       <Label htmlFor="projectBhk">BHK / Home Size</Label>
@@ -45,7 +45,7 @@ export function ProjectTypeFields({ value, onChange, placeField }: { value: stri
         previousSize={details.size} onChange={floorSizes => change({ size: '', floorSizes })} />
     </div> : details.floors === 'Other' ? <DetailPicker id="projectBhk" label="BHK / Home Size" value={details.size} options={homeSizes} placeholder="Select BHK" onChange={size => change({ size })} /> : <div className="min-w-0 space-y-2">
       <Label htmlFor="projectBhk">BHK / Home Size</Label>
-      <Button id="projectBhk" type="button" variant="outline" disabled className="h-auto min-h-12 w-full justify-start whitespace-normal rounded-xl px-2 py-3 text-left text-sm font-normal sm:px-3">Select floors first</Button>
+      <Button id="projectBhk" type="button" variant="outline" disabled className="h-auto min-h-12 w-full justify-start whitespace-normal rounded-xl px-2 py-3 text-left text-sm font-normal sm:px-3">Select Floors</Button>
     </div>)}
   </div>;
 }
