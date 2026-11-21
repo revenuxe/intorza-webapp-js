@@ -6,6 +6,7 @@ import { getDraftReference, clearDraftReference } from "@/lib/draft-quotation-re
 
 
 import { appendFloorPlanEstimate } from '@/lib/quotation-ai/apply-estimate';
+import { quotationPdfFilename, quotationWhatsappMessage, shareQuotationFile } from '@/lib/quotationSharing';
 import { Fragment, useState, useEffect, useRef, useMemo } from "react";
 import { floorRoomTitle, groupFloorSections, nextQuotationFloor, quotationFloorNames, splitFloorRoomTitle } from '@/lib/quotationFloorGroups';
 import { parseProjectTypeDetails, projectFloorNames } from '@/lib/projectTypeDetails';
@@ -819,7 +820,26 @@ const QuotationEditor = () => {
         if (savedQuotationId) {
           // Fetch fresh profile and generate PDF with the saved quotation ID for Accept/Reject buttons
           const freshProfile = await fetchFreshProfile();
-          await handleDownloadPDF(undefined, savedQuotationId, freshProfile || undefined);
+          const pdf = await handleDownloadPDF(undefined, savedQuotationId, freshProfile || undefined, undefined, verifiedQuotation.reference_no);
+          if (!pdf) return savedQuotationId;
+          const company = (freshProfile || profile).company_name?.trim();
+          if (!company || !verifiedQuotation.reference_no) {
+            toast({ title: 'Quotation saved and PDF downloaded', description: 'Complete your business company name and quotation reference before sharing the predefined message.', variant: 'destructive' });
+          } else {
+            const file = new File([pdf.output('blob')], quotationPdfFilename(clientName, verifiedQuotation.reference_no), { type: 'application/pdf' });
+            const message = quotationWhatsappMessage(clientName, company, verifiedQuotation.reference_no);
+            const sharePdf = async () => {
+              const result = await shareQuotationFile(file, message);
+              if (result === 'shared') {
+                toast({ title: 'PDF handed to sharing app', description: <>Choose WhatsApp and the customer, then review and send. WhatsApp may omit the accompanying message on some devices.{' '}<button type="button" className="underline" onClick={() => { void navigator.clipboard?.writeText(message).catch(() => toast({ title: 'Could not copy message', description: 'Clipboard access is unavailable in this browser.', variant: 'destructive' })); }}>Copy message</button></> });
+              } else if (result === 'unsupported') {
+                toast({ title: 'Quotation saved and PDF downloaded', description: 'This browser cannot share PDF files. Attach the downloaded PDF manually in WhatsApp.', variant: 'destructive' });
+              } else {
+                toast({ title: result === 'cancelled' ? 'Sharing cancelled; PDF downloaded' : 'PDF downloaded; tap to share', description: <>Choose WhatsApp and the customer, then review and send. If WhatsApp omits the message, you can copy it here.{' '}<button type="button" className="underline" onClick={() => void sharePdf()}>Share PDF</button>{' '}<button type="button" className="underline" onClick={() => { void navigator.clipboard?.writeText(message).catch(() => toast({ title: 'Could not copy message', description: 'Clipboard access is unavailable in this browser.', variant: 'destructive' })); }}>Copy message</button></> });
+              }
+            };
+            await sharePdf();
+          }
         }
         
         setClientName("");
@@ -932,7 +952,7 @@ const QuotationEditor = () => {
     };
   };
 
-  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, overrideQuotationId?: string, overrideProfile?: typeof profile, editorTerms?: import("@/lib/libraryDefaults").TermsSection[]) => {
+  const handleDownloadPDF = async (editorSettings?: PDFEditorSettings, overrideQuotationId?: string, overrideProfile?: typeof profile, editorTerms?: import("@/lib/libraryDefaults").TermsSection[], savedReference?: string) => {
     setIsDownloading(true);
     try {
       if (!clientName.trim() || !clientAddress.trim()) {
@@ -943,7 +963,7 @@ const QuotationEditor = () => {
           variant: "destructive"
         });
         setIsDownloading(false);
-        return;
+        return false;
       }
       
       // Use override profile if provided, otherwise use state profile
@@ -956,9 +976,10 @@ const QuotationEditor = () => {
       }
       
       const { generateQuotationPDF } = await import("@/lib/pdfGenerator");
-      await generateQuotationPDF({
+      const pdf = await generateQuotationPDF({
+        downloadOnly: !!savedReference,
         quotationId: overrideQuotationId || quotationId || undefined,
-        referenceNo: tierContext?.referenceNo || referenceNo || await getDraftReference(),
+        referenceNo: savedReference || tierContext?.referenceNo || referenceNo || await getDraftReference(),
         quotationTitle: tierQuotationTitle(projectTitle, tierContext?.name),
         clientName,
         clientAddress,
@@ -1021,6 +1042,7 @@ const QuotationEditor = () => {
         title: "PDF Downloaded",
         description: "Your quotation PDF has been generated successfully"
       });
+      return pdf;
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast({
@@ -1028,6 +1050,7 @@ const QuotationEditor = () => {
         description: "Failed to generate PDF. Please try again.",
         variant: "destructive"
       });
+      return false;
     } finally {
       setIsDownloading(false);
     }

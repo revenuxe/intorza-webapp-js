@@ -1,4 +1,5 @@
 "use client";
+import { quotationPdfFilename } from '@/lib/quotationSharing';
 import { formatItemDetails } from '@/lib/itemSpecifications';
 import { getQuotationUnit } from '@/lib/quotationUnits';
 
@@ -280,7 +281,7 @@ const QuotationDetail = () => {
         editorSettings: editorSettings,
       });
 
-      const filename = `${quotation.client_name || 'Quotation'}${quotation.tier_name ? `-${quotation.tier_name}` : ''}.pdf`.replace(/[<>:"/\\|?*]/g, '-');
+      const filename = quotationPdfFilename(quotation.client_name, quotation.reference_no);
       const file = new File([pdf.output('blob')], filename, { type: 'application/pdf' });
       if (share && navigator.share && navigator.canShare?.({ files: [file] })) {
         try {

@@ -1,3 +1,4 @@
+import { quotationPdfFilename } from './quotationSharing';
 import { formatItemDetails, type ItemSpecification } from './itemSpecifications';
 import { displayProjectTypeDetails } from './projectTypeDetails';
 import { groupFloorSections, splitFloorRoomTitle } from './quotationFloorGroups';
@@ -140,6 +141,7 @@ export interface QuotationData {
   editorSettings?: PDFEditorSettings;
   // Preview mode - if true, returns doc without saving
   previewOnly?: boolean;
+  downloadOnly?: boolean;
 }
 
 // --- Helpers ---
@@ -1698,14 +1700,14 @@ export const generateQuotationPDF = async (data: QuotationData) => {
   }
 
   // Generate PDF and handle sharing + download
-  const fileName = `Quotation_${data.clientName.replace(/\s+/g, '_')}.pdf`;
+  const fileName = quotationPdfFilename(data.clientName, data.referenceNo);
   const pdfBlob = doc.output('blob');
   
   // Always save the file first
   doc.save(fileName);
   
   // Then try Web Share API (primarily works on mobile)
-  if (typeof navigator !== 'undefined' && navigator.share) {
+  if (!data.downloadOnly && typeof navigator !== 'undefined' && navigator.share) {
     try {
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       const shareData = { files: [file], title: `Quotation for ${data.clientName}` };
