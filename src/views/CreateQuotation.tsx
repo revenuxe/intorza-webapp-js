@@ -366,7 +366,7 @@ const QuotationEditor = () => {
           if (continueAction === 'createWithAI') {
             setBuilderMode('details');
           } else if (continueAction === 'saveDraft') {
-            await handleSaveQuotation('draft');
+            await handleSaveQuotation('draft', false, true);
           } else if (continueAction === 'downloadPdf') {
             const savedId = await handleSaveQuotation('draft');
             if (savedId) {
@@ -674,7 +674,7 @@ const QuotationEditor = () => {
     { projectTitle, clientName, clientAddress, placeOfProject, projectType }, sections,
     { gstEnabled, gstRate: Number(gstRate) || 0, discountPercentage, enableSocialMediaDiscount, socialMediaDiscountRate },
   );
-  const handleSaveQuotation = async (status: string, showShare: boolean = false): Promise<string | null> => {
+  const handleSaveQuotation = async (status: string, showShare: boolean = false, startNewDraft: boolean = false): Promise<string | null> => {
     if (quotationSaveInProgress.current) return null;
     quotationSaveInProgress.current = true;
     setIsSaving(true);
@@ -773,14 +773,14 @@ const QuotationEditor = () => {
       })));
       setAIPriceEvidence(current => Object.fromEntries(Object.entries(current).map(([id, price]) => [mapping.items[id] ?? id, price])));
       setItemImages(current => Object.fromEntries(Object.entries(current).map(([id, images]) => [mapping.items[id] ?? id, images])));
-      if (!existingId && !showShare) {
+      if (!existingId && !showShare && !startNewDraft) {
         adoptedSaveRoute.current = { id: savedQuotationId, owner: user.id };
         const params = new URLSearchParams(searchParams); params.set('id', savedQuotationId); setSearchParams(params, { replace: true });
       }
       toast({ title: existingId ? 'Quotation updated' : 'Quotation saved', description: `Verified ${payloadSections.length} sections and ${payloadSections.reduce((count, section) => count + section.items.length, 0)} items.` });
 
       // Silently save last used preferences and track item usage
-      saveLastUsedPreferences({
+      await saveLastUsedPreferences({
         warranty,
         projectType,
         placeOfProject,
@@ -851,6 +851,16 @@ const QuotationEditor = () => {
         setQuotationValidTill(defaults.quotationValidTill);
       }
       
+      if (startNewDraft && status === 'draft') {
+        // Changing this key remounts the complete editor, including AI, images,
+        // pricing, tiers and save identities, only after a verified save.
+        const params = new URLSearchParams(searchParams);
+        params.delete('id');
+        params.delete('continueAction');
+        params.set('freshDraft', crypto.randomUUID());
+        setSearchParams(params, { replace: true });
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
       return savedQuotationId;
     } catch (error) {
       if (saveSession.id) savedQuotationIdRef.current = saveSession.id;
@@ -1408,7 +1418,7 @@ const QuotationEditor = () => {
 
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-4">
-              <Button variant="outline" className="w-full" onClick={() => requireAuth(async () => { await handleSaveQuotation('draft'); }, 'saveDraft', getFormData())}>
+              <Button variant="outline" className="w-full" disabled={isSaving || isLoadingQuotation} onClick={() => requireAuth(async () => { await handleSaveQuotation('draft', false, true); }, 'saveDraft', getFormData())}>
                 Save as Draft
               </Button>
               <Button variant="outline" className="w-full" onClick={() => setShowPreview(true)}>
@@ -1482,8 +1492,9 @@ const QuotationEditor = () => {
 };
 export default function CreateQuotation() {
   const {user,loading}=useAuth();
+  const [params] = useSearchParams();
   if(loading) return <GlobalLoader message="Loading quotation workspace…" fullScreen={false} />;
   // Retain edits through token refresh, but never carry one account's form,
   // profile, gallery or pending save session into another identity.
-  return <QuotationEditor key={user?.id || 'guest'} />;
+  return <QuotationEditor key={`${user?.id || 'guest'}:${params.get('freshDraft') || ''}`} />;
 }
