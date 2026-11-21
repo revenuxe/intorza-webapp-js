@@ -142,6 +142,19 @@ it('prioritises an explicit Luxury brief over the Standard selector and carries 
   expect(result.estimate.draft.sections[0].items[0].ratePerSft).not.toBe(1200);
 });
 
+it('keeps a kitchen specification and its attributes when the primary note only requests a U-shaped layout', async () => {
+  const analysis = planFixture(); analysis.rooms = [{ ...analysis.rooms[0], name: 'Kitchen', kind: 'kitchen' }];
+  interpretRequirements.mockResolvedValueOnce({ exclusions: [], roomRequirements: [{ roomName: 'Kitchen', items: [{ workKey: 'base_cabinets', details: "Base cabinets should be arranged in a U-shaped layout as per the customer's request." }] }] });
+  generate.mockResolvedValueOnce({ sections: [{ title: 'Kitchen', roomName: 'Kitchen', items: [{ ...proposalFixture().sections[0].items[0], productName: 'Kitchen base cabinets', description: 'Base cabinets with storage and soft-close hardware.', specifications: [{ label: 'Finish', value: 'Laminate' }] }] }], assumptions: [] });
+  const response = await POST(request({ ...payload(), analysis, brief: { ...briefFixture(), scope: 'kitchen', automatic: true, roomNames: ['Kitchen'], requestNotes: 'Needed U shaped design for the kitchen' } }));
+  expect(response.status).toBe(200);
+  const { estimate } = await response.json();
+  const cabinet = estimate.draft.sections.flatMap(section => section.items).find(item => item.productName === 'Kitchen base cabinets');
+  expect(cabinet.productDetails).toContain('U-shaped layout');
+  expect(cabinet.productDetails).toContain('soft-close hardware');
+  expect(cabinet.productDetails).not.toMatch(/User requirement|customer.*request/);
+  expect(cabinet.specifications).toEqual([{ label: 'Finish', value: 'Laminate' }]);
+});
 it('researches the actual material requirement instead of substituting same-tier kitchen controls or catalogue prices', async () => {
   const analysis = planFixture(); analysis.rooms[0] = { ...analysis.rooms[0], name: 'Kitchen', kind: 'kitchen' };
   interpretRequirements.mockResolvedValueOnce({ exclusions: [], designDirection: 'Marine plywood kitchen with Blum hardware.', roomRequirements: [{ roomName: 'Kitchen', items: [{ workKey: 'base_cabinets', details: 'Marine plywood carcass with Blum hardware and matte walnut finish.' }] }] });

@@ -51,7 +51,6 @@ export function applyCompletion(previous: Estimate, raw: unknown, brief: Project
       item.measurementMode = 'dimensions'; item.widthFt = suggestion.widthFt; item.heightFt = suggestion.heightFt; item.sftArea = null;
       row.quantityStatus = 'estimated';
       row.reason = `AI work allowance: ${suggestion.widthFt} ft × ${suggestion.heightFt} ft. ${suggestion.measurementAssumption}`.slice(0, 600);
-      item.productDetails = `${item.productDetails.slice(0, 790)} Estimated work dimensions; ${suggestion.measurementAssumption.slice(0, 170)}`.slice(0, 1000);
     }
     if (item.ratePerSft == null) {
       item.ratePerSft = suggestion.ratePerSqft;

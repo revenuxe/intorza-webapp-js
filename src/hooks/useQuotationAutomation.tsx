@@ -154,7 +154,7 @@ export const useQuotationAutomation = () => {
       quotationValidTill: validTillDate.toISOString().split('T')[0],
       warranty: preferences.last_warranty || preferences.default_warranty || '10',
       projectType: preferences.last_project_type || preferences.default_project_type || '',
-      placeOfProject: preferences.last_place_of_project || preferences.default_place_of_project || '',
+      placeOfProject: preferences.default_place_of_project?.trim() || preferences.last_place_of_project?.trim() || '',
       gstEnabled: preferences.last_gst_enabled ?? preferences.default_gst_enabled ?? false,
       gstRate: preferences.last_gst_rate || preferences.default_gst_rate || '18',
       discountPercentage: preferences.last_discount_percentage ?? preferences.default_discount_percentage ?? 0,
@@ -221,7 +221,7 @@ export const useQuotationAutomation = () => {
 
       if (values.warranty !== undefined) updateData.last_warranty = values.warranty;
       if (values.projectType !== undefined) updateData.last_project_type = values.projectType;
-      if (values.placeOfProject !== undefined) updateData.last_place_of_project = values.placeOfProject;
+      if (values.placeOfProject?.trim()) updateData.last_place_of_project = values.placeOfProject.trim();
       if (values.gstEnabled !== undefined) updateData.last_gst_enabled = values.gstEnabled;
       if (values.gstRate !== undefined) updateData.last_gst_rate = values.gstRate;
       if (values.discountPercentage !== undefined) updateData.last_discount_percentage = values.discountPercentage;
@@ -229,9 +229,16 @@ export const useQuotationAutomation = () => {
       if (values.socialMediaDiscountRate !== undefined) updateData.last_social_media_discount_rate = values.socialMediaDiscountRate;
 
       // Upsert preferences
-      await supabase
+      const { data, error } = await supabase
         .from('quotation_preferences')
-        .upsert(updateData, { onConflict: 'user_id' });
+        .upsert(updateData, { onConflict: 'user_id' })
+        .select('*')
+        .single();
+      if (error) throw error;
+      if (data && active.current && identity.current === user.id) {
+        setPreferences({ ...DEFAULT_PREFERENCES, ...data });
+        setLoadedOwner(user.id);
+      }
     } catch (error) {
       console.error('Error saving preferences:', error);
     }

@@ -1,7 +1,7 @@
 "use client";
 import { addDays, format, parseISO } from 'date-fns';
 import { useQuotationLibrarySuggestions } from "@/hooks/useQuotationLibrarySuggestions";
-import { ProjectTypePicker } from "@/components/quotation/ProjectTypePicker";
+import { ProjectTypeFields, residentialProjectType } from "@/components/quotation/ProjectTypeFields";
 import { getDraftReference, clearDraftReference } from "@/lib/draft-quotation-reference";
 
 
@@ -296,7 +296,7 @@ const QuotationEditor = () => {
       setQuotationValidTill(defaults.quotationValidTill);
       setWarranty(normalizeWarrantyInput(defaults.warranty));
       setProjectType("Residential");
-      setPlaceOfProject(defaults.placeOfProject);
+      setPlaceOfProject(current => current || defaults.placeOfProject);
       setGstEnabled(defaults.gstEnabled);
       setGstRate(defaults.gstRate);
       setDiscountPercentage(defaults.discountPercentage);
@@ -1228,19 +1228,16 @@ const QuotationEditor = () => {
                   <Label htmlFor="projectDeadline">Project Deadline</Label>
                   <Input id="projectDeadline" type="date" value={projectDeadline} onChange={e => setProjectDeadline(e.target.value)} />
                 </div>}
-              {customizeSettings.showPlaceOfProject && <div className="min-w-0 space-y-2">
-                  <Label htmlFor="placeOfProject">Place of Project</Label>
-                  <Input id="placeOfProject" placeholder="Enter location" value={placeOfProject} onChange={e => setPlaceOfProject(e.target.value)} />
-                </div>}
-              {(customizeSettings.showWarranty || customizeSettings.showProjectType) && <div className={`col-span-2 grid items-end gap-x-5 sm:gap-x-6 ${customizeSettings.showWarranty && customizeSettings.showProjectType ? "grid-cols-2" : "grid-cols-1"}`}>
               {customizeSettings.showWarranty && <div className="min-w-0 space-y-2">
                   <Label htmlFor="warranty" className="whitespace-nowrap">Warranty</Label>
                   <Input id="warranty" className="h-12" type="number" value={warranty} onChange={e => setWarranty(e.target.value)} placeholder="10" />
                 </div>}
-              {customizeSettings.showProjectType && <div className="min-w-0 space-y-2">
-                  <Label htmlFor="projectType">Project Type</Label>
-                  <ProjectTypePicker id="projectType" value={projectType} onChange={setProjectType} />
+              {(customizeSettings.showPlaceOfProject || customizeSettings.showProjectType) && <div className={`col-span-2 grid items-end gap-x-5 gap-y-5 sm:gap-x-6 ${customizeSettings.showPlaceOfProject && customizeSettings.showProjectType && !residentialProjectType(projectType) ? "grid-cols-2" : "grid-cols-1"}`}>
+              {customizeSettings.showPlaceOfProject && <div className="min-w-0 space-y-2">
+                  <Label htmlFor="placeOfProject">Place of Project</Label>
+                  <Input id="placeOfProject" placeholder="Enter location" value={placeOfProject} onChange={e => setPlaceOfProject(e.target.value)} />
                 </div>}
+              {customizeSettings.showProjectType && <ProjectTypeFields value={projectType} onChange={setProjectType} />}
               </div>}
               {!profile.logo_url && <div className="col-span-2 space-y-2 p-3 bg-muted/30 rounded-lg">
                   <p className="text-sm text-muted-foreground">

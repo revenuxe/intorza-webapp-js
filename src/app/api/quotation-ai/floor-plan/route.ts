@@ -14,6 +14,7 @@ import { researchMarketBatches, OpenAIWebMarketPricing, type ResearchInput } fro
 import { OpenAIEstimateCompletion } from '@/lib/quotation-ai/estimate-completion';
 import { finishTierGuidance, rateSupportsFinishTier, tierPricingSpecification } from '@/lib/quotation-ai/finish-tier';
 import { formatItemDetails } from '@/lib/itemSpecifications';
+import { requiredProductDetails } from '@/lib/quotation-ai/required-product-details';
 import { closeReferencePrice, matchingReferenceRate, normalizeReferenceText, referenceCity, unknownReferenceCity, referencePriceEvidence, preferredLibraryRates, type ReferencePrice } from '@/lib/quotation-ai/reference-pricing';
 
 export const dynamic = 'force-dynamic';
@@ -309,8 +310,10 @@ export async function POST(request: Request) {
     for (const section of proposal.sections) for (const item of section.items) {
       const requirement = itemRequirements(item.productName, section.roomName, brief.requirements);
       if (requirement) {
-        item.description = `${/Billing: (piece|lump_sum); price separately/i.test(item.description) ? item.description.match(/Billing: (?:piece|lump_sum); price separately[^.]*\./)?.[0] ?? '' : ''} User requirement: ${requirement}`.trim().slice(0, 1000);
-        item.specifications = [];
+        const details = requiredProductDetails(requirement, item.description);
+        const billing = item.description.match(/Billing: (?:piece|lump_sum); price separately[^.]*\./)?.[0] ?? '';
+        item.description = `${billing && !details.description.includes(billing) ? `${billing} ` : ''}${details.description}`.slice(0, 1000);
+        if (!details.preserveSpecifications) item.specifications = [];
       }
     }
     const researchLimitations: string[] = [];

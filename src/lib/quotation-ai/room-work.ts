@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { normalizeReferenceText, referenceProduct } from './reference-pricing';
 import type { PlanAnalysis, ProjectBrief, generatedSchema } from './floor-plan';
 import { excludedWork, exclusionsForBrief, itemRequirements, requestedWork } from './requirements';
+import { requiredProductDetails } from './required-product-details';
 
 const size = z.number().finite().positive().max(100000).nullable();
 export const roomWorkSchema = z.object({
@@ -113,7 +114,8 @@ export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, roo
         if (!task) return [];
         if (excludedWork(task.key, room.name, exclusions)) return [];
         const requirement = itemRequirements(task.name, room.name, brief.requirements);
-        return [{ ...item, productName: task.name, ...(requirement ? { description: `User requirement: ${requirement}. ${task.hint}`.slice(0, 1000), specifications: [] } : {}) }];
+        const details = requirement ? requiredProductDetails(requirement, item.description) : null;
+        return [{ ...item, productName: task.name, ...(details ? { description: details.description, ...(details.preserveSpecifications ? {} : { specifications: [] }) } : {}) }];
       });
       const essentials = baseline.sections.find(section => section.roomName === room.name)!.items;
       const items: z.infer<typeof generatedSchema>['sections'][number]['items'] = [...proposed];
@@ -142,10 +144,11 @@ export function ensureRoomWorkCoverage(raw: z.infer<typeof generatedSchema>, roo
       const proposed = generated.find(item => item.productName.trim().toLowerCase() === task.name.toLowerCase());
       const requirement = itemRequirements(task.name, room.name, brief.requirements);
       const area = task.unit !== 'sqft' ? null : work.areaSqft ?? (work.widthFt && work.heightFt ? Math.round(work.widthFt * work.heightFt * 10000) / 10000 : null);
+      const requiredDetails = requirement ? requiredProductDetails(requirement, proposed?.description) : null;
       const details = [task.unit === 'sqft' ? '' : `Billing: ${task.unit}; price separately. No square-foot amount is assumed.`,
-        requirement ? `User requirement: ${requirement}` : '',
+        requiredDetails?.description,
         ...(requirement ? [] : [work.details, answer.notes, proposed?.description]), task.hint].filter(Boolean).join(' ').slice(0, 1000);
-      return { productName: task.name, description: details, ...(!requirement && proposed?.specifications ? { specifications: proposed.specifications } : {}), ...(proposed?.side ? { side: proposed.side } : {}), rateId: task.unit === 'sqft' ? proposed?.rateId ?? null : null,
+      return { productName: task.name, description: details, ...((!requirement || requiredDetails?.preserveSpecifications) && proposed?.specifications ? { specifications: proposed.specifications } : {}), ...(proposed?.side ? { side: proposed.side } : {}), rateId: task.unit === 'sqft' ? proposed?.rateId ?? null : null,
         quantity: area, measurementStatus: area == null ? 'unknown' as const : 'estimated' as const,
         measurementReason: area == null ? `${room.name}: ${task.hint}` : `${room.name}: confirmed work coverage ${area} sqft; verify on site.` };
     }) };
