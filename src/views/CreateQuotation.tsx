@@ -2,6 +2,7 @@
 import { addDays, format, parseISO } from 'date-fns';
 import { useQuotationLibrarySuggestions } from "@/hooks/useQuotationLibrarySuggestions";
 import { ProjectTypeFields } from "@/components/quotation/ProjectTypeFields";
+import { ProjectDeadlinePicker } from "@/components/quotation/ProjectDeadlinePicker";
 import { getDraftReference, clearDraftReference } from "@/lib/draft-quotation-reference";
 
 
@@ -1266,10 +1267,7 @@ const QuotationEditor = () => {
                   <Label htmlFor="quotationValidTill">Quotation Valid Till</Label>
                   <Input id="quotationValidTill" type="date" value={quotationValidTill} onChange={e => setQuotationValidTill(e.target.value)} />
                 </div>}
-              {customizeSettings.showProjectDeadline && <div className="min-w-0 space-y-2">
-                  <Label htmlFor="projectDeadline">Project Deadline</Label>
-                  <Input id="projectDeadline" type="date" value={projectDeadline} onChange={e => setProjectDeadline(e.target.value)} />
-                </div>}
+              {customizeSettings.showProjectDeadline && <ProjectDeadlinePicker value={projectDeadline} proposalDate={dateOfProposal} onChange={setProjectDeadline} />}
               {customizeSettings.showWarranty && <div className="min-w-0 space-y-2">
                   <Label htmlFor="warranty" className="whitespace-nowrap">Warranty</Label>
                   <Input id="warranty" className="h-12" type="number" value={warranty} onChange={e => setWarranty(e.target.value)} placeholder="10" />

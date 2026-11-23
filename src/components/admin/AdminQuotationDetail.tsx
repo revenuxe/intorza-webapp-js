@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatItemDetails } from '@/lib/itemSpecifications';
 import type { QuotationTier } from '@/lib/quotationTiers';
+import { parseProjectTypeDetails } from '@/lib/projectTypeDetails';
 
 type AdminTier = QuotationTier & { quotation_number: string; created_at: string; version_count: number };
 type Detail = { root_id: string; user_email: string | null; tiers: AdminTier[] };
@@ -31,6 +32,7 @@ export function AdminQuotationDetail({ quotationId, onClose, formatCurrency }: {
   }, [quotationId, retry]);
   const tier = data?.tiers.find(option => option.id === selected);
   const snapshot = tier?.snapshot;
+  const project = parseProjectTypeDetails(String(snapshot?.project_type || ''));
   return <Dialog open={Boolean(quotationId)} onOpenChange={open => { if (!open) onClose(); }}>
     <DialogContent className="flex max-h-[88dvh] w-[calc(100%-1.5rem)] max-w-3xl flex-col gap-3 overflow-hidden p-3.5 sm:p-6">
       <DialogHeader className="shrink-0 pr-7 text-left"><DialogTitle className="text-base sm:text-lg">Quotation details</DialogTitle><DialogDescription className="text-xs sm:text-sm">Select a tier to inspect its saved quotation. Admin view is read-only.</DialogDescription></DialogHeader>
@@ -42,7 +44,9 @@ export function AdminQuotationDetail({ quotationId, onClose, formatCurrency }: {
             <p className="text-2xl font-semibold tabular-nums text-primary">{formatCurrency(Number(snapshot.grand_total || 0))}</p>
             <dl className="grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2">{[
               ['Account', data.user_email], ['Client', snapshot.client_name], ['Client address', snapshot.client_address],
-              ['Project location', snapshot.place_of_project], ['Project type', snapshot.project_type],
+              ['Project location', snapshot.place_of_project], ['Project type', project.type],
+              ['Floors', project.floors], ['BHK / home size', project.size],
+              ...Object.entries(project.floorSizes || {}).map(([floor, size]) => [`${floor} home size`, size]),
               ['Proposal date', snapshot.date_of_proposal], ['Valid till', snapshot.valid_till], ['Deadline', snapshot.project_deadline],
               ['Quotation number', tier.quotation_number], ['Saved versions', tier.version_count],
             ].map(([label,value]) => <div key={String(label)} className="min-w-0 break-words"><dt className="text-xs text-muted-foreground">{String(label)}</dt><dd className="mt-1">{value === null || value === undefined || value === '' ? '—' : String(value)}</dd></div>)}</dl>
