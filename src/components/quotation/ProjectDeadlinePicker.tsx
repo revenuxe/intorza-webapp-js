@@ -24,7 +24,6 @@ export function ProjectDeadlinePicker({ value, proposalDate, onChange, id = 'pro
       {[7, 14, 30, 45].map(day => <option key={day} value={day}>{day} days</option>)}
       <option value="custom">Custom</option>
     </select>
-    <p className="text-xs text-muted-foreground">{isValid(selected) ? `Due ${format(selected, 'dd MMM yyyy')}. ` : ''}Days from {isValid(proposal) ? 'the proposal date' : 'today'}.</p>
     {choice === 'custom' && <div className="w-fit max-w-full rounded-xl border bg-background">
       <Calendar mode="single" required aria-label={`${label} calendar`} selected={isValid(selected) ? selected : undefined} defaultMonth={isValid(selected) ? selected : base} onSelect={date => onChange(format(date, 'yyyy-MM-dd'))} />
     </div>}
