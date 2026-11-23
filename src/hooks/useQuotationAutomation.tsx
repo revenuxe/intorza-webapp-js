@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
+import { addDays, format } from 'date-fns';
 
 interface QuotationPreferences {
   default_warranty: string;
@@ -12,6 +13,8 @@ interface QuotationPreferences {
   default_social_media_discount_enabled: boolean;
   default_social_media_discount_rate: number;
   default_quotation_valid_days: number;
+  chosen_valid_days: number | null;
+  chosen_deadline_days: number | null;
   // Last used values
   last_warranty: string | null;
   last_project_type: string | null;
@@ -51,6 +54,8 @@ const DEFAULT_PREFERENCES: QuotationPreferences = {
   default_social_media_discount_enabled: false,
   default_social_media_discount_rate: 6,
   default_quotation_valid_days: 7,
+  chosen_valid_days: null,
+  chosen_deadline_days: null,
   last_warranty: null,
   last_project_type: null,
   last_place_of_project: null,
@@ -145,13 +150,12 @@ export const useQuotationAutomation = () => {
   const getSmartDefaults = useCallback(() => {
     const preferences = activePreferences;
     const today = new Date();
-    const validTillDate = new Date(today);
-    validTillDate.setDate(validTillDate.getDate() + (preferences.default_quotation_valid_days || 7));
 
     // Prefer last used values over defaults
     return {
-      dateOfProposal: today.toISOString().split('T')[0],
-      quotationValidTill: validTillDate.toISOString().split('T')[0],
+      dateOfProposal: format(today, 'yyyy-MM-dd'),
+      quotationValidTill: preferences.chosen_valid_days === null ? '' : format(addDays(today, preferences.chosen_valid_days), 'yyyy-MM-dd'),
+      projectDeadline: preferences.chosen_deadline_days === null ? '' : format(addDays(today, preferences.chosen_deadline_days), 'yyyy-MM-dd'),
       warranty: preferences.last_warranty || preferences.default_warranty || '10',
       projectType: preferences.last_project_type || preferences.default_project_type || '',
       placeOfProject: preferences.default_place_of_project?.trim() || preferences.last_place_of_project?.trim() || '',
@@ -210,6 +214,8 @@ export const useQuotationAutomation = () => {
     discountPercentage?: number;
     enableSocialMediaDiscount?: boolean;
     socialMediaDiscountRate?: number;
+    validDays?: number | null;
+    deadlineDays?: number | null;
   }) => {
     if (!user || !active.current || identity.current !== user.id) return;
 
@@ -220,6 +226,8 @@ export const useQuotationAutomation = () => {
       };
 
       if (values.warranty !== undefined) updateData.last_warranty = values.warranty;
+      if (values.validDays !== undefined) updateData.chosen_valid_days = values.validDays;
+      if (values.deadlineDays !== undefined) updateData.chosen_deadline_days = values.deadlineDays;
       if (values.projectType !== undefined) updateData.last_project_type = values.projectType;
       if (values.placeOfProject?.trim()) updateData.last_place_of_project = values.placeOfProject.trim();
       if (values.gstEnabled !== undefined) updateData.last_gst_enabled = values.gstEnabled;

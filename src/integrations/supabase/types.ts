@@ -796,6 +796,8 @@ export type Database = {
           default_gst_rate: string | null
           default_place_of_project: string | null
           default_project_type: string | null
+          chosen_valid_days: number | null
+          chosen_deadline_days: number | null
           default_quotation_valid_days: number | null
           default_social_media_discount_enabled: boolean | null
           default_social_media_discount_rate: number | null
@@ -819,6 +821,8 @@ export type Database = {
           default_gst_rate?: string | null
           default_place_of_project?: string | null
           default_project_type?: string | null
+          chosen_valid_days?: number | null
+          chosen_deadline_days?: number | null
           default_quotation_valid_days?: number | null
           default_social_media_discount_enabled?: boolean | null
           default_social_media_discount_rate?: number | null
@@ -842,6 +846,8 @@ export type Database = {
           default_gst_rate?: string | null
           default_place_of_project?: string | null
           default_project_type?: string | null
+          chosen_valid_days?: number | null
+          chosen_deadline_days?: number | null
           default_quotation_valid_days?: number | null
           default_social_media_discount_enabled?: boolean | null
           default_social_media_discount_rate?: number | null

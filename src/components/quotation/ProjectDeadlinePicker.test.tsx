@@ -13,15 +13,22 @@ function Form() {
   </>;
 }
 
-it('updates and highlights custom dates and keeps Custom selected', () => {
+it('uses a plain date input for custom dates and returns to presets when cleared', () => {
   render(<Form />);
   fireEvent.change(screen.getByLabelText('Project Deadline'), { target: { value: 'custom' } });
-  fireEvent.click(screen.getByRole('button', { name: /Wednesday, January 27th, 2027/i }));
+  fireEvent.change(screen.getByLabelText('Project Deadline'), { target: { value: '2027-01-27' } });
   expect(screen.getByLabelText('Saved deadline')).toHaveTextContent('2027-01-27');
-  expect(screen.getByRole('gridcell', { selected: true })).toHaveTextContent('27');
-  expect(screen.getByLabelText('Project Deadline')).toHaveValue('custom');
-  fireEvent.click(screen.getByRole('button', { name: /Wednesday, January 27th, 2027/i }));
-  expect(screen.getByLabelText('Saved deadline')).toHaveTextContent('2027-01-27');
+  expect(screen.getByLabelText('Project Deadline')).toHaveValue('2027-01-27');
+  expect(screen.getByLabelText('Project Deadline')).toHaveAttribute('type', 'date');
+  expect(screen.queryByRole('combobox', { name: 'Project Deadline' })).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Project Deadline')).toHaveValue('2027-01-27');
+  fireEvent.change(screen.getByLabelText('Project Deadline'), { target: { value: '2027-01-20' } });
+  expect(screen.getByLabelText('Project Deadline')).toHaveValue('2027-01-20');
+  fireEvent.change(screen.getByLabelText('Project Deadline'), { target: { value: '' } });
+  fireEvent.change(screen.getByLabelText('Project Deadline'), { target: { value: '14' } });
+  expect(screen.getByLabelText('Project Deadline')).toHaveValue('14');
+  expect(screen.getByLabelText('Saved deadline')).toHaveTextContent('2026-12-20');
+  expect(screen.queryByLabelText('Project Deadline duration')).not.toBeInTheDocument();
 });
 
 it('supports every preset independently for validity and deadline', () => {
@@ -33,6 +40,7 @@ it('supports every preset independently for validity and deadline', () => {
   }
   expect(screen.getByLabelText('Saved deadline')).toHaveTextContent('2027-01-20');
   fireEvent.change(screen.getByLabelText('Quotation Valid Till'), { target: { value: 'custom' } });
-  fireEvent.click(screen.getByRole('button', { name: /Friday, January 29th, 2027/i }));
+  fireEvent.change(screen.getByLabelText('Quotation Valid Till'), { target: { value: '2027-01-29' } });
   expect(screen.getByLabelText('Saved validity')).toHaveTextContent('2027-01-29');
+  expect(screen.getByLabelText('Quotation Valid Till')).toHaveValue('2027-01-29');
 });

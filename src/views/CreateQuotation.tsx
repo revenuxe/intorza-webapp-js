@@ -1,5 +1,5 @@
 "use client";
-import { addDays, format, parseISO } from 'date-fns';
+import { addDays, differenceInCalendarDays, format, isValid, parseISO } from 'date-fns';
 import { useQuotationLibrarySuggestions } from "@/hooks/useQuotationLibrarySuggestions";
 import { ProjectTypeFields } from "@/components/quotation/ProjectTypeFields";
 import { ProjectDeadlinePicker } from "@/components/quotation/ProjectDeadlinePicker";
@@ -84,7 +84,8 @@ interface PaymentStage {
   milestone: string;
   percentage: number;
 }
-const defaultProjectDeadline = (proposal: string) => proposal ? format(addDays(parseISO(proposal), 45), 'yyyy-MM-dd') : '';
+const dateOffset = (value: string, proposal: string) => { const date = parseISO(value); const base = parseISO(proposal); return isValid(date) && isValid(base) ? Math.max(0, differenceInCalendarDays(date, base)) : null; };
+const shiftQuotationDate = (value: string, previous: string, next: string) => { const offset = dateOffset(value, previous); return offset !== null && next ? format(addDays(parseISO(next), offset), 'yyyy-MM-dd') : value; };
 
 const QuotationEditor = () => {
   const { user: accountUser, loading: accountLoading } = useAuth();
@@ -281,7 +282,7 @@ const QuotationEditor = () => {
         if (formData.clientAddress) setClientAddress(formData.clientAddress);
         if (formData.dateOfProposal) setDateOfProposal(formData.dateOfProposal);
         if (formData.quotationValidTill) setQuotationValidTill(formData.quotationValidTill);
-        setProjectDeadline(formData.projectDeadline || defaultProjectDeadline(formData.dateOfProposal || ""));
+        setProjectDeadline(formData.projectDeadline || "");
         if (formData.placeOfProject) setPlaceOfProject(formData.placeOfProject);
         if (formData.warranty) setWarranty(normalizeWarrantyInput(formData.warranty));
         if (formData.projectType) setProjectType(formData.projectType);
@@ -301,7 +302,7 @@ const QuotationEditor = () => {
     if (!automationLoading && !quotationId && !smartDefaultsApplied.current && !continueAction) {
       const defaults = getSmartDefaults();
       setDateOfProposal(defaults.dateOfProposal);
-      setProjectDeadline(defaultProjectDeadline(defaults.dateOfProposal));
+      setProjectDeadline(defaults.projectDeadline);
       setQuotationValidTill(defaults.quotationValidTill);
       setWarranty(normalizeWarrantyInput(defaults.warranty));
       setProjectType("Residential");
@@ -877,7 +878,7 @@ const QuotationEditor = () => {
         // Re-apply smart defaults after reset
         const defaults = getSmartDefaults();
         setDateOfProposal(defaults.dateOfProposal);
-      setProjectDeadline(defaultProjectDeadline(defaults.dateOfProposal));
+      setProjectDeadline(defaults.projectDeadline);
         setQuotationValidTill(defaults.quotationValidTill);
       }
       
@@ -1056,7 +1057,7 @@ const QuotationEditor = () => {
       setIsDownloading(false);
     }
   };
-  // Memoized so the object reference is stable across unrelated re-renders —
+  // Memoized so the object reference is stable across unrelated re-renders â€”
   // it's passed straight into PDFPreviewEditor's live-preview effect, which
   // treats a new reference as "data changed" and restarts PDF regeneration.
   const quotationPreviewData = useMemo(() => ({
@@ -1166,7 +1167,7 @@ const QuotationEditor = () => {
       {(isSaving || isLoadingQuotation) && <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" role="status" aria-live="polite">
         <div className="flex items-center gap-3 rounded-lg border bg-card px-5 py-4 shadow-sm">
           <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" />
-          <span>{isLoadingQuotation ? 'Loading quotation…' : 'Saving quotation…'}</span>
+          <span>{isLoadingQuotation ? 'Loading quotationâ€¦' : 'Saving quotationâ€¦'}</span>
         </div>
       </div>}
       {/* Download Loader Overlay */}
@@ -1225,10 +1226,10 @@ const QuotationEditor = () => {
           </div>
         </div>
 
-        {lastAIDraft.current && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100" role="status">AI-generated estimate — rates and measurements require review before final confirmation. Pending items are excluded from the provisional total.</div>}
+        {lastAIDraft.current && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-100" role="status">AI-generated estimate â€” rates and measurements require review before final confirmation. Pending items are excluded from the provisional total.</div>}
 
         {/* Project Details */}
-        {tierContext && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><div><p className="font-semibold">Editing {tierContext.name} tier</p><p className="mt-1 text-xs text-muted-foreground">Library pricing: {libraryTierForName(tierContext.name)} · Matching rates are used for item suggestions.</p><p className="mt-1 text-sm text-muted-foreground">Items and prices belong to this tier.{tierContext.parentId ? ' Client details are shared from the original tier.' : ' Client details apply to every tier.'}</p></div><div className="flex flex-wrap gap-2">{tierContext.parentId && <Button variant="outline" onClick={() => navigate(`/?id=${tierContext.parentId}`)}>Edit shared client</Button>}<Button variant="outline" onClick={() => navigate(`/quotations/${tierContext.parentId || quotationId}${tierContext.parentId ? `?tier=${quotationId}` : ''}`)}>View tiers</Button><Button variant="outline" onClick={() => navigate(`/library?pricingTier=${libraryTierForName(tierContext.name)}`)}>My Library</Button></div></div>}
+        {tierContext && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4"><div><p className="font-semibold">Editing {tierContext.name} tier</p><p className="mt-1 text-xs text-muted-foreground">Library pricing: {libraryTierForName(tierContext.name)} Â· Matching rates are used for item suggestions.</p><p className="mt-1 text-sm text-muted-foreground">Items and prices belong to this tier.{tierContext.parentId ? ' Client details are shared from the original tier.' : ' Client details apply to every tier.'}</p></div><div className="flex flex-wrap gap-2">{tierContext.parentId && <Button variant="outline" onClick={() => navigate(`/?id=${tierContext.parentId}`)}>Edit shared client</Button>}<Button variant="outline" onClick={() => navigate(`/quotations/${tierContext.parentId || quotationId}${tierContext.parentId ? `?tier=${quotationId}` : ''}`)}>View tiers</Button><Button variant="outline" onClick={() => navigate(`/library?pricingTier=${libraryTierForName(tierContext.name)}`)}>My Library</Button></div></div>}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between gap-2"><CardTitle className="shrink-0 text-base sm:text-lg">Project Details</CardTitle><div className="shrink-0 whitespace-nowrap rounded-lg border bg-muted/40 px-2 py-2 text-[10px] sm:px-3 sm:text-xs"><span className="text-muted-foreground">Ref QNO: </span><span className="font-mono font-semibold" aria-live="polite">{tierContext?.referenceNo || referenceNo || (referenceError ? <button type="button" onClick={()=>setReferenceRetry(value=>value+1)}>Retry</button> : 'Generating...')}</span></div></div>
@@ -1261,10 +1262,10 @@ const QuotationEditor = () => {
                 </div>}
               {customizeSettings.showDateOfProposal && <div className="flex min-w-0 flex-col justify-end space-y-2">
                   <Label htmlFor="dateOfProposal">Date of Proposal</Label>
-                  <Input id="dateOfProposal" type="date" value={dateOfProposal} onChange={e => { const next = e.target.value; if (!projectDeadline || projectDeadline === defaultProjectDeadline(dateOfProposal)) setProjectDeadline(defaultProjectDeadline(next)); setDateOfProposal(next); }} />
+                  <Input id="dateOfProposal" type="date" value={dateOfProposal} onChange={e => { const next = e.target.value; setProjectDeadline(shiftQuotationDate(projectDeadline, dateOfProposal, next)); setQuotationValidTill(shiftQuotationDate(quotationValidTill, dateOfProposal, next)); setDateOfProposal(next); }} />
                 </div>}
-              {customizeSettings.showQuotationValidTill && <ProjectDeadlinePicker id="quotationValidTill" label="Quotation Valid Till" value={quotationValidTill} proposalDate={dateOfProposal} onChange={setQuotationValidTill} />}
-              {customizeSettings.showProjectDeadline && <ProjectDeadlinePicker value={projectDeadline} proposalDate={dateOfProposal} onChange={setProjectDeadline} />}
+              {customizeSettings.showQuotationValidTill && <ProjectDeadlinePicker id="quotationValidTill" label="Quotation Valid Till" value={quotationValidTill} proposalDate={dateOfProposal} onChange={value => { setQuotationValidTill(value); void saveLastUsedPreferences({ validDays: dateOffset(value, dateOfProposal) }); }} />}
+              {customizeSettings.showProjectDeadline && <ProjectDeadlinePicker value={projectDeadline} proposalDate={dateOfProposal} onChange={value => { setProjectDeadline(value); void saveLastUsedPreferences({ deadlineDays: dateOffset(value, dateOfProposal) }); }} />}
               {customizeSettings.showWarranty && <div className="min-w-0 space-y-2">
                   <Label htmlFor="warranty" className="whitespace-nowrap">Warranty</Label>
                   <Input id="warranty" className="h-12" type="number" value={warranty} onChange={e => setWarranty(e.target.value)} placeholder="10" />
@@ -1342,7 +1343,7 @@ const QuotationEditor = () => {
                         <div key={img.id} className="relative group">
                           <img src={img.image_url} alt="" className="h-12 w-12 rounded-lg object-cover border border-border" />
                           <button onClick={() => setItemImages(prev => ({...prev, [item.id]: prev[item.id].filter(i => i.id !== img.id)}))}
-                            className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">×</button>
+                            className="absolute -top-1 -right-1 h-4 w-4 bg-destructive text-destructive-foreground rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">Ã—</button>
                         </div>
                       ))}
                     </div>
@@ -1547,7 +1548,7 @@ const QuotationEditor = () => {
 export default function CreateQuotation() {
   const {user,loading}=useAuth();
   const [params] = useSearchParams();
-  if(loading) return <GlobalLoader message="Loading quotation workspace…" fullScreen={false} />;
+  if(loading) return <GlobalLoader message="Loading quotation workspaceâ€¦" fullScreen={false} />;
   // Retain edits through token refresh, but never carry one account's form,
   // profile, gallery or pending save session into another identity.
   return <QuotationEditor key={`${user?.id || 'guest'}:${params.get('freshDraft') || ''}`} />;
