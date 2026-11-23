@@ -1263,10 +1263,7 @@ const QuotationEditor = () => {
                   <Label htmlFor="dateOfProposal">Date of Proposal</Label>
                   <Input id="dateOfProposal" type="date" value={dateOfProposal} onChange={e => { const next = e.target.value; if (!projectDeadline || projectDeadline === defaultProjectDeadline(dateOfProposal)) setProjectDeadline(defaultProjectDeadline(next)); setDateOfProposal(next); }} />
                 </div>}
-              {customizeSettings.showQuotationValidTill && <div className="flex min-w-0 flex-col justify-end space-y-2">
-                  <Label htmlFor="quotationValidTill">Quotation Valid Till</Label>
-                  <Input id="quotationValidTill" type="date" value={quotationValidTill} onChange={e => setQuotationValidTill(e.target.value)} />
-                </div>}
+              {customizeSettings.showQuotationValidTill && <ProjectDeadlinePicker id="quotationValidTill" label="Quotation Valid Till" value={quotationValidTill} proposalDate={dateOfProposal} onChange={setQuotationValidTill} />}
               {customizeSettings.showProjectDeadline && <ProjectDeadlinePicker value={projectDeadline} proposalDate={dateOfProposal} onChange={setProjectDeadline} />}
               {customizeSettings.showWarranty && <div className="min-w-0 space-y-2">
                   <Label htmlFor="warranty" className="whitespace-nowrap">Warranty</Label>
